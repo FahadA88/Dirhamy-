@@ -1,0 +1,383 @@
+// The Daily — template library. News text is NEVER free-form generated;
+// each week the engine draws templates and fills variables.
+
+import type { NewsCategory, Reliability } from "../engine/types";
+
+export interface NewsTemplate {
+  id: string;
+  category: NewsCategory;
+  reliabilities: Reliability[];
+  headline: string; // {shop} {pct} {asset} {dir} substituted at draw
+  body: string[];
+  affects: string;
+  effect:
+    | { kind: "retailSale"; locations: string[]; discount: [number, number] }
+    | { kind: "marketSkew"; assetGroup: "equity" | "gold" | "bonds" | "reit" | "crypto" | "all"; direction: 1 | -1 }
+    | { kind: "realEstate"; direction: 1 | -1 }
+    | { kind: "salary"; pct: number }
+    | { kind: "consumerAlert"; alert: "bnpl" | "scam" | "subscription" };
+}
+
+export const NEWS_TEMPLATES: NewsTemplate[] = [
+  // ---- MARKETS (equity up/down, gold, bonds, crypto) ----
+  { id: "mk-dfm-earnings-up", category: "Markets", reliabilities: ["confirmed", "forecast"],
+    headline: "DFM-listed companies post stronger-than-expected earnings",
+    body: [
+      "Quarterly results across Dubai Financial Market heavyweights came in ahead of analyst estimates, led by banking and logistics names.",
+      "Fund managers say the beat could carry equity funds higher in the coming weeks as institutional money rotates back into the region.",
+    ],
+    affects: "Equity funds (index, Sharia-compliant, emerging markets)",
+    effect: { kind: "marketSkew", assetGroup: "equity", direction: 1 } },
+  { id: "mk-adx-selloff", category: "Markets", reliabilities: ["confirmed", "forecast"],
+    headline: "ADX slides as global jitters reach Gulf trading floors",
+    body: [
+      "Abu Dhabi Securities Exchange tracked global markets lower this week, with broad-based selling across sectors.",
+      "Strategists caution that equity funds may see a soft stretch while sentiment resets.",
+    ],
+    affects: "Equity funds",
+    effect: { kind: "marketSkew", assetGroup: "equity", direction: -1 } },
+  { id: "mk-halal-inflows", category: "Markets", reliabilities: ["confirmed", "forecast"],
+    headline: "Sharia-compliant funds see record regional inflows",
+    body: [
+      "Halal-screened equity products attracted their largest quarterly inflows on record, driven by younger Gulf investors.",
+      "Analysts expect the momentum to support Sharia-compliant equity performance in the near term.",
+    ],
+    affects: "Sharia-compliant equity fund",
+    effect: { kind: "marketSkew", assetGroup: "equity", direction: 1 } },
+  { id: "mk-gold-haven", category: "Markets", reliabilities: ["confirmed", "forecast", "speculation"],
+    headline: "Gold glitters as investors hunt for safety",
+    body: [
+      "Bullion demand at the Gold Souk and on global exchanges climbed this week as investors hedged against uncertainty.",
+      "Traders see room for gold to keep edging up if the mood stays cautious.",
+    ],
+    affects: "Gold",
+    effect: { kind: "marketSkew", assetGroup: "gold", direction: 1 } },
+  { id: "mk-gold-cool", category: "Markets", reliabilities: ["forecast", "speculation"],
+    headline: "Analysts call the top on gold's recent run",
+    body: [
+      "After weeks of gains, several desks argue gold looks stretched and due for a breather.",
+      "If risk appetite returns, the metal could give back part of its rally.",
+    ],
+    affects: "Gold",
+    effect: { kind: "marketSkew", assetGroup: "gold", direction: -1 } },
+  { id: "mk-rates-bonds", category: "Markets", reliabilities: ["confirmed", "forecast"],
+    headline: "Stable rates outlook lifts bond and sukuk pricing",
+    body: [
+      "A steady interest-rate picture is feeding through to stronger pricing on corporate bonds and sukuk certificates.",
+      "Fixed-income desks expect modest but reliable gains while the outlook holds.",
+    ],
+    affects: "Corporate bonds and Sukuk",
+    effect: { kind: "marketSkew", assetGroup: "bonds", direction: 1 } },
+  { id: "mk-sukuk-issuance", category: "Markets", reliabilities: ["confirmed"],
+    headline: "Bumper sukuk issuance oversubscribed within hours",
+    body: [
+      "A major UAE sukuk offering drew orders several times its size, underlining appetite for Sharia-compliant fixed income.",
+      "Strong demand tends to firm up prices across the sukuk market.",
+    ],
+    affects: "Sukuk",
+    effect: { kind: "marketSkew", assetGroup: "bonds", direction: 1 } },
+  { id: "mk-crypto-surge", category: "Markets", reliabilities: ["forecast", "speculation"],
+    headline: "Crypto chatter heats up after institutional adoption rumours",
+    body: [
+      "Social feeds and trading desks are buzzing over rumoured institutional moves into digital assets.",
+      "If the rumours hold, crypto funds could spike — and if they don't, the air comes out fast.",
+    ],
+    affects: "Crypto fund",
+    effect: { kind: "marketSkew", assetGroup: "crypto", direction: 1 } },
+  { id: "mk-crypto-crackdown", category: "Markets", reliabilities: ["forecast", "speculation"],
+    headline: "Regulatory rumblings spook digital asset markets",
+    body: [
+      "Reports of tightening rules in major markets have digital-asset traders on edge.",
+      "Volatility cuts both ways: crypto funds may be in for a rough stretch.",
+    ],
+    affects: "Crypto fund",
+    effect: { kind: "marketSkew", assetGroup: "crypto", direction: -1 } },
+  { id: "mk-em-rally", category: "Markets", reliabilities: ["forecast", "speculation"],
+    headline: "Emerging markets tipped for a strong quarter",
+    body: [
+      "A weaker dollar outlook has strategists pencilling in gains for emerging-market equities.",
+      "Emerging-market funds are the highest-beta way to play it — in both directions.",
+    ],
+    affects: "Emerging markets fund",
+    effect: { kind: "marketSkew", assetGroup: "equity", direction: 1 } },
+  { id: "mk-oil-dip", category: "Markets", reliabilities: ["confirmed", "forecast"],
+    headline: "Oil retreat weighs on regional equity outlook",
+    body: [
+      "Softer crude prices pressured energy-linked names across Gulf exchanges this week.",
+      "Regional equity funds often feel the drag when oil wobbles.",
+    ],
+    affects: "Equity funds",
+    effect: { kind: "marketSkew", assetGroup: "equity", direction: -1 } },
+  { id: "mk-dividends", category: "Markets", reliabilities: ["confirmed"],
+    headline: "Dividend season delivers for index investors",
+    body: [
+      "Blue-chip payouts across DFM and ADX landed this week, a reminder that boring index holdings quietly pay you to wait.",
+      "Distributions typically buoy fund values in the weeks that follow.",
+    ],
+    affects: "Diversified index fund",
+    effect: { kind: "marketSkew", assetGroup: "equity", direction: 1 } },
+  { id: "mk-volatility", category: "Markets", reliabilities: ["speculation"],
+    headline: "Trading forum predicts 'the big one' is coming",
+    body: [
+      "A viral thread claims a major correction is days away, citing chart patterns and vibes.",
+      "Remember the reliability tag on this one. Speculation is right about half the time — that's the point.",
+    ],
+    affects: "All investments",
+    effect: { kind: "marketSkew", assetGroup: "all", direction: -1 } },
+  { id: "mk-yearend-rally", category: "Markets", reliabilities: ["forecast", "speculation"],
+    headline: "Desks whisper about a broad year-end rally",
+    body: [
+      "Seasonal patterns and fresh inflows have some managers positioning for a broad move higher.",
+      "History rhymes, but it doesn't repeat on command.",
+    ],
+    affects: "All investments",
+    effect: { kind: "marketSkew", assetGroup: "all", direction: 1 } },
+
+  // ---- RETAIL (sales at locations) ----
+  { id: "rt-electronics-sale", category: "Retail", reliabilities: ["confirmed"],
+    headline: "Mega electronics sale lands this week — up to {pct}% off",
+    body: [
+      "The big electronics retailers are clearing stock ahead of new releases, with discounts of around {pct}% across audio, phones and gaming.",
+      "Readers of The Daily get the drop before the crowds: the discount applies at the Electronics store this week only.",
+    ],
+    affects: "Electronics store prices this week",
+    effect: { kind: "retailSale", locations: ["electronics"], discount: [10, 20] } },
+  { id: "rt-fashion-sale", category: "Retail", reliabilities: ["confirmed"],
+    headline: "Mall-wide fashion clearance: {pct}% off this week",
+    body: [
+      "End-of-season racks hit the floor across the mall's fashion outlets, with roughly {pct}% off clothing, shoes and accessories.",
+      "If something's been sitting in your reservations, this is the week it might get cheaper.",
+    ],
+    affects: "Mall / Fashion prices this week",
+    effect: { kind: "retailSale", locations: ["mall"], discount: [10, 25] } },
+  { id: "rt-supermarket-promo", category: "Retail", reliabilities: ["confirmed"],
+    headline: "Supermarket price war knocks {pct}% off baskets",
+    body: [
+      "Competing grocery chains slashed prices this week in a fight for market share.",
+      "Groceries at the Supermarket cost about {pct}% less for the next week.",
+    ],
+    affects: "Supermarket prices this week",
+    effect: { kind: "retailSale", locations: ["supermarket"], discount: [8, 15] } },
+  { id: "rt-restaurant-week", category: "Retail", reliabilities: ["confirmed"],
+    headline: "Restaurant Week returns with {pct}% off set menus",
+    body: [
+      "Dozens of venues join the annual Restaurant Week, discounting menus by about {pct}%.",
+      "Casual to fine dining, the discount runs this week at Restaurants.",
+    ],
+    affects: "Restaurant prices this week",
+    effect: { kind: "retailSale", locations: ["restaurants"], discount: [15, 25] } },
+  { id: "rt-entertainment-promo", category: "Retail", reliabilities: ["confirmed"],
+    headline: "Cinema and arcade bundle deals cut prices {pct}%",
+    body: [
+      "Entertainment venues launched mid-season bundles worth about {pct}% off standard pricing.",
+      "Valid this week at Entertainment venues for readers who saw it here first.",
+    ],
+    affects: "Entertainment prices this week",
+    effect: { kind: "retailSale", locations: ["entertainment"], discount: [10, 20] } },
+  { id: "rt-gym-january", category: "Retail", reliabilities: ["confirmed"],
+    headline: "Fitness chains discount memberships {pct}% in sign-up push",
+    body: [
+      "Gyms are competing hard for new members, cutting passes and memberships by around {pct}%.",
+      "The annual-vs-monthly maths gets more interesting at a discount.",
+    ],
+    affects: "Gym / Fitness prices this week",
+    effect: { kind: "retailSale", locations: ["gym"], discount: [10, 20] } },
+  { id: "rt-travel-deals", category: "Retail", reliabilities: ["confirmed"],
+    headline: "Shoulder-season travel deals: {pct}% off packages",
+    body: [
+      "Agencies released shoulder-season packages at roughly {pct}% below usual pricing.",
+      "The Travel Agency honours the discount this week.",
+    ],
+    affects: "Travel Agency prices this week",
+    effect: { kind: "retailSale", locations: ["travel"], discount: [10, 20] } },
+  { id: "rt-bookfair", category: "Retail", reliabilities: ["confirmed"],
+    headline: "Book fair week: {pct}% off across the bookstore",
+    body: [
+      "The annual book fair spills into retail, with about {pct}% off titles all week.",
+      "The library membership remains the quiet best deal in the building.",
+    ],
+    affects: "Bookstore prices this week",
+    effect: { kind: "retailSale", locations: ["bookstore"], discount: [10, 20] } },
+  { id: "rt-salon-promo", category: "Retail", reliabilities: ["confirmed"],
+    headline: "Grooming lounges run {pct}% off packages this week",
+    body: [
+      "A cluster of salons and barbershops launched a joint promotion at about {pct}% off.",
+      "Premium packages see the biggest absolute savings.",
+    ],
+    affects: "Salon / Barber prices this week",
+    effect: { kind: "retailSale", locations: ["salon"], discount: [10, 20] } },
+  { id: "rt-cafe-loyalty", category: "Retail", reliabilities: ["confirmed"],
+    headline: "Specialty cafés brew up a {pct}% promo week",
+    body: [
+      "Independent cafés banded together for a promo week, taking about {pct}% off menus.",
+      "Your karak habit just got marginally cheaper — this week only.",
+    ],
+    affects: "Café prices this week",
+    effect: { kind: "retailSale", locations: ["cafe"], discount: [10, 15] } },
+
+  // ---- REAL ESTATE ----
+  { id: "re-offplan-boom", category: "Real Estate", reliabilities: ["confirmed", "forecast"],
+    headline: "Off-plan sales hit new records across Dubai",
+    body: [
+      "Developers report record off-plan transactions, with waiting lists for new launches.",
+      "REITs and property funds typically ride this wave over the following months.",
+    ],
+    affects: "REITs / real estate over the next 2–3 months",
+    effect: { kind: "realEstate", direction: 1 } },
+  { id: "re-rents-up", category: "Real Estate", reliabilities: ["confirmed", "forecast"],
+    headline: "Rents climb again as demand outpaces new supply",
+    body: [
+      "Rental indices moved higher for another quarter across major communities.",
+      "Rising rents feed straight into real-estate fund income.",
+    ],
+    affects: "REITs / real estate over the next 2–3 months",
+    effect: { kind: "realEstate", direction: 1 } },
+  { id: "re-supply-glut", category: "Real Estate", reliabilities: ["forecast", "speculation"],
+    headline: "Analysts warn of looming supply glut in apartments",
+    body: [
+      "Tens of thousands of new units are due for handover, and some analysts see prices softening as they land.",
+      "Property funds could feel the pressure over the coming months.",
+    ],
+    affects: "REITs / real estate over the next 2–3 months",
+    effect: { kind: "realEstate", direction: -1 } },
+  { id: "re-cooling", category: "Real Estate", reliabilities: ["forecast", "speculation"],
+    headline: "Property market shows first signs of cooling",
+    body: [
+      "Transaction volumes dipped for the first time in several quarters.",
+      "One data point isn't a trend — but funds priced for perfection wobble on less.",
+    ],
+    affects: "REITs / real estate over the next 2–3 months",
+    effect: { kind: "realEstate", direction: -1 } },
+  { id: "re-megaproject", category: "Real Estate", reliabilities: ["confirmed"],
+    headline: "New mega-project announcement lifts property sentiment",
+    body: [
+      "A landmark mixed-use development was unveiled, complete with renders of impossible skylines.",
+      "Announcements like this historically buoy real-estate assets for months.",
+    ],
+    affects: "REITs / real estate over the next 2–3 months",
+    effect: { kind: "realEstate", direction: 1 } },
+  { id: "re-fractional", category: "Real Estate", reliabilities: ["forecast"],
+    headline: "Fractional property platforms report surging youth sign-ups",
+    body: [
+      "Platforms selling property by the slice say under-25 sign-ups doubled this year.",
+      "More demand for fractions tends to firm up the whole pie.",
+    ],
+    affects: "Fractional real estate",
+    effect: { kind: "realEstate", direction: 1 } },
+
+  // ---- JOBS & ECONOMY ----
+  { id: "jb-parttime-up", category: "Jobs & Economy", reliabilities: ["confirmed", "forecast"],
+    headline: "Part-time wages tick up as retailers fight for staff",
+    body: [
+      "Seasonal hiring pressure is pushing part-time pay higher across retail and hospitality.",
+      "Expect a small bump in next month's salary.",
+    ],
+    affects: "Next month's salary (+5%)",
+    effect: { kind: "salary", pct: 5 } },
+  { id: "jb-hours-cut", category: "Jobs & Economy", reliabilities: ["confirmed", "forecast"],
+    headline: "Retailers trim junior hours amid cost pressure",
+    body: [
+      "Several chains quietly reduced junior staff hours this month to protect margins.",
+      "Part-time pay packets are likely to come in slightly lighter next month.",
+    ],
+    affects: "Next month's salary (−5%)",
+    effect: { kind: "salary", pct: -5 } },
+  { id: "jb-tourism-boom", category: "Jobs & Economy", reliabilities: ["confirmed"],
+    headline: "Record tourist season floods service sector with shifts",
+    body: [
+      "Arrivals hit an all-time high, and venues are paying up for extra weekend cover.",
+      "Overtime and gig pay both trend up when the city is this full.",
+    ],
+    affects: "Next month's salary (+5%)",
+    effect: { kind: "salary", pct: 5 } },
+  { id: "jb-gig-demand", category: "Jobs & Economy", reliabilities: ["confirmed", "forecast"],
+    headline: "Freelance marketplaces report surge in small-business demand",
+    body: [
+      "Small firms are outsourcing design, content and bookkeeping at record rates.",
+      "Skills that cost a few hundred dirhams to learn keep paying rent for those who have them.",
+    ],
+    affects: "Gig availability",
+    effect: { kind: "salary", pct: 0 } },
+  { id: "jb-minimum-review", category: "Jobs & Economy", reliabilities: ["speculation"],
+    headline: "Whispers of a youth wage review circulate",
+    body: [
+      "Unconfirmed reports suggest a review of youth part-time pay structures is being studied.",
+      "Nothing official. Speculation pays off about half the time — tag noted.",
+    ],
+    affects: "Next month's salary (+5% if true)",
+    effect: { kind: "salary", pct: 5 } },
+  { id: "jb-vat-reminder", category: "Jobs & Economy", reliabilities: ["confirmed"],
+    headline: "Explainer: where your 5% VAT actually goes",
+    body: [
+      "Every AED 100 you spend includes roughly AED 5 of value-added tax, collected by businesses for the government.",
+      "Your monthly payslip in this simulation estimates the VAT inside your spending — check it on payday.",
+    ],
+    affects: "Understanding your payslip",
+    effect: { kind: "salary", pct: 0 } },
+  { id: "jb-eos-explainer", category: "Jobs & Economy", reliabilities: ["confirmed"],
+    headline: "Explainer: end-of-service benefits, the quiet savings account",
+    body: [
+      "UAE employees accrue end-of-service benefits with every month worked — a lump sum that grows silently in the background.",
+      "Your simulated payslip sets aside AED 100 a month to teach the shape of it.",
+    ],
+    affects: "Understanding your payslip",
+    effect: { kind: "salary", pct: 0 } },
+
+  // ---- CONSUMER ALERTS ----
+  { id: "ca-bnpl-hike", category: "Consumer Alerts", reliabilities: ["confirmed", "forecast"],
+    headline: "Buy-now-pay-later providers raising late fees",
+    body: [
+      "Several BNPL providers are hiking late-payment fees and tightening terms from next month.",
+      "If you're carrying instalments, budget for the payment before you budget for anything fun. Readers who saw this alert avoid the surcharge this month.",
+    ],
+    affects: "Active BNPL plans",
+    effect: { kind: "consumerAlert", alert: "bnpl" } },
+  { id: "ca-scam-wave", category: "Consumer Alerts", reliabilities: ["confirmed"],
+    headline: "Authorities warn of prize-draw scam texts doing the rounds",
+    body: [
+      "A wave of messages claiming lottery wins is targeting young residents; clicking costs people real money.",
+      "Reading this alert inoculates you: you'll dodge the scam event if it comes your way.",
+    ],
+    affects: "Protects against a scam loss",
+    effect: { kind: "consumerAlert", alert: "scam" } },
+  { id: "ca-subscription-audit", category: "Consumer Alerts", reliabilities: ["confirmed"],
+    headline: "Study: teens waste AED 60/month on forgotten subscriptions",
+    body: [
+      "A consumer study found free trials quietly converting to paid plans is the top source of wasted money under 20.",
+      "Reading this alert means you'll catch the next forgotten subscription before it bills.",
+    ],
+    affects: "Protects against a forgotten-subscription charge",
+    effect: { kind: "consumerAlert", alert: "subscription" } },
+  { id: "ca-warranty", category: "Consumer Alerts", reliabilities: ["confirmed"],
+    headline: "Know your rights: retailers must honour warranty repairs",
+    body: [
+      "Consumer protection rules require retailers to repair or replace faulty goods within warranty.",
+      "Cheap goods that break early usually aren't covered for wear — another entry in the price-versus-quality ledger.",
+    ],
+    affects: "Awareness",
+    effect: { kind: "consumerAlert", alert: "subscription" } },
+  { id: "ca-fomo", category: "Consumer Alerts", reliabilities: ["confirmed"],
+    headline: "Financial educators flag 'FOMO pricing' at limited drops",
+    body: [
+      "Limited releases are engineered scarcity: the queue is the product, researchers argue.",
+      "Worth remembering the next time a drop lands on a Saturday.",
+    ],
+    affects: "Awareness",
+    effect: { kind: "consumerAlert", alert: "scam" } },
+  { id: "ca-impulse", category: "Consumer Alerts", reliabilities: ["confirmed"],
+    headline: "The 24-hour rule: one day's wait kills most impulse buys",
+    body: [
+      "Behavioural studies keep finding the same thing: a forced pause collapses purchase intent on non-essentials.",
+      "The Reserve & Save option on big-ticket items is this rule with a progress bar.",
+    ],
+    affects: "Awareness",
+    effect: { kind: "consumerAlert", alert: "subscription" } },
+  { id: "ca-phone-plans", category: "Consumer Alerts", reliabilities: ["forecast"],
+    headline: "Telcos expected to reshuffle youth plan pricing",
+    body: [
+      "Industry watchers expect youth phone-plan pricing to shift next quarter.",
+      "Your AED 150 plan is fixed in this simulation — but the habit of checking bills isn't.",
+    ],
+    affects: "Awareness",
+    effect: { kind: "consumerAlert", alert: "subscription" } },
+];
