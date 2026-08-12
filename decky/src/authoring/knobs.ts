@@ -2,15 +2,21 @@
 // set of KNOBS; buildDefinition() compiles those knobs into a full GameDefinition the engine
 // can run. This is what the visual editor edits and what the AI co-pilot writes to.
 
-import { Effect, GameDefinition, Predicate, Rank } from '../engine/types';
+import { Effect, GameDefinition, Predicate, Rank, Suit } from '../engine/types';
 
 export const RANKS_13: Rank[] = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
 
 export interface Knobs {
+  family: 'shedding' | 'trick';
   name: string;
   description: string;
   minPlayers: number;
   maxPlayers: number;
+  // trick-taking
+  trump: Suit | 'none';
+  mustFollowSuit: boolean;
+  aceHigh: boolean;
+  trickScoreBy: 'mostTricks' | 'fewestTricks';
   // deck
   handSize: number;
   deckCount: number;
@@ -49,10 +55,15 @@ const defaultPoints: Record<string, number> = {
 };
 
 export const defaultKnobs: Knobs = {
+  family: 'shedding',
   name: 'My Card Game',
   description: '',
   minPlayers: 2,
   maxPlayers: 6,
+  trump: 'S',
+  mustFollowSuit: true,
+  aceHigh: true,
+  trickScoreBy: 'mostTricks',
   handSize: 5,
   deckCount: 1,
   excludeRanks: [],
@@ -79,6 +90,37 @@ export const defaultKnobs: Knobs = {
 };
 
 export function buildDefinition(knobs: Knobs, id = 'draft'): GameDefinition {
+  return knobs.family === 'trick' ? buildTrickDefinition(knobs, id) : buildSheddingDefinition(knobs, id);
+}
+
+function buildTrickDefinition(knobs: Knobs, id: string): GameDefinition {
+  return {
+    schemaVersion: '1.0',
+    meta: {
+      id, name: knobs.name, description: knobs.description || autoTrickDescription(knobs),
+      players: { min: clampInt(knobs.minPlayers, 2, 8), max: clampInt(knobs.maxPlayers, knobs.minPlayers, 8) },
+      family: 'trick-taking',
+    },
+    deck: { base: 'standard54', includeJokers: knobs.includeJokers, deckCount: 1, excludeRanks: knobs.excludeRanks, rankOrder: RANKS_13, tags: {} },
+    zones: [
+      { id: 'draw', type: 'pile', ordered: true, faceDown: true, visibility: 'none', shared: true },
+      { id: 'trick', type: 'trick', ordered: true, faceDown: false, visibility: 'all', shared: true },
+      { id: 'hand', type: 'hand', ordered: false, faceDown: true, visibility: 'owner', perPlayer: true },
+    ],
+    setup: [
+      { op: 'shuffle', zone: 'draw' },
+      { op: 'deal', from: 'draw', to: 'hand', countPerPlayer: knobs.handSize },
+    ],
+    turnFlow: { order: knobs.direction, startPlayer: 'first', actionsPerTurn: { min: 1, max: 1 } },
+    actions: [],
+    triggers: [],
+    endConditions: [{ id: 'handsEmpty', when: { zoneCount: { zone: 'hand', of: 'anyPlayer', eq: 0 } }, result: 'roundOver' }],
+    scoring: { mode: 'lowestPoints', winner: 'highestTotal', cardPoints: {}, target: null },
+    trick: { trump: knobs.trump, mustFollowSuit: knobs.mustFollowSuit, aceHigh: knobs.aceHigh, scoreBy: knobs.trickScoreBy },
+  };
+}
+
+function buildSheddingDefinition(knobs: Knobs, id: string): GameDefinition {
   const wildAll = dedup([...knobs.wildRanks, ...knobs.wildDrawRanks]);
 
   const tags: GameDefinition['deck']['tags'] = {};
@@ -187,6 +229,11 @@ export function knobsFromDefinition(def: GameDefinition): Knobs {
   const wildRanks = tagRanks('wild').filter((r) => !wildDrawRanks.includes(r));
 
   return {
+    family: def.trick ? 'trick' : 'shedding',
+    trump: def.trick?.trump ?? 'S',
+    mustFollowSuit: def.trick?.mustFollowSuit ?? true,
+    aceHigh: def.trick?.aceHigh ?? true,
+    trickScoreBy: def.trick?.scoreBy === 'fewestTricks' ? 'fewestTricks' : 'mostTricks',
     name: def.meta.name,
     description: def.meta.description,
     minPlayers: def.meta.players.min,
@@ -218,6 +265,16 @@ export function knobsFromDefinition(def: GameDefinition): Knobs {
 }
 
 export function rankLabel(r: Rank): string { return r === 'JOKER' ? 'Joker' : r; }
+
+const SUIT_WORD: Record<string, string> = { C: 'Clubs', D: 'Diamonds', H: 'Hearts', S: 'Spades', none: 'no suit' };
+function autoTrickDescription(k: Knobs): string {
+  const parts = [`A trick-taking game. Deal ${k.handSize} cards each.`];
+  parts.push(k.mustFollowSuit ? 'You must follow the led suit if you can.' : 'You may play any card.');
+  if (k.trump !== 'none') parts.push(`${SUIT_WORD[k.trump]} are trump and beat every other suit.`);
+  parts.push('The highest card wins the trick and leads the next.');
+  parts.push(k.trickScoreBy === 'mostTricks' ? 'Take the most tricks to win.' : 'Take the fewest tricks to win.');
+  return parts.join(' ');
+}
 
 function dedup(rs: Rank[]): Rank[] { return Array.from(new Set(rs)); }
 function clampInt(n: number, lo: number, hi: number): number { return Math.max(lo, Math.min(hi, Math.round(n))); }

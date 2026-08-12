@@ -7,7 +7,8 @@ import { validate } from '../engine/validator';
 import { simulate, SimReport } from '../engine/simulator';
 import { crazyEights } from '../games/crazyEights';
 import { switchGame } from '../games/switch';
-import { GameDefinition, Rank } from '../engine/types';
+import { spadesLite } from '../games/spades';
+import { GameDefinition, Rank, Suit } from '../engine/types';
 import { Table } from './Table';
 
 type RankArrayKey = 'wildRanks' | 'skipRanks' | 'reverseRanks' | 'drawRanks' | 'extraTurnRanks' | 'wildDrawRanks' | 'excludeRanks';
@@ -75,6 +76,14 @@ export function CreateView() {
             <button className="chip" onClick={() => startFrom({ ...defaultKnobs })}>Blank</button>
             <button className="chip" onClick={() => startFrom(knobsFromDefinition(crazyEights))}>Crazy Eights</button>
             <button className="chip" onClick={() => startFrom(knobsFromDefinition(switchGame))}>Switch</button>
+            <button className="chip" onClick={() => startFrom(knobsFromDefinition(spadesLite))}>Spades</button>
+          </div>
+
+          <div className="field"><span>Game family</span>
+            <div className="seg">
+              <button className={knobs.family === 'shedding' ? 'on' : ''} onClick={() => set('family', 'shedding')}>Shedding / matching</button>
+              <button className={knobs.family === 'trick' ? 'on' : ''} onClick={() => set('family', 'trick')}>Trick-taking</button>
+            </div>
           </div>
 
           {override && <div className="expert-note">Expert override active — knob edits will replace the raw definition.</div>}
@@ -89,6 +98,36 @@ export function CreateView() {
             </div>
           </Section>
 
+          {knobs.family === 'trick' && (
+            <>
+              <Section title="Deal" defaultOpen>
+                <label className="field"><span>Cards dealt each: <b>{knobs.handSize}</b></span>
+                  <input type="range" min={1} max={13} value={knobs.handSize} onChange={(e) => set('handSize', +e.target.value)} /></label>
+                <span className="mini-label">Tip: cards × players must fit the 52-card deck (e.g. 13 each for 4 players).</span>
+              </Section>
+              <Section title="Trick rules" defaultOpen>
+                <label className="field"><span>Trump suit (beats all others)</span>
+                  <select value={knobs.trump} onChange={(e) => set('trump', e.target.value as Suit | 'none')}>
+                    <option value="none">No trump</option>
+                    <option value="S">♠ Spades</option>
+                    <option value="H">♥ Hearts</option>
+                    <option value="D">♦ Diamonds</option>
+                    <option value="C">♣ Clubs</option>
+                  </select></label>
+                <label className="field row"><Switch on={knobs.mustFollowSuit} onChange={(v) => set('mustFollowSuit', v)} /><span>Must follow the led suit if able</span></label>
+                <label className="field row"><Switch on={knobs.aceHigh} onChange={(v) => set('aceHigh', v)} /><span>Ace is the highest card</span></label>
+              </Section>
+              <Section title="Scoring" defaultOpen>
+                <div className="field"><span>Winner is</span>
+                  <div className="seg">
+                    <button className={knobs.trickScoreBy === 'mostTricks' ? 'on' : ''} onClick={() => set('trickScoreBy', 'mostTricks')}>Most tricks</button>
+                    <button className={knobs.trickScoreBy === 'fewestTricks' ? 'on' : ''} onClick={() => set('trickScoreBy', 'fewestTricks')}>Fewest tricks</button>
+                  </div></div>
+              </Section>
+            </>
+          )}
+
+          {knobs.family === 'shedding' && <>
           <Section title="Deal & deck" defaultOpen>
             <label className="field"><span>Cards dealt each: <b>{knobs.handSize}</b></span>
               <input type="range" min={1} max={13} value={knobs.handSize} onChange={(e) => set('handSize', +e.target.value)} /></label>
@@ -171,6 +210,7 @@ export function CreateView() {
             <label className="field"><span>Play to (points target)</span>
               <input type="number" value={knobs.pointTarget} onChange={(e) => set('pointTarget', parseInt(e.target.value || '0', 10))} /></label>
           </Section>
+          </>}
         </div>
 
         {/* RIGHT: co-pilot, verify, expert */}

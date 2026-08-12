@@ -8,7 +8,7 @@
 // implements the same interface and drops in without any UI change.
 
 import { Knobs, RANK_CHOICES, rankLabel } from './knobs';
-import { Rank } from '../engine/types';
+import { Rank, Suit } from '../engine/types';
 
 export interface ProposedChange {
   field: keyof Knobs;
@@ -102,6 +102,18 @@ export const offlineTranslator: Translator = {
     const patch: Partial<Knobs> = {};
     const notes: string[] = [];
 
+    // trick-taking family detection (before the shedding rules)
+    if (/\btrick(-|\s)?taking\b|\bfollow(s|ing)? suit\b|\btakes? the trick\b|\bwins? the trick\b|\btrump\b|\bmost tricks\b|\bfewest tricks\b/.test(text)) {
+      patch.family = 'trick';
+      notes.push('Trick-taking game.');
+      if (/\bfollow(s|ing)? suit\b/.test(text)) patch.mustFollowSuit = true;
+      const t = detectTrumpSuit(text);
+      if (t) { patch.trump = t; notes.push(`${t} is trump.`); }
+      if (/\bno trump\b/.test(text)) patch.trump = 'none';
+      if (/\bfewest tricks\b|\bavoid tricks\b|\bavoid taking\b/.test(text)) patch.trickScoreBy = 'fewestTricks';
+      else if (/\bmost tricks\b/.test(text)) patch.trickScoreBy = 'mostTricks';
+    }
+
     // name: "call it X" / "named X" / quoted
     const quoted = description.match(/["“”']([^"“”']{2,40})["“”']/);
     const called = description.match(/\b(?:call(?:ed)? it|named?)\s+([A-Z][\w' ]{1,30})/i);
@@ -179,9 +191,11 @@ export const offlineTranslator: Translator = {
     const merged = { ...current, ...patch };
     const questions: Question[] = [];
 
-    // 1) draw-pile-empty is a genuinely load-bearing rule people forget.
+    const isTrick = (patch.family ?? current.family) === 'trick';
+
+    // 1) draw-pile-empty is a genuinely load-bearing rule people forget (shedding only).
     const mentionedDrawEmpty = /reshuffle|run(s)? out|deck (is )?empty|draw pile/.test(text);
-    if (!mentionedDrawEmpty && changes.length > 0) {
+    if (!isTrick && !mentionedDrawEmpty && changes.length > 0) {
       questions.push({
         id: 'drawEmpty',
         text: 'What happens when the draw pile runs out?',
@@ -193,7 +207,7 @@ export const offlineTranslator: Translator = {
     }
 
     // 2) if nothing set a wild and the user didn't mention wilds at all, offer the common default.
-    if (merged.wildRanks.length === 0 && !/wild/.test(text)) {
+    if (!isTrick && merged.wildRanks.length === 0 && !/wild/.test(text)) {
       questions.push({
         id: 'wild',
         text: 'Do you want a wild card that can be played anytime?',
@@ -228,6 +242,14 @@ function detectDrawTwo(text: string): Rank | null {
 
 function detectWildDraw(text: string): Rank | null {
   return detectLeft(text, ['draw four', 'draw 4', 'draws four', 'draws 4', 'pick up four', 'pick up 4', 'wild draw', '+4']);
+}
+
+function detectTrumpSuit(text: string): Suit | null {
+  const suits: Record<string, Suit> = { spade: 'S', spades: 'S', heart: 'H', hearts: 'H', diamond: 'D', diamonds: 'D', club: 'C', clubs: 'C' };
+  const idx = text.indexOf('trump');
+  const win = idx >= 0 ? text.slice(Math.max(0, idx - 30), idx + 30) : text;
+  for (const [w, s] of Object.entries(suits)) if (new RegExp(`\\b${w}\\b`).test(win)) return s;
+  return null;
 }
 
 // Ranks a "remove/strip/without" clause takes out of the deck.
@@ -276,6 +298,10 @@ function describeChange(field: keyof Knobs, value: unknown): string {
     case 'matchSuit': return value ? 'Match by suit' : 'No suit matching';
     case 'matchRank': return value ? 'Match by rank' : 'No rank matching';
     case 'drawUntilCanPlay': return value ? 'Draw until you can play' : 'Draw one card';
+    case 'family': return value === 'trick' ? 'Trick-taking game' : 'Shedding/matching game';
+    case 'trump': return value === 'none' ? 'No trump' : `Trump: ${value}`;
+    case 'mustFollowSuit': return value ? 'Must follow suit' : 'Follow suit not required';
+    case 'trickScoreBy': return value === 'mostTricks' ? 'Win: most tricks' : 'Win: fewest tricks';
     case 'direction': return `Direction → ${value}`;
     case 'winMode': return value === 'firstOut' ? 'Win: first to empty' : value === 'highestTotal' ? 'Win: highest points' : 'Win: lowest points';
     case 'includeJokers': return value ? 'Include jokers' : 'No jokers';
