@@ -4,8 +4,9 @@ A web app where people play card games and create their own, using a standard 54
 **The engine is the referee** — it deals, enforces every rule, hides what should be hidden,
 tracks score, and decides the winner. Clients only render state and submit intended moves.
 
-This is the **V1 engine slice** (Milestone M1 from the master build spec): the pure,
-deterministic engine plus a playable web UI for Crazy Eights, solo vs bots.
+This covers **Milestones M1–M5** from the master build spec: the pure deterministic engine,
+a classics library, a static validator, a bot-simulator, a visual editor (remix + family
+skeleton), and an AI co-pilot with interview behavior — all in a playable web app.
 
 ## The core idea: a game is data, not code
 
@@ -21,15 +22,25 @@ src/engine/
   rng.ts         # seeded deterministic RNG (mulberry32 + Fisher–Yates)
   deck.ts        # standard-54 deck build, card tags
   engine.ts      # the interpreter: createMatch, legalMoves, applyMove, isTerminal, redact
-  simulator.ts   # bot-simulator: proves a game terminates, is winnable, and roughly balanced
+  validator.ts   # M3: static well-formedness checks (missing zones/tags, unreachable win…)
+  simulator.ts   # M3: bot-simulator — proves a game terminates, is winnable, roughly balanced
 src/games/
   crazyEights.ts # a classic, as pure data
+  switch.ts      # M2: a second classic (action cards) — ran with ZERO engine changes
+  catalog.ts     # the classics library
+src/authoring/
+  knobs.ts       # M4: the authoring model — knobs compile to a full GameDefinition
+  copilot.ts     # M5: describe→knobs translator + interview (offline; LLM-swap seam)
 src/bots/
   randomBot.ts   # legal-move bot (works for ANY game for free — engine enumerates moves)
 src/ui/
-  App.tsx        # the table: renders the REDACTED view, highlights legal moves, drives bots
+  App.tsx        # Play / Create router
+  Table.tsx      # renders the REDACTED view, highlights legal moves, drives bots
+  PlayView.tsx   # the classics library + discovery
+  CreateView.tsx # M4/M5: the visual editor + AI co-pilot + live validation + test/playtest
 scripts/
-  selftest.ts    # headless 1000-game self-play — the engine's acceptance test
+  selftest.ts    # headless self-play over every classic — the engine's acceptance test
+  validate.ts    # proves the validator passes classics and catches broken definitions
 ```
 
 ## Architecture (mirrors the authoritative-server model)
@@ -49,18 +60,27 @@ run headless in the simulator, in the browser today, and on an authoritative ser
 
 ```bash
 npm install
-npm run selftest   # headless proof: 1000 Crazy Eights games all terminate with a winner
-npm run dev        # play it in the browser, solo vs 2 bots
+npm run test       # selftest (bot self-play over all classics) + validator checks
+npm run dev        # the web app: Play the classics, or Create your own
 npm run build      # production build
 ```
 
+In the app: **Play** a classic solo vs bots, or **Create** — start from a blank skeleton or
+remix a classic, turn knobs, describe rules to the co-pilot, watch it interview you about
+gaps, run the simulator, and playtest.
+
 ## Verified
 
-`npm run selftest` runs 1000 four-player games: **all terminate**, **winnable**, avg ~29 moves,
-seat win-rates ~20–30% (mild first-player edge, expected for a shedding game), zero move-cap hits.
+- **Engine (`npm run selftest`):** 1000 four-player games each of Crazy Eights and Switch —
+  all terminate, all winnable, no move-cap hits. Crazy Eights ~29 moves, Switch ~52.
+- **Validator (`npm run validate`):** classics validate clean; deliberately broken defs
+  (missing tag, unreachable win, over-deal, missing zone) are all caught.
+- **Co-pilot:** parses e.g. *"Deal 7 each, jokers wild, queens reverse, 2s draw two"* into the
+  right knobs and asks about the unspecified draw-pile-empty rule.
 
 ## Next (per the master build spec)
 
-M2 hand-author more classics (each one stress-tests the schema) → M3 static validator +
-richer simulator reports → M4 visual editor (remix / family skeletons) → M5 AI co-pilot →
-authoritative multiplayer server + reconnect. See `docs/card-game-engine-master-build-spec.md`.
+The remaining V1 pieces: an **authoritative multiplayer server** (the UI already renders only
+the redacted view, so this is a lift-and-shift), **reconnect/resume**, **publish + discovery +
+moderation** for community games, and swapping the offline co-pilot translator for a live LLM
+behind the existing `Translator` seam. See `docs/card-game-engine-master-build-spec.md`.

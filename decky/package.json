@@ -8,6 +8,8 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "selftest": "tsx scripts/selftest.ts",
+    "validate": "tsx scripts/validate.ts",
+    "test": "tsx scripts/selftest.ts && tsx scripts/validate.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
