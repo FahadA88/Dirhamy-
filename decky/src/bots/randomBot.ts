@@ -12,6 +12,7 @@ export function chooseMove(
   state: MatchState,
   playerId: string,
   botSeed: number,
+  mode: 'smart' | 'random' = 'smart',
 ): { move: Move; botSeed: number } {
   const moves = legalMoves(state, playerId);
   if (moves.length === 0) return { move: { actionId: 'drawCard' }, botSeed };
@@ -30,6 +31,12 @@ export function chooseMove(
   if (plays.length === 0) {
     // Only drawing is possible.
     return { move: moves[0], botSeed };
+  }
+
+  // Easy mode: pick any legal move uniformly at random.
+  if (mode === 'random') {
+    const r = nextRandom(botSeed);
+    return { move: moves[Math.floor(r.value * moves.length)], botSeed: r.state };
   }
 
   const hand = state.zones[`hand:${playerId}`] || [];

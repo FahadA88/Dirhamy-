@@ -1,10 +1,13 @@
 import { useMemo } from 'react';
+import { useSettings } from '../settings/SettingsContext';
 
-// Ambient 3D scene behind the whole app: drifting, rotating holographic cards plus a couple
-// of glowing orbs. Purely decorative, fixed, non-interactive, GPU-driven CSS transforms.
+// Ambient 3D scene behind the app: drifting holographic cards, glowing orbs, a perspective
+// grid floor. Every layer is individually toggleable in Settings; the whole thing is off when
+// ambient3d is disabled.
 const SUITS = ['♠', '♥', '♦', '♣', '★', '♠', '♥', '♦'];
 
 export function Backdrop() {
+  const { settings } = useSettings();
   const cards = useMemo(
     () =>
       SUITS.map((s, i) => ({
@@ -19,18 +22,18 @@ export function Backdrop() {
     [],
   );
 
+  if (!settings.ambient3d) return null;
+
   return (
     <div className="backdrop" aria-hidden>
-      <div className="orb orb-a" />
-      <div className="orb orb-b" />
-      <div className="grid3d" />
-      {cards.map((c, i) => (
+      {settings.orbs && <><div className="orb orb-a" /><div className="orb orb-b" /></>}
+      {settings.grid && <div className="grid3d" />}
+      {settings.floaties && cards.map((c, i) => (
         <div
           key={i}
           className={`floaty ${c.hue}`}
           style={{
-            left: c.left, top: c.top,
-            animationDelay: c.delay, animationDuration: c.dur,
+            left: c.left, top: c.top, animationDelay: c.delay, animationDuration: c.dur,
             // @ts-expect-error custom prop
             '--sc': c.scale,
           }}

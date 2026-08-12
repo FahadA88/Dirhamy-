@@ -31,6 +31,9 @@ src/games/
 src/authoring/
   knobs.ts       # M4: the authoring model — knobs compile to a full GameDefinition
   copilot.ts     # M5: describe→knobs translator + interview (offline; LLM-swap seam)
+src/settings/
+  settings.ts    # user customization: theme/accent/cards/motion/gameplay, persisted
+  SettingsContext.tsx # provider that applies settings to the DOM live
 src/bots/
   randomBot.ts   # legal-move bot (works for ANY game for free — engine enumerates moves)
 src/ui/
@@ -67,7 +70,11 @@ npm run build      # production build
 
 In the app: **Play** a classic solo vs bots, or **Create** — start from a blank skeleton or
 remix a classic, turn knobs, describe rules to the co-pilot, watch it interview you about
-gaps, run the simulator, and playtest.
+gaps, run the simulator, and playtest. The **⚙ Customize** drawer controls appearance and
+gameplay: light/dark/system theme, 7 accent colors, card backs, card size, four-color deck,
+table surface, ambient-3D toggles, motion, density — plus your name, bot labels/speed/
+difficulty, legal-move highlight style, hand sorting, confirm-to-play, log, and sound. All
+persisted to localStorage.
 
 ## Verified
 

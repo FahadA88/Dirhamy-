@@ -3,11 +3,13 @@ import { catalog } from '../games/catalog';
 import { Table } from './Table';
 import { GameDefinition } from '../engine/types';
 import { useTilt } from './useTilt';
+import { useSettings } from '../settings/SettingsContext';
 
 // Discover + play the classics library (and, once wired, published community games).
 export function PlayView() {
+  const { settings } = useSettings();
   const [game, setGame] = useState<GameDefinition | null>(null);
-  const [seats, setSeats] = useState(3);
+  const [seats, setSeats] = useState(settings.defaultSeats);
 
   if (game) {
     return (
@@ -37,7 +39,7 @@ export function PlayView() {
       </div>
       <div className="cards-grid">
         {catalog.map((g) => (
-          <GameCard key={g.meta.id} game={g} onPlay={() => { setSeats(Math.min(3, g.meta.players.max)); setGame(g); }} />
+          <GameCard key={g.meta.id} game={g} onPlay={() => { setSeats(Math.min(Math.max(settings.defaultSeats, g.meta.players.min), g.meta.players.max)); setGame(g); }} />
         ))}
       </div>
     </div>
