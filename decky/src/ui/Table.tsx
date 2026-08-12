@@ -31,7 +31,8 @@ export function Table({ def, seats = 3 }: { def: GameDefinition; seats?: number 
     [myLegal],
   );
   const canDraw = myLegal.some((m) => m.actionId === 'drawCard');
-  const playActionId = view.mode === 'trick' ? 'playToTrick' : 'playCard';
+  const canPass = myLegal.some((m) => m.actionId === 'climbPass');
+  const playActionId = view.mode === 'trick' ? 'playToTrick' : view.mode === 'climb' ? 'climbPlay' : 'playCard';
 
   // Bot loop, paced by the user's bot-speed setting.
   useEffect(() => {
@@ -55,7 +56,7 @@ export function Table({ def, seats = 3 }: { def: GameDefinition; seats?: number 
 
   function submit(move: Move) {
     if (!view.isYourTurn) return;
-    if (move.actionId === 'playCard' || move.actionId === 'playToTrick') playSound('play', settings.sound);
+    if (move.actionId === 'playCard' || move.actionId === 'playToTrick' || move.actionId === 'climbPlay') playSound('play', settings.sound);
     if (move.actionId === 'drawCard') playSound('draw', settings.sound);
     setSelected(null);
     setState((s) => applyMove(s, HUMAN, move));
@@ -85,6 +86,7 @@ export function Table({ def, seats = 3 }: { def: GameDefinition; seats?: number 
             </div>
             <div className="count">
               {p.handCount} cards{view.mode === 'trick' ? ` · ${view.tricksWon?.[p.id] ?? 0} tricks` : ''}
+              {view.mode === 'climb' && view.finished?.includes(p.id) ? ` · out #${view.finished.indexOf(p.id) + 1}` : ''}
             </div>
           </div>
         ))}
@@ -105,6 +107,13 @@ export function Table({ def, seats = 3 }: { def: GameDefinition; seats?: number 
             {view.lead ? ` · led ${SUIT_SYMBOLS[view.lead]}` : ''}
           </div>
         </div>
+      ) : view.mode === 'climb' ? (
+        <div className="center">
+          <div className="pile">
+            {top ? <CardFace card={top} /> : <div className="card big empty" />}
+            <div className="pile-label">{top ? 'Pile to beat' : 'Empty — lead any card'}</div>
+          </div>
+        </div>
       ) : (
         <div className="center">
           <div className="pile">
@@ -123,6 +132,7 @@ export function Table({ def, seats = 3 }: { def: GameDefinition; seats?: number 
           <span>{settings.playerName === 'You' ? 'Your hand' : `${settings.playerName}’s hand`}{view.mode === 'trick' ? ` · ${view.tricksWon?.[HUMAN] ?? 0} tricks` : ''}</span>
           {view.isYourTurn && !suitPickerOpen && <span className="turn-badge">Your turn</span>}
           {canDraw && <button className="draw-btn" onClick={() => submit({ actionId: 'drawCard' })}>Draw a card</button>}
+          {canPass && <button className="draw-btn" onClick={() => submit({ actionId: 'climbPass' })}>Pass</button>}
         </div>
         <div className={`hand hl-${settings.highlight}`}>
           {hand.map((c) => {

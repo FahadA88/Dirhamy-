@@ -54,6 +54,9 @@ export function createMatch(def: GameDefinition, players: string[], seed: number
     lead: null,
     trickPlays: [],
     tricksWon: Object.fromEntries(players.map((p) => [p, 0])),
+    passStreak: 0,
+    lastPlayer: null,
+    finished: [],
     vars: {},
     scores: Object.fromEntries(players.map((p) => [p, 0])),
     phase: 'playing',
@@ -90,6 +93,13 @@ export function createMatch(def: GameDefinition, players: string[], seed: number
           const card = state.zones[step.from].pop();
           if (card) state.zones[zoneKey(def, step.to, p)].push(card);
         }
+      }
+    } else if (step.op === 'dealAll') {
+      let seat = 0;
+      while (state.zones[step.from].length) {
+        const card = state.zones[step.from].pop()!;
+        state.zones[zoneKey(def, step.to, players[seat % players.length])].push(card);
+        seat++;
       }
     } else if (step.op === 'move') {
       for (let i = 0; i < step.count; i++) {
@@ -193,6 +203,7 @@ function stripExistsLegal(p: Predicate): Predicate {
 export function legalMoves(state: MatchState, playerId: string): Move[] {
   if (state.phase !== 'playing') return [];
   if (state.definition.trick) return trickLegalMoves(state, playerId);
+  if (state.definition.climb) return climbLegalMoves(state, playerId);
 
   // Resolve a pending choice first (e.g. pick a suit after a wild).
   if (state.pendingChoice) {
@@ -233,6 +244,7 @@ function cloneState(state: MatchState): MatchState {
     scores: { ...state.scores },
     tricksWon: { ...state.tricksWon },
     trickPlays: state.trickPlays.map((t) => ({ ...t })),
+    finished: state.finished.slice(),
     pendingChoice: state.pendingChoice ? { ...state.pendingChoice } : null,
     log: state.log.slice(),
   };
@@ -358,6 +370,7 @@ export function applyMove(state: MatchState, playerId: string, move: Move): Matc
   const def = s.definition;
 
   if (def.trick) return applyTrickMove(s, playerId, move);
+  if (def.climb) return applyClimbMove(s, playerId, move);
 
   // Resolve a pending suit choice.
   if (move.actionId === 'resolveChoice') {
@@ -610,6 +623,106 @@ function endTrickRound(s: MatchState): void {
   log(s, null, `Round over — ${short(winner)} wins.`);
 }
 
+// ---------- climbing family (President / Big Two) ----------
+
+function climbRank(def: MatchState['definition'], rank: string): number {
+  const i = def.climb!.order.indexOf(rank as never);
+  return i < 0 ? -1 : i;
+}
+
+function climbLegalMoves(state: MatchState, playerId: string): Move[] {
+  if (state.players[state.turnIndex] !== playerId) return [];
+  if (state.finished.includes(playerId)) return [];
+  const def = state.definition;
+  const hand = state.zones[`hand:${playerId}`] || [];
+  const discardZone = def.zones.find((z) => z.visibility === 'top-public');
+  const top = discardZone ? topCard(state.zones[discardZone.id]) : undefined;
+
+  if (!top) {
+    // Leading (fresh pile): play any card, no passing.
+    return hand.map((c) => ({ actionId: 'climbPlay', cardId: c.id }));
+  }
+  const beat = hand.filter((c) => climbRank(def, c.rank) > climbRank(def, top.rank));
+  const moves: Move[] = beat.map((c) => ({ actionId: 'climbPlay', cardId: c.id }));
+  moves.push({ actionId: 'climbPass' });
+  return moves;
+}
+
+function activeCount(s: MatchState): number {
+  return s.players.filter((p) => !s.finished.includes(p)).length;
+}
+
+function nextActiveIndex(s: MatchState): number {
+  const n = s.players.length;
+  let i = s.turnIndex;
+  for (let step = 0; step < n; step++) {
+    i = ((i + s.direction) % n + n) % n;
+    if (!s.finished.includes(s.players[i])) return i;
+  }
+  return s.turnIndex;
+}
+
+function applyClimbMove(s: MatchState, playerId: string, move: Move): MatchState {
+  const legal = climbLegalMoves(s, playerId);
+  const chosen = legal.find((m) => m.actionId === move.actionId && m.cardId === move.cardId);
+  if (!chosen) return s;
+  const def = s.definition;
+  const discardZone = def.zones.find((z) => z.visibility === 'top-public')!;
+
+  if (move.actionId === 'climbPass') {
+    s.passStreak += 1;
+    log(s, playerId, `${short(playerId)} passes.`);
+    // Everyone still in except the last player has passed → the pile clears.
+    if (s.passStreak >= activeCount(s) - 1 && s.lastPlayer) {
+      s.zones[discardZone.id] = [];
+      s.passStreak = 0;
+      log(s, null, `Pile cleared — ${short(s.lastPlayer)} leads.`);
+      const li = s.players.indexOf(s.lastPlayer);
+      s.turnIndex = s.finished.includes(s.lastPlayer) ? nextFromIndex(s, li) : li;
+      return s;
+    }
+    s.turnIndex = nextActiveIndex(s);
+    return s;
+  }
+
+  // climbPlay
+  const hand = s.zones[`hand:${playerId}`];
+  const idx = hand.findIndex((c) => c.id === move.cardId);
+  const card = hand[idx];
+  hand.splice(idx, 1);
+  s.zones[discardZone.id].push(card);
+  s.lastPlayer = playerId;
+  s.passStreak = 0;
+  log(s, playerId, `${short(playerId)} played ${cardLabel(card)}.`);
+
+  if (hand.length === 0 && !s.finished.includes(playerId)) {
+    s.finished.push(playerId);
+    log(s, null, `${short(playerId)} is out (#${s.finished.length}).`);
+  }
+  if (activeCount(s) <= 1) { endClimbRound(s); return s; }
+  s.turnIndex = nextActiveIndex(s);
+  return s;
+}
+
+function nextFromIndex(s: MatchState, from: number): number {
+  const n = s.players.length;
+  let i = from;
+  for (let step = 0; step < n; step++) {
+    i = ((i + s.direction) % n + n) % n;
+    if (!s.finished.includes(s.players[i])) return i;
+  }
+  return from;
+}
+
+function endClimbRound(s: MatchState): void {
+  s.phase = 'roundOver';
+  // Whoever still holds cards finishes last.
+  for (const p of s.players) if (!s.finished.includes(p)) s.finished.push(p);
+  s.players.forEach((p, i) => { s.scores[p] = s.finished.indexOf(p) + 1; void i; }); // 1 = President
+  s.winner = s.finished[0] ?? s.players[0];
+  log(s, null, `Round over — ${short(s.winner)} is President.`);
+}
+
 // ---------- redaction (hidden information) ----------
 
 export function redact(state: MatchState, viewer: string): RedactedState {
@@ -664,10 +777,11 @@ export function redact(state: MatchState, viewer: string): RedactedState {
     pendingChoice: state.pendingChoice,
     scores: { ...state.scores },
     log: state.log.slice(-40),
-    mode: state.definition.trick ? 'trick' : 'shedding',
+    mode: state.definition.trick ? 'trick' : state.definition.climb ? 'climb' : 'shedding',
     trick: state.definition.trick ? state.trickPlays.map((t) => ({ ...t })) : undefined,
     lead: state.definition.trick ? state.lead : undefined,
     tricksWon: state.definition.trick ? { ...state.tricksWon } : undefined,
+    finished: state.definition.climb ? state.finished.slice() : undefined,
   };
 }
 

@@ -27,6 +27,8 @@ export function validate(def: GameDefinition): ValidationResult {
   const tagNames = new Set(Object.keys(def.deck.tags));
   const actionIds = new Set(def.actions.map((a) => a.id));
   const isTrick = !!def.trick;
+  const isClimb = !!def.climb;
+  const isSpecial = isTrick || isClimb;
 
   // --- players ---
   if (def.meta.players.min < 2) err('players.min', 'A game needs at least 2 players.');
@@ -43,6 +45,9 @@ export function validate(def: GameDefinition): ValidationResult {
   if (isTrick && def.trick!.trump !== 'none' && !['C', 'D', 'H', 'S'].includes(def.trick!.trump)) {
     err('trick.trump', `Trump must be a suit or "none" (got "${def.trick!.trump}").`);
   }
+  if (isClimb && !def.zones.some((z) => z.visibility === 'top-public')) {
+    err('zones.pile', 'Climbing games need a shared play pile (a top-public discard).');
+  }
 
   const zoneRef = (id: string | undefined, where: string) => {
     if (id && !zoneIds.has(id)) err('zone.missing', `${where} references unknown zone "${id}".`);
@@ -52,6 +57,7 @@ export function validate(def: GameDefinition): ValidationResult {
   for (const step of def.setup) {
     if (step.op === 'shuffle') zoneRef(step.zone, 'setup.shuffle');
     if (step.op === 'deal') { zoneRef(step.from, 'setup.deal.from'); zoneRef(step.to, 'setup.deal.to'); }
+    if (step.op === 'dealAll') { zoneRef(step.from, 'setup.dealAll.from'); zoneRef(step.to, 'setup.dealAll.to'); }
     if (step.op === 'move') { zoneRef(step.from, 'setup.move.from'); zoneRef(step.to, 'setup.move.to'); }
   }
 
@@ -64,7 +70,7 @@ export function validate(def: GameDefinition): ValidationResult {
     .reduce((n, s: any) => n + s.countPerPlayer * def.meta.players.max, 0);
   if (dealt > deckSize) {
     err('deck.overdeal', `Dealing ${dealt} cards to ${def.meta.players.max} players exceeds the ${deckSize}-card deck.`);
-  } else if (!isTrick && dealt > deckSize * 0.75) {
+  } else if (!isSpecial && dealt > deckSize * 0.75) {
     warn('deck.tight', `Dealing ${dealt} of ${deckSize} cards leaves a thin draw pile at max players.`);
   }
 
@@ -111,7 +117,7 @@ export function validate(def: GameDefinition): ValidationResult {
 
   // --- win reachability (heuristic) ---
   // If a win requires emptying a hand, some action must be able to move cards OUT of the hand.
-  const emptiesHand = !isTrick && def.endConditions.some((ec) => ec.when.zoneCount.zone === 'hand' && ec.when.zoneCount.eq === 0);
+  const emptiesHand = !isSpecial && def.endConditions.some((ec) => ec.when.zoneCount.zone === 'hand' && ec.when.zoneCount.eq === 0);
   if (emptiesHand) {
     const canShed = def.actions.some((a) =>
       a.effects.some((e) => e.op === 'move' && e.card === '$target') ||
@@ -129,7 +135,7 @@ export function validate(def: GameDefinition): ValidationResult {
     // an untargeted action whose legality is either always-true or only gated on "can't play"
     return true;
   });
-  if (!isTrick && !hasFallback) {
+  if (!isSpecial && !hasFallback) {
     warn('deadend.fallback', 'No fallback action (e.g. draw or pass) — players may get stuck with no legal move.');
   }
 

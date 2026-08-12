@@ -45,6 +45,13 @@ export interface GameDefinition {
   // Present iff this is a trick-taking game. The interpreter runs a trick-taking loop
   // (follow suit, trump, highest card takes the trick and leads next) instead of shedding.
   trick?: TrickConfig;
+  // Present iff this is a climbing game (President/Big Two): beat the previous play or pass;
+  // when everyone passes the pile clears and the last player to play leads again.
+  climb?: ClimbConfig;
+}
+
+export interface ClimbConfig {
+  order: Rank[]; // rank strength, low → high (e.g. 3,4,…,K,A,2)
 }
 
 export interface TrickConfig {
@@ -70,6 +77,7 @@ export interface ZoneDef {
 export type SetupStep =
   | { op: 'shuffle'; zone: string }
   | { op: 'deal'; from: string; to: string; countPerPlayer: number }
+  | { op: 'dealAll'; from: string; to: string } // distribute every card round-robin
   | { op: 'move'; from: string; to: string; count: number };
 
 export interface ActionDef {
@@ -148,6 +156,10 @@ export interface MatchState {
   lead: Suit | null;        // led suit of the current trick
   trickPlays: { player: string; card: Card }[]; // cards played into the current trick
   tricksWon: Record<string, number>;
+  // climbing state (unused by other families)
+  passStreak: number;       // consecutive passes since the last play
+  lastPlayer: string | null; // who made the last play (leads when the pile clears)
+  finished: string[];       // players who have emptied their hand, in finishing order
   vars: Record<string, string>;
   scores: Record<string, number>;
   phase: 'playing' | 'roundOver';
@@ -192,9 +204,10 @@ export interface RedactedState {
   pendingChoice: MatchState['pendingChoice'];
   scores: Record<string, number>;
   log: LogEntry[];
-  // trick-taking view (present only for trick games)
-  mode: 'shedding' | 'trick';
+  // family-specific view
+  mode: 'shedding' | 'trick' | 'climb';
   trick?: { player: string; card: Card }[];
   lead?: Suit | null;
   tricksWon?: Record<string, number>;
+  finished?: string[];
 }

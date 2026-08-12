@@ -44,6 +44,19 @@ export function chooseMove(
     return { move: best, botSeed };
   }
 
+  // Climbing (President): play the lowest card that beats the pile, else pass.
+  if (moves[0].actionId === 'climbPlay' || moves[0].actionId === 'climbPass') {
+    if (mode === 'random') { const r = nextRandom(botSeed); return { move: moves[Math.floor(r.value * moves.length)], botSeed: r.state }; }
+    const plays = moves.filter((m) => m.actionId === 'climbPlay');
+    if (plays.length === 0) return { move: moves[0], botSeed };
+    const hand = state.zones[`hand:${playerId}`] || [];
+    const order = state.definition.climb!.order;
+    const rankOf = (id?: string) => { const c = hand.find((x) => x.id === id); return c ? order.indexOf(c.rank as never) : 999; };
+    let best = plays[0];
+    for (const m of plays) if (rankOf(m.cardId) < rankOf(best.cardId)) best = m;
+    return { move: best, botSeed };
+  }
+
   // Easy mode: pick any legal move uniformly at random.
   if (mode === 'random') {
     const r = nextRandom(botSeed);
