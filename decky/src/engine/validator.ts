@@ -51,7 +51,9 @@ export function validate(def: GameDefinition): ValidationResult {
   }
 
   // --- deck size vs deal ---
-  const deckSize = 52 + (def.deck.includeJokers ? 2 : 0);
+  const copies = Math.max(1, def.deck.deckCount ?? 1);
+  const excluded = (def.deck.excludeRanks ?? []).length;
+  const deckSize = ((13 - excluded) * 4 + (def.deck.includeJokers ? 2 : 0)) * copies;
   const dealt = def.setup
     .filter((s) => s.op === 'deal')
     .reduce((n, s: any) => n + s.countPerPlayer * def.meta.players.max, 0);
@@ -83,6 +85,7 @@ export function validate(def: GameDefinition): ValidationResult {
     for (const e of effects) {
       if (e.op === 'move') { zoneRef(e.from, `${where}.move.from`); zoneRef(e.to, `${where}.move.to`); }
       if (e.op === 'forceDraw') zoneRef(e.from, `${where}.forceDraw.from`);
+      if (e.op === 'drawUntilPlayable') zoneRef(e.from, `${where}.drawUntilPlayable.from`);
       if (e.op === 'reshuffleDiscardInto') zoneRef(e.zone, `${where}.reshuffle`);
       if (e.op === 'if') { checkPredicate(e.cond, `${where}.if`); checkEffects(e.then, `${where}.if.then`); if (e.else) checkEffects(e.else, `${where}.if.else`); }
     }

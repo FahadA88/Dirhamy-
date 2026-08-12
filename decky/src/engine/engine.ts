@@ -12,7 +12,7 @@ import {
   ActionDef, Card, Effect, GameDefinition, MatchState, Move, Predicate,
   RedactedState, RedactedZone, ScoringDef, ZoneDef,
 } from './types';
-import { buildDeck, cardTags } from './deck';
+import { buildDeck, cardColor, cardTags } from './deck';
 import { seededShuffle } from './rng';
 
 // ---------- zone helpers ----------
@@ -31,6 +31,12 @@ function topCard(cards: Card[]): Card | undefined {
   return cards.length ? cards[cards.length - 1] : undefined;
 }
 
+function propOf(card: Card, prop: 'suit' | 'rank' | 'color'): string {
+  if (prop === 'suit') return card.suit;
+  if (prop === 'rank') return card.rank;
+  return cardColor(card);
+}
+
 // ---------- match creation ----------
 
 export function createMatch(def: GameDefinition, players: string[], seed: number): MatchState {
@@ -43,6 +49,7 @@ export function createMatch(def: GameDefinition, players: string[], seed: number
     turnIndex: 0,
     direction: def.turnFlow.order === 'clockwise' ? 1 : -1,
     skipCount: 0,
+    repeatTurn: false,
     stallCount: 0,
     vars: {},
     scores: Object.fromEntries(players.map((p) => [p, 0])),
@@ -123,11 +130,11 @@ function evalPredicate(state: MatchState, p: Predicate, ctx: Ctx): boolean {
   if ('matches' in p) {
     const m = p.matches;
     if (!ctx.targetCard) return false;
-    const val = m.cardProp === 'suit' ? ctx.targetCard.suit : ctx.targetCard.rank;
+    const val = propOf(ctx.targetCard, m.cardProp);
     if (m.equalsTopOf) {
       const top = topCard(state.zones[m.equalsTopOf]);
       if (!top) return false;
-      return (m.cardProp === 'suit' ? top.suit : top.rank) === val;
+      return propOf(top, m.cardProp) === val;
     }
     if (m.equalsStateOrTopOf) {
       const [stateVar, zoneId] = m.equalsStateOrTopOf;
@@ -135,7 +142,7 @@ function evalPredicate(state: MatchState, p: Predicate, ctx: Ctx): boolean {
       if (sv !== undefined) return sv === val;
       const top = topCard(state.zones[zoneId]);
       if (!top) return false;
-      return (m.cardProp === 'suit' ? top.suit : top.rank) === val;
+      return propOf(top, m.cardProp) === val;
     }
     return false;
   }
@@ -288,6 +295,22 @@ function runEffects(state: MatchState, effects: Effect[], ctx: Ctx & { playedCar
         reshuffleDiscardInto(state, e.zone, e.keepTop);
         break;
       }
+      case 'extraTurn': {
+        state.repeatTurn = true;
+        break;
+      }
+      case 'drawUntilPlayable': {
+        const handKey = zoneKey(def, 'hand', ctx.playerId);
+        let guard = 0;
+        while (guard++ < 30) {
+          if (actionHasLegalMove(state, ctx.playerId, 'playCard', true)) break;
+          let card = state.zones[e.from].pop();
+          if (!card) { fireDrawPileTriggers(state); card = state.zones[e.from].pop(); }
+          if (!card) break;
+          state.zones[handKey].push(card);
+        }
+        break;
+      }
     }
   }
 }
@@ -370,6 +393,11 @@ export function applyMove(state: MatchState, playerId: string, move: Move): Matc
 
 function advanceAndCheck(s: MatchState): void {
   if (checkEnd(s)) return;
+  // Extra-turn cards: the same player goes again (unless they've stalled out).
+  if (s.repeatTurn) {
+    s.repeatTurn = false;
+    if (legalMoves(s, s.players[s.turnIndex]).length > 0) return;
+  }
   advanceTurn(s);
   // Deadlock guard: if the whole table has stalled with no productive move, end the round.
   if (s.stallCount >= s.players.length) {
@@ -439,14 +467,15 @@ function computeWinner(state: MatchState, winnerHint?: string): string {
   const def = state.definition;
   const s: ScoringDef = def.scoring;
   if (s.winner === 'firstOut' && winnerHint) return winnerHint;
-  // lowestTotal: sum remaining hand points, lowest wins.
+  // Sum remaining hand points; lowest or highest wins per scoring.winner.
+  const highest = s.winner === 'highestTotal';
   let best: string = state.players[0];
-  let bestPts = Infinity;
+  let bestPts = highest ? -Infinity : Infinity;
   for (const p of state.players) {
     const hand = state.zones[`hand:${p}`] || [];
     const pts = hand.reduce((sum, c) => sum + cardPoints(s, c), 0);
     state.scores[p] = pts;
-    if (pts < bestPts) { bestPts = pts; best = p; }
+    if (highest ? pts > bestPts : pts < bestPts) { bestPts = pts; best = p; }
   }
   return best;
 }

@@ -2,29 +2,51 @@
 // set of KNOBS; buildDefinition() compiles those knobs into a full GameDefinition the engine
 // can run. This is what the visual editor edits and what the AI co-pilot writes to.
 
-import { GameDefinition, Rank } from '../engine/types';
+import { Effect, GameDefinition, Predicate, Rank } from '../engine/types';
+
+export const RANKS_13: Rank[] = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
 
 export interface Knobs {
   name: string;
   description: string;
   minPlayers: number;
   maxPlayers: number;
+  // deck
   handSize: number;
-  direction: 'clockwise' | 'counter-clockwise';
-  canAlwaysDraw: boolean;    // true = draw anytime; false = only when you can't play
-  wildRanks: Rank[];         // playable anytime → then name a suit
-  skipRanks: Rank[];         // playing one skips the next player
-  reverseRanks: Rank[];      // playing one reverses direction
-  drawRanks: Rank[];         // playing one makes the next player draw N and miss a turn
-  drawCount: number;         // how many the next player draws
+  deckCount: number;
+  excludeRanks: Rank[];
   includeJokers: boolean;
+  // matching
+  matchSuit: boolean;
+  matchRank: boolean;
+  matchColor: boolean;
+  // drawing
+  canAlwaysDraw: boolean;
+  drawUntilCanPlay: boolean;
+  // special cards
+  wildRanks: Rank[];
+  skipRanks: Rank[];
+  reverseRanks: Rank[];
+  drawRanks: Rank[];
+  drawCount: number;
+  extraTurnRanks: Rank[];
+  wildDrawRanks: Rank[];
+  wildDrawCount: number;
+  // flow & endgame
+  direction: 'clockwise' | 'counter-clockwise';
   reshuffleWhenEmpty: boolean;
-  winMode: 'firstOut' | 'lowestTotal';
-  pointTarget: number;       // play up to this many points across rounds (advisory metadata)
-  points: { joker: number; eight: number; face: number; ace: number }; // card values for scoring
+  winMode: 'firstOut' | 'lowestTotal' | 'highestTotal';
+  pointTarget: number;
+  // scoring
+  perRankPoints: Record<string, number>;
+  jokerPoints: number;
 }
 
-export const RANK_CHOICES: Rank[] = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'JOKER'];
+export const RANK_CHOICES: Rank[] = [...RANKS_13, 'JOKER'];
+
+const defaultPoints: Record<string, number> = {
+  A: 1, '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, '10': 10, J: 10, Q: 10, K: 10,
+};
 
 export const defaultKnobs: Knobs = {
   name: 'My Card Game',
@@ -32,72 +54,88 @@ export const defaultKnobs: Knobs = {
   minPlayers: 2,
   maxPlayers: 6,
   handSize: 5,
-  direction: 'clockwise',
+  deckCount: 1,
+  excludeRanks: [],
+  includeJokers: false,
+  matchSuit: true,
+  matchRank: true,
+  matchColor: false,
   canAlwaysDraw: false,
+  drawUntilCanPlay: false,
   wildRanks: ['8'],
   skipRanks: [],
   reverseRanks: [],
   drawRanks: [],
   drawCount: 2,
-  includeJokers: false,
+  extraTurnRanks: [],
+  wildDrawRanks: [],
+  wildDrawCount: 4,
+  direction: 'clockwise',
   reshuffleWhenEmpty: true,
   winMode: 'firstOut',
   pointTarget: 100,
-  points: { joker: 50, eight: 50, face: 10, ace: 1 },
+  perRankPoints: { ...defaultPoints },
+  jokerPoints: 50,
 };
 
 export function buildDefinition(knobs: Knobs, id = 'draft'): GameDefinition {
+  const wildAll = dedup([...knobs.wildRanks, ...knobs.wildDrawRanks]);
+
   const tags: GameDefinition['deck']['tags'] = {};
-  if (knobs.wildRanks.length) tags.wild = { ranks: knobs.wildRanks };
+  if (wildAll.length) tags.wild = { ranks: wildAll };
   if (knobs.skipRanks.length) tags.skip = { ranks: knobs.skipRanks };
   if (knobs.reverseRanks.length) tags.reverse = { ranks: knobs.reverseRanks };
   if (knobs.drawRanks.length) tags.drawTwo = { ranks: knobs.drawRanks };
+  if (knobs.extraTurnRanks.length) tags.again = { ranks: knobs.extraTurnRanks };
+  if (knobs.wildDrawRanks.length) tags.wildDraw = { ranks: knobs.wildDrawRanks };
 
   const triggers: GameDefinition['triggers'] = [];
   if (knobs.skipRanks.length) triggers.push({ on: 'cardPlayed', cardHasTag: 'skip', do: [{ op: 'skipNext' }] });
   if (knobs.reverseRanks.length) triggers.push({ on: 'cardPlayed', cardHasTag: 'reverse', do: [{ op: 'reverseOrder' }] });
   if (knobs.drawRanks.length) {
-    triggers.push({
-      on: 'cardPlayed', cardHasTag: 'drawTwo',
-      do: [{ op: 'forceDraw', target: 'next', from: 'draw', count: knobs.drawCount }, { op: 'skipNext' }],
-    });
+    triggers.push({ on: 'cardPlayed', cardHasTag: 'drawTwo', do: [{ op: 'forceDraw', target: 'next', from: 'draw', count: knobs.drawCount }, { op: 'skipNext' }] });
   }
-  if (knobs.reshuffleWhenEmpty) {
-    triggers.push({ on: 'drawPileEmpty', do: [{ op: 'reshuffleDiscardInto', zone: 'draw', keepTop: true }] });
+  if (knobs.extraTurnRanks.length) triggers.push({ on: 'cardPlayed', cardHasTag: 'again', do: [{ op: 'extraTurn' }] });
+  if (knobs.wildDrawRanks.length) {
+    triggers.push({ on: 'cardPlayed', cardHasTag: 'wildDraw', do: [{ op: 'forceDraw', target: 'next', from: 'draw', count: knobs.wildDrawCount }, { op: 'skipNext' }] });
   }
+  if (knobs.reshuffleWhenEmpty) triggers.push({ on: 'drawPileEmpty', do: [{ op: 'reshuffleDiscardInto', zone: 'draw', keepTop: true }] });
 
-  const whenPlay: GameDefinition['actions'][number]['when'] = {
-    any: [
-      { matches: { cardProp: 'suit', equalsStateOrTopOf: ['activeSuit', 'discard'] } },
-      { matches: { cardProp: 'rank', equalsTopOf: 'discard' } },
-      ...(knobs.wildRanks.length ? [{ cardHasTag: 'wild' } as const] : []),
-    ],
-  };
+  const matchClauses: Predicate[] = [];
+  if (knobs.matchSuit) matchClauses.push({ matches: { cardProp: 'suit', equalsStateOrTopOf: ['activeSuit', 'discard'] } });
+  if (knobs.matchRank) matchClauses.push({ matches: { cardProp: 'rank', equalsTopOf: 'discard' } });
+  if (knobs.matchColor) matchClauses.push({ matches: { cardProp: 'color', equalsTopOf: 'discard' } });
+  if (wildAll.length) matchClauses.push({ cardHasTag: 'wild' });
+  // Never leave the play with zero ways to match (that would be unplayable): fall back to rank.
+  if (matchClauses.length === 0) matchClauses.push({ matches: { cardProp: 'rank', equalsTopOf: 'discard' } });
 
-  const playEffects: GameDefinition['actions'][number]['effects'] = [
+  const playEffects: Effect[] = [
     { op: 'move', card: '$target', to: 'discard' },
     { op: 'setState', var: 'activeSuit', value: '$target.suit' },
   ];
-  if (knobs.wildRanks.length) {
-    playEffects.push({ op: 'if', cond: { cardHasTag: 'wild' }, then: [{ op: 'chooseSuit', setState: 'activeSuit' }] });
-  }
+  if (wildAll.length) playEffects.push({ op: 'if', cond: { cardHasTag: 'wild' }, then: [{ op: 'chooseSuit', setState: 'activeSuit' }] });
 
-  const drawWhen: GameDefinition['actions'][number]['when'] =
-    knobs.canAlwaysDraw ? { always: true } : { not: { existsLegal: 'playCard' } };
+  const drawEffects: Effect[] = knobs.drawUntilCanPlay && !knobs.canAlwaysDraw
+    ? [{ op: 'drawUntilPlayable', from: 'draw' }]
+    : [{ op: 'move', from: 'draw', to: 'hand', count: 1 }];
+  const drawWhen: Predicate = knobs.canAlwaysDraw ? { always: true } : { not: { existsLegal: 'playCard' } };
+
+  const cardPoints: Record<string, number | 'rankValue'> = { JOKER: knobs.jokerPoints };
+  for (const r of RANKS_13) cardPoints[r] = knobs.perRankPoints[r] ?? 0;
 
   return {
     schemaVersion: '1.0',
     meta: {
-      id,
-      name: knobs.name,
-      description: knobs.description || autoDescription(knobs),
+      id, name: knobs.name, description: knobs.description || autoDescription(knobs),
       players: { min: clampInt(knobs.minPlayers, 2, 8), max: clampInt(knobs.maxPlayers, knobs.minPlayers, 8) },
       family: 'shedding-matching',
     },
     deck: {
       base: 'standard54',
       includeJokers: knobs.includeJokers,
-      rankOrder: ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'],
+      deckCount: clampInt(knobs.deckCount, 1, 3),
+      excludeRanks: knobs.excludeRanks,
+      rankOrder: RANKS_13,
       tags,
     },
     zones: [
@@ -112,8 +150,8 @@ export function buildDefinition(knobs: Knobs, id = 'draft'): GameDefinition {
     ],
     turnFlow: { order: knobs.direction, startPlayer: 'first', actionsPerTurn: { min: 1, max: 1 } },
     actions: [
-      { id: 'playCard', target: { from: 'hand', select: 'one' }, when: whenPlay, effects: playEffects },
-      { id: 'drawCard', when: drawWhen, effects: [{ op: 'move', from: 'draw', to: 'hand', count: 1 }] },
+      { id: 'playCard', target: { from: 'hand', select: 'one' }, when: { any: matchClauses }, effects: playEffects },
+      { id: 'drawCard', when: drawWhen, effects: drawEffects },
     ],
     triggers,
     endConditions: [
@@ -121,13 +159,9 @@ export function buildDefinition(knobs: Knobs, id = 'draft'): GameDefinition {
     ],
     scoring: {
       mode: knobs.winMode === 'firstOut' ? 'firstToEmptyWins' : 'lowestPoints',
-      cardPoints: {
-        JOKER: knobs.points.joker, '8': knobs.points.eight,
-        K: knobs.points.face, Q: knobs.points.face, J: knobs.points.face, '10': knobs.points.face,
-        default: 'rankValue', A: knobs.points.ace,
-      },
+      cardPoints,
       target: knobs.pointTarget,
-      winner: knobs.winMode === 'firstOut' ? 'firstOut' : 'lowestTotal',
+      winner: knobs.winMode,
     },
   };
 }
@@ -136,47 +170,74 @@ export function buildDefinition(knobs: Knobs, id = 'draft'): GameDefinition {
 export function knobsFromDefinition(def: GameDefinition): Knobs {
   const deal = def.setup.find((s) => s.op === 'deal') as { countPerPlayer: number } | undefined;
   const tagRanks = (t: string) => def.deck.tags[t]?.ranks ?? [];
+  const play = def.actions.find((a) => a.id === 'playCard');
+  const clauses = play && 'any' in play.when ? play.when.any : [];
+  const hasMatch = (prop: string) => clauses.some((c) => 'matches' in c && c.matches.cardProp === prop);
   const drawTrig = def.triggers.find((t) => t.on === 'cardPlayed' && t.cardHasTag === 'drawTwo');
-  const forceDraw = drawTrig?.do.find((e) => e.op === 'forceDraw') as { count: number } | undefined;
+  const wildDrawTrig = def.triggers.find((t) => t.on === 'cardPlayed' && t.cardHasTag === 'wildDraw');
+  const countOf = (trig: typeof drawTrig, d: number) => {
+    const fd = trig?.do.find((e) => e.op === 'forceDraw') as { count: number } | undefined;
+    return fd?.count ?? d;
+  };
   const drawAction = def.actions.find((a) => a.id === 'drawCard');
   const cp = def.scoring.cardPoints || {};
-  const num = (v: unknown, d: number) => (typeof v === 'number' ? v : d);
+  const perRank: Record<string, number> = {};
+  for (const r of RANKS_13) perRank[r] = typeof cp[r] === 'number' ? (cp[r] as number) : (defaultPoints[r] ?? 0);
+  const wildDrawRanks = tagRanks('wildDraw');
+  const wildRanks = tagRanks('wild').filter((r) => !wildDrawRanks.includes(r));
+
   return {
     name: def.meta.name,
     description: def.meta.description,
     minPlayers: def.meta.players.min,
     maxPlayers: def.meta.players.max,
     handSize: deal?.countPerPlayer ?? 5,
-    direction: def.turnFlow.order,
+    deckCount: def.deck.deckCount ?? 1,
+    excludeRanks: def.deck.excludeRanks ?? [],
+    includeJokers: def.deck.includeJokers,
+    matchSuit: hasMatch('suit'),
+    matchRank: hasMatch('rank'),
+    matchColor: hasMatch('color'),
     canAlwaysDraw: !!drawAction && 'always' in (drawAction.when as object),
-    wildRanks: tagRanks('wild'),
+    drawUntilCanPlay: !!drawAction?.effects.some((e) => e.op === 'drawUntilPlayable'),
+    wildRanks,
     skipRanks: tagRanks('skip'),
     reverseRanks: tagRanks('reverse'),
     drawRanks: tagRanks('drawTwo'),
-    drawCount: forceDraw?.count ?? 2,
-    includeJokers: def.deck.includeJokers,
+    drawCount: countOf(drawTrig, 2),
+    extraTurnRanks: tagRanks('again'),
+    wildDrawRanks,
+    wildDrawCount: countOf(wildDrawTrig, 4),
+    direction: def.turnFlow.order,
     reshuffleWhenEmpty: def.triggers.some((t) => t.on === 'drawPileEmpty'),
-    winMode: def.scoring.winner === 'firstOut' ? 'firstOut' : 'lowestTotal',
-    pointTarget: num(def.scoring.target, 100),
-    points: { joker: num(cp.JOKER, 50), eight: num(cp['8'], 50), face: num(cp.K, 10), ace: num(cp.A, 1) },
+    winMode: def.scoring.winner,
+    pointTarget: typeof def.scoring.target === 'number' ? def.scoring.target : 100,
+    perRankPoints: perRank,
+    jokerPoints: typeof cp.JOKER === 'number' ? (cp.JOKER as number) : 50,
   };
 }
 
-export function rankLabel(r: Rank): string {
-  return r === 'JOKER' ? 'Joker' : r;
-}
+export function rankLabel(r: Rank): string { return r === 'JOKER' ? 'Joker' : r; }
 
-function clampInt(n: number, lo: number, hi: number): number {
-  return Math.max(lo, Math.min(hi, Math.round(n)));
-}
+function dedup(rs: Rank[]): Rank[] { return Array.from(new Set(rs)); }
+function clampInt(n: number, lo: number, hi: number): number { return Math.max(lo, Math.min(hi, Math.round(n))); }
 
 function autoDescription(k: Knobs): string {
   const list = (rs: Rank[]) => rs.map(rankLabel).join('/');
-  const parts = [`Match the top card by rank or suit. Deal ${k.handSize} cards each.`];
+  const crit: string[] = [];
+  if (k.matchSuit) crit.push('suit');
+  if (k.matchRank) crit.push('rank');
+  if (k.matchColor) crit.push('color');
+  const parts = [`Match the top card by ${crit.join(' or ') || 'rank'}. Deal ${k.handSize} cards each${k.deckCount > 1 ? ` from ${k.deckCount} decks` : ''}.`];
+  if (k.excludeRanks.length) parts.push(`${list(k.excludeRanks)} are removed from the deck.`);
   if (k.wildRanks.length) parts.push(`${list(k.wildRanks)} are wild.`);
+  if (k.wildDrawRanks.length) parts.push(`${list(k.wildDrawRanks)} are wild and make the next player draw ${k.wildDrawCount}.`);
   if (k.skipRanks.length) parts.push(`${list(k.skipRanks)} skip the next player.`);
   if (k.reverseRanks.length) parts.push(`${list(k.reverseRanks)} reverse direction.`);
   if (k.drawRanks.length) parts.push(`${list(k.drawRanks)} make the next player draw ${k.drawCount}.`);
-  parts.push(k.winMode === 'firstOut' ? 'First to empty their hand wins.' : 'Lowest points wins when someone goes out.');
+  if (k.extraTurnRanks.length) parts.push(`${list(k.extraTurnRanks)} let you play again.`);
+  if (k.drawUntilCanPlay) parts.push('If you cannot play, keep drawing until you can.');
+  parts.push(k.winMode === 'firstOut' ? 'First to empty their hand wins.'
+    : k.winMode === 'highestTotal' ? 'Highest points wins.' : 'Lowest points wins.');
   return parts.join(' ');
 }

@@ -63,11 +63,35 @@ function findRankNear(text: string, keyword: string): Rank | null {
     let m: RegExpExecArray | null;
     while ((m = re.exec(text))) consider(rank, m.index + word.length / 2);
   }
-  const digits = /\b(10|[2-9])\b/g;
+  const digits = /\b(10|[2-9])s?\b/g; // also matches "2s", "7s"
   let dm: RegExpExecArray | null;
   while ((dm = digits.exec(text))) consider(dm[1] as Rank, dm.index);
 
   return best ? (best as { rank: Rank }).rank : null;
+}
+
+// The card that TRIGGERS an effect is usually named to the left of the effect phrase
+// ("aces … draw four", "7s let you play again"). Searching left of the keyword avoids
+// mistaking the count word ("four") for the card's rank.
+function findRankLeftOf(text: string, keyword: string): Rank | null {
+  const idx = text.indexOf(keyword);
+  if (idx < 0) return null;
+  let best: Rank | null = null;
+  let bestPos = -1;
+  const consider = (rank: Rank, at: number) => { if (at < idx && at > bestPos) { bestPos = at; best = rank; } };
+  for (const [w, r] of Object.entries(RANK_WORDS)) {
+    const re = new RegExp(`\\b${w}\\b`, 'g');
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(text))) consider(r, m.index);
+  }
+  const dre = /\b(10|[2-9])s?\b/g; let d: RegExpExecArray | null;
+  while ((d = dre.exec(text))) consider(d[1] as Rank, d.index);
+  return best;
+}
+
+function detectLeft(text: string, keys: string[]): Rank | null {
+  for (const k of keys) if (text.includes(k)) { const r = findRankLeftOf(text, k); if (r) return r; }
+  return null;
 }
 
 // ---------- the offline translator ----------
@@ -107,9 +131,35 @@ export const offlineTranslator: Translator = {
     const drawTwo = detectDrawTwo(text);
     if (drawTwo) { patch.drawRanks = [drawTwo]; notes.push(`${rankLabel(drawTwo)}s make the next player draw two.`); }
 
+    // extra turn / wild-draw (trigger card named to the left of the effect phrase)
+    const again = detectLeft(text, ['play again', 'go again', 'extra turn', 'another turn', 'plays again']);
+    if (again) { patch.extraTurnRanks = [again]; notes.push(`${rankLabel(again)}s let you play again.`); }
+    const wildDraw = detectWildDraw(text);
+    if (wildDraw) { patch.wildDrawRanks = [wildDraw]; patch.wildDrawCount = 4; notes.push(`${rankLabel(wildDraw)}s are wild and force a draw of four.`); }
+
+    // decks / short deck
+    if (/\b(two|2|double|second)\s+(full\s+)?decks?\b|\btwo decks?\b/.test(text)) { patch.deckCount = 2; notes.push('Two decks shuffled together.'); }
+    const removed = detectRemovedRanks(description);
+    if (removed.length) { patch.excludeRanks = removed; notes.push(`Removed from the deck: ${removed.map(rankLabel).join(', ')}.`); }
+
+    // matching criteria
+    if (/\b(match|same)[^.]*colou?r\b|\bby colou?r\b/.test(text)) { patch.matchColor = true; notes.push('Cards may also match by color.'); }
+    if (/\bsuit only\b|\bmatch(?:es|ing)? (?:the )?suit only\b/.test(text)) { patch.matchRank = false; patch.matchSuit = true; }
+
+    // drawing
+    if (/\bkeep drawing\b|\bdraw until\b|\buntil you can play\b|\buntil playable\b/.test(text)) { patch.drawUntilCanPlay = true; notes.push('If you can’t play, keep drawing until you can.'); }
+
     // direction / win mode
     if (/\bcounter.?clock|anti.?clock/.test(text)) { patch.direction = 'counter-clockwise'; notes.push('Play goes counter-clockwise.'); }
-    if (/\blowest (points|score|hand) wins\b|\bfewest points\b/.test(text)) { patch.winMode = 'lowestTotal'; notes.push('Lowest points wins.'); }
+    if (/\blowest (points|score|hand|total) wins\b|\bfewest points\b/.test(text)) { patch.winMode = 'lowestTotal'; notes.push('Lowest points wins.'); }
+    if (/\bhighest (points|score|total) wins\b|\bmost points wins\b/.test(text)) { patch.winMode = 'highestTotal'; notes.push('Highest points wins.'); }
+
+    // keep a rank out of the plain-wild set if it's a wild-draw card
+    if (patch.wildDrawRanks && patch.wildDrawRanks.length) {
+      const wd = new Set(patch.wildDrawRanks);
+      const baseWild = (patch.wildRanks ?? current.wildRanks).filter((r) => !wd.has(r));
+      patch.wildRanks = baseWild;
+    }
 
     // jokers include
     if (/\b(?:with|include|add)\s+jokers?\b/.test(text)) { patch.includeJokers = true; notes.push('Jokers included in the deck.'); }
@@ -173,14 +223,29 @@ function detect(text: string, keywords: string[]): Rank | null {
 }
 
 function detectDrawTwo(text: string): Rank | null {
-  const keys = ['draw two', 'draw 2', 'pick up two', 'pick up 2', 'draws two', 'draws 2', '+2'];
-  for (const k of keys) {
-    if (text.includes(k)) {
-      const r = findRankNear(text, k);
-      if (r) return r;
-    }
-  }
-  return null;
+  return detectLeft(text, ['draw two', 'draw 2', 'pick up two', 'pick up 2', 'draws two', 'draws 2', '+2']);
+}
+
+function detectWildDraw(text: string): Rank | null {
+  return detectLeft(text, ['draw four', 'draw 4', 'draws four', 'draws 4', 'pick up four', 'pick up 4', 'wild draw', '+4']);
+}
+
+// Ranks a "remove/strip/without" clause takes out of the deck.
+function detectRemovedRanks(description: string): Rank[] {
+  const text = ` ${description.toLowerCase()} `;
+  const m = /\b(remove|strip|without|take out|exclude|no)\b([^.!?]*)/.exec(text);
+  if (!m) return [];
+  const clause = m[2];
+  const found = new Set<Rank>();
+  const words: Record<string, Rank> = {
+    ace: 'A', aces: 'A', two: '2', twos: '2', three: '3', threes: '3', four: '4', fours: '4',
+    five: '5', fives: '5', six: '6', sixes: '6', seven: '7', sevens: '7', eight: '8', eights: '8',
+    nine: '9', nines: '9', ten: '10', tens: '10', jack: 'J', jacks: 'J', queen: 'Q', queens: 'Q', king: 'K', kings: 'K',
+  };
+  for (const [w, r] of Object.entries(words)) if (new RegExp(`\\b${w}\\b`).test(clause)) found.add(r);
+  const digitRe = /\b(10|[2-9])s?\b/g; let d: RegExpExecArray | null;
+  while ((d = digitRe.exec(clause))) found.add(d[1] as Rank);
+  return [...found];
 }
 
 function diffKnobs(from: Knobs, to: Knobs): ProposedChange[] {
@@ -203,8 +268,16 @@ function describeChange(field: keyof Knobs, value: unknown): string {
     case 'skipRanks': return (value as Rank[]).length ? `Skip on ${ranks(value)}` : 'No skip card';
     case 'reverseRanks': return (value as Rank[]).length ? `Reverse on ${ranks(value)}` : 'No reverse card';
     case 'drawRanks': return (value as Rank[]).length ? `Draw-two on ${ranks(value)}` : 'No draw-two card';
+    case 'extraTurnRanks': return (value as Rank[]).length ? `Play again on ${ranks(value)}` : 'No play-again card';
+    case 'wildDrawRanks': return (value as Rank[]).length ? `Wild-draw on ${ranks(value)}` : 'No wild-draw card';
+    case 'excludeRanks': return (value as Rank[]).length ? `Remove ${ranks(value)} from the deck` : 'Full deck';
+    case 'deckCount': return `${value} deck${(value as number) > 1 ? 's' : ''}`;
+    case 'matchColor': return value ? 'Also match by color' : 'No color matching';
+    case 'matchSuit': return value ? 'Match by suit' : 'No suit matching';
+    case 'matchRank': return value ? 'Match by rank' : 'No rank matching';
+    case 'drawUntilCanPlay': return value ? 'Draw until you can play' : 'Draw one card';
     case 'direction': return `Direction → ${value}`;
-    case 'winMode': return value === 'firstOut' ? 'Win: first to empty' : 'Win: lowest points';
+    case 'winMode': return value === 'firstOut' ? 'Win: first to empty' : value === 'highestTotal' ? 'Win: highest points' : 'Win: lowest points';
     case 'includeJokers': return value ? 'Include jokers' : 'No jokers';
     case 'reshuffleWhenEmpty': return value ? 'Reshuffle discard when draw runs out' : 'Round ends when draw runs out';
     default: return String(field);

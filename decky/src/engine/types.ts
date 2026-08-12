@@ -26,6 +26,8 @@ export interface GameDefinition {
   deck: {
     base: 'standard54';
     includeJokers: boolean;
+    deckCount?: number;        // how many copies of the deck are shuffled together (default 1)
+    excludeRanks?: Rank[];     // ranks removed from the deck entirely (short-deck games)
     rankOrder: Rank[];
     tags: Record<string, { ranks: Rank[] }>; // named card sets, e.g. wild -> ["8"]
   };
@@ -78,7 +80,7 @@ export type Predicate =
   | { always: true };
 
 export interface MatchPredicate {
-  cardProp: 'suit' | 'rank';
+  cardProp: 'suit' | 'rank' | 'color'; // color = red (H/D) vs black (C/S)
   // compare the target card's prop against the top card of a zone,
   // optionally preferring a state var (e.g. activeSuit) over the zone's top.
   equalsTopOf?: string;
@@ -95,7 +97,9 @@ export type Effect =
   | { op: 'reverseOrder' }
   | { op: 'skipNext' }
   | { op: 'forceDraw'; target: 'next'; from: string; count: number }
-  | { op: 'reshuffleDiscardInto'; zone: string; keepTop: boolean };
+  | { op: 'reshuffleDiscardInto'; zone: string; keepTop: boolean }
+  | { op: 'extraTurn' }                              // current player takes another turn
+  | { op: 'drawUntilPlayable'; from: string };       // draw until a legal play appears
 
 export interface TriggerDef {
   on: 'drawPileEmpty' | 'cardPlayed';
@@ -113,7 +117,7 @@ export interface ScoringDef {
   mode: 'firstToEmptyWins' | 'lowestPoints';
   cardPoints?: Record<string, number | 'rankValue'>;
   target?: number | null;
-  winner: 'lowestTotal' | 'firstOut';
+  winner: 'lowestTotal' | 'highestTotal' | 'firstOut';
 }
 
 // ---------- Runtime state ----------
@@ -127,6 +131,7 @@ export interface MatchState {
   turnIndex: number;        // index into players
   direction: 1 | -1;
   skipCount: number;        // seats to skip on next advance
+  repeatTurn: boolean;      // current player takes another turn (extra-turn cards)
   stallCount: number;       // consecutive non-productive draws (deadlock guard)
   vars: Record<string, string>;
   scores: Record<string, number>;
