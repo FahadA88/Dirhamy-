@@ -51,6 +51,9 @@ export function createMatch(def: GameDefinition, players: string[], seed: number
     skipCount: 0,
     repeatTurn: false,
     stallCount: 0,
+    lead: null,
+    trickPlays: [],
+    tricksWon: Object.fromEntries(players.map((p) => [p, 0])),
     vars: {},
     scores: Object.fromEntries(players.map((p) => [p, 0])),
     phase: 'playing',
@@ -189,6 +192,7 @@ function stripExistsLegal(p: Predicate): Predicate {
 
 export function legalMoves(state: MatchState, playerId: string): Move[] {
   if (state.phase !== 'playing') return [];
+  if (state.definition.trick) return trickLegalMoves(state, playerId);
 
   // Resolve a pending choice first (e.g. pick a suit after a wild).
   if (state.pendingChoice) {
@@ -227,6 +231,8 @@ function cloneState(state: MatchState): MatchState {
     zones: Object.fromEntries(Object.entries(state.zones).map(([k, v]) => [k, v.slice()])),
     vars: { ...state.vars },
     scores: { ...state.scores },
+    tricksWon: { ...state.tricksWon },
+    trickPlays: state.trickPlays.map((t) => ({ ...t })),
     pendingChoice: state.pendingChoice ? { ...state.pendingChoice } : null,
     log: state.log.slice(),
   };
@@ -350,6 +356,8 @@ function reshuffleDiscardInto(state: MatchState, drawZoneId: string, keepTop: bo
 export function applyMove(state: MatchState, playerId: string, move: Move): MatchState {
   const s = cloneState(state);
   const def = s.definition;
+
+  if (def.trick) return applyTrickMove(s, playerId, move);
 
   // Resolve a pending suit choice.
   if (move.actionId === 'resolveChoice') {
@@ -502,6 +510,106 @@ export function isTerminal(state: MatchState): boolean {
   return state.phase === 'roundOver';
 }
 
+// ---------- trick-taking family ----------
+
+function trickLegalMoves(state: MatchState, playerId: string): Move[] {
+  if (state.players[state.turnIndex] !== playerId) return [];
+  const def = state.definition;
+  const hand = state.zones[`hand:${playerId}`] || [];
+  let playable = hand;
+  // Must follow the led suit if you hold one.
+  if (def.trick!.mustFollowSuit && state.lead) {
+    const following = hand.filter((c) => c.suit === state.lead);
+    if (following.length) playable = following;
+  }
+  return playable.map((c) => ({ actionId: 'playToTrick', cardId: c.id }));
+}
+
+function applyTrickMove(s: MatchState, playerId: string, move: Move): MatchState {
+  const legal = trickLegalMoves(s, playerId);
+  const chosen = legal.find((m) => m.cardId === move.cardId);
+  if (!chosen) return s;
+
+  const hand = s.zones[`hand:${playerId}`];
+  const idx = hand.findIndex((c) => c.id === move.cardId);
+  const card = hand[idx];
+  hand.splice(idx, 1);
+  const trickZone = s.definition.zones.find((z) => z.type === 'trick')!;
+  s.zones[trickZone.id].push(card);
+  if (s.trickPlays.length === 0) s.lead = card.suit;
+  s.trickPlays.push({ player: playerId, card });
+  log(s, playerId, `${short(playerId)} played ${cardLabel(card)}.`);
+
+  if (s.trickPlays.length < s.players.length) {
+    s.turnIndex = nextIndex(s);
+    return s;
+  }
+  resolveTrick(s, trickZone.id);
+  return s;
+}
+
+function nextIndex(s: MatchState): number {
+  const n = s.players.length;
+  return ((s.turnIndex + s.direction) % n + n) % n;
+}
+
+function resolveTrick(s: MatchState, trickZoneId: string): void {
+  const cfg = s.definition.trick!;
+  const rankStrength = (rank: string) => {
+    const base = s.definition.deck.rankOrder.indexOf(rank as never);
+    return cfg.aceHigh && rank === 'A' ? 1000 : base;
+  };
+  const category = (suit: string) => (cfg.trump !== 'none' && suit === cfg.trump ? 2 : suit === s.lead ? 1 : 0);
+
+  let winner = s.trickPlays[0];
+  for (const play of s.trickPlays) {
+    const a = category(play.card.suit) * 1000 + rankStrength(play.card.rank);
+    const b = category(winner.card.suit) * 1000 + rankStrength(winner.card.rank);
+    if (a > b) winner = play;
+  }
+  s.tricksWon[winner.player] = (s.tricksWon[winner.player] ?? 0) + 1;
+
+  // Hearts-style penalty points travel to the trick winner.
+  if (cfg.scoreBy === 'penalty' && cfg.penaltyPoints) {
+    let pts = 0;
+    for (const { card } of s.trickPlays) {
+      pts += cfg.penaltyPoints[card.rank] ?? 0;
+      pts += cfg.penaltyPoints[card.suit] ?? 0;
+    }
+    s.scores[winner.player] = (s.scores[winner.player] ?? 0) + pts;
+  }
+
+  s.zones[trickZoneId] = [];
+  s.trickPlays = [];
+  s.lead = null;
+  s.turnIndex = s.players.indexOf(winner.player); // winner leads the next trick
+  log(s, null, `${short(winner.player)} takes the trick (${s.tricksWon[winner.player]}).`);
+
+  // Round ends when every hand is empty.
+  if (s.players.every((p) => (s.zones[`hand:${p}`] || []).length === 0)) endTrickRound(s);
+}
+
+function endTrickRound(s: MatchState): void {
+  const cfg = s.definition.trick!;
+  s.phase = 'roundOver';
+  let winner = s.players[0];
+  if (cfg.scoreBy === 'penalty') {
+    // Fewest penalty points wins; scores already accumulated.
+    let best = Infinity;
+    for (const p of s.players) { const v = s.scores[p] ?? 0; if (v < best) { best = v; winner = p; } }
+  } else {
+    const most = cfg.scoreBy === 'mostTricks';
+    let best = most ? -Infinity : Infinity;
+    for (const p of s.players) {
+      const v = s.tricksWon[p] ?? 0;
+      s.scores[p] = v;
+      if (most ? v > best : v < best) { best = v; winner = p; }
+    }
+  }
+  s.winner = winner;
+  log(s, null, `Round over — ${short(winner)} wins.`);
+}
+
 // ---------- redaction (hidden information) ----------
 
 export function redact(state: MatchState, viewer: string): RedactedState {
@@ -556,6 +664,10 @@ export function redact(state: MatchState, viewer: string): RedactedState {
     pendingChoice: state.pendingChoice,
     scores: { ...state.scores },
     log: state.log.slice(-40),
+    mode: state.definition.trick ? 'trick' : 'shedding',
+    trick: state.definition.trick ? state.trickPlays.map((t) => ({ ...t })) : undefined,
+    lead: state.definition.trick ? state.lead : undefined,
+    tricksWon: state.definition.trick ? { ...state.tricksWon } : undefined,
   };
 }
 

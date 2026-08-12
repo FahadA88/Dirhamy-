@@ -42,13 +42,24 @@ export interface GameDefinition {
   triggers: TriggerDef[];
   endConditions: EndConditionDef[];
   scoring: ScoringDef;
+  // Present iff this is a trick-taking game. The interpreter runs a trick-taking loop
+  // (follow suit, trump, highest card takes the trick and leads next) instead of shedding.
+  trick?: TrickConfig;
+}
+
+export interface TrickConfig {
+  trump: Suit | 'none';        // suit that beats all others when resolving a trick
+  mustFollowSuit: boolean;     // must play the led suit if you hold one
+  aceHigh: boolean;            // Ace is the strongest rank (else lowest)
+  scoreBy: 'mostTricks' | 'fewestTricks' | 'penalty';
+  penaltyPoints?: Record<string, number>; // card rank/suit → points (Hearts-style), for scoreBy: 'penalty'
 }
 
 export type Visibility = 'none' | 'owner' | 'top-public' | 'all';
 
 export interface ZoneDef {
   id: string;
-  type: 'pile' | 'hand';
+  type: 'pile' | 'hand' | 'trick';
   ordered: boolean;
   faceDown: boolean;
   visibility: Visibility;
@@ -133,6 +144,10 @@ export interface MatchState {
   skipCount: number;        // seats to skip on next advance
   repeatTurn: boolean;      // current player takes another turn (extra-turn cards)
   stallCount: number;       // consecutive non-productive draws (deadlock guard)
+  // trick-taking state (unused by shedding games)
+  lead: Suit | null;        // led suit of the current trick
+  trickPlays: { player: string; card: Card }[]; // cards played into the current trick
+  tricksWon: Record<string, number>;
   vars: Record<string, string>;
   scores: Record<string, number>;
   phase: 'playing' | 'roundOver';
@@ -177,4 +192,9 @@ export interface RedactedState {
   pendingChoice: MatchState['pendingChoice'];
   scores: Record<string, number>;
   log: LogEntry[];
+  // trick-taking view (present only for trick games)
+  mode: 'shedding' | 'trick';
+  trick?: { player: string; card: Card }[];
+  lead?: Suit | null;
+  tricksWon?: Record<string, number>;
 }

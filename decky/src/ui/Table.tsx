@@ -27,10 +27,11 @@ export function Table({ def, seats = 3 }: { def: GameDefinition; seats?: number 
   const view = useMemo(() => redact(state, HUMAN), [state]);
   const myLegal = useMemo(() => (view.isYourTurn ? legalMoves(state, HUMAN) : []), [state, view.isYourTurn]);
   const playableCardIds = useMemo(
-    () => new Set(myLegal.filter((m) => m.actionId === 'playCard').map((m) => m.cardId)),
+    () => new Set(myLegal.filter((m) => m.cardId).map((m) => m.cardId)),
     [myLegal],
   );
   const canDraw = myLegal.some((m) => m.actionId === 'drawCard');
+  const playActionId = view.mode === 'trick' ? 'playToTrick' : 'playCard';
 
   // Bot loop, paced by the user's bot-speed setting.
   useEffect(() => {
@@ -54,7 +55,7 @@ export function Table({ def, seats = 3 }: { def: GameDefinition; seats?: number 
 
   function submit(move: Move) {
     if (!view.isYourTurn) return;
-    if (move.actionId === 'playCard') playSound('play', settings.sound);
+    if (move.actionId === 'playCard' || move.actionId === 'playToTrick') playSound('play', settings.sound);
     if (move.actionId === 'drawCard') playSound('draw', settings.sound);
     setSelected(null);
     setState((s) => applyMove(s, HUMAN, move));
@@ -63,7 +64,7 @@ export function Table({ def, seats = 3 }: { def: GameDefinition; seats?: number 
   function clickCard(id: string) {
     if (!playableCardIds.has(id)) return;
     if (settings.confirmPlays && selected !== id) { setSelected(id); playSound('ui', settings.sound); return; }
-    submit({ actionId: 'playCard', cardId: id });
+    submit({ actionId: playActionId, cardId: id });
   }
 
   const hand = useMemo(() => sortHand(view.hand, def, settings.sort), [view.hand, def, settings.sort]);
@@ -82,25 +83,44 @@ export function Table({ def, seats = 3 }: { def: GameDefinition; seats?: number 
             <div className="fanned">
               {Array.from({ length: Math.min(p.handCount, 12) }).map((_, i) => (<div key={i} className={backCls} />))}
             </div>
-            <div className="count">{p.handCount} cards</div>
+            <div className="count">
+              {p.handCount} cards{view.mode === 'trick' ? ` · ${view.tricksWon?.[p.id] ?? 0} tricks` : ''}
+            </div>
           </div>
         ))}
       </div>
 
-      <div className="center">
-        <div className="pile">
-          <div className={`${backCls} big`} />
-          <div className="pile-label">Draw · {view.zones.draw?.count ?? 0}</div>
+      {view.mode === 'trick' ? (
+        <div className="center trick-area">
+          {view.trick && view.trick.length > 0
+            ? view.trick.map((t) => (
+                <div key={t.player} className="trick-card">
+                  <CardFace card={t.card} />
+                  <div className="pile-label">{nameOf(t.player)}</div>
+                </div>
+              ))
+            : <div className="trick-empty">Trick is empty — {view.isYourTurn ? 'your lead' : 'waiting…'}</div>}
+          <div className="trick-meta">
+            Trump {SUIT_SYMBOLS[state.definition.trick!.trump] ?? '—'}
+            {view.lead ? ` · led ${SUIT_SYMBOLS[view.lead]}` : ''}
+          </div>
         </div>
-        <div className="pile">
-          {top ? <CardFace card={top} /> : <div className="card big empty" />}
-          <div className="pile-label">Discard{activeSuit ? ` · suit ${SUIT_SYMBOLS[activeSuit] ?? activeSuit}` : ''}</div>
+      ) : (
+        <div className="center">
+          <div className="pile">
+            <div className={`${backCls} big`} />
+            <div className="pile-label">Draw · {view.zones.draw?.count ?? 0}</div>
+          </div>
+          <div className="pile">
+            {top ? <CardFace card={top} /> : <div className="card big empty" />}
+            <div className="pile-label">Discard{activeSuit ? ` · suit ${SUIT_SYMBOLS[activeSuit] ?? activeSuit}` : ''}</div>
+          </div>
         </div>
-      </div>
+      )}
 
       <div className={`you ${view.isYourTurn ? 'your-turn' : ''}`}>
         <div className="you-head">
-          <span>{settings.playerName === 'You' ? 'Your hand' : `${settings.playerName}’s hand`}</span>
+          <span>{settings.playerName === 'You' ? 'Your hand' : `${settings.playerName}’s hand`}{view.mode === 'trick' ? ` · ${view.tricksWon?.[HUMAN] ?? 0} tricks` : ''}</span>
           {view.isYourTurn && !suitPickerOpen && <span className="turn-badge">Your turn</span>}
           {canDraw && <button className="draw-btn" onClick={() => submit({ actionId: 'drawCard' })}>Draw a card</button>}
         </div>

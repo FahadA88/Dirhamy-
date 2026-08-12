@@ -33,6 +33,17 @@ export function chooseMove(
     return { move: moves[0], botSeed };
   }
 
+  // Trick-taking: play from the trick-legal set. Smart = shed the lowest card.
+  if (moves[0].actionId === 'playToTrick') {
+    if (mode === 'random') { const r = nextRandom(botSeed); return { move: moves[Math.floor(r.value * moves.length)], botSeed: r.state }; }
+    const hand = state.zones[`hand:${playerId}`] || [];
+    const order = state.definition.deck.rankOrder;
+    const strength = (id?: string) => { const c = hand.find((x) => x.id === id); if (!c) return 0; const b = order.indexOf(c.rank as never); return c.rank === 'A' ? 100 : b; };
+    let best = moves[0];
+    for (const m of moves) if (strength(m.cardId) < strength(best.cardId)) best = m;
+    return { move: best, botSeed };
+  }
+
   // Easy mode: pick any legal move uniformly at random.
   if (mode === 'random') {
     const r = nextRandom(botSeed);
