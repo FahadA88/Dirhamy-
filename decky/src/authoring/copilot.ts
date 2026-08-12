@@ -101,11 +101,15 @@ export const offlineTranslator: Translator = {
 
     // action cards
     const skip = detect(text, ['skip', 'skips', 'miss a turn', 'misses a turn']);
-    if (skip) { patch.skipRank = skip; notes.push(`${rankLabel(skip)}s skip the next player.`); }
+    if (skip) { patch.skipRanks = [skip]; notes.push(`${rankLabel(skip)}s skip the next player.`); }
     const reverse = detect(text, ['reverse', 'reverses', 'change direction', 'switch direction']);
-    if (reverse) { patch.reverseRank = reverse; notes.push(`${rankLabel(reverse)}s reverse direction.`); }
+    if (reverse) { patch.reverseRanks = [reverse]; notes.push(`${rankLabel(reverse)}s reverse direction.`); }
     const drawTwo = detectDrawTwo(text);
-    if (drawTwo) { patch.drawTwoRank = drawTwo; notes.push(`${rankLabel(drawTwo)}s make the next player draw two.`); }
+    if (drawTwo) { patch.drawRanks = [drawTwo]; notes.push(`${rankLabel(drawTwo)}s make the next player draw two.`); }
+
+    // direction / win mode
+    if (/\bcounter.?clock|anti.?clock/.test(text)) { patch.direction = 'counter-clockwise'; notes.push('Play goes counter-clockwise.'); }
+    if (/\blowest (points|score|hand) wins\b|\bfewest points\b/.test(text)) { patch.winMode = 'lowestTotal'; notes.push('Lowest points wins.'); }
 
     // jokers include
     if (/\b(?:with|include|add)\s+jokers?\b/.test(text)) { patch.includeJokers = true; notes.push('Jokers included in the deck.'); }
@@ -191,13 +195,16 @@ function diffKnobs(from: Knobs, to: Knobs): ProposedChange[] {
 }
 
 function describeChange(field: keyof Knobs, value: unknown): string {
+  const ranks = (v: unknown) => (v as Rank[]).map(rankLabel).join(', ');
   switch (field) {
     case 'name': return `Name → "${value}"`;
     case 'handSize': return `Deal ${value} cards each`;
-    case 'wildRanks': return (value as Rank[]).length ? `Wild: ${(value as Rank[]).map(rankLabel).join(', ')}` : 'No wild cards';
-    case 'skipRank': return value ? `Skip on ${rankLabel(value as Rank)}` : 'No skip card';
-    case 'reverseRank': return value ? `Reverse on ${rankLabel(value as Rank)}` : 'No reverse card';
-    case 'drawTwoRank': return value ? `Draw-two on ${rankLabel(value as Rank)}` : 'No draw-two card';
+    case 'wildRanks': return (value as Rank[]).length ? `Wild: ${ranks(value)}` : 'No wild cards';
+    case 'skipRanks': return (value as Rank[]).length ? `Skip on ${ranks(value)}` : 'No skip card';
+    case 'reverseRanks': return (value as Rank[]).length ? `Reverse on ${ranks(value)}` : 'No reverse card';
+    case 'drawRanks': return (value as Rank[]).length ? `Draw-two on ${ranks(value)}` : 'No draw-two card';
+    case 'direction': return `Direction → ${value}`;
+    case 'winMode': return value === 'firstOut' ? 'Win: first to empty' : 'Win: lowest points';
     case 'includeJokers': return value ? 'Include jokers' : 'No jokers';
     case 'reshuffleWhenEmpty': return value ? 'Reshuffle discard when draw runs out' : 'Round ends when draw runs out';
     default: return String(field);
