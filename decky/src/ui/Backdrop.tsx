@@ -4,7 +4,7 @@ import { useSettings } from '../settings/SettingsContext';
 // Ambient 3D scene behind the app: drifting holographic cards, glowing orbs, a perspective
 // grid floor. Every layer is individually toggleable in Settings; the whole thing is off when
 // ambient3d is disabled.
-const SUITS = ['♠', '♥', '♦', '♣', '★', '♠', '♥', '♦'];
+const SUITS = ['♠', '♥', '♦', '♣', '★', '♣'];
 
 export function Backdrop() {
   const { settings } = useSettings();

@@ -19,13 +19,14 @@
   --glow: rgba(22, 163, 74, 0.35);
   --input-bg: #ffffff;
   --cw: 76px; --ch: 108px; --bw: 56px; --bh: 80px;
+  --panel: rgba(255, 255, 255, 0.86);
 }
 
 /* ---------------- dark theme ---------------- */
 :root[data-theme="dark"] {
   --bg0: #0a0f14;
   --bg1: #0f151c;
-  --panel: rgba(255, 255, 255, 0.05);
+  --panel: rgba(22, 30, 40, 0.90);
   --panel-solid: #141b24;
   --panel-brd: rgba(255, 255, 255, 0.12);
   --ink: #e7eef2;
@@ -57,7 +58,7 @@ body {
 
 /* ---------------- 3D animated backdrop ---------------- */
 .backdrop { position: fixed; inset: 0; z-index: -1; overflow: hidden; perspective: 1000px; }
-.orb { position: absolute; border-radius: 50%; filter: blur(90px); opacity: 0.32; }
+.orb { position: absolute; border-radius: 50%; filter: blur(70px); opacity: 0.28; will-change: transform; }
 .orb-a { width: 440px; height: 440px; top: -120px; left: -90px;
   background: radial-gradient(circle, var(--lime), transparent 70%); animation: orbA 26s ease-in-out infinite; }
 .orb-b { width: 560px; height: 560px; bottom: -200px; right: -140px;
@@ -79,14 +80,14 @@ body {
 }
 @keyframes gridmove { to { background-position: 0 46px, 46px 0; } }
 
-.floaty { position: absolute; width: 62px; height: 86px; transform-style: preserve-3d;
+.floaty { position: absolute; width: 62px; height: 86px; transform-style: preserve-3d; will-change: transform;
   animation-name: drift; animation-timing-function: linear; animation-iteration-count: infinite; opacity: 0.16; }
 .floaty-inner {
   width: 100%; height: 100%; border-radius: 9px; display: grid; place-items: center; font-size: 34px;
   border: 1px solid; backface-visibility: hidden; background: rgba(255, 255, 255, 0.5);
 }
-.floaty.cyan .floaty-inner { color: var(--green); border-color: rgba(22, 163, 74, 0.45); box-shadow: 0 0 30px rgba(22, 163, 74, 0.22); }
-.floaty.violet .floaty-inner { color: var(--emerald); border-color: rgba(16, 185, 129, 0.45); box-shadow: 0 0 30px rgba(16, 185, 129, 0.22); }
+.floaty.cyan .floaty-inner { color: var(--green); border-color: rgba(22, 163, 74, 0.4); }
+.floaty.violet .floaty-inner { color: var(--emerald); border-color: rgba(16, 185, 129, 0.4); }
 @keyframes drift {
   0%   { transform: translate3d(0,0,0) rotateX(0) rotateY(0) scale(var(--sc)); }
   50%  { transform: translate3d(26px,-42px,70px) rotateX(180deg) rotateY(120deg) scale(var(--sc)); }
@@ -144,7 +145,7 @@ button.primary.sm, button.ghost.sm { padding: 6px 12px; font-size: 13px; }
 .seg-btn.on { background: linear-gradient(135deg, var(--emerald), var(--green)); color: #fff; border-color: transparent; }
 .seg-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 
-.glass { background: var(--panel); border: 1px solid var(--panel-brd); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border-radius: 18px; box-shadow: 0 10px 34px rgba(16, 64, 40, 0.07); }
+.glass { background: var(--panel); border: 1px solid var(--panel-brd); border-radius: 18px; box-shadow: 0 10px 34px rgba(16, 64, 40, 0.07); }
 .section-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
 .muted { color: var(--muted); font-size: 13px; }
 h2 { font-family: var(--mono); letter-spacing: 1px; color: var(--ink); font-size: 17px; margin: 0 0 4px; }
@@ -173,7 +174,7 @@ h2 { font-family: var(--mono); letter-spacing: 1px; color: var(--ink); font-size
   background:
     radial-gradient(700px 300px at 50% 0%, rgba(22, 163, 74, 0.07), transparent 60%),
     var(--panel);
-  border: 1px solid var(--panel-brd); backdrop-filter: blur(14px);
+  border: 1px solid var(--panel-brd);
   box-shadow: 0 14px 40px rgba(16, 64, 40, 0.08), inset 0 0 60px rgba(22, 163, 74, 0.03);
 }
 .opponents { display: flex; gap: 26px; justify-content: center; flex-wrap: wrap; }
@@ -212,12 +213,11 @@ h2 { font-family: var(--mono); letter-spacing: 1px; color: var(--ink); font-size
   box-shadow: 0 6px 16px rgba(16, 64, 40, 0.18); color: var(--card-black); overflow: hidden;
 }
 .card.face.red { color: var(--card-red); }
+/* Static sheen (no per-frame repaint — keeps long hands smooth on mobile). */
 .card.face .holo {
-  position: absolute; inset: 0; pointer-events: none; mix-blend-mode: multiply; opacity: 0.14;
-  background: linear-gradient(115deg, transparent 30%, rgba(22, 163, 74, 0.6), rgba(16, 185, 129, 0.6), transparent 70%);
-  background-size: 220% 220%; animation: holo 4s linear infinite;
+  position: absolute; inset: 0; pointer-events: none; opacity: 0.10;
+  background: linear-gradient(125deg, transparent 40%, rgba(22, 163, 74, 0.5) 55%, transparent 70%);
 }
-@keyframes holo { to { background-position: 220% 0; } }
 .card.face .corner { position: absolute; font-weight: 800; font-size: 15px; line-height: 1; text-align: center; z-index: 1; }
 .card.face .corner span { display: block; font-size: 12px; }
 .card.face .corner.tl { top: 7px; left: 7px; }
@@ -232,9 +232,8 @@ h2 { font-family: var(--mono); letter-spacing: 1px; color: var(--ink); font-size
 
 .hand { display: flex; flex-wrap: wrap; gap: 10px; perspective: 900px; }
 .card-btn { background: none; border: none; padding: 0; cursor: pointer; border-radius: 9px; transition: transform 0.14s; transform-style: preserve-3d; }
-/* legal-move highlight styles */
-.hand.hl-glow .card-btn.playable .card.face { box-shadow: 0 0 0 2px var(--green), 0 6px 22px var(--glow); animation: pulseNeon 1.9s ease-in-out infinite; }
-@keyframes pulseNeon { 50% { box-shadow: 0 0 0 2px var(--green), 0 8px 30px var(--glow); } }
+/* legal-move highlight styles (static — no continuous repaint) */
+.hand.hl-glow .card-btn.playable .card.face { box-shadow: 0 0 0 2px var(--green), 0 6px 24px var(--glow); }
 .hand.hl-outline .card-btn.playable .card.face { box-shadow: 0 0 0 2px var(--green); }
 .hand.hl-lift .card-btn.playable { transform: translateY(-8px); }
 .hand.hl-off .card-btn.playable .card.face { box-shadow: 0 6px 16px rgba(16, 64, 40, 0.18); }
