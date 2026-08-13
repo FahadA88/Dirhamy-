@@ -33,6 +33,20 @@ export function chooseMove(
     return { move: moves[0], botSeed };
   }
 
+  // Bidding (Spades): estimate tricks from high cards + long trump.
+  if (moves[0].actionId === 'bid') {
+    if (mode === 'random') { const r = nextRandom(botSeed); return { move: moves[Math.floor(r.value * moves.length)], botSeed: r.state }; }
+    const hand = state.zones[`hand:${playerId}`] || [];
+    const trump = state.definition.trick?.trump;
+    let bid = 0;
+    for (const c of hand) if (c.rank === 'A' || c.rank === 'K') bid++;
+    const trumpCount = trump && trump !== 'none' ? hand.filter((c) => c.suit === trump).length : 0;
+    if (trumpCount > 3) bid += trumpCount - 3;
+    bid = Math.min(bid, moves.length - 1);
+    const pick = moves.find((m) => m.choice === String(bid)) || moves[0];
+    return { move: pick, botSeed };
+  }
+
   // Trick-taking: play from the trick-legal set. Smart = shed the lowest card.
   if (moves[0].actionId === 'playToTrick') {
     if (mode === 'random') { const r = nextRandom(botSeed); return { move: moves[Math.floor(r.value * moves.length)], botSeed: r.state }; }

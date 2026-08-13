@@ -10,7 +10,7 @@ export const spadesLite: GameDefinition = {
     id: 'classic-spades',
     name: 'Spades',
     description:
-      'A trick-taking game. Follow the led suit if you can. Spades are trump and beat every other suit. The highest card wins the trick and leads the next. Take the most tricks to win.',
+      'Partners (seats 1&3 vs 2&4) bid how many tricks they will take, then play. Follow the led suit if you can; spades are trump. Make your combined bid to score 10 per trick bid (+1 per overtrick "bag"), or lose it. A nil bid (0) scores ±100. Highest team score wins.',
     players: { min: 4, max: 4 },
     family: 'trick-taking',
   },
@@ -35,5 +35,5 @@ export const spadesLite: GameDefinition = {
     { id: 'handsEmpty', when: { zoneCount: { zone: 'hand', of: 'anyPlayer', eq: 0 } }, result: 'roundOver' },
   ],
   scoring: { mode: 'lowestPoints', winner: 'highestTotal', cardPoints: {}, target: null },
-  trick: { trump: 'S', mustFollowSuit: true, aceHigh: true, scoreBy: 'mostTricks' },
+  trick: { trump: 'S', mustFollowSuit: true, aceHigh: true, scoreBy: 'mostTricks', bidding: true, partnerships: true },
 };

@@ -82,6 +82,11 @@ export function Table({ def, seats = 3 }: { def: GameDefinition; seats?: number 
   const activeSuit = view.vars.activeSuit;
   const suitPickerOpen = !!state.pendingChoice && state.pendingChoice.player === HUMAN;
   const nameOf = (id: string) => (id === HUMAN ? settings.playerName : settings.botLabels ? `Bot ${id.slice(1)}` : id);
+  const teamOf = (id: string): string | null => {
+    if (!view.teams) return null;
+    const i = view.teams.findIndex((t) => t.includes(id));
+    return i >= 0 ? `Team ${i === 0 ? 'A' : 'B'}` : null;
+  };
   const backCls = `card back style-${settings.cardBack}`;
 
   return (
@@ -99,16 +104,33 @@ export function Table({ def, seats = 3 }: { def: GameDefinition; seats?: number 
               </div>
               <div className="count">
                 {p.handCount} cards{view.mode === 'trick' ? ` · ${view.tricksWon?.[p.id] ?? 0} tricks` : ''}
+                {view.mode === 'trick' && view.bids?.[p.id] !== undefined ? ` · bid ${view.bids[p.id]}` : ''}
                 {isFish ? ` · ${view.booksWon?.[p.id] ?? 0} books` : ''}
                 {view.mode === 'climb' && view.finished?.includes(p.id) ? ` · out #${view.finished.indexOf(p.id) + 1}` : ''}
               </div>
+              {teamOf(p.id) && <div className="team-tag">{teamOf(p.id)}</div>}
               {askable && <div className="ask-hint">Ask for {askRank}s</div>}
             </div>
           );
         })}
       </div>
 
-      {view.mode === 'trick' ? (
+      {view.mode === 'trick' && view.bidding ? (
+        <div className="center bid-area">
+          {view.isYourTurn ? (
+            <div className="bid-panel">
+              <div className="bid-title">How many tricks will you take?</div>
+              <div className="bid-buttons">
+                {Array.from({ length: view.hand.length + 1 }, (_, n) => (
+                  <button key={n} className="bid-btn" onClick={() => submit({ actionId: 'bid', choice: String(n) })}>
+                    {n === 0 ? 'Nil' : n}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : <div className="trick-empty">Bidding… waiting for other players</div>}
+        </div>
+      ) : view.mode === 'trick' ? (
         <div className="center trick-area">
           {view.trick && view.trick.length > 0
             ? view.trick.map((t) => (
@@ -157,7 +179,7 @@ export function Table({ def, seats = 3 }: { def: GameDefinition; seats?: number 
 
       <div className={`you ${view.isYourTurn ? 'your-turn' : ''}`}>
         <div className="you-head">
-          <span>{settings.playerName === 'You' ? 'Your hand' : `${settings.playerName}’s hand`}{view.mode === 'trick' ? ` · ${view.tricksWon?.[HUMAN] ?? 0} tricks` : ''}{isFish ? ` · ${view.booksWon?.[HUMAN] ?? 0} books` : ''}</span>
+          <span>{settings.playerName === 'You' ? 'Your hand' : `${settings.playerName}’s hand`}{view.mode === 'trick' ? ` · ${view.tricksWon?.[HUMAN] ?? 0} tricks` : ''}{view.mode === 'trick' && view.bids?.[HUMAN] !== undefined ? ` · bid ${view.bids[HUMAN]}` : ''}{isFish ? ` · ${view.booksWon?.[HUMAN] ?? 0} books` : ''}{teamOf(HUMAN) ? ` · ${teamOf(HUMAN)}` : ''}</span>
           {view.isYourTurn && !suitPickerOpen && <span className="turn-badge">Your turn</span>}
           {canDraw && <button className="draw-btn" onClick={() => submit({ actionId: 'drawCard' })}>Draw a card</button>}
           {canPass && <button className="draw-btn" onClick={() => submit({ actionId: 'climbPass' })}>Pass</button>}

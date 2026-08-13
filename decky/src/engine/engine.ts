@@ -54,6 +54,8 @@ export function createMatch(def: GameDefinition, players: string[], seed: number
     lead: null,
     trickPlays: [],
     tricksWon: Object.fromEntries(players.map((p) => [p, 0])),
+    bids: {},
+    bidding: !!def.trick?.bidding,
     passStreak: 0,
     lastPlayer: null,
     finished: [],
@@ -248,6 +250,7 @@ function cloneState(state: MatchState): MatchState {
     vars: { ...state.vars },
     scores: { ...state.scores },
     tricksWon: { ...state.tricksWon },
+    bids: { ...state.bids },
     trickPlays: state.trickPlays.map((t) => ({ ...t })),
     finished: state.finished.slice(),
     booksWon: { ...state.booksWon },
@@ -535,6 +538,11 @@ export function isTerminal(state: MatchState): boolean {
 function trickLegalMoves(state: MatchState, playerId: string): Move[] {
   if (state.players[state.turnIndex] !== playerId) return [];
   const def = state.definition;
+  // Bidding phase: bid 0..handSize tricks.
+  if (state.bidding) {
+    const n = (state.zones[`hand:${playerId}`] || []).length;
+    return Array.from({ length: n + 1 }, (_, i) => ({ actionId: 'bid', choice: String(i) }));
+  }
   const hand = state.zones[`hand:${playerId}`] || [];
   let playable = hand;
   // Must follow the led suit if you hold one.
@@ -546,6 +554,16 @@ function trickLegalMoves(state: MatchState, playerId: string): Move[] {
 }
 
 function applyTrickMove(s: MatchState, playerId: string, move: Move): MatchState {
+  // Bidding phase.
+  if (s.bidding) {
+    if (move.actionId !== 'bid' || move.choice === undefined) return s;
+    s.bids[playerId] = parseInt(move.choice, 10);
+    log(s, playerId, `${short(playerId)} bids ${move.choice}${move.choice === '0' ? ' (nil)' : ''}.`);
+    if (Object.keys(s.bids).length >= s.players.length) { s.bidding = false; s.turnIndex = 0; }
+    else s.turnIndex = ((s.turnIndex + s.direction) % s.players.length + s.players.length) % s.players.length;
+    return s;
+  }
+
   const legal = trickLegalMoves(s, playerId);
   const chosen = legal.find((m) => m.cardId === move.cardId);
   if (!chosen) return s;
@@ -609,12 +627,38 @@ function resolveTrick(s: MatchState, trickZoneId: string): void {
   if (s.players.every((p) => (s.zones[`hand:${p}`] || []).length === 0)) endTrickRound(s);
 }
 
+export function trickTeams(s: MatchState): string[][] {
+  if (s.definition.trick?.partnerships && s.players.length === 4) {
+    return [[s.players[0], s.players[2]], [s.players[1], s.players[3]]];
+  }
+  return s.players.map((p) => [p]);
+}
+
 function endTrickRound(s: MatchState): void {
   const cfg = s.definition.trick!;
   s.phase = 'roundOver';
+
+  // Spades-style bid scoring (with partnerships and nil).
+  if (cfg.bidding) {
+    const teams = trickTeams(s);
+    let winner = s.players[0];
+    let bestScore = -Infinity;
+    for (const team of teams) {
+      const teamBid = team.reduce((a, p) => a + (s.bids[p] ?? 0), 0);
+      const teamTricks = team.reduce((a, p) => a + (s.tricksWon[p] ?? 0), 0);
+      let score = teamTricks >= teamBid ? teamBid * 10 + (teamTricks - teamBid) : -teamBid * 10;
+      // Nil bids score individually: +100 made, -100 failed.
+      for (const p of team) if ((s.bids[p] ?? -1) === 0) score += (s.tricksWon[p] ?? 0) === 0 ? 100 : -100;
+      for (const p of team) s.scores[p] = score;
+      if (score > bestScore) { bestScore = score; winner = team[0]; }
+    }
+    s.winner = winner;
+    log(s, null, `Round over — ${short(winner)}${cfg.partnerships ? "'s team" : ''} wins (${bestScore}).`);
+    return;
+  }
+
   let winner = s.players[0];
   if (cfg.scoreBy === 'penalty') {
-    // Fewest penalty points wins; scores already accumulated.
     let best = Infinity;
     for (const p of s.players) { const v = s.scores[p] ?? 0; if (v < best) { best = v; winner = p; } }
   } else {
@@ -917,6 +961,9 @@ export function redact(state: MatchState, viewer: string): RedactedState {
     finished: state.definition.climb ? state.finished.slice() : undefined,
     booksWon: state.definition.fish ? { ...state.booksWon } : undefined,
     oceanCount: state.definition.fish ? (state.zones[oceanZoneId(state.definition)] || []).length : undefined,
+    bids: state.definition.trick?.bidding ? { ...state.bids } : undefined,
+    bidding: state.definition.trick?.bidding ? state.bidding : undefined,
+    teams: state.definition.trick?.partnerships ? trickTeams(state) : undefined,
   };
 }
 

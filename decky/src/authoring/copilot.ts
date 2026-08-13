@@ -102,6 +102,12 @@ export const offlineTranslator: Translator = {
     const patch: Partial<Knobs> = {};
     const notes: string[] = [];
 
+    // fishing family detection
+    if (/\bgo fish\b|\bfishing\b|\bask (an?|another|your) (opponent|player)\b|\bask for (a )?rank\b|\bcollect (a )?book\b|\bbooks?\b.*\brank\b/.test(text)) {
+      patch.family = 'fish';
+      notes.push('Fishing game (ask for ranks, collect books).');
+    }
+
     // climbing family detection
     if (/\bclimbing\b|\bpresident\b|\bscum\b|\bbig two\b|\bbeat the (previous|last|pile|card)\b|\bplay(ing)? (a )?higher\b|\bhigher card or pass\b|\bpass or play\b/.test(text)) {
       patch.family = 'climb';
@@ -306,7 +312,7 @@ function describeChange(field: keyof Knobs, value: unknown): string {
     case 'matchSuit': return value ? 'Match by suit' : 'No suit matching';
     case 'matchRank': return value ? 'Match by rank' : 'No rank matching';
     case 'drawUntilCanPlay': return value ? 'Draw until you can play' : 'Draw one card';
-    case 'family': return value === 'trick' ? 'Trick-taking game' : value === 'climb' ? 'Climbing game' : 'Shedding/matching game';
+    case 'family': return value === 'trick' ? 'Trick-taking game' : value === 'climb' ? 'Climbing game' : value === 'fish' ? 'Fishing game' : 'Shedding/matching game';
     case 'climbTwosHigh': return value ? 'Ranks: 3 low … 2 high' : 'Ranks: 2 low … Ace high';
     case 'trump': return value === 'none' ? 'No trump' : `Trump: ${value}`;
     case 'mustFollowSuit': return value ? 'Must follow suit' : 'Follow suit not required';

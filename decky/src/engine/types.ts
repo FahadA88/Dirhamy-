@@ -67,6 +67,8 @@ export interface TrickConfig {
   aceHigh: boolean;            // Ace is the strongest rank (else lowest)
   scoreBy: 'mostTricks' | 'fewestTricks' | 'penalty';
   penaltyPoints?: Record<string, number>; // card rank/suit → points (Hearts-style), for scoreBy: 'penalty'
+  bidding?: boolean;           // players bid tricks before play (Spades); overrides scoreBy with bid scoring
+  partnerships?: boolean;      // 4 players in 2 teams (seats 1&3 vs 2&4)
 }
 
 export type Visibility = 'none' | 'owner' | 'top-public' | 'all';
@@ -163,6 +165,8 @@ export interface MatchState {
   lead: Suit | null;        // led suit of the current trick
   trickPlays: { player: string; card: Card }[]; // cards played into the current trick
   tricksWon: Record<string, number>;
+  bids: Record<string, number>; // trick bids (Spades)
+  bidding: boolean;         // true while the bidding phase is open
   // climbing state (unused by other families)
   passStreak: number;       // consecutive passes since the last play
   lastPlayer: string | null; // who made the last play (leads when the pile clears)
@@ -222,4 +226,7 @@ export interface RedactedState {
   finished?: string[];
   booksWon?: Record<string, number>;
   oceanCount?: number;
+  bids?: Record<string, number>;
+  bidding?: boolean;
+  teams?: string[][];
 }

@@ -9,6 +9,7 @@ import { crazyEights } from '../games/crazyEights';
 import { switchGame } from '../games/switch';
 import { spadesLite } from '../games/spades';
 import { president } from '../games/president';
+import { goFish } from '../games/goFish';
 import { GameDefinition, Rank, Suit } from '../engine/types';
 import { Table } from './Table';
 
@@ -79,6 +80,7 @@ export function CreateView() {
             <button className="chip" onClick={() => startFrom(knobsFromDefinition(switchGame))}>Switch</button>
             <button className="chip" onClick={() => startFrom(knobsFromDefinition(spadesLite))}>Spades</button>
             <button className="chip" onClick={() => startFrom(knobsFromDefinition(president))}>President</button>
+            <button className="chip" onClick={() => startFrom(knobsFromDefinition(goFish))}>Go Fish</button>
           </div>
 
           <div className="field"><span>Game family</span>
@@ -86,6 +88,7 @@ export function CreateView() {
               <button className={knobs.family === 'shedding' ? 'on' : ''} onClick={() => set('family', 'shedding')}>Shedding</button>
               <button className={knobs.family === 'trick' ? 'on' : ''} onClick={() => set('family', 'trick')}>Trick-taking</button>
               <button className={knobs.family === 'climb' ? 'on' : ''} onClick={() => set('family', 'climb')}>Climbing</button>
+              <button className={knobs.family === 'fish' ? 'on' : ''} onClick={() => set('family', 'fish')}>Fishing</button>
             </div>
           </div>
 
@@ -128,6 +131,14 @@ export function CreateView() {
                   </div></div>
               </Section>
             </>
+          )}
+
+          {knobs.family === 'fish' && (
+            <Section title="Fishing rules" defaultOpen>
+              <label className="field"><span>Cards dealt each: <b>{knobs.handSize}</b></span>
+                <input type="range" min={5} max={7} value={knobs.handSize} onChange={(e) => set('handSize', +e.target.value)} /></label>
+              <span className="mini-label">Ask opponents for ranks; collect four of a rank for a book. Most books wins.</span>
+            </Section>
           )}
 
           {knobs.family === 'climb' && (

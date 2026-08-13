@@ -7,7 +7,7 @@ import { Effect, GameDefinition, Predicate, Rank, Suit } from '../engine/types';
 export const RANKS_13: Rank[] = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
 
 export interface Knobs {
-  family: 'shedding' | 'trick' | 'climb';
+  family: 'shedding' | 'trick' | 'climb' | 'fish';
   name: string;
   description: string;
   minPlayers: number;
@@ -95,7 +95,31 @@ export const defaultKnobs: Knobs = {
 export function buildDefinition(knobs: Knobs, id = 'draft'): GameDefinition {
   if (knobs.family === 'trick') return buildTrickDefinition(knobs, id);
   if (knobs.family === 'climb') return buildClimbDefinition(knobs, id);
+  if (knobs.family === 'fish') return buildFishDefinition(knobs, id);
   return buildSheddingDefinition(knobs, id);
+}
+
+function buildFishDefinition(knobs: Knobs, id: string): GameDefinition {
+  return {
+    schemaVersion: '1.0',
+    meta: {
+      id, name: knobs.name, description: knobs.description || autoFishDescription(knobs),
+      players: { min: clampInt(knobs.minPlayers, 2, 6), max: clampInt(knobs.maxPlayers, knobs.minPlayers, 6) },
+      family: 'fishing',
+    },
+    deck: { base: 'standard54', includeJokers: false, deckCount: 1, excludeRanks: knobs.excludeRanks, rankOrder: RANKS_13, tags: {} },
+    zones: [
+      { id: 'ocean', type: 'pile', ordered: true, faceDown: true, visibility: 'none', shared: true },
+      { id: 'hand', type: 'hand', ordered: false, faceDown: true, visibility: 'owner', perPlayer: true },
+    ],
+    setup: [{ op: 'shuffle', zone: 'ocean' }, { op: 'deal', from: 'ocean', to: 'hand', countPerPlayer: knobs.handSize }],
+    turnFlow: { order: 'clockwise', startPlayer: 'first', actionsPerTurn: { min: 1, max: 1 } },
+    actions: [],
+    triggers: [],
+    endConditions: [],
+    scoring: { mode: 'lowestPoints', winner: 'highestTotal', cardPoints: {}, target: 13 },
+    fish: { bookSize: 4 },
+  };
 }
 
 function buildClimbDefinition(knobs: Knobs, id: string): GameDefinition {
@@ -261,7 +285,7 @@ export function knobsFromDefinition(def: GameDefinition): Knobs {
   const wildRanks = tagRanks('wild').filter((r) => !wildDrawRanks.includes(r));
 
   return {
-    family: def.climb ? 'climb' : def.trick ? 'trick' : 'shedding',
+    family: def.fish ? 'fish' : def.climb ? 'climb' : def.trick ? 'trick' : 'shedding',
     trump: def.trick?.trump ?? 'S',
     mustFollowSuit: def.trick?.mustFollowSuit ?? true,
     aceHigh: def.trick?.aceHigh ?? true,
@@ -312,6 +336,10 @@ function autoTrickDescription(k: Knobs): string {
 function autoClimbDescription(k: Knobs): string {
   const order = k.climbTwosHigh ? 'run 3 (low) up to 2 (high)' : 'run 2 (low) up to Ace (high)';
   return `A climbing game. Beat the card on the pile with a strictly higher one, or pass. When everyone passes, the pile clears and the last player to play leads. Ranks ${order}. First to empty their hand wins.`;
+}
+
+function autoFishDescription(k: Knobs): string {
+  return `A fishing game. Deal ${k.handSize} cards each. Ask an opponent for a rank you hold; if they have it you take all of it and ask again, otherwise draw from the ocean. Collect four of a rank for a book. Most books wins.`;
 }
 
 function dedup(rs: Rank[]): Rank[] { return Array.from(new Set(rs)); }
