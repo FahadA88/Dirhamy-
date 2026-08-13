@@ -10,7 +10,7 @@
 
 import {
   ActionDef, Card, Effect, GameDefinition, MatchState, Move, Predicate,
-  RedactedState, RedactedZone, ScoringDef, TrickConfig, ZoneDef,
+  RedactedState, RedactedZone, ScoringDef, Suit, TrickConfig, ZoneDef,
 } from './types';
 import { buildDeck, cardColor, cardTags } from './deck';
 import { seededShuffle } from './rng';
@@ -62,6 +62,15 @@ export function createMatch(
     tricksWon: Object.fromEntries(players.map((p) => [p, 0])),
     bids: {},
     bidding: !!def.trick?.bidding,
+    trumpSuit: def.trick?.auction ? null : (def.trick?.trump ?? null),
+    auctionRound: 0,
+    auctionPasses: 0,
+    turnedDownSuit: null,
+    dealerIndex: 0,
+    maker: null,
+    alone: false,
+    sittingOut: null,
+    discarding: null,
     rummyPhase: 'draw',
     passStreak: 0,
     lastPlayer: null,
@@ -144,7 +153,16 @@ export function createMatch(
   log(state, null, `${def.meta.name} started with ${players.length} players.`);
   // A pre-hand exchange happens before anyone plays; otherwise open at the designated lead.
   if (def.handPass) startHandPass(state);
-  if (def.trick && !state.passDirection && !state.bidding) state.turnIndex = openingLeadSeat(state);
+  if (def.trick?.auction) {
+    // The deal rotates each hand, and bidding opens to the dealer's left.
+    state.dealerIndex = ((carry?.handNumber ?? 1) - 1) % players.length;
+    state.auctionRound = 1;
+    state.turnIndex = (state.dealerIndex + 1) % players.length;
+    const up = topCard(state.zones[def.trick.auction.upcardZone] || []);
+    log(state, null, `${short(players[state.dealerIndex])} deals. ${up ? `${cardLabel(up)} is turned up.` : ''}`);
+  } else if (def.trick && !state.passDirection && !state.bidding) {
+    state.turnIndex = openingLeadSeat(state);
+  }
   return state;
 }
 
@@ -668,6 +686,7 @@ export function isTerminal(state: MatchState): boolean {
 export function actingPlayers(state: MatchState): string[] {
   if (state.phase !== 'playing') return [];
   if (state.pendingChoice) return [state.pendingChoice.player];
+  if (state.discarding) return [state.discarding];
   if (state.passDirection) return state.players.filter((p) => !(p in state.passChoices));
   const current = state.players[state.turnIndex];
   if (state.definition.climb?.bombSize) {
@@ -735,9 +754,70 @@ export function nextHand(state: MatchState, seed: number): MatchState {
 
 // ---------- trick-taking family ----------
 
+// Trump is normally fixed by the definition, but an auction game names it per hand.
+function trumpOf(s: MatchState): Suit | 'none' {
+  return s.definition.trick!.auction ? (s.trumpSuit ?? 'none') : s.definition.trick!.trump;
+}
+
+const SAME_COLOUR: Record<string, string> = { C: 'S', S: 'C', H: 'D', D: 'H' };
+
+// The left bower is a trump card, not a card of its printed suit — for following suit AND for
+// resolving the trick. Every suit comparison in this family goes through here.
+function suitOf(s: MatchState, card: Card): string {
+  const t = trumpOf(s);
+  if (!s.definition.trick!.bowers || t === 'none') return card.suit;
+  if (card.rank === 'J' && card.suit === SAME_COLOUR[t]) return t;
+  return card.suit;
+}
+
+// Rank within a trick: right bower tops, then left bower, then the rest of the rank order.
+function trickStrength(s: MatchState, card: Card): number {
+  const cfg = s.definition.trick!;
+  const t = trumpOf(s);
+  if (cfg.bowers && t !== 'none' && card.rank === 'J') {
+    if (card.suit === t) return 3000;
+    if (card.suit === SAME_COLOUR[t]) return 2900;
+  }
+  const base = s.definition.deck.rankOrder.indexOf(card.rank as never);
+  return cfg.aceHigh && card.rank === 'A' ? 1000 : base;
+}
+
 function trickLegalMoves(state: MatchState, playerId: string): Move[] {
+  const cfgEarly = state.definition.trick!;
+
+  // The dealer owes a discard after taking the upcard — nothing else can happen until they do.
+  if (state.discarding) {
+    if (state.discarding !== playerId) return [];
+    return (state.zones[`hand:${playerId}`] || []).map((c) => ({ actionId: 'dealerDiscard', cardId: c.id }));
+  }
+
+  if (state.sittingOut === playerId) return [];   // partner is out while the maker plays alone
   if (state.players[state.turnIndex] !== playerId) return [];
   const def = state.definition;
+
+  // Trump auction: take the turned-up suit (round 1) or name one (round 2), or pass.
+  if (state.auctionRound > 0 && cfgEarly.auction) {
+    const moves: Move[] = [];
+    const up = topCard(state.zones[cfgEarly.auction.upcardZone] || []);
+    if (state.auctionRound === 1) {
+      if (up) moves.push({ actionId: 'orderUp', choice: up.suit });
+    } else {
+      // Round 2 bars the suit that was just turned down.
+      for (const suit of ['C', 'D', 'H', 'S'] as const) {
+        if (suit !== state.turnedDownSuit) moves.push({ actionId: 'nameTrump', choice: suit });
+      }
+    }
+    if (cfgEarly.goAlone) {
+      for (const m of [...moves]) moves.push({ ...m, alone: true });
+    }
+    // "Screw the dealer": on the last call of the final round the dealer must name something,
+    // so a hand can never be passed out forever.
+    const lastCall = state.auctionRound === cfgEarly.auction.rounds
+      && state.auctionPasses === state.players.length - 1;
+    if (!lastCall) moves.push({ actionId: 'passBid' });
+    return moves;
+  }
+
   // Bidding phase: bid 0..handSize tricks.
   if (state.bidding) {
     const n = (state.zones[`hand:${playerId}`] || []).length;
@@ -754,9 +834,9 @@ function trickLegalMoves(state: MatchState, playerId: string): Move[] {
   }
 
   let playable = hand;
-  // Must follow the led suit if you hold one.
+  // Must follow the led suit if you hold one. Effective suit, so the left bower follows trump.
   if (cfg.mustFollowSuit && state.lead) {
-    const following = hand.filter((c) => c.suit === state.lead);
+    const following = hand.filter((c) => suitOf(state, c) === state.lead);
     if (following.length) playable = following;
   }
 
@@ -783,6 +863,14 @@ function penaltyOf(cfg: TrickConfig, card: Card): number {
 }
 
 function applyTrickMove(s: MatchState, playerId: string, move: Move): MatchState {
+  // Trump auction and the dealer's discard.
+  if (s.discarding || s.auctionRound > 0) {
+    const auctionMoves = trickLegalMoves(s, playerId);
+    if (!auctionMoves.some((m) => m.actionId === move.actionId && m.choice === move.choice
+      && !!m.alone === !!move.alone && m.cardId === move.cardId)) return s;
+    return applyAuctionMove(s, playerId, move);
+  }
+
   // Bidding phase.
   if (s.bidding) {
     if (move.actionId !== 'bid' || move.choice === undefined) return s;
@@ -803,7 +891,7 @@ function applyTrickMove(s: MatchState, playerId: string, move: Move): MatchState
   hand.splice(idx, 1);
   const trickZone = s.definition.zones.find((z) => z.type === 'trick')!;
   s.zones[trickZone.id].push(card);
-  if (s.trickPlays.length === 0) s.lead = card.suit;
+  if (s.trickPlays.length === 0) s.lead = suitOf(s, card) as MatchState['lead'];
   const brk = s.definition.trick!.brokenSuit;
   if (brk && card.suit === brk && !s.brokenSuitPlayed) {
     s.brokenSuitPlayed = true;
@@ -812,7 +900,7 @@ function applyTrickMove(s: MatchState, playerId: string, move: Move): MatchState
   s.trickPlays.push({ player: playerId, card });
   log(s, playerId, `${short(playerId)} played ${cardLabel(card)}.`);
 
-  if (s.trickPlays.length < s.players.length) {
+  if (s.trickPlays.length < activeSeats(s).length) {
     s.turnIndex = nextIndex(s);
     return s;
   }
@@ -820,25 +908,115 @@ function applyTrickMove(s: MatchState, playerId: string, move: Move): MatchState
   return s;
 }
 
+// The trump auction: order up the turned card's suit, name a different one, or pass. When
+// everyone passes twice the hand is dead and gets thrown in.
+function applyAuctionMove(s: MatchState, playerId: string, move: Move): MatchState {
+  const cfg = s.definition.trick!;
+  const auction = cfg.auction!;
+
+  if (move.actionId === 'dealerDiscard') {
+    const hand = s.zones[`hand:${playerId}`];
+    const i = hand.findIndex((c) => c.id === move.cardId);
+    if (i < 0) return s;
+    hand.splice(i, 1);
+    s.discarding = null;
+    log(s, playerId, `${short(playerId)} discards.`);
+    beginTrickPlay(s);
+    return s;
+  }
+
+  if (move.actionId === 'passBid') {
+    s.auctionPasses += 1;
+    log(s, playerId, `${short(playerId)} passes.`);
+    if (s.auctionPasses < s.players.length) {
+      s.turnIndex = nextIndex(s);
+      return s;
+    }
+    // A full circle of passes: move to round 2, or throw the hand in.
+    s.auctionPasses = 0;
+    if (s.auctionRound === 1 && auction.rounds === 2) {
+      s.auctionRound = 2;
+      const down = topCard(s.zones[auction.upcardZone] || []);
+      s.turnedDownSuit = (down?.suit as MatchState['turnedDownSuit']) ?? null;
+      s.zones[auction.upcardZone] = [];       // the upcard is turned down
+      s.turnIndex = ((s.dealerIndex + 1) % s.players.length + s.players.length) % s.players.length;
+      log(s, null, 'Turned down — name any other suit.');
+      return s;
+    }
+    s.auctionRound = 0;
+    log(s, null, 'Nobody took it — the hand is thrown in.');
+    endTrickRound(s);
+    return s;
+  }
+
+  // orderUp / nameTrump
+  s.trumpSuit = move.choice as MatchState['trumpSuit'];
+  s.maker = playerId;
+  s.alone = !!move.alone;
+  s.auctionRound = 0;
+  s.auctionPasses = 0;
+  log(s, playerId, `${short(playerId)} makes ${suitName(move.choice!)} trump${move.alone ? ' — going alone' : ''}.`);
+
+  if (s.alone) {
+    const partner = partnerOf(s, playerId);
+    if (partner) {
+      s.sittingOut = partner;
+      log(s, null, `${short(partner)} sits this hand out.`);
+    }
+  }
+
+  // Ordering it up in round 1 hands the dealer the upcard, and they owe a discard.
+  if (move.actionId === 'orderUp' && auction.dealerDiscards) {
+    const up = s.zones[auction.upcardZone].pop();
+    const dealer = s.players[s.dealerIndex];
+    if (up) {
+      s.zones[`hand:${dealer}`].push(up);
+      log(s, null, `${short(dealer)} takes ${cardLabel(up)}.`);
+      s.discarding = dealer;
+      return s;
+    }
+  }
+  s.zones[auction.upcardZone] = [];
+  beginTrickPlay(s);
+  return s;
+}
+
+// Trump is settled — the player left of the dealer leads, skipping anyone sitting out.
+function beginTrickPlay(s: MatchState): void {
+  const n = s.players.length;
+  let i = ((s.dealerIndex + 1) % n + n) % n;
+  for (let step = 0; step < n && s.players[i] === s.sittingOut; step++) i = (i + 1) % n;
+  s.turnIndex = i;
+}
+
+function partnerOf(s: MatchState, playerId: string): string | null {
+  if (!s.definition.trick?.partnerships || s.players.length !== 4) return null;
+  const i = s.players.indexOf(playerId);
+  return s.players[(i + 2) % 4];
+}
+
+// How many seats actually play this hand (one sits out when the maker goes alone).
+function activeSeats(s: MatchState): string[] {
+  return s.players.filter((p) => p !== s.sittingOut);
+}
+
 function nextIndex(s: MatchState): number {
   const n = s.players.length;
-  return ((s.turnIndex + s.direction) % n + n) % n;
+  let i = ((s.turnIndex + s.direction) % n + n) % n;
+  for (let step = 0; step < n && s.players[i] === s.sittingOut; step++) {
+    i = ((i + s.direction) % n + n) % n;
+  }
+  return i;
 }
 
 function resolveTrick(s: MatchState, trickZoneId: string): void {
   const cfg = s.definition.trick!;
-  const rankStrength = (rank: string) => {
-    const base = s.definition.deck.rankOrder.indexOf(rank as never);
-    return cfg.aceHigh && rank === 'A' ? 1000 : base;
-  };
-  const category = (suit: string) => (cfg.trump !== 'none' && suit === cfg.trump ? 2 : suit === s.lead ? 1 : 0);
+  const trump = trumpOf(s);
+  const category = (suit: string) => (trump !== 'none' && suit === trump ? 2 : suit === s.lead ? 1 : 0);
+  const value = (c: Card) => category(suitOf(s, c)) * 10000 + trickStrength(s, c);
 
   let winner = s.trickPlays[0];
-  for (const play of s.trickPlays) {
-    const a = category(play.card.suit) * 1000 + rankStrength(play.card.rank);
-    const b = category(winner.card.suit) * 1000 + rankStrength(winner.card.rank);
-    if (a > b) winner = play;
-  }
+  for (const play of s.trickPlays) if (value(play.card) > value(winner.card)) winner = play;
   s.tricksWon[winner.player] = (s.tricksWon[winner.player] ?? 0) + 1;
 
   // Hearts-style penalty points travel to the trick winner.
@@ -858,8 +1036,8 @@ function resolveTrick(s: MatchState, trickZoneId: string): void {
   s.turnIndex = s.players.indexOf(winner.player); // winner leads the next trick
   log(s, null, `${short(winner.player)} takes the trick (${s.tricksWon[winner.player]}).`);
 
-  // Round ends when every hand is empty.
-  if (s.players.every((p) => (s.zones[`hand:${p}`] || []).length === 0)) endTrickRound(s);
+  // Round ends when every hand still in play is empty.
+  if (activeSeats(s).every((p) => (s.zones[`hand:${p}`] || []).length === 0)) endTrickRound(s);
 }
 
 export function trickTeams(s: MatchState): string[][] {
@@ -872,6 +1050,32 @@ export function trickTeams(s: MatchState): string[][] {
 function endTrickRound(s: MatchState): void {
   const cfg = s.definition.trick!;
   s.phase = 'roundOver';
+
+  // Euchre: only the making team can score by making it; setting them is worth more.
+  if (cfg.euchreScoring) {
+    const teams = trickTeams(s);
+    const makerTeam = teams.find((t) => t.includes(s.maker ?? '')) ?? teams[0];
+    const defenders = teams.find((t) => t !== makerTeam) ?? teams[1] ?? [];
+    const made = makerTeam.reduce((a, p) => a + (s.tricksWon[p] ?? 0), 0);
+    const total = Object.values(s.tricksWon).reduce((a, b) => a + b, 0);
+
+    let makerPts = 0;
+    let defPts = 0;
+    if (total === 0) {
+      log(s, null, 'Hand thrown in — no score.');            // nobody named trump
+    } else if (made * 2 > total) {
+      makerPts = made === total ? (s.alone ? 4 : 2) : 1;
+      log(s, null, `${s.maker ? short(s.maker) : 'Makers'} made it — ${makerPts} point${makerPts === 1 ? '' : 's'}.`);
+    } else {
+      defPts = 2;
+      log(s, null, `Euchred — defenders take 2.`);
+    }
+    for (const p of makerTeam) s.scores[p] = makerPts;
+    for (const p of defenders) s.scores[p] = defPts;
+    s.winner = makerPts >= defPts ? makerTeam[0] : defenders[0];
+    finalizeMatchProgress(s);
+    return;
+  }
 
   // Spades-style bid scoring (with partnerships and nil).
   if (cfg.bidding) {
@@ -942,8 +1146,8 @@ function climbGroups(hand: Card[], size: number): { rank: string; cards: string[
 // Bomb moves are available to EVERY player, in or out of turn, whenever they hold enough of
 // a rank — this is what lets actingPlayers() surface interrupts.
 function climbBombMoves(state: MatchState, playerId: string): Move[] {
-  const cfg = state.definition.climb!;
-  if (!cfg.bombSize || state.finished.includes(playerId) || state.climbBombDeclined[playerId]) return [];
+  const cfg = state.definition.climb;
+  if (!cfg?.bombSize || state.finished.includes(playerId) || state.climbBombDeclined[playerId]) return [];
   const hand = state.zones[`hand:${playerId}`] || [];
   return climbGroups(hand, cfg.bombSize).map((g) => ({ actionId: 'climbBomb', cards: g.cards }));
 }
@@ -1442,8 +1646,12 @@ export function redact(state: MatchState, viewer: string): RedactedState {
       state.phase === 'playing' &&
       (state.pendingChoice
         ? state.pendingChoice.player === viewer
+        : state.discarding
+        ? state.discarding === viewer
         : state.passDirection
         ? !(viewer in state.passChoices)
+        : state.sittingOut === viewer
+        ? false
         : state.players[state.turnIndex] === viewer || climbBombMoves(state, viewer).length > 0),
     pendingChoice: state.pendingChoice,
     scores: { ...state.scores },
@@ -1469,6 +1677,14 @@ export function redact(state: MatchState, viewer: string): RedactedState {
     bids: state.definition.trick?.bidding ? { ...state.bids } : undefined,
     bidding: state.definition.trick?.bidding ? state.bidding : undefined,
     teams: state.definition.trick?.partnerships ? trickTeams(state) : undefined,
+    trumpSuit: state.definition.trick ? trumpOf(state) : undefined,
+    auctionRound: state.definition.trick?.auction ? state.auctionRound : undefined,
+    upcard: state.definition.trick?.auction
+      ? topCard(state.zones[state.definition.trick.auction.upcardZone] || []) ?? null : undefined,
+    maker: state.definition.trick?.auction ? state.maker : undefined,
+    alone: state.definition.trick?.auction ? state.alone : undefined,
+    sittingOut: state.definition.trick?.auction ? state.sittingOut : undefined,
+    dealer: state.definition.trick?.auction ? state.players[state.dealerIndex] : undefined,
     matchScores: { ...state.matchScores },
     handNumber: state.handNumber,
     matchOver: state.matchOver,

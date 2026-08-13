@@ -58,9 +58,16 @@ export function Table({ def, seats = 3 }: { def: GameDefinition; seats?: number 
   const canDeclineBomb = myLegal.some((m) => m.actionId === 'climbNoBomb');
   const isInterrupt = isClimb && view.isYourTurn && !view.players.find((p) => p.id === HUMAN)?.isTurn;
   const rankOfId = (id: string) => view.hand.find((c) => c.id === id)?.rank ?? '?';
+  const auctionMoves = useMemo(
+    () => myLegal.filter((m) => m.actionId === 'orderUp' || m.actionId === 'nameTrump'),
+    [myLegal],
+  );
+  const canPassBid = myLegal.some((m) => m.actionId === 'passBid');
+  const discardMoves = useMemo(() => myLegal.filter((m) => m.actionId === 'dealerDiscard'), [myLegal]);
   const canFlip = myLegal.some((m) => m.actionId === 'warFlip');
   const myPile = view.players.find((p) => p.id === HUMAN)?.handCount ?? 0;
   const playActionId = view.needsPassChoice ? 'choosePass'
+    : discardMoves.length > 0 ? 'dealerDiscard'
     : view.mode === 'trick' ? 'playToTrick' : view.mode === 'climb' ? 'climbPlay' : isRummy ? 'rummyDiscard' : 'playCard';
 
   // Bot loop, paced by the user's bot-speed setting. Usually one actor is waiting (whoever's
@@ -159,7 +166,44 @@ export function Table({ def, seats = 3 }: { def: GameDefinition; seats?: number 
         })}
       </div>
 
-      {view.mode === 'trick' && view.bidding ? (
+      {view.mode === 'trick' && (view.auctionRound ?? 0) > 0 ? (
+        <div className="center bid-area">
+          {view.upcard && (
+            <div className="pile">
+              <CardFace card={view.upcard} />
+              <div className="pile-label">Turned up</div>
+            </div>
+          )}
+          {view.isYourTurn ? (
+            <div className="bid-panel">
+              <div className="bid-title">
+                {view.auctionRound === 1
+                  ? `Order it up — make ${view.upcard ? SUIT_SYMBOLS[view.upcard.suit] : ''} trump?`
+                  : 'Name a trump suit'}
+              </div>
+              <div className="bid-buttons">
+                {auctionMoves.filter((m) => !m.alone).map((m, i) => (
+                  <button key={`a${i}`} className={`bid-btn s-${m.choice}`} onClick={() => submit(m)}>
+                    {m.actionId === 'orderUp' ? 'Order up' : SUIT_SYMBOLS[m.choice!] ?? m.choice}
+                  </button>
+                ))}
+              </div>
+              {auctionMoves.some((m) => m.alone) && (
+                <div className="bid-buttons">
+                  {auctionMoves.filter((m) => m.alone).map((m, i) => (
+                    <button key={`s${i}`} className="bid-btn alone" onClick={() => submit(m)}>
+                      Alone {m.actionId === 'orderUp' ? '' : SUIT_SYMBOLS[m.choice!] ?? m.choice}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {canPassBid
+                ? <button className="draw-btn" onClick={() => submit({ actionId: 'passBid' })}>Pass</button>
+                : <span className="mini-label">You're the dealer on the last call — you have to name one.</span>}
+            </div>
+          ) : <div className="trick-empty">Bidding for trump… waiting for other players</div>}
+        </div>
+      ) : view.mode === 'trick' && view.bidding ? (
         <div className="center bid-area">
           {view.isYourTurn ? (
             <div className="bid-panel">
@@ -185,8 +229,9 @@ export function Table({ def, seats = 3 }: { def: GameDefinition; seats?: number 
               ))
             : <div className="trick-empty">Trick is empty — {view.isYourTurn ? 'your lead' : 'waiting…'}</div>}
           <div className="trick-meta">
-            Trump {SUIT_SYMBOLS[state.definition.trick!.trump] ?? '—'}
+            Trump {view.trumpSuit && view.trumpSuit !== 'none' ? SUIT_SYMBOLS[view.trumpSuit] : '—'}
             {view.lead ? ` · led ${SUIT_SYMBOLS[view.lead]}` : ''}
+            {view.maker ? ` · ${nameOf(view.maker)} called it${view.alone ? ' alone' : ''}` : ''}
           </div>
         </div>
       ) : isFish ? (
@@ -270,6 +315,7 @@ export function Table({ def, seats = 3 }: { def: GameDefinition; seats?: number 
             </span>
           )}
           {isInterrupt && <span className="bomb-badge">💣 You can bomb out of turn</span>}
+          {discardMoves.length > 0 && <span className="turn-badge">You took the upcard — tap a card to discard</span>}
           {!view.passDirection && view.isYourTurn && !suitPickerOpen && !isInterrupt && <span className="turn-badge">Your turn</span>}
           {!view.needsPassChoice && view.passDirection && <span className="waiting-badge">Waiting on {view.passWaitingOn} player{view.passWaitingOn === 1 ? '' : 's'}…</span>}
           {canDraw && <button className="draw-btn" onClick={() => submit({ actionId: 'drawCard' })}>Draw a card</button>}

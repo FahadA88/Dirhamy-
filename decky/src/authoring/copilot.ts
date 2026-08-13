@@ -150,6 +150,16 @@ export const offlineTranslator: Translator = {
       const bustMatch = /\b(?:bust|lose|drops?|falls?)\b[^.]*?-\s*(\d+)/.exec(text) || /-\s*(\d+)\s*(?:and you'?re out|points? you lose|and you lose)/.exec(text);
       if (bustMatch) { patch.bustEnabled = true; patch.bustScore = clampMatchTarget(parseInt(bustMatch[1], 10)); notes.push(`Bust at -${patch.bustScore} — the match ends instantly.`); }
 
+      // Euchre rules.
+      if (/\beuchre\b|\border (it )?up\b|\bturn(ed)? up\b|\bname trump\b|\bcall trump\b|\btrump is (named|chosen|decided)\b|\bbower\b/.test(text)) {
+        patch.trumpAuction = true;
+        patch.trickPartnerships = true;
+        notes.push('Trump is named each hand from a turned-up card.');
+        if (/\beuchre\b|\bbower\b/.test(text)) { patch.bowers = true; notes.push('Bowers: the jacks top the trump suit.'); }
+        if (/\beuchre\b|\balone\b|\bwithout (your|their) partner\b/.test(text)) { patch.goAlone = true; notes.push('The maker may go alone.'); }
+        if (/\beuchre\b/.test(text)) { patch.excludeRanks = ['2', '3', '4', '5', '6', '7', '8']; patch.handSize = 5; patch.minPlayers = 4; patch.maxPlayers = 4; }
+      }
+
       // Hearts rules.
       if (/\bshoot(ing)? the moon\b|\ball (26|the points)\b|\btakes? every (point|heart)\b/.test(text)) {
         patch.shootTheMoon = true;
@@ -388,6 +398,9 @@ function describeChange(field: keyof Knobs, value: unknown): string {
     case 'rummySetMin': return `Sets of ${value}+`;
     case 'rummyRunMin': return `Runs of ${value}+`;
     case 'climbTwosHigh': return value ? 'Ranks: 3 low … 2 high' : 'Ranks: 2 low … Ace high';
+    case 'trumpAuction': return value ? 'Trump named each hand' : 'Trump fixed by the rules';
+    case 'bowers': return value ? 'Bowers on' : 'No bowers';
+    case 'goAlone': return value ? 'Going alone allowed' : 'No going alone';
     case 'shootTheMoon': return value ? 'Shooting the moon on' : 'No moon shot';
     case 'brokenSuitLead': return value ? 'Hearts must be broken to lead' : 'Hearts may be led freely';
     case 'forceOpeningLead': return value ? '2♣ leads the first trick' : 'Any card opens';

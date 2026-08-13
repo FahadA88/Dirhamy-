@@ -27,6 +27,59 @@ export function chooseMove(
     return { move: { actionId: 'resolveChoice', choice: best }, botSeed };
   }
 
+  // Euchre auction: take a suit only when the hand is genuinely strong in it. Count the two
+  // bowers, then trump aces/kings; go alone on a near-lock.
+  if (moves.some((m) => m.actionId === 'orderUp' || m.actionId === 'nameTrump' || m.actionId === 'passBid')) {
+    if (mode === 'random') { const r = nextRandom(botSeed); return { move: moves[Math.floor(r.value * moves.length)], botSeed: r.state }; }
+    const hand = state.zones[`hand:${playerId}`] || [];
+    const sameColour: Record<string, string> = { C: 'S', S: 'C', H: 'D', D: 'H' };
+    const strengthIn = (suit: string) => {
+      let v = 0;
+      for (const c of hand) {
+        if (c.rank === 'J' && c.suit === suit) v += 4;
+        else if (c.rank === 'J' && c.suit === sameColour[suit]) v += 3;
+        else if (c.suit === suit) v += c.rank === 'A' ? 2 : c.rank === 'K' ? 1.5 : 1;
+        else if (c.rank === 'A') v += 0.5;
+      }
+      return v;
+    };
+    const bids = moves.filter((m) => m.actionId === 'orderUp' || m.actionId === 'nameTrump');
+    let best: Move | null = null;
+    let bestV = 0;
+    for (const m of bids) {
+      if (m.alone) continue;
+      const v = strengthIn(m.choice!);
+      if (v > bestV) { bestV = v; best = m; }
+    }
+    const canPass = moves.some((m) => m.actionId === 'passBid');
+    // On the dealer's forced last call there is no pass — take the best suit going.
+    if (!best) return { move: canPass ? { actionId: 'passBid' } : bids[0], botSeed };
+    if (bestV < 6.5 && canPass) return { move: { actionId: 'passBid' }, botSeed };
+    if (bestV >= 10.5) {
+      const solo = moves.find((m) => m.actionId === best!.actionId && m.choice === best!.choice && m.alone);
+      if (solo) return { move: solo, botSeed };
+    }
+    return { move: best, botSeed };
+  }
+
+  // Dealer's discard after taking the upcard: throw the weakest off-trump card.
+  if (moves[0].actionId === 'dealerDiscard') {
+    if (mode === 'random') { const r = nextRandom(botSeed); return { move: moves[Math.floor(r.value * moves.length)], botSeed: r.state }; }
+    const hand = state.zones[`hand:${playerId}`] || [];
+    const order = state.definition.deck.rankOrder;
+    const trump = state.trumpSuit;
+    const sameColour: Record<string, string> = { C: 'S', S: 'C', H: 'D', D: 'H' };
+    const keep = (id?: string) => {
+      const c = hand.find((x) => x.id === id);
+      if (!c) return 0;
+      if (c.rank === 'J' && (c.suit === trump || c.suit === sameColour[trump ?? ''])) return 1000;
+      return (c.suit === trump ? 100 : 0) + order.indexOf(c.rank as never);
+    };
+    let best = moves[0];
+    for (const m of moves) if (keep(m.cardId) < keep(best.cardId)) best = m;
+    return { move: best, botSeed };
+  }
+
   // Bidding (Spades): estimate tricks from high cards + long trump.
   if (moves[0].actionId === 'bid') {
     if (mode === 'random') { const r = nextRandom(botSeed); return { move: moves[Math.floor(r.value * moves.length)], botSeed: r.state }; }

@@ -23,6 +23,9 @@ export interface Knobs {
   bustScore: number;      // stored positive; the actual threshold is -bustScore
   heartsValue: number;       // penalty per heart (penalty scoring)
   queenSpadesValue: number;  // penalty for the Queen of Spades (penalty scoring)
+  trumpAuction: boolean;     // trump is named per hand rather than fixed by the definition
+  bowers: boolean;           // trump jack, then the same-colour jack, top the trump suit
+  goAlone: boolean;          // the maker may cut their partner out of the hand
   shootTheMoon: boolean;     // sweeping every penalty point scores you 0 and everyone else the pot
   brokenSuitLead: boolean;   // the penalty suit may not be LED until it has been broken
   forceOpeningLead: boolean; // the 2♣ holder leads it, and no points may fall on the first trick
@@ -96,6 +99,9 @@ export const defaultKnobs: Knobs = {
   bustScore: 200,
   heartsValue: 1,
   queenSpadesValue: 13,
+  trumpAuction: false,
+  bowers: false,
+  goAlone: false,
   shootTheMoon: false,
   brokenSuitLead: false,
   forceOpeningLead: false,
@@ -251,12 +257,17 @@ function buildTrickDefinition(knobs: Knobs, id: string): GameDefinition {
     deck: { base: 'standard54', includeJokers: knobs.includeJokers, deckCount: 1, excludeRanks: knobs.excludeRanks, rankOrder: RANKS_13, tags: {} },
     zones: [
       { id: 'draw', type: 'pile', ordered: true, faceDown: true, visibility: 'none', shared: true },
+      // The auction needs somewhere to turn a card up from.
+      ...(knobs.trumpAuction
+        ? [{ id: 'kitty', type: 'pile' as const, ordered: true, faceDown: false, visibility: 'top-public' as const, shared: true }]
+        : []),
       { id: 'trick', type: 'trick', ordered: true, faceDown: false, visibility: 'all', shared: true },
       { id: 'hand', type: 'hand', ordered: false, faceDown: true, visibility: 'owner', perPlayer: true },
     ],
     setup: [
       { op: 'shuffle', zone: 'draw' },
       { op: 'deal', from: 'draw', to: 'hand', countPerPlayer: knobs.handSize },
+      ...(knobs.trumpAuction ? [{ op: 'move' as const, from: 'draw', to: 'kitty', count: 1 }] : []),
     ],
     turnFlow: { order: knobs.direction, startPlayer: 'first', actionsPerTurn: { min: 1, max: 1 } },
     actions: [],
@@ -278,6 +289,11 @@ function buildTrickDefinition(knobs: Knobs, id: string): GameDefinition {
         : undefined,
       bidding: knobs.trickBidding || undefined,
       partnerships: knobs.trickPartnerships || undefined,
+      // Euchre: trump is auctioned per hand instead of fixed.
+      auction: knobs.trumpAuction ? { upcardZone: 'kitty', dealerDiscards: true, rounds: 2 as const } : undefined,
+      bowers: knobs.trumpAuction && knobs.bowers ? true : undefined,
+      goAlone: knobs.trumpAuction && knobs.goAlone && knobs.trickPartnerships ? true : undefined,
+      euchreScoring: knobs.trumpAuction && knobs.trickPartnerships ? true : undefined,
       // Hearts rules only make sense alongside penalty scoring.
       shootTheMoon: knobs.trickScoreBy === 'penalty' && knobs.shootTheMoon ? true : undefined,
       brokenSuit: knobs.trickScoreBy === 'penalty' && knobs.brokenSuitLead ? 'H' : undefined,
@@ -414,6 +430,9 @@ export function knobsFromDefinition(def: GameDefinition): Knobs {
     bustScore: def.scoring.bust != null ? Math.abs(def.scoring.bust) : 200,
     heartsValue: (def.trick?.penaltyPoints?.H as number) ?? 1,
     queenSpadesValue: (def.trick?.penaltyPoints?.SQ as number) ?? 13,
+    trumpAuction: !!def.trick?.auction,
+    bowers: !!def.trick?.bowers,
+    goAlone: !!def.trick?.goAlone,
     shootTheMoon: !!def.trick?.shootTheMoon,
     brokenSuitLead: !!def.trick?.brokenSuit,
     forceOpeningLead: !!def.trick?.leadCard,

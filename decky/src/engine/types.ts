@@ -92,11 +92,26 @@ export interface TrickConfig {
   bidding?: boolean;           // players bid tricks before play (Spades); overrides scoreBy with bid scoring
   partnerships?: boolean;      // 4 players in 2 teams (seats 1&3 vs 2&4)
 
+  // Euchre-family rules. With `auction`, trump is not fixed by the definition — it is named
+  // during a bidding round and lives on MatchState for the duration of the hand.
+  auction?: AuctionConfig;
+  bowers?: boolean;            // the trump jack, then the same-colour jack, outrank every trump
+  goAlone?: boolean;           // the maker may play the hand without their partner
+  euchreScoring?: boolean;     // makers 1 / all five 2 / alone-all-five 4 / set 2 to the defenders
+
   // Hearts-family rules.
   brokenSuit?: Suit;           // may not be LED until it has been discarded off-suit ("hearts broken")
   leadCard?: string;           // card id (e.g. "C2") — its holder leads trick 1 and must play it
   noPenaltyFirstTrick?: boolean; // no point-carrying card may be discarded on the opening trick
   shootTheMoon?: boolean;      // taking EVERY penalty point scores you 0 and everyone else the full pot
+}
+
+// A trump-naming auction (Euchre). Round 1 offers the turned-up card's suit; round 2 lets each
+// player name any other suit. If nobody takes it, the hand is thrown in and redealt.
+export interface AuctionConfig {
+  upcardZone: string;          // shared pile holding the kitty; its top card is turned up
+  dealerDiscards: boolean;     // ordering it up makes the dealer take the upcard and discard one
+  rounds: 1 | 2;
 }
 
 // A simultaneous pre-hand exchange (Hearts). Direction cycles per hand; 'hold' skips a hand.
@@ -207,6 +222,16 @@ export interface MatchState {
   tricksWon: Record<string, number>;
   bids: Record<string, number>; // trick bids (Spades)
   bidding: boolean;         // true while the bidding phase is open
+  // Euchre auction. trumpSuit overrides TrickConfig.trump once a hand's trump is named.
+  trumpSuit: Suit | 'none' | null;
+  auctionRound: 0 | 1 | 2;  // 0 = no auction running
+  auctionPasses: number;
+  turnedDownSuit: Suit | null; // the upcard's suit once it is turned down; barred in round 2
+  dealerIndex: number;
+  maker: string | null;     // who named trump this hand
+  alone: boolean;
+  sittingOut: string | null; // the maker's partner, when going alone
+  discarding: string | null; // the dealer, while they owe a discard after taking the upcard
   rummyPhase: 'draw' | 'play'; // rummy turn phase
   // climbing state (unused by other families)
   passStreak: number;       // consecutive passes since the last play
@@ -254,6 +279,7 @@ export interface Move {
   target?: string;        // fishing: the player being asked
   rank?: string;          // fishing: the rank being asked for
   cards?: string[];       // rummy: the card ids that form a meld
+  alone?: boolean;        // euchre: name trump and play the hand without your partner
 }
 
 // ---------- Redacted (per-player) view ----------
@@ -294,6 +320,13 @@ export interface RedactedState {
   bids?: Record<string, number>;
   bidding?: boolean;
   teams?: string[][];
+  trumpSuit?: Suit | 'none' | null;
+  auctionRound?: 0 | 1 | 2;
+  upcard?: Card | null;
+  maker?: string | null;
+  alone?: boolean;
+  sittingOut?: string | null;
+  dealer?: string | null;
   // match play (see MatchState)
   matchScores: Record<string, number>;
   handNumber: number;

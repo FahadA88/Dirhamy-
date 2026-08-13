@@ -2,6 +2,8 @@
 // Simulation shows a game terminates; these show a specific rule actually fires correctly.
 import { undertow } from '../src/games/undertow';
 import { hearts } from '../src/games/hearts';
+import { euchre } from '../src/games/euchre';
+import { catalog } from '../src/games/catalog';
 import { createMatch, legalMoves, applyMove, actingPlayers, redact, nextHand } from '../src/engine/engine';
 import { chooseMove } from '../src/bots/randomBot';
 import { Card, MatchState } from '../src/engine/types';
@@ -236,6 +238,183 @@ section('Trick-taking — shooting the moon');
   const pot = P.reduce((a, p) => a + (t.scores[p] ?? 0), 0);
   check('a split hand still totals 17 points', pot === 17, t.scores);
   check('a split hand does not invert', !t.log.some((l) => l.text.includes('SHOT THE MOON')), t.scores);
+}
+
+// ---------- Euchre: auction, bowers, kitty, going alone ----------
+section('Trick-taking — Euchre auction, bowers and going alone');
+{
+  const P = ['A', 'B', 'C', 'D'];
+  const s = createMatch(euchre, P, 11);
+
+  check('the auction opens, not play', s.auctionRound === 1);
+  check('five cards each', P.every((p) => s.zones[`hand:${p}`].length === 5), P.map((p) => s.zones[`hand:${p}`].length));
+  check('four cards in the kitty', s.zones['kitty'].length === 4, s.zones['kitty'].length);
+  check('the dealer is seat A on hand 1', s.dealerIndex === 0);
+  check('bidding opens to the dealer left', s.players[s.turnIndex] === 'B', s.players[s.turnIndex]);
+  check('the upcard is public', redact(s, 'C').upcard !== null && redact(s, 'C').upcard !== undefined);
+
+  const up = s.zones['kitty'][s.zones['kitty'].length - 1];
+  const bidMoves = legalMoves(s, 'B');
+  check('round 1 offers only the turned-up suit',
+    bidMoves.filter((m) => m.actionId === 'orderUp').every((m) => m.choice === up.suit), bidMoves);
+  check('going alone is offered alongside', bidMoves.some((m) => m.actionId === 'orderUp' && m.alone));
+  check('passing is allowed early on', bidMoves.some((m) => m.actionId === 'passBid'));
+  check('nobody else can act mid-auction', legalMoves(s, 'C').length === 0);
+
+  // Ordering it up gives the dealer the upcard and stalls everything until they discard.
+  let t = applyMove(s, 'B', { actionId: 'orderUp', choice: up.suit });
+  check('trump is now the upcard suit', t.trumpSuit === up.suit, t.trumpSuit);
+  check('the bidder is the maker', t.maker === 'B');
+  check('the dealer picked the upcard up', t.zones['hand:A'].length === 6, t.zones['hand:A'].length);
+  check('the dealer owes a discard', t.discarding === 'A');
+  check('the dealer is the only actor', JSON.stringify(actingPlayers(t)) === '["A"]', actingPlayers(t));
+  check('only discards are legal', legalMoves(t, 'A').every((m) => m.actionId === 'dealerDiscard'));
+  t = applyMove(t, 'A', { actionId: 'dealerDiscard', cardId: t.zones['hand:A'][0].id });
+  check('dealer back to five cards', t.zones['hand:A'].length === 5);
+  check('play opens to the dealer left', t.players[t.turnIndex] === 'B', t.players[t.turnIndex]);
+
+  // All four passing in round 1 turns the card down and opens round 2.
+  let r2 = s;
+  for (const p of ['B', 'C', 'D', 'A']) r2 = applyMove(r2, p, { actionId: 'passBid' });
+  check('round 2 opened', r2.auctionRound === 2);
+  check('the upcard was turned down', r2.zones['kitty'].length === 0);
+  const r2Moves = legalMoves(r2, 'B');
+  check('the turned-down suit is remembered', r2.turnedDownSuit === up.suit, r2.turnedDownSuit);
+  check('round 2 bars the suit that was turned down',
+    !r2Moves.some((m) => m.choice === up.suit), r2Moves.map((m) => m.choice));
+  check('round 2 offers the other three suits',
+    new Set(r2Moves.filter((m) => m.actionId === 'nameTrump').map((m) => m.choice)).size === 3,
+    r2Moves.filter((m) => m.actionId === 'nameTrump').map((m) => m.choice));
+
+  // Screw the dealer: on the last call of round 2 there is no pass.
+  let stuck = r2;
+  for (const p of ['B', 'C', 'D']) stuck = applyMove(stuck, p, { actionId: 'passBid' });
+  check('the dealer is on the last call', stuck.players[stuck.turnIndex] === 'A');
+  check('the dealer cannot pass', !legalMoves(stuck, 'A').some((m) => m.actionId === 'passBid'),
+    legalMoves(stuck, 'A').map((m) => m.actionId));
+  check('the dealer must name a suit', legalMoves(stuck, 'A').every((m) => m.actionId === 'nameTrump'));
+}
+
+section('Trick-taking — bowers change suit and rank');
+{
+  const P = ['A', 'B', 'C', 'D'];
+  const card = (id: string, rank: string, suit: string) => ({ id, rank, suit }) as Card;
+  const base = () => {
+    const s = createMatch(euchre, P, 11);
+    s.auctionRound = 0;
+    s.trumpSuit = 'S';
+    s.maker = 'A';
+    s.zones['kitty'] = [];
+    s.zones['trick'] = [];
+    s.trickPlays = [];
+    return s;
+  };
+
+  // J♣ is the left bower: it is a SPADE while spades are trump.
+  let s = base();
+  s.zones['hand:B'] = [card('CJ', 'J', 'C'), card('C9', '9', 'C'), card('CA', 'A', 'C')];
+  s.turnIndex = 1;
+  s.lead = 'S';
+  let offered = legalMoves(s, 'B').map((m) => m.cardId);
+  check('with spades led, the left bower is the only legal follow', JSON.stringify(offered) === '["CJ"]', offered);
+
+  s = base();
+  s.zones['hand:B'] = [card('CJ', 'J', 'C'), card('C9', '9', 'C'), card('CA', 'A', 'C')];
+  s.turnIndex = 1;
+  s.lead = 'C';
+  offered = legalMoves(s, 'B').map((m) => m.cardId);
+  check('with clubs led, the left bower is NOT a club', !offered.includes('CJ') && offered.length === 2, offered);
+
+  // Right bower > left bower > ace of trump.
+  const play = (st: MatchState, seat: string, c: Card) => {
+    st.zones[`hand:${seat}`] = [c];
+    return applyMove(st, seat, { actionId: 'playToTrick', cardId: c.id });
+  };
+  let u = base();
+  for (const p of P) u.zones[`hand:${p}`] = [];
+  u.turnIndex = 0;
+  u = play(u, 'A', card('SA', 'A', 'S'));
+  u = play(u, 'B', card('CJ', 'J', 'C'));
+  check('the left bower beats the ace of trump', u.trickPlays.length === 2 && u.lead === 'S');
+  u = play(u, 'C', card('SJ', 'J', 'S'));
+  u = play(u, 'D', card('SK', 'K', 'S'));
+  check('the right bower takes the trick', u.tricksWon['C'] === 1, u.tricksWon);
+}
+
+section('Trick-taking — Euchre scoring');
+{
+  const P = ['A', 'B', 'C', 'D'];
+  const card = (id: string, rank: string, suit: string) => ({ id, rank, suit }) as Card;
+  // Stack a hand, name trump for A, and play it out with the first legal move each time.
+  const runHand = (hands: Record<string, string[]>, alone: boolean) => {
+    const s = createMatch(euchre, P, 11);
+    const byId = new Map(Object.values(s.zones).flat().map((c) => [c.id, c]));
+    s.auctionRound = 0;
+    s.trumpSuit = 'S';
+    s.maker = 'A';
+    s.alone = alone;
+    s.sittingOut = alone ? 'C' : null;
+    s.zones['kitty'] = [];
+    s.zones['trick'] = [];
+    s.trickPlays = [];
+    for (const p of P) s.zones[`hand:${p}`] = (hands[p] ?? []).map((id) => byId.get(id) ?? card(id, id.slice(1), id[0]));
+    s.turnIndex = 0;
+    let st = s;
+    let guard = 0;
+    while (st.phase === 'playing' && guard++ < 60) {
+      const actor = actingPlayers(st)[0];
+      const ms = actor ? legalMoves(st, actor) : [];
+      if (!actor || ms.length === 0) break;
+      st = applyMove(st, actor, ms[0]);
+    }
+    return st;
+  };
+
+  // A holds every trump — a march.
+  const allTrump = { A: ['SJ', 'CJ', 'SA', 'SK', 'SQ'], B: ['H9', 'H10', 'HQ', 'HK', 'HA'], C: ['D9', 'D10', 'DQ', 'DK', 'DA'], D: ['C9', 'C10', 'CQ', 'CK', 'CA'] };
+  let m = runHand(allTrump, false);
+  check('march: makers take all five', m.tricksWon['A'] === 5, m.tricksWon);
+  check('march scores 2', m.scores['A'] === 2 && m.scores['C'] === 2, m.scores);
+  check('defenders score 0', m.scores['B'] === 0 && m.scores['D'] === 0, m.scores);
+
+  // Same march, but going alone with the partner out.
+  const solo = { A: ['SJ', 'CJ', 'SA', 'SK', 'SQ'], B: ['H9', 'H10', 'HQ', 'HK', 'HA'], C: [], D: ['C9', 'C10', 'CQ', 'CK', 'CA'] };
+  const a = runHand(solo, true);
+  check('the partner sat out', a.zones['hand:C'].length === 0 && a.sittingOut === 'C');
+  check('alone march scores 4', a.scores['A'] === 4, a.scores);
+
+  // Defenders take three — the makers are euchred.
+  const set = { A: ['SJ', 'CJ', 'H9', 'H10', 'HQ'], B: ['SA', 'SK', 'SQ', 'S10', 'S9'], C: ['D9', 'D10', 'DQ', 'DK', 'DA'], D: ['C9', 'C10', 'CQ', 'CK', 'CA'] };
+  const e = runHand(set, false);
+  const madeTricks = (e.tricksWon['A'] ?? 0) + (e.tricksWon['C'] ?? 0);
+  check('makers fell short', madeTricks < 3, e.tricksWon);
+  check('euchred pays the defenders 2', e.scores['B'] === 2 && e.scores['D'] === 2, e.scores);
+  check('the makers score nothing', e.scores['A'] === 0 && e.scores['C'] === 0, e.scores);
+  check('the euchre is announced', e.log.some((l) => l.text.includes('Euchred')), e.log.slice(-3).map((l) => l.text));
+}
+
+// Redaction runs for every seat, in every classic, whether or not that seat is on turn — the
+// off-turn path is the one a spectating player hits on every bot move.
+section('Redaction — every classic, every seat, on and off turn');
+{
+  for (const def of catalog) {
+    const seats = Math.max(def.meta.players.min, Math.min(4, def.meta.players.max));
+    const P = Array.from({ length: seats }, (_, i) => `P${i + 1}`);
+    let s = createMatch(def, P, 4242);
+    let ok = true;
+    let detail = '';
+    for (let step = 0; step < 40 && s.phase === 'playing'; step++) {
+      for (const p of P) {
+        try { redact(s, p); } catch (e) { ok = false; detail = `${p}: ${(e as Error).message}`; }
+      }
+      if (!ok) break;
+      const actor = actingPlayers(s)[0];
+      const ms = actor ? legalMoves(s, actor) : [];
+      if (!actor || ms.length === 0) break;
+      s = applyMove(s, actor, ms[0]);
+    }
+    check(`${def.meta.name} redacts cleanly for all seats`, ok, detail);
+  }
 }
 
 console.log(failed ? '\nMECHANICS: FAILED' : '\nMECHANICS: all checks passed');

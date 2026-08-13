@@ -142,6 +142,21 @@ export function CreateView() {
                   </>
                 )}
               </Section>
+              <Section title="Trump auction">
+                <label className="field row"><Switch on={knobs.trumpAuction} onChange={(v) => set('trumpAuction', v)} />
+                  <span>Name trump each hand instead of fixing it — a card is turned up, and players order it up or pass</span></label>
+                {knobs.trumpAuction && <>
+                  <label className="field row"><Switch on={knobs.bowers} onChange={(v) => set('bowers', v)} />
+                    <span>Bowers — trump's jack is highest, and the other jack of the same colour becomes trump just under it</span></label>
+                  <label className="field row"><Switch on={knobs.goAlone} onChange={(v) => set('goAlone', v)} />
+                    <span>Going alone — the maker may cut their partner out for a bigger score{knobs.trickPartnerships ? '' : ' (needs partnerships)'}</span></label>
+                  <span className="mini-label">
+                    {knobs.trickPartnerships
+                      ? 'Scores Euchre-style: 1 for making it, 2 for all tricks, 4 alone, and 2 to the defenders if the makers fall short.'
+                      : 'Turn partnerships on to get Euchre scoring (make it / march / euchred).'}
+                  </span>
+                </>}
+              </Section>
               <Section title="Scoring" defaultOpen>
                 <div className="field"><span>Winner is</span>
                   <div className="seg wrap">

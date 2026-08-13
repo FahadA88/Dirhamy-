@@ -9,9 +9,10 @@ import { war } from './war';
 import { tradeWinds } from './tradeWinds';
 import { undertow } from './undertow';
 import { hearts } from './hearts';
+import { euchre } from './euchre';
 
 // The classics library. Each entry is a hand-authored game, expressed purely as data.
-export const catalog: GameDefinition[] = [crazyEights, switchGame, spadesLite, hearts, president, goFish, rummy, war, tradeWinds, undertow];
+export const catalog: GameDefinition[] = [crazyEights, switchGame, spadesLite, hearts, euchre, president, goFish, rummy, war, tradeWinds, undertow];
 
 export function getGame(id: string): GameDefinition | undefined {
   return catalog.find((g) => g.meta.id === id);
