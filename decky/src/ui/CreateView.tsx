@@ -15,7 +15,7 @@ import { war } from '../games/war';
 import { GameDefinition, Rank, Suit } from '../engine/types';
 import { Table } from './Table';
 
-type RankArrayKey = 'wildRanks' | 'skipRanks' | 'reverseRanks' | 'drawRanks' | 'extraTurnRanks' | 'wildDrawRanks' | 'excludeRanks';
+type RankArrayKey = 'wildRanks' | 'skipRanks' | 'reverseRanks' | 'drawRanks' | 'extraTurnRanks' | 'wildDrawRanks' | 'excludeRanks' | 'passRanks';
 
 export function CreateView() {
   const [knobs, setKnobs] = useState<Knobs>({ ...defaultKnobs });
@@ -132,6 +132,15 @@ export function CreateView() {
                 {knobs.minPlayers <= 4 && knobs.maxPlayers >= 4 && (
                   <label className="field row"><Switch on={knobs.trickPartnerships} onChange={(v) => set('trickPartnerships', v)} /><span>Partnerships (4 players: seats 1&3 vs 2&4)</span></label>
                 )}
+                {knobs.trickBidding && (
+                  <>
+                    <label className="field row"><Switch on={knobs.bustEnabled} onChange={(v) => set('bustEnabled', v)} /><span>Lose the match instantly if score drops too low</span></label>
+                    {knobs.bustEnabled && (
+                      <label className="field"><span>Bust at (needs Match play on, below)</span>
+                        <input type="number" value={knobs.bustScore} onChange={(e) => set('bustScore', parseInt(e.target.value || '0', 10))} /></label>
+                    )}
+                  </>
+                )}
               </Section>
               <Section title="Scoring" defaultOpen>
                 <div className="field"><span>Winner is</span>
@@ -236,6 +245,15 @@ export function CreateView() {
             {knobs.wildDrawRanks.length > 0 && (
               <label className="field"><span>Wild-draw amount: <b>{knobs.wildDrawCount}</b></span>
                 <input type="range" min={1} max={8} value={knobs.wildDrawCount} onChange={(e) => set('wildDrawCount', +e.target.value)} /></label>
+            )}
+            <div className="mini-label">Trade wind — everyone passes a card at once</div>
+            <RankGrid selected={knobs.passRanks} onToggle={(r) => toggleRank('passRanks', r)} />
+            {knobs.passRanks.length > 0 && (
+              <div className="field"><span>Pass direction</span>
+                <div className="seg">
+                  <button className={knobs.passDirectionKnob === 'left' ? 'on' : ''} onClick={() => set('passDirectionKnob', 'left')}>Left</button>
+                  <button className={knobs.passDirectionKnob === 'right' ? 'on' : ''} onClick={() => set('passDirectionKnob', 'right')}>Right</button>
+                </div></div>
             )}
           </Section>
 

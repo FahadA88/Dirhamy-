@@ -472,3 +472,6 @@ h2 { font-family: var(--mono); letter-spacing: 1px; color: var(--ink); font-size
 .ms-title { font-family: var(--mono); font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: var(--green-d); margin-bottom: 8px; }
 .ms-row { display: flex; justify-content: space-between; padding: 3px 0; font-size: 13.5px; }
 .ms-row b { font-family: var(--mono); }
+
+/* card passing */
+.waiting-badge { font-family: var(--mono); font-size: 11px; color: var(--muted); background: rgba(0,0,0,0.04); border: 1px solid var(--panel-brd); border-radius: 999px; padding: 3px 10px; }

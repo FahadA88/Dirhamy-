@@ -19,6 +19,8 @@ export interface Knobs {
   trickScoreBy: 'mostTricks' | 'fewestTricks' | 'penalty';
   trickBidding: boolean;
   trickPartnerships: boolean;
+  bustEnabled: boolean;   // match ends instantly if a player/team's score drops this low
+  bustScore: number;      // stored positive; the actual threshold is -bustScore
   heartsValue: number;       // penalty per heart (penalty scoring)
   queenSpadesValue: number;  // penalty for the Queen of Spades (penalty scoring)
   // climbing
@@ -51,6 +53,8 @@ export interface Knobs {
   extraTurnRanks: Rank[];
   wildDrawRanks: Rank[];
   wildDrawCount: number;
+  passRanks: Rank[];               // playing one of these sweeps the table: everyone passes a card at once
+  passDirectionKnob: 'left' | 'right';
   // flow & endgame
   direction: 'clockwise' | 'counter-clockwise';
   reshuffleWhenEmpty: boolean;
@@ -82,6 +86,8 @@ export const defaultKnobs: Knobs = {
   trickScoreBy: 'mostTricks',
   trickBidding: false,
   trickPartnerships: false,
+  bustEnabled: false,
+  bustScore: 200,
   heartsValue: 1,
   queenSpadesValue: 13,
   climbTwosHigh: true,
@@ -106,6 +112,8 @@ export const defaultKnobs: Knobs = {
   extraTurnRanks: [],
   wildDrawRanks: [],
   wildDrawCount: 4,
+  passRanks: [],
+  passDirectionKnob: 'left',
   direction: 'clockwise',
   reshuffleWhenEmpty: true,
   winMode: 'firstOut',
@@ -248,6 +256,7 @@ function buildTrickDefinition(knobs: Knobs, id: string): GameDefinition {
       // (Hearts-style); most-tricks and bidding want HIGH cumulative scores to win (Spades-style).
       winner: knobs.trickScoreBy === 'penalty' || knobs.trickScoreBy === 'fewestTricks' ? 'lowestTotal' : 'highestTotal',
       cardPoints: {}, target: matchTarget(knobs),
+      bust: knobs.trickBidding && knobs.matchPlay && knobs.bustEnabled ? -Math.abs(clampInt(knobs.bustScore, 10, 2000)) : null,
     },
     trick: {
       trump: knobs.trump, mustFollowSuit: knobs.mustFollowSuit, aceHigh: knobs.aceHigh,
@@ -271,6 +280,7 @@ function buildSheddingDefinition(knobs: Knobs, id: string): GameDefinition {
   if (knobs.drawRanks.length) tags.drawTwo = { ranks: knobs.drawRanks };
   if (knobs.extraTurnRanks.length) tags.again = { ranks: knobs.extraTurnRanks };
   if (knobs.wildDrawRanks.length) tags.wildDraw = { ranks: knobs.wildDrawRanks };
+  if (knobs.passRanks.length) tags.wind = { ranks: knobs.passRanks };
 
   const triggers: GameDefinition['triggers'] = [];
   if (knobs.skipRanks.length) triggers.push({ on: 'cardPlayed', cardHasTag: 'skip', do: [{ op: 'skipNext' }] });
@@ -282,6 +292,7 @@ function buildSheddingDefinition(knobs: Knobs, id: string): GameDefinition {
   if (knobs.wildDrawRanks.length) {
     triggers.push({ on: 'cardPlayed', cardHasTag: 'wildDraw', do: [{ op: 'forceDraw', target: 'next', from: 'draw', count: knobs.wildDrawCount }, { op: 'skipNext' }] });
   }
+  if (knobs.passRanks.length) triggers.push({ on: 'cardPlayed', cardHasTag: 'wind', do: [{ op: 'passCards', direction: knobs.passDirectionKnob }] });
   if (knobs.reshuffleWhenEmpty) triggers.push({ on: 'drawPileEmpty', do: [{ op: 'reshuffleDiscardInto', zone: 'draw', keepTop: true }] });
 
   const matchClauses: Predicate[] = [];
@@ -358,6 +369,8 @@ export function knobsFromDefinition(def: GameDefinition): Knobs {
   const hasMatch = (prop: string) => clauses.some((c) => 'matches' in c && c.matches.cardProp === prop);
   const drawTrig = def.triggers.find((t) => t.on === 'cardPlayed' && t.cardHasTag === 'drawTwo');
   const wildDrawTrig = def.triggers.find((t) => t.on === 'cardPlayed' && t.cardHasTag === 'wildDraw');
+  const passTrig = def.triggers.find((t) => t.on === 'cardPlayed' && t.cardHasTag === 'wind');
+  const passOp = passTrig?.do.find((e) => e.op === 'passCards') as { direction: 'left' | 'right' } | undefined;
   const countOf = (trig: typeof drawTrig, d: number) => {
     const fd = trig?.do.find((e) => e.op === 'forceDraw') as { count: number } | undefined;
     return fd?.count ?? d;
@@ -377,6 +390,8 @@ export function knobsFromDefinition(def: GameDefinition): Knobs {
     trickScoreBy: def.trick?.scoreBy ?? 'mostTricks',
     trickBidding: !!def.trick?.bidding,
     trickPartnerships: !!def.trick?.partnerships,
+    bustEnabled: def.scoring.bust != null,
+    bustScore: def.scoring.bust != null ? Math.abs(def.scoring.bust) : 200,
     heartsValue: (def.trick?.penaltyPoints?.H as number) ?? 1,
     queenSpadesValue: (def.trick?.penaltyPoints?.SQ as number) ?? 13,
     bookSize: def.fish?.bookSize ?? 4,
@@ -405,6 +420,8 @@ export function knobsFromDefinition(def: GameDefinition): Knobs {
     extraTurnRanks: tagRanks('again'),
     wildDrawRanks,
     wildDrawCount: countOf(wildDrawTrig, 4),
+    passRanks: tagRanks('wind'),
+    passDirectionKnob: passOp?.direction ?? 'left',
     direction: def.turnFlow.order,
     reshuffleWhenEmpty: def.triggers.some((t) => t.on === 'drawPileEmpty'),
     winMode: def.scoring.winner,

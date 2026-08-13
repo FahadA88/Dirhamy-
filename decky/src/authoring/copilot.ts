@@ -139,6 +139,8 @@ export const offlineTranslator: Translator = {
       else if (/\bmost tricks\b/.test(text)) patch.trickScoreBy = 'mostTricks';
       if (/\bbid(ding|s)?\b/.test(text)) patch.trickBidding = true;
       if (/\bpartner(ship|s)?\b|\bteams?\b|\b2v2\b|\bteammate/.test(text)) patch.trickPartnerships = true;
+      const bustMatch = /\b(?:bust|lose|drops?|falls?)\b[^.]*?-\s*(\d+)/.exec(text) || /-\s*(\d+)\s*(?:and you'?re out|points? you lose|and you lose)/.exec(text);
+      if (bustMatch) { patch.bustEnabled = true; patch.bustScore = clampMatchTarget(parseInt(bustMatch[1], 10)); notes.push(`Bust at -${patch.bustScore} — the match ends instantly.`); }
     }
 
     // rummy / war families
@@ -179,6 +181,12 @@ export const offlineTranslator: Translator = {
     if (again) { patch.extraTurnRanks = [again]; notes.push(`${rankLabel(again)}s let you play again.`); }
     const wildDraw = detectWildDraw(text);
     if (wildDraw) { patch.wildDrawRanks = [wildDraw]; patch.wildDrawCount = 4; notes.push(`${rankLabel(wildDraw)}s are wild and force a draw of four.`); }
+    const passer = detectLeft(text, ['pass a card', 'passes a card', 'trade wind', 'everyone passes', 'players pass', 'pass one card']);
+    if (passer) {
+      patch.passRanks = [passer];
+      if (/\bright\b/.test(text)) patch.passDirectionKnob = 'right';
+      notes.push(`${rankLabel(passer)}s make everyone pass a card${/\bright\b/.test(text) ? ' right' : ' left'}, all at once.`);
+    }
 
     // decks / short deck
     if (/\b(two|2|double|second)\s+(full\s+)?decks?\b|\btwo decks?\b/.test(text)) { patch.deckCount = 2; notes.push('Two decks shuffled together.'); }
@@ -342,6 +350,10 @@ function describeChange(field: keyof Knobs, value: unknown): string {
     case 'trickScoreBy': return value === 'mostTricks' ? 'Win: most tricks' : value === 'fewestTricks' ? 'Win: fewest tricks' : 'Win: fewest penalty points';
     case 'trickBidding': return value ? 'Bidding before play' : 'No bidding';
     case 'trickPartnerships': return value ? 'Partnerships (2 teams)' : 'Every player for themselves';
+    case 'bustEnabled': return value ? 'Bust threshold: on' : 'No bust threshold';
+    case 'bustScore': return `Bust at -${value}`;
+    case 'passRanks': return (value as Rank[]).length ? `Pass a card on ${ranks(value)}` : 'No card passing';
+    case 'passDirectionKnob': return `Pass direction → ${value}`;
     case 'bookSize': return `Book = ${value} of a rank`;
     case 'rummySetMin': return `Sets of ${value}+`;
     case 'rummyRunMin': return `Runs of ${value}+`;

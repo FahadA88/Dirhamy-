@@ -1,16 +1,15 @@
 import { GameDefinition } from '../engine/types';
 
-// Spades (lite) — the first TRICK-TAKING game. Same engine, a different family: instead of
-// shedding onto a discard, players play one card into a trick, must follow the led suit, and
-// the highest card (spades trump everything) takes the trick and leads the next.
-// (Bidding and 2v2 partnerships are a planned follow-up; this scores by most tricks taken.)
+// Spades — the first TRICK-TAKING game, and a real MATCH: teams bid, play repeated hands, and
+// race to 500 — unless a team's running score drops to -200 first, which ends the match as an
+// immediate loss for them (the classic Spades "bust" rule).
 export const spadesLite: GameDefinition = {
   schemaVersion: '1.0',
   meta: {
     id: 'classic-spades',
     name: 'Spades',
     description:
-      'Partners (seats 1&3 vs 2&4) bid how many tricks they will take, then play. Follow the led suit if you can; spades are trump. Make your combined bid to score 10 per trick bid (+1 per overtrick "bag"), or lose it. A nil bid (0) scores ±100. Highest team score wins.',
+      'Partners (seats 1&3 vs 2&4) bid how many tricks they will take, then play. Follow the led suit if you can; spades are trump. Make your combined bid to score 10 per trick bid (+1 per overtrick "bag"), or lose it. A nil bid (0) scores ±100. First team to 500 wins the match — unless a team drops to -200 first, which loses it instantly.',
     players: { min: 4, max: 4 },
     family: 'trick-taking',
   },
@@ -34,6 +33,6 @@ export const spadesLite: GameDefinition = {
   endConditions: [
     { id: 'handsEmpty', when: { zoneCount: { zone: 'hand', of: 'anyPlayer', eq: 0 } }, result: 'roundOver' },
   ],
-  scoring: { mode: 'lowestPoints', winner: 'highestTotal', cardPoints: {}, target: null },
+  scoring: { mode: 'lowestPoints', winner: 'highestTotal', cardPoints: {}, target: 500, bust: -200 },
   trick: { trump: 'S', mustFollowSuit: true, aceHigh: true, scoreBy: 'mostTricks', bidding: true, partnerships: true },
 };

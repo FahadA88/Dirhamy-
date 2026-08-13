@@ -143,7 +143,8 @@ export type Effect =
   | { op: 'forceDraw'; target: 'next'; from: string; count: number }
   | { op: 'reshuffleDiscardInto'; zone: string; keepTop: boolean }
   | { op: 'extraTurn' }                              // current player takes another turn
-  | { op: 'drawUntilPlayable'; from: string };       // draw until a legal play appears
+  | { op: 'drawUntilPlayable'; from: string }        // draw until a legal play appears
+  | { op: 'passCards'; direction: 'left' | 'right' }; // every player passes one hand card to a neighbor, simultaneously
 
 export interface TriggerDef {
   on: 'drawPileEmpty' | 'cardPlayed';
@@ -162,6 +163,10 @@ export interface ScoringDef {
   cardPoints?: Record<string, number | 'rankValue'>;
   target?: number | null;
   winner: 'lowestTotal' | 'highestTotal' | 'firstOut';
+  // A cumulative match score at or below this value ends the match immediately as a loss for
+  // whoever crossed it (e.g. Spades' "-200 and you're out"), regardless of the target above.
+  // Only meaningful alongside a negative-scoring match (bidding games where a hand can lose points).
+  bust?: number | null;
 }
 
 // ---------- Runtime state ----------
@@ -201,6 +206,12 @@ export interface MatchState {
   matchOver: boolean;
   matchWinner: string | null;
   pendingChoice: { type: 'suit'; player: string; setState: string } | null;
+  // A simultaneous card pass in progress (e.g. "everyone passes a card left"), triggered by
+  // the passCards effect. While set, EVERY player (not just whoever's turn it is) may submit
+  // a `choosePass` move; once all have chosen, the swap resolves atomically and turn flow
+  // resumes from wherever it was paused.
+  passDirection: 'left' | 'right' | null;
+  passChoices: Record<string, string>; // playerId -> chosen cardId, only present once chosen
   log: LogEntry[];
 }
 
@@ -263,4 +274,9 @@ export interface RedactedState {
   matchOver: boolean;
   matchWinner: string | null;
   matchTarget: number | null;
+  matchBust: number | null;
+  // simultaneous card pass (see MatchState.passDirection)
+  passDirection: 'left' | 'right' | null;
+  needsPassChoice: boolean; // true iff a pass is pending and this viewer hasn't chosen yet
+  passWaitingOn: number;    // how many players still need to choose
 }

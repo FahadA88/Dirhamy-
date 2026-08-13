@@ -2,7 +2,7 @@
 // is winnable, and isn't wildly unbalanced. Also the pre-publish playtest gate.
 
 import { GameDefinition } from './types';
-import { createMatch, applyMove, isTerminal, isMatchOver, nextHand, legalMoves } from './engine';
+import { createMatch, applyMove, isTerminal, isMatchOver, nextHand, legalMoves, actingPlayers } from './engine';
 import { chooseMove } from '../bots/randomBot';
 
 export interface SimReport {
@@ -38,14 +38,23 @@ export function simulate(
     // target, in which case hands repeat — with a running score — until someone crosses it).
     while (moves < moveCap) {
       while (!isTerminal(state) && moves < moveCap) {
-        const current = state.pendingChoice
-          ? state.pendingChoice.player
-          : state.players[state.turnIndex];
-        if (legalMoves(state, current).length === 0) break;
-        const r = chooseMove(state, current, botSeed);
-        botSeed = r.botSeed;
-        state = applyMove(state, current, r.move);
-        moves++;
+        // Usually one actor (whoever's turn it is); a simultaneous pass can have several —
+        // drive every one of them before checking again.
+        const actors = actingPlayers(state);
+        if (actors.length === 0) break;
+        let progressed = false;
+        for (const actor of actors) {
+          if (isTerminal(state) || moves >= moveCap) break;
+          if (!actingPlayers(state).includes(actor)) continue; // already resolved this pass
+          const lm = legalMoves(state, actor);
+          if (lm.length === 0) continue;
+          const r = chooseMove(state, actor, botSeed);
+          botSeed = r.botSeed;
+          state = applyMove(state, actor, r.move);
+          moves++;
+          progressed = true;
+        }
+        if (!progressed) break;
       }
       if (!isTerminal(state) || isMatchOver(state)) break;
       handSeed = (Math.imul(handSeed, 48271) + 12345) >>> 0;

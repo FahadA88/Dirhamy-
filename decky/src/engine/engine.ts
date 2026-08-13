@@ -72,6 +72,8 @@ export function createMatch(
     phase: 'playing',
     winner: null,
     pendingChoice: null,
+    passDirection: null,
+    passChoices: {},
     log: [],
     matchScores: carry?.matchScores ?? Object.fromEntries(players.map((p) => [p, 0])),
     handNumber: carry?.handNumber ?? 1,
@@ -233,6 +235,14 @@ export function legalMoves(state: MatchState, playerId: string): Move[] {
     }));
   }
 
+  // A simultaneous pass overrides whose turn it is — every player who hasn't chosen yet may
+  // pick a card to give away, regardless of the normal turn order.
+  if (state.passDirection) {
+    if (playerId in state.passChoices) return [];
+    const hand = state.zones[`hand:${playerId}`] || [];
+    return hand.map((c) => ({ actionId: 'choosePass', cardId: c.id }));
+  }
+
   if (state.players[state.turnIndex] !== playerId) return [];
 
   const def = state.definition;
@@ -268,6 +278,7 @@ function cloneState(state: MatchState): MatchState {
     finished: state.finished.slice(),
     booksWon: { ...state.booksWon },
     pendingChoice: state.pendingChoice ? { ...state.pendingChoice } : null,
+    passChoices: { ...state.passChoices },
     log: state.log.slice(),
   };
 }
@@ -351,6 +362,14 @@ function runEffects(state: MatchState, effects: Effect[], ctx: Ctx & { playedCar
         }
         break;
       }
+      case 'passCards': {
+        // Only players still holding a card can be asked to give one away.
+        if (state.players.every((p) => (state.zones[`hand:${p}`] || []).length > 0)) {
+          state.passDirection = e.direction;
+          state.passChoices = {};
+        }
+        break;
+      }
     }
   }
 }
@@ -407,6 +426,18 @@ export function applyMove(state: MatchState, playerId: string, move: Move): Matc
     return s;
   }
 
+  // Contribute a card to a simultaneous pass. Any player may submit this, in any order —
+  // the swap only resolves once everyone has chosen.
+  if (move.actionId === 'choosePass') {
+    if (!s.passDirection || playerId in s.passChoices) return s;
+    const hand = s.zones[`hand:${playerId}`] || [];
+    if (!hand.some((c) => c.id === move.cardId)) return s;
+    s.passChoices[playerId] = move.cardId!;
+    log(s, playerId, `${short(playerId)} picks a card to pass.`);
+    if (s.players.every((p) => p in s.passChoices)) resolvePassCards(s);
+    return s;
+  }
+
   // Validate the move is currently legal.
   const legal = legalMoves(s, playerId);
   const chosen = legal.find((m) => m.actionId === move.actionId && m.cardId === move.cardId);
@@ -430,11 +461,36 @@ export function applyMove(state: MatchState, playerId: string, move: Move): Matc
   // Draw-pile-empty triggers (e.g. reshuffle).
   fireDrawPileTriggers(s);
 
-  // If a choice is pending (e.g. wild suit), pause here — turn does not advance.
+  // If a choice is pending (e.g. wild suit) or a simultaneous pass just started, pause here —
+  // turn does not advance until it resolves.
   if (s.pendingChoice) return s;
+  if (s.passDirection) return s;
 
   advanceAndCheck(s);
   return s;
+}
+
+// Resolves a fully-collected simultaneous pass: every player's chosen card moves to their
+// neighbor at once, using each player's ORIGINAL choice (nobody can react to what they're
+// about to receive). Then resumes whatever turn flow was paused when the pass began.
+function resolvePassCards(s: MatchState): void {
+  const dir = s.passDirection!;
+  const n = s.players.length;
+  const offset = dir === 'left' ? 1 : -1;
+  const picks = s.players.map((from, i) => ({
+    from, to: s.players[((i + offset) % n + n) % n], cardId: s.passChoices[from],
+  }));
+  for (const { from, to, cardId } of picks) {
+    const hand = s.zones[`hand:${from}`];
+    const idx = hand.findIndex((c) => c.id === cardId);
+    if (idx < 0) continue;
+    const [card] = hand.splice(idx, 1);
+    s.zones[`hand:${to}`].push(card);
+  }
+  log(s, null, `Cards passed ${dir}.`);
+  s.passDirection = null;
+  s.passChoices = {};
+  advanceAndCheck(s);
 }
 
 function advanceAndCheck(s: MatchState): void {
@@ -552,6 +608,16 @@ export function isTerminal(state: MatchState): boolean {
   return state.phase === 'roundOver';
 }
 
+// Every player who currently needs to submit a move. Almost always a single player (whoever's
+// turn it is, or whoever owes a pending choice) — but a simultaneous pass can have several
+// players acting at once, none of them necessarily the seat whose turn it nominally is.
+export function actingPlayers(state: MatchState): string[] {
+  if (state.phase !== 'playing') return [];
+  if (state.pendingChoice) return [state.pendingChoice.player];
+  if (state.passDirection) return state.players.filter((p) => !(p in state.passChoices));
+  return [state.players[state.turnIndex]];
+}
+
 // True once the MATCH has ended: either this game has no points target (a match is exactly
 // one hand, the legacy behavior), or a player's cumulative score has crossed the target.
 export function isMatchOver(state: MatchState): boolean {
@@ -563,12 +629,31 @@ export function isMatchOver(state: MatchState): boolean {
 // the match continues or someone has crossed the target.
 function finalizeMatchProgress(s: MatchState): void {
   for (const p of s.players) s.matchScores[p] = (s.matchScores[p] ?? 0) + (s.scores[p] ?? 0);
-  const target = s.definition.scoring.target;
+  const scoring = s.definition.scoring;
+
+  // Busting out (e.g. Spades' "-200 and you're out") ends the match immediately, below-target,
+  // as a loss for whoever crossed it — the best-placed of everyone else wins.
+  const bust = scoring.bust;
+  if (bust != null) {
+    const busted = s.players.filter((p) => s.matchScores[p] <= bust);
+    if (busted.length > 0 && busted.length < s.players.length) {
+      s.matchOver = true;
+      const survivors = s.players.filter((p) => !busted.includes(p));
+      let best = survivors[0];
+      let bestV = -Infinity;
+      for (const p of survivors) { const v = s.matchScores[p]; if (v > bestV) { bestV = v; best = p; } }
+      s.matchWinner = best;
+      log(s, null, `Match over — ${short(busted[0])} dropped to ${s.matchScores[busted[0]]} (bust at ${bust}); ${short(best)} wins.`);
+      return;
+    }
+  }
+
+  const target = scoring.target;
   if (target == null) { s.matchOver = true; s.matchWinner = s.winner; return; }
   const crossed = s.players.some((p) => s.matchScores[p] >= target);
   if (!crossed) { s.matchOver = false; s.matchWinner = null; return; }
   s.matchOver = true;
-  const highest = s.definition.scoring.winner === 'highestTotal';
+  const highest = scoring.winner === 'highestTotal';
   let best = s.players[0];
   let bestV = highest ? -Infinity : Infinity;
   for (const p of s.players) {
@@ -1206,6 +1291,8 @@ export function redact(state: MatchState, viewer: string): RedactedState {
       state.phase === 'playing' &&
       (state.pendingChoice
         ? state.pendingChoice.player === viewer
+        : state.passDirection
+        ? !(viewer in state.passChoices)
         : state.players[state.turnIndex] === viewer),
     pendingChoice: state.pendingChoice,
     scores: { ...state.scores },
@@ -1229,6 +1316,10 @@ export function redact(state: MatchState, viewer: string): RedactedState {
     matchOver: state.matchOver,
     matchWinner: state.matchWinner,
     matchTarget: state.definition.scoring.target ?? null,
+    matchBust: state.definition.scoring.bust ?? null,
+    passDirection: state.passDirection,
+    needsPassChoice: !!state.passDirection && !(viewer in state.passChoices),
+    passWaitingOn: state.passDirection ? state.players.filter((p) => !(p in state.passChoices)).length : 0,
   };
 }
 

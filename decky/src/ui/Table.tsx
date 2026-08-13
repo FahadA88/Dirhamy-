@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { applyMove, createMatch, isTerminal, legalMoves, nextHand, redact } from '../engine/engine';
+import { actingPlayers, applyMove, createMatch, isTerminal, legalMoves, nextHand, redact } from '../engine/engine';
 import { chooseMove } from '../bots/randomBot';
 import { Card, GameDefinition, MatchState, Move } from '../engine/types';
 import { SUIT_SYMBOLS } from '../engine/deck';
@@ -44,17 +44,20 @@ export function Table({ def, seats = 3 }: { def: GameDefinition; seats?: number 
   const isWar = view.mode === 'war';
   const canFlip = myLegal.some((m) => m.actionId === 'warFlip');
   const myPile = view.players.find((p) => p.id === HUMAN)?.handCount ?? 0;
-  const playActionId = view.mode === 'trick' ? 'playToTrick' : view.mode === 'climb' ? 'climbPlay' : isRummy ? 'rummyDiscard' : 'playCard';
+  const playActionId = view.needsPassChoice ? 'choosePass'
+    : view.mode === 'trick' ? 'playToTrick' : view.mode === 'climb' ? 'climbPlay' : isRummy ? 'rummyDiscard' : 'playCard';
 
-  // Bot loop, paced by the user's bot-speed setting.
+  // Bot loop, paced by the user's bot-speed setting. Usually one actor is waiting (whoever's
+  // turn it is); a simultaneous pass can leave several bots waiting at once — this drives one
+  // per tick, which naturally cascades through all of them.
   useEffect(() => {
     if (isTerminal(state)) return;
-    const current = state.pendingChoice ? state.pendingChoice.player : state.players[state.turnIndex];
-    if (current === HUMAN) return;
+    const actor = actingPlayers(state).find((p) => p !== HUMAN);
+    if (!actor) return;
     const timer = setTimeout(() => {
-      const r = chooseMove(state, current, botSeed.current, settings.botDiff);
+      const r = chooseMove(state, actor, botSeed.current, settings.botDiff);
       botSeed.current = r.botSeed;
-      setState((s) => applyMove(s, current, r.move));
+      setState((s) => applyMove(s, actor, r.move));
     }, BOT_SPEED_MS[settings.botSpeed]);
     return () => clearTimeout(timer);
   }, [state, settings.botSpeed, settings.botDiff]);
@@ -105,7 +108,7 @@ export function Table({ def, seats = 3 }: { def: GameDefinition; seats?: number 
     <div className="table">
       {view.matchTarget != null && (
         <div className="match-bar">
-          <span className="match-hand">Hand {view.handNumber} · race to {view.matchTarget}</span>
+          <span className="match-hand">Hand {view.handNumber} · race to {view.matchTarget}{view.matchBust != null ? ` (bust at ${view.matchBust})` : ''}</span>
           <div className="match-chips">
             {view.players.map((p) => (
               <span key={p.id} className={`match-chip ${p.id === HUMAN ? 'you' : ''}`}>
@@ -234,7 +237,9 @@ export function Table({ def, seats = 3 }: { def: GameDefinition; seats?: number 
       <div className={`you ${view.isYourTurn ? 'your-turn' : ''}`}>
         <div className="you-head">
           <span>{settings.playerName === 'You' ? 'Your hand' : `${settings.playerName}’s hand`}{view.mode === 'trick' ? ` · ${view.tricksWon?.[HUMAN] ?? 0} tricks` : ''}{view.mode === 'trick' && view.bids?.[HUMAN] !== undefined ? ` · bid ${view.bids[HUMAN]}` : ''}{isFish ? ` · ${view.booksWon?.[HUMAN] ?? 0} books` : ''}{teamOf(HUMAN) ? ` · ${teamOf(HUMAN)}` : ''}</span>
-          {view.isYourTurn && !suitPickerOpen && <span className="turn-badge">Your turn</span>}
+          {view.needsPassChoice && <span className="turn-badge">Pick a card to pass {view.passDirection}</span>}
+          {!view.passDirection && view.isYourTurn && !suitPickerOpen && <span className="turn-badge">Your turn</span>}
+          {!view.needsPassChoice && view.passDirection && <span className="waiting-badge">Waiting on {view.passWaitingOn} player{view.passWaitingOn === 1 ? '' : 's'}…</span>}
           {canDraw && <button className="draw-btn" onClick={() => submit({ actionId: 'drawCard' })}>Draw a card</button>}
           {canPass && <button className="draw-btn" onClick={() => submit({ actionId: 'climbPass' })}>Pass</button>}
           {canFishDraw && <button className="draw-btn" onClick={() => submit({ actionId: 'fishDraw' })}>Draw from ocean</button>}
@@ -260,7 +265,7 @@ export function Table({ def, seats = 3 }: { def: GameDefinition; seats?: number 
                 className={`card-btn ${playable ? 'playable' : 'dim'} ${(isFish ? c.rank === askRank : selected === c.id) ? 'selected' : ''}`}
                 disabled={!playable}
                 onClick={() => clickCard(c.id)}
-                title={playable ? (isFish ? 'Pick this rank to ask for' : settings.confirmPlays && selected !== c.id ? 'Click to select' : 'Play this card') : 'Not a legal move right now'}
+                title={playable ? (isFish ? 'Pick this rank to ask for' : view.needsPassChoice ? 'Give this card away' : settings.confirmPlays && selected !== c.id ? 'Click to select' : 'Play this card') : 'Not a legal move right now'}
               >
                 <CardFace card={c} />
               </button>

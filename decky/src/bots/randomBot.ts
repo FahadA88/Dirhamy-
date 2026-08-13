@@ -106,6 +106,17 @@ export function chooseMove(
     return { move: best, botSeed };
   }
 
+  // Simultaneous pass: give away the least useful card (highest rank, no strategy beyond that).
+  if (moves[0].actionId === 'choosePass') {
+    if (mode === 'random') { const r = nextRandom(botSeed); return { move: moves[Math.floor(r.value * moves.length)], botSeed: r.state }; }
+    const hand = state.zones[`hand:${playerId}`] || [];
+    const order = state.definition.deck.rankOrder;
+    const rankOf = (id?: string) => { const c = hand.find((x) => x.id === id); return c ? order.indexOf(c.rank as never) : -1; };
+    let best = moves[0];
+    for (const m of moves) if (rankOf(m.cardId) > rankOf(best.cardId)) best = m;
+    return { move: best, botSeed };
+  }
+
   // From here down is the shedding/matching family.
   const plays = moves.filter((m) => m.actionId === 'playCard');
   if (plays.length === 0) return { move: moves[0], botSeed }; // only a draw is available
