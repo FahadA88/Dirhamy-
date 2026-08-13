@@ -209,7 +209,19 @@ export function CreateView() {
                 <Seg options={[[2, '2'], [3, '3'], [4, '4']]} value={knobs.rummySetMin} onChange={(v) => set('rummySetMin', v)} /></div>
               <div className="field"><span>Run length (sequence in a suit)</span>
                 <Seg options={[[2, '2'], [3, '3'], [4, '4'], [5, '5']]} value={knobs.rummyRunMin} onChange={(v) => set('rummyRunMin', v)} /></div>
-              <span className="mini-label">Draw, lay down sets and runs, then discard. First to shed every card wins.</span>
+              <label className="field row"><Switch on={knobs.rummyKnock} onChange={(v) => set('rummyKnock', v)} />
+                <span>Knocking (Gin) — melds stay hidden in hand and you end the hand by knocking</span></label>
+              {knobs.rummyKnock && (
+                <label className="field"><span>Knock when your unmatched cards total <b>{knobs.rummyKnockAt}</b> or less</span>
+                  <input type="range" min={0} max={20} value={knobs.rummyKnockAt} onChange={(e) => set('rummyKnockAt', +e.target.value)} /></label>
+              )}
+              <label className="field row"><Switch on={knobs.rummyLayOff} onChange={(v) => set('rummyLayOff', v)} />
+                <span>Lay-off — spare cards can extend a meld already on the table</span></label>
+              <span className="mini-label">
+                {knobs.rummyKnock
+                  ? 'Score the gap between the two players’ unmatched cards. No deadwood at all is gin (+25); fail to beat your opponent and they undercut you (+25).'
+                  : 'Draw, lay down sets and runs, then discard. First to shed every card wins.'}
+              </span>
             </Section>
           )}
 

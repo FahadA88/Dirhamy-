@@ -69,6 +69,13 @@ export interface WarConfig {
 export interface RummyConfig {
   setMin: number; // cards of equal rank to form a set (usually 3)
   runMin: number; // consecutive same-suit cards to form a run (usually 3)
+
+  // Gin-family rules. With `knock` set, melds are never laid down during play — you hold them
+  // concealed and end the hand by knocking, scoring the difference in unmatched ("deadwood") cards.
+  knock?: number;          // most deadwood you may knock with (10 in Gin; 0 = gin only)
+  ginBonus?: number;       // extra for knocking with no deadwood at all
+  undercutBonus?: number;  // extra to the defender when their deadwood matches or beats the knocker's
+  layOff?: boolean;        // the defender's spare cards may extend the knocker's melds before scoring
 }
 
 export interface ClimbConfig {
@@ -309,6 +316,7 @@ export interface RedactedState {
   mode: 'shedding' | 'trick' | 'climb' | 'fish' | 'rummy' | 'war';
   rummyPhase?: 'draw' | 'play';
   meldMoves?: { cards: string[]; label: string }[];
+  deadwood?: number;       // gin: what this viewer's unmatched cards are currently worth
   battle?: Card[];
   trick?: { player: string; card: Card }[];
   lead?: Suit | null;

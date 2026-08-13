@@ -1438,6 +1438,130 @@ function findMelds(state: MatchState, hand: Card[]): { cards: string[]; label: s
   return out;
 }
 
+// Standard deadwood values: ace 1, face cards 10, everything else its pip count.
+function deadwoodValue(card: Card): number {
+  if (card.rank === 'A') return 1;
+  if (card.rank === 'J' || card.rank === 'Q' || card.rank === 'K') return 10;
+  const n = parseInt(card.rank, 10);
+  return Number.isFinite(n) ? n : 0;
+}
+
+// Every meld that can be formed from a hand, as a bitmask over hand positions.
+function meldMasks(state: MatchState, hand: Card[]): number[] {
+  const cfg = state.definition.rummy!;
+  const order = state.definition.deck.rankOrder;
+  const masks: number[] = [];
+
+  const byRank = new Map<string, number[]>();
+  hand.forEach((c, i) => {
+    const list = byRank.get(c.rank) ?? [];
+    list.push(i);
+    byRank.set(c.rank, list);
+  });
+  for (const idxs of byRank.values()) {
+    for (let sub = 1; sub < 1 << idxs.length; sub++) {
+      let count = 0;
+      let mask = 0;
+      for (let b = 0; b < idxs.length; b++) if (sub & (1 << b)) { mask |= 1 << idxs[b]; count++; }
+      if (count >= cfg.setMin) masks.push(mask);
+    }
+  }
+
+  for (const suit of ['C', 'D', 'H', 'S']) {
+    const cs = hand.map((c, i) => ({ c, i })).filter((x) => x.c.suit === suit)
+      .sort((a, b) => order.indexOf(a.c.rank as never) - order.indexOf(b.c.rank as never));
+    for (let i = 0; i < cs.length; i++) {
+      let mask = 1 << cs[i].i;
+      for (let j = i + 1; j < cs.length; j++) {
+        if (order.indexOf(cs[j].c.rank as never) !== order.indexOf(cs[j - 1].c.rank as never) + 1) break;
+        mask |= 1 << cs[j].i;
+        if (j - i + 1 >= cfg.runMin) masks.push(mask);
+      }
+    }
+  }
+  return masks;
+}
+
+// The arrangement of a hand that leaves the fewest points unmatched. Gin scoring lives or dies
+// on this being optimal rather than greedy — a card can belong to a set OR a run, not both.
+function bestArrangement(state: MatchState, hand: Card[]): { deadwood: number; melds: Card[][]; spare: Card[] } {
+  const n = hand.length;
+  const masks = meldMasks(state, hand);
+  const memo = new Map<number, { deadwood: number; melds: number[] }>();
+
+  const solve = (used: number): { deadwood: number; melds: number[] } => {
+    const hit = memo.get(used);
+    if (hit) return hit;
+    let first = -1;
+    for (let i = 0; i < n; i++) if (!(used & (1 << i))) { first = i; break; }
+    if (first < 0) return { deadwood: 0, melds: [] };
+
+    // Leave this card unmatched.
+    const skip = solve(used | (1 << first));
+    let best = { deadwood: skip.deadwood + deadwoodValue(hand[first]), melds: skip.melds };
+
+    // Or spend it in a meld.
+    for (const m of masks) {
+      if (!(m & (1 << first)) || (m & used)) continue;
+      const rest = solve(used | m);
+      if (rest.deadwood < best.deadwood) best = { deadwood: rest.deadwood, melds: [m, ...rest.melds] };
+    }
+    memo.set(used, best);
+    return best;
+  };
+
+  const r = solve(0);
+  const usedMask = r.melds.reduce((a, m) => a | m, 0);
+  return {
+    deadwood: r.deadwood,
+    melds: r.melds.map((m) => hand.filter((_, i) => m & (1 << i))),
+    spare: hand.filter((_, i) => !(usedMask & (1 << i))),
+  };
+}
+
+// What a hand's unmatched cards are worth under its best arrangement. Exported because a gin
+// bot's whole job is minimizing it.
+export function handDeadwood(state: MatchState, hand: Card[]): number {
+  return bestArrangement(state, hand).deadwood;
+}
+
+// A card extends a meld if adding it still leaves a legal set or run.
+function extendsMeld(state: MatchState, meld: Card[], card: Card): boolean {
+  const cfg = state.definition.rummy!;
+  const order = state.definition.deck.rankOrder;
+  if (meld.length === 0) return false;
+  const isSet = meld.every((c) => c.rank === meld[0].rank);
+  if (isSet) return card.rank === meld[0].rank && meld.length + 1 <= 4;
+  if (!meld.every((c) => c.suit === meld[0].suit) || card.suit !== meld[0].suit) return false;
+  const idx = meld.map((c) => order.indexOf(c.rank as never)).sort((a, b) => a - b);
+  const ci = order.indexOf(card.rank as never);
+  void cfg;
+  return ci === idx[0] - 1 || ci === idx[idx.length - 1] + 1;
+}
+
+// After a knock, the defender's spare cards may be absorbed into the knocker's melds, cutting
+// their deadwood. Resolved greedily but repeatedly, so chains (…9,10,J then Q then K) all land.
+function layOffDeadwood(state: MatchState, melds: Card[][], spare: Card[]): number {
+  const pool = spare.slice();
+  const target = melds.map((m) => m.slice());
+  let moved = true;
+  while (moved) {
+    moved = false;
+    for (let i = 0; i < pool.length; i++) {
+      for (const m of target) {
+        if (extendsMeld(state, m, pool[i])) {
+          m.push(pool[i]);
+          pool.splice(i, 1);
+          moved = true;
+          break;
+        }
+      }
+      if (moved) break;
+    }
+  }
+  return pool.reduce((a, c) => a + deadwoodValue(c), 0);
+}
+
 function rummyLegalMoves(state: MatchState, playerId: string): Move[] {
   if (state.players[state.turnIndex] !== playerId) return [];
   const z = rummyZones(state.definition);
@@ -1447,10 +1571,53 @@ function rummyLegalMoves(state: MatchState, playerId: string): Move[] {
     if ((state.zones[z.discard] || []).length > 0) moves.push({ actionId: 'drawDiscard' });
     return moves;
   }
-  // play phase: lay any meld, or discard to end the turn
+  const cfg = state.definition.rummy!;
+  // Gin: melds stay concealed. The only choices are which card to throw, and whether throwing
+  // it ends the hand.
+  if (cfg.knock !== undefined) {
+    const moves: Move[] = [];
+    for (const c of hand) {
+      moves.push({ actionId: 'rummyDiscard', cardId: c.id });
+      const rest = hand.filter((x) => x.id !== c.id);
+      if (bestArrangement(state, rest).deadwood <= cfg.knock) moves.push({ actionId: 'knock', cardId: c.id });
+    }
+    return moves;
+  }
+
+  // play phase: lay any meld, extend one already down, or discard to end the turn
   const moves: Move[] = findMelds(state, hand).map((m) => ({ actionId: 'meld', cards: m.cards }));
+  if (cfg.layOff) {
+    for (const m of layOffTargets(state, hand)) moves.push({ actionId: 'layOff', cardId: m.cardId, choice: m.meldKey });
+  }
   for (const c of hand) moves.push({ actionId: 'rummyDiscard', cardId: c.id });
   return moves;
+}
+
+// Melds already on the table, grouped back out of the shared pile so cards can be added to them.
+function tableMelds(state: MatchState): Card[][] {
+  const z = rummyZones(state.definition);
+  if (!z.melds) return [];
+  const cards = state.zones[z.melds] || [];
+  const cfg = state.definition.rummy!;
+  const out: Card[][] = [];
+  let cur: Card[] = [];
+  for (const c of cards) {
+    if (cur.length === 0) { cur = [c]; continue; }
+    const sameSet = cur.every((x) => x.rank === c.rank);
+    const sameRun = cur.every((x) => x.suit === c.suit);
+    if (sameSet || sameRun) cur.push(c); else { out.push(cur); cur = [c]; }
+  }
+  if (cur.length) out.push(cur);
+  return out.filter((m) => m.length >= Math.min(cfg.setMin, cfg.runMin));
+}
+
+function layOffTargets(state: MatchState, hand: Card[]): { cardId: string; meldKey: string }[] {
+  const out: { cardId: string; meldKey: string }[] = [];
+  const melds = tableMelds(state);
+  melds.forEach((m, i) => {
+    for (const c of hand) if (extendsMeld(state, m, c)) out.push({ cardId: c.id, meldKey: String(i) });
+  });
+  return out;
 }
 
 function applyRummyMove(s: MatchState, playerId: string, move: Move): MatchState {
@@ -1461,6 +1628,15 @@ function applyRummyMove(s: MatchState, playerId: string, move: Move): MatchState
   const hand = s.zones[`hand:${playerId}`];
 
   if (move.actionId === 'drawStock') {
+    // Gin does not recycle the discard — running the stock out washes the hand out.
+    if (s.definition.rummy!.knock !== undefined && (s.zones[z.stock] || []).length === 0) {
+      s.phase = 'roundOver';
+      for (const p of s.players) s.scores[p] = 0;
+      s.winner = null;
+      log(s, null, 'Stock exhausted — the hand is a wash.');
+      finalizeMatchProgress(s);
+      return s;
+    }
     if ((s.zones[z.stock] || []).length === 0) {
       // refill the stock from the discard pile
       const disc = s.zones[z.discard];
@@ -1486,6 +1662,34 @@ function applyRummyMove(s: MatchState, playerId: string, move: Move): MatchState
     log(s, playerId, `${short(playerId)} takes the discard.`);
     return s;
   }
+  if (move.actionId === 'knock') {
+    const idx = hand.findIndex((c) => c.id === move.cardId);
+    const [thrown] = hand.splice(idx, 1);
+    s.zones[z.discard].push(thrown);
+    log(s, playerId, `${short(playerId)} knocks, throwing ${cardLabel(thrown)}.`);
+    endGinRound(s, playerId);
+    return s;
+  }
+
+  if (move.actionId === 'layOff') {
+    const melds = tableMelds(s);
+    const meld = melds[parseInt(move.choice ?? '', 10)];
+    const i = hand.findIndex((c) => c.id === move.cardId);
+    if (!meld || i < 0) return s;
+    const [card] = hand.splice(i, 1);
+    // Rebuild the shared pile with the card inserted into its meld, so groupings survive.
+    const rebuilt: Card[] = [];
+    for (const m of melds) {
+      rebuilt.push(...m);
+      if (m === meld) rebuilt.push(card);
+    }
+    if (z.melds) s.zones[z.melds] = rebuilt;
+    s.stallCount = 0;
+    log(s, playerId, `${short(playerId)} lays ${cardLabel(card)} onto a meld.`);
+    if (s.zones[`hand:${playerId}`].length === 0) endRummyRound(s, playerId);
+    return s;
+  }
+
   if (move.actionId === 'meld') {
     const ids = new Set(move.cards);
     const melded = hand.filter((c) => ids.has(c.id));
@@ -1506,8 +1710,48 @@ function applyRummyMove(s: MatchState, playerId: string, move: Move): MatchState
   s.stallCount += 1;
   s.rummyPhase = 'draw';
   s.turnIndex = ((s.turnIndex + s.direction) % s.players.length + s.players.length) % s.players.length;
-  if (s.stallCount >= 4 * s.players.length) endRummyRound(s, null); // nobody melding → end by fewest cards
+  // A knocking game never melds mid-hand, so "nobody has melded lately" means nothing there —
+  // it ends on a knock or when the stock runs out.
+  if (s.definition.rummy!.knock === undefined && s.stallCount >= 4 * s.players.length) {
+    endRummyRound(s, null); // nobody melding → end by fewest cards
+  }
   return s;
+}
+
+// Knocking scores the gap between the two players' unmatched cards. Going gin pays a bonus;
+// failing to beat the defender hands them the hand instead ("undercut").
+function endGinRound(s: MatchState, knocker: string): void {
+  const cfg = s.definition.rummy!;
+  s.phase = 'roundOver';
+
+  const mine = bestArrangement(s, s.zones[`hand:${knocker}`] || []);
+  const defender = s.players.find((p) => p !== knocker) ?? knocker;
+  const theirs = bestArrangement(s, s.zones[`hand:${defender}`] || []);
+
+  // A gin hand cannot be laid off against.
+  const theirDeadwood = cfg.layOff && mine.deadwood > 0
+    ? layOffDeadwood(s, mine.melds, theirs.spare)
+    : theirs.deadwood;
+
+  for (const p of s.players) s.scores[p] = 0;
+  if (mine.deadwood === 0) {
+    s.scores[knocker] = theirDeadwood + (cfg.ginBonus ?? 0);
+    s.winner = knocker;
+    log(s, knocker, `GIN — ${short(knocker)} scores ${s.scores[knocker]}.`);
+  } else if (theirDeadwood < mine.deadwood) {
+    s.scores[defender] = mine.deadwood - theirDeadwood + (cfg.undercutBonus ?? 0);
+    s.winner = defender;
+    log(s, defender, `Undercut! ${short(defender)} scores ${s.scores[defender]} (${theirDeadwood} v ${mine.deadwood}).`);
+  } else if (theirDeadwood === mine.deadwood) {
+    s.scores[defender] = cfg.undercutBonus ?? 0;
+    s.winner = defender;
+    log(s, defender, `Undercut on a tie — ${short(defender)} scores ${s.scores[defender]}.`);
+  } else {
+    s.scores[knocker] = theirDeadwood - mine.deadwood;
+    s.winner = knocker;
+    log(s, knocker, `${short(knocker)} scores ${s.scores[knocker]} (${mine.deadwood} v ${theirDeadwood}).`);
+  }
+  finalizeMatchProgress(s);
 }
 
 function endRummyRound(s: MatchState, winner: string | null): void {
@@ -1659,8 +1903,11 @@ export function redact(state: MatchState, viewer: string): RedactedState {
     mode: state.definition.trick ? 'trick' : state.definition.climb ? 'climb' : state.definition.fish ? 'fish' : state.definition.rummy ? 'rummy' : state.definition.war ? 'war' : 'shedding',
     battle: state.definition.war ? (state.zones[state.definition.zones.find((z) => z.shared && z.visibility === 'all')!.id] || []).slice() : undefined,
     rummyPhase: state.definition.rummy ? state.rummyPhase : undefined,
-    meldMoves: state.definition.rummy && state.players[state.turnIndex] === viewer && state.rummyPhase === 'play'
+    meldMoves: state.definition.rummy && state.definition.rummy.knock === undefined
+      && state.players[state.turnIndex] === viewer && state.rummyPhase === 'play'
       ? findMelds(state, state.zones[`hand:${viewer}`] || []) : undefined,
+    deadwood: state.definition.rummy?.knock !== undefined
+      ? bestArrangement(state, state.zones[`hand:${viewer}`] || []).deadwood : undefined,
     trick: state.definition.trick ? state.trickPlays.map((t) => ({ ...t })) : undefined,
     lead: state.definition.trick ? state.lead : undefined,
     tricksWon: state.definition.trick ? { ...state.tricksWon } : undefined,

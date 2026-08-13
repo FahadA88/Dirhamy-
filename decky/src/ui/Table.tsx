@@ -63,6 +63,8 @@ export function Table({ def, seats = 3 }: { def: GameDefinition; seats?: number 
     [myLegal],
   );
   const canPassBid = myLegal.some((m) => m.actionId === 'passBid');
+  const knockMoves = useMemo(() => myLegal.filter((m) => m.actionId === 'knock'), [myLegal]);
+  const layOffMoves = useMemo(() => myLegal.filter((m) => m.actionId === 'layOff'), [myLegal]);
   const discardMoves = useMemo(() => myLegal.filter((m) => m.actionId === 'dealerDiscard'), [myLegal]);
   const canFlip = myLegal.some((m) => m.actionId === 'warFlip');
   const myPile = view.players.find((p) => p.id === HUMAN)?.handCount ?? 0;
@@ -337,6 +339,17 @@ export function Table({ def, seats = 3 }: { def: GameDefinition; seats?: number 
             </button>
           ))}
           {canDeclineBomb && <button className="draw-btn" onClick={() => submit({ actionId: 'climbNoBomb' })}>Hold my bomb</button>}
+          {layOffMoves.map((m, i) => (
+            <button key={`lay${i}`} className="meld-btn" onClick={() => submit(m)}>
+              Lay off {rankOfId(m.cardId!)}
+            </button>
+          ))}
+          {view.deadwood != null && <span className="rummy-hint">deadwood {view.deadwood}</span>}
+          {knockMoves.map((m, i) => (
+            <button key={`knock${i}`} className="knock-btn" onClick={() => submit(m)}>
+              Knock — throw {rankOfId(m.cardId!)}
+            </button>
+          ))}
           {isRummy && view.rummyPhase === 'play' && view.isYourTurn && <span className="rummy-hint">tap a card to discard</span>}
         </div>
         {isWar ? (

@@ -9,7 +9,7 @@ export const rummy: GameDefinition = {
     id: 'classic-rummy',
     name: 'Rummy',
     description:
-      'Draw a card from the stock or the discard, lay down sets (three or more of a rank) and runs (three or more in sequence of one suit), then discard. First to get rid of every card wins.',
+      'Draw a card from the stock or the discard, lay down sets (three or more of a rank) and runs (three or more in sequence of one suit), then discard. Cards that fit a meld already on the table can be laid off onto it, whoever put it down. First to get rid of every card wins.',
     players: { min: 2, max: 4 },
     family: 'rummy',
   },
@@ -34,5 +34,5 @@ export const rummy: GameDefinition = {
   triggers: [],
   endConditions: [{ id: 'handEmpty', when: { zoneCount: { zone: 'hand', of: 'anyPlayer', eq: 0 } }, result: 'roundOver' }],
   scoring: { mode: 'lowestPoints', winner: 'lowestTotal', cardPoints: {}, target: null },
-  rummy: { setMin: 3, runMin: 3 },
+  rummy: { setMin: 3, runMin: 3, layOff: true },
 };

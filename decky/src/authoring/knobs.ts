@@ -39,6 +39,9 @@ export interface Knobs {
   // rummy
   rummySetMin: number;
   rummyRunMin: number;
+  rummyKnock: boolean;      // gin-style: melds stay hidden and you end the hand by knocking
+  rummyKnockAt: number;     // most deadwood you may knock with
+  rummyLayOff: boolean;     // spare cards may extend melds already on the table
   // war
   warRoundCap: number;
   // deck
@@ -112,6 +115,9 @@ export const defaultKnobs: Knobs = {
   bookSize: 4,
   rummySetMin: 3,
   rummyRunMin: 3,
+  rummyKnock: false,
+  rummyKnockAt: 10,
+  rummyLayOff: true,
   warRoundCap: 800,
   handSize: 5,
   deckCount: 1,
@@ -170,7 +176,13 @@ function buildRummyDefinition(knobs: Knobs, id: string): GameDefinition {
     actions: [], triggers: [],
     endConditions: [{ id: 'handEmpty', when: { zoneCount: { zone: 'hand', of: 'anyPlayer', eq: 0 } }, result: 'roundOver' }],
     scoring: { mode: 'lowestPoints', winner: 'lowestTotal', cardPoints: {}, target: matchTarget(knobs) },
-    rummy: { setMin: clampInt(knobs.rummySetMin, 2, 4), runMin: clampInt(knobs.rummyRunMin, 2, 5) },
+    rummy: {
+      setMin: clampInt(knobs.rummySetMin, 2, 4), runMin: clampInt(knobs.rummyRunMin, 2, 5),
+      knock: knobs.rummyKnock ? clampInt(knobs.rummyKnockAt, 0, 30) : undefined,
+      ginBonus: knobs.rummyKnock ? 25 : undefined,
+      undercutBonus: knobs.rummyKnock ? 25 : undefined,
+      layOff: knobs.rummyLayOff || undefined,
+    },
   };
 }
 
@@ -438,6 +450,9 @@ export function knobsFromDefinition(def: GameDefinition): Knobs {
     forceOpeningLead: !!def.trick?.leadCard,
     handPassCount: def.handPass?.count ?? 0,
     bookSize: def.fish?.bookSize ?? 4,
+    rummyKnock: def.rummy?.knock !== undefined,
+    rummyKnockAt: def.rummy?.knock ?? 10,
+    rummyLayOff: !!def.rummy?.layOff,
     rummySetMin: def.rummy?.setMin ?? 3,
     rummyRunMin: def.rummy?.runMin ?? 3,
     warRoundCap: def.war?.roundCap ?? 800,

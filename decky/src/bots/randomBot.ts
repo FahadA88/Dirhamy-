@@ -1,5 +1,5 @@
 import { MatchState, Move } from '../engine/types';
-import { legalMoves } from '../engine/engine';
+import { legalMoves, handDeadwood } from '../engine/engine';
 import { nextRandom } from '../engine/rng';
 
 // Because the engine enumerates legal moves, a bot works for ANY valid game for free.
@@ -148,7 +148,8 @@ export function chooseMove(
 
   // Rummy: draw the discard when it connects with the hand; meld greedily; discard the least
   // useful card (one with no rank-mate and no same-suit neighbour).
-  if (moves[0].actionId === 'drawStock' || moves[0].actionId === 'meld' || moves[0].actionId === 'rummyDiscard') {
+  if (moves[0].actionId === 'drawStock' || moves[0].actionId === 'meld'
+    || moves[0].actionId === 'rummyDiscard' || moves[0].actionId === 'knock' || moves[0].actionId === 'layOff') {
     const hand = state.zones[`hand:${playerId}`] || [];
     const order = state.definition.deck.rankOrder;
     const idxOf = (rank: string) => order.indexOf(rank as never);
@@ -158,17 +159,53 @@ export function chooseMove(
       return sameRank * 2 + neighbour;
     };
 
+    const isGin = state.definition.rummy!.knock !== undefined;
+
     if (moves.some((m) => m.actionId === 'drawStock')) {
       const discardZone = state.definition.zones.find((z) => z.visibility === 'top-public');
       const top = discardZone ? state.zones[discardZone.id]?.[state.zones[discardZone.id].length - 1] : undefined;
-      const takeDiscard = !!top && moves.some((m) => m.actionId === 'drawDiscard') && usefulness(top.rank, top.suit, false) > 0;
+      const canTake = !!top && moves.some((m) => m.actionId === 'drawDiscard');
+      // Gin: take the discard only if it actually lowers what the hand would be left holding.
+      if (isGin) {
+        const take = canTake && handDeadwood(state, [...hand, top!]) < handDeadwood(state, hand);
+        return { move: { actionId: take ? 'drawDiscard' : 'drawStock' }, botSeed };
+      }
+      const takeDiscard = canTake && usefulness(top!.rank, top!.suit, false) > 0;
       return { move: { actionId: takeDiscard ? 'drawDiscard' : 'drawStock' }, botSeed };
+    }
+
+    // Gin: knocking is the whole game — take it whenever it's offered, preferring the throw
+    // that leaves the least deadwood behind.
+    const knocks = moves.filter((m) => m.actionId === 'knock');
+    if (knocks.length > 0) {
+      if (mode === 'random') { const r = nextRandom(botSeed); return { move: knocks[Math.floor(r.value * knocks.length)], botSeed: r.state }; }
+      const value = (id?: string) => { const c = hand.find((x) => x.id === id); return c ? (c.rank === 'A' ? 1 : ['J', 'Q', 'K'].includes(c.rank) ? 10 : parseInt(c.rank, 10) || 0) : 0; };
+      let best = knocks[0];
+      for (const m of knocks) if (value(m.cardId) > value(best.cardId)) best = m;
+      return { move: best, botSeed };
     }
 
     const meld = moves.find((m) => m.actionId === 'meld');
     if (meld) return { move: meld, botSeed };
+    const lay = moves.find((m) => m.actionId === 'layOff');
+    if (lay) return { move: lay, botSeed };
     const discards = moves.filter((m) => m.actionId === 'rummyDiscard');
     if (mode === 'random') { const r = nextRandom(botSeed); return { move: discards[Math.floor(r.value * discards.length)], botSeed: r.state }; }
+
+    // Gin: throw whichever card leaves the least deadwood behind, breaking ties on card value.
+    if (isGin) {
+      let best = discards[0];
+      let bestScore = Infinity;
+      for (const m of discards) {
+        const rest = hand.filter((c) => c.id !== m.cardId);
+        const c = hand.find((x) => x.id === m.cardId);
+        const value = c ? (c.rank === 'A' ? 1 : ['J', 'Q', 'K'].includes(c.rank) ? 10 : parseInt(c.rank, 10) || 0) : 0;
+        const sc = handDeadwood(state, rest) * 100 - value;
+        if (sc < bestScore) { bestScore = sc; best = m; }
+      }
+      return { move: best, botSeed };
+    }
+
     const score = (id?: string) => { const c = hand.find((x) => x.id === id); return c ? usefulness(c.rank, c.suit) * 10 - idxOf(c.rank) : 0; };
     let best = discards[0];
     for (const m of discards) if (score(m.cardId) < score(best.cardId)) best = m;

@@ -184,7 +184,21 @@ export const offlineTranslator: Translator = {
     }
 
     // rummy / war families
-    if (/\brummy\b|\bmelds?\b|\bsets and runs\b|\blay (down|off)\b|\bgin\b/.test(text)) { patch.family = 'rummy'; notes.push('Rummy/melding game.'); }
+    if (/\brummy\b|\bmelds?\b|\bsets and runs\b|\blay (down|off)\b|\bgin\b/.test(text)) {
+      patch.family = 'rummy';
+      notes.push('Rummy/melding game.');
+      if (/\bgin\b|\bknock(ing|s)?\b|\bdeadwood\b|\bunmatched cards\b|\bundercut\b/.test(text)) {
+        patch.rummyKnock = true;
+        patch.minPlayers = 2; patch.maxPlayers = 2; patch.handSize = 10;
+        notes.push('Knocking on — melds stay hidden and you score the deadwood gap.');
+        const at = /\bknock (?:at|with|on)\s+(\d{1,2})\b/.exec(text);
+        if (at) { patch.rummyKnockAt = clamp(parseInt(at[1], 10), 0, 20); notes.push(`Knock at ${patch.rummyKnockAt} or less.`); }
+      }
+      if (/\blay(ing)? off\b|\badd to (a |an )?(existing )?meld\b|\bextend(ing)? (a )?meld\b/.test(text)) {
+        patch.rummyLayOff = true;
+        notes.push('Lay-off allowed onto melds already down.');
+      }
+    }
     if (/\bgame of war\b|(^|\s)war(\s|$|,|\.)|\bflip[^.]*(higher|highest)[^.]*(take|win)|\bhigher card takes both\b/.test(text)) { patch.family = 'war'; notes.push('Comparison game (War).'); }
 
     // name: "call it X" / "named X" / quoted
@@ -395,6 +409,9 @@ function describeChange(field: keyof Knobs, value: unknown): string {
     case 'passRanks': return (value as Rank[]).length ? `Pass a card on ${ranks(value)}` : 'No card passing';
     case 'passDirectionKnob': return `Pass direction → ${value}`;
     case 'bookSize': return `Book = ${value} of a rank`;
+    case 'rummyKnock': return value ? 'Knocking (Gin-style)' : 'Lay melds down as you go';
+    case 'rummyKnockAt': return `Knock at ${value} deadwood or less`;
+    case 'rummyLayOff': return value ? 'Lay-off allowed' : 'No lay-off';
     case 'rummySetMin': return `Sets of ${value}+`;
     case 'rummyRunMin': return `Runs of ${value}+`;
     case 'climbTwosHigh': return value ? 'Ranks: 3 low … 2 high' : 'Ranks: 2 low … Ace high';

@@ -3,6 +3,7 @@
 import { undertow } from '../src/games/undertow';
 import { hearts } from '../src/games/hearts';
 import { euchre } from '../src/games/euchre';
+import { ginRummy } from '../src/games/ginRummy';
 import { catalog } from '../src/games/catalog';
 import { createMatch, legalMoves, applyMove, actingPlayers, redact, nextHand } from '../src/engine/engine';
 import { chooseMove } from '../src/bots/randomBot';
@@ -391,6 +392,83 @@ section('Trick-taking — Euchre scoring');
   check('euchred pays the defenders 2', e.scores['B'] === 2 && e.scores['D'] === 2, e.scores);
   check('the makers score nothing', e.scores['A'] === 0 && e.scores['C'] === 0, e.scores);
   check('the euchre is announced', e.log.some((l) => l.text.includes('Euchred')), e.log.slice(-3).map((l) => l.text));
+}
+
+// ---------- Gin Rummy: deadwood, knocking, gin, undercut, lay-off ----------
+section('Rummy — knocking, deadwood and lay-off (Gin Rummy)');
+{
+  const P = ['A', 'B'];
+  const setup = (aHand: string[], bHand: string[]) => {
+    const s = createMatch(ginRummy, P, 5);
+    const byId = new Map(Object.values(s.zones).flat().map((c) => [c.id, c]));
+    const grab = (ids: string[]) => ids.map((id) => byId.get(id) ?? card(id, id.slice(1), id[0]));
+    s.zones['hand:A'] = grab(aHand);
+    s.zones['hand:B'] = grab(bHand);
+    s.zones['discard'] = [];
+    s.rummyPhase = 'play';
+    s.turnIndex = 0;
+    return s;
+  };
+
+  // Eleven cards: a spade run, a set of nines, three loose cards worth 6, and a king.
+  // Only throwing the king gets deadwood under 10.
+  const knockHand = ['S4', 'S5', 'S6', 'S7', 'H9', 'D9', 'C9', 'C2', 'D3', 'HA', 'SK'];
+  // B holds three runs plus a lone king — 10 deadwood, and nothing that can hang off A's melds.
+  let s = setup(knockHand, ['H2', 'H3', 'H4', 'D5', 'D6', 'D7', 'CK', 'CQ', 'CJ', 'SK']);
+  const knocks = legalMoves(s, 'A').filter((m) => m.actionId === 'knock');
+  check('exactly one throw makes the hand knockable', knocks.length === 1, knocks.map((m) => m.cardId));
+  check('and it is the king', knocks[0]?.cardId === 'SK', knocks[0]);
+  check('discarding is always available too', legalMoves(s, 'A').filter((m) => m.actionId === 'rummyDiscard').length === 11);
+
+  // Optimality: a nine can serve the run OR the set, never both. Greedy picking would misprice this.
+  const overlap = setup(['H7', 'H8', 'H9', 'C9', 'D9', 'SK', 'SQ', 'CA', 'D2', 'H3', 'S5'], ['H2', 'H4', 'D5', 'D6', 'D7', 'CK', 'CQ', 'CJ', 'S9', 'S3']);
+  const overlapKnocks = legalMoves(overlap, 'A').filter((m) => m.actionId === 'knock');
+  check('a card cannot count in two melds at once', overlapKnocks.length === 0, overlapKnocks.map((m) => m.cardId));
+
+  // Knock and score: A's deadwood 6, B's deadwood is its whole hand bar the run/melds.
+  let scored = applyMove(s, 'A', { actionId: 'knock', cardId: 'SK' });
+  check('the hand ended on the knock', scored.phase === 'roundOver');
+  check('the knocker won', scored.winner === 'A', { winner: scored.winner, scores: scored.scores });
+  check('the knocker scores the spread (10 - 6)', scored.scores['A'] === 4, scored.scores);
+  check('the knock is logged', scored.log.some((l) => l.text.includes('knocks')));
+
+  // Gin: no deadwood at all pays the bonus.
+  const ginHand = ['S4', 'S5', 'S6', 'S7', 'H9', 'D9', 'C9', 'CA', 'DA', 'HA', 'SK'];
+  let g = setup(ginHand, ['H2', 'H4', 'D5', 'D7', 'CK', 'CQ', 'S9', 'S3', 'D10', 'HJ']);
+  const ginKnock = legalMoves(g, 'A').filter((m) => m.actionId === 'knock');
+  check('a gin hand can knock', ginKnock.some((m) => m.cardId === 'SK'), ginKnock.map((m) => m.cardId));
+  g = applyMove(g, 'A', { actionId: 'knock', cardId: 'SK' });
+  check('gin is announced', g.log.some((l) => l.text.includes('GIN')), g.log.slice(-2).map((l) => l.text));
+  check('gin pays the 25 bonus on top of the spread', (g.scores['A'] ?? 0) > 25, g.scores);
+  check('the defender scores nothing', g.scores['B'] === 0, g.scores);
+
+  // Undercut: the knocker throws with 9 deadwood, the defender is sitting on less.
+  const loose = setup(['S4', 'S5', 'S6', 'H9', 'D9', 'C9', 'D2', 'D3', 'CA', 'H3', 'SK'],
+                      ['H4', 'H5', 'H6', 'C10', 'CJ', 'CQ', 'DA', 'D4', 'S2', 'S3']);
+  const lm = legalMoves(loose, 'A').filter((m) => m.actionId === 'knock');
+  let u = applyMove(loose, 'A', lm[0]);
+  check('undercut goes to the defender', u.winner === 'B', { winner: u.winner, scores: u.scores });
+  check('undercut is announced', u.log.some((l) => l.text.includes('Undercut')), u.log.slice(-2).map((l) => l.text));
+  check('undercut pays the 25 bonus', (u.scores['B'] ?? 0) >= 25, u.scores);
+
+  // Lay-off: the defender's spare 8♠ hangs off the knocker's 4-5-6-7♠ run and stops counting.
+  const withLayoff = setup(['S4', 'S5', 'S6', 'S7', 'H9', 'D9', 'C9', 'C2', 'D3', 'HA', 'SK'],
+                           ['S8', 'CK', 'CQ', 'CJ', 'H2', 'H3', 'H4', 'D5', 'D6', 'D7']);
+  const laid = applyMove(withLayoff, 'A', { actionId: 'knock', cardId: 'SK' });
+  // Same two hands with lay-off switched off: A's loose knock survives and wins by 2.
+  const noLayoffDef = { ...ginRummy, rummy: { ...ginRummy.rummy!, layOff: false } };
+  const s2 = createMatch(noLayoffDef, P, 5);
+  const byId2 = new Map(Object.values(s2.zones).flat().map((c) => [c.id, c]));
+  s2.zones['hand:A'] = ['S4', 'S5', 'S6', 'S7', 'H9', 'D9', 'C9', 'C2', 'D3', 'HA', 'SK'].map((id) => byId2.get(id)!);
+  s2.zones['hand:B'] = ['S8', 'CK', 'CQ', 'CJ', 'H2', 'H3', 'H4', 'D5', 'D6', 'D7'].map((id) => byId2.get(id)!);
+  s2.zones['discard'] = [];
+  s2.rummyPhase = 'play';
+  s2.turnIndex = 0;
+  const unlaid = applyMove(s2, 'A', { actionId: 'knock', cardId: 'SK' });
+  check('without lay-off the loose knock wins by 2', unlaid.winner === 'A' && unlaid.scores['A'] === 2, unlaid.scores);
+  check('the 8♠ hangs off the knocker 4-5-6-7♠ run and wipes the defender deadwood',
+    laid.winner === 'B', { withLayoff: laid.scores, without: unlaid.scores });
+  check('so the lay-off turns a win into an undercut', (laid.scores['B'] ?? 0) === 31, laid.scores);
 }
 
 // Redaction runs for every seat, in every classic, whether or not that seat is on turn — the
