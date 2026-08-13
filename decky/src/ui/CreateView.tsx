@@ -8,6 +8,7 @@ import { simulate, SimReport } from '../engine/simulator';
 import { crazyEights } from '../games/crazyEights';
 import { switchGame } from '../games/switch';
 import { spadesLite } from '../games/spades';
+import { president } from '../games/president';
 import { GameDefinition, Rank, Suit } from '../engine/types';
 import { Table } from './Table';
 
@@ -77,12 +78,14 @@ export function CreateView() {
             <button className="chip" onClick={() => startFrom(knobsFromDefinition(crazyEights))}>Crazy Eights</button>
             <button className="chip" onClick={() => startFrom(knobsFromDefinition(switchGame))}>Switch</button>
             <button className="chip" onClick={() => startFrom(knobsFromDefinition(spadesLite))}>Spades</button>
+            <button className="chip" onClick={() => startFrom(knobsFromDefinition(president))}>President</button>
           </div>
 
           <div className="field"><span>Game family</span>
-            <div className="seg">
-              <button className={knobs.family === 'shedding' ? 'on' : ''} onClick={() => set('family', 'shedding')}>Shedding / matching</button>
+            <div className="seg wrap">
+              <button className={knobs.family === 'shedding' ? 'on' : ''} onClick={() => set('family', 'shedding')}>Shedding</button>
               <button className={knobs.family === 'trick' ? 'on' : ''} onClick={() => set('family', 'trick')}>Trick-taking</button>
+              <button className={knobs.family === 'climb' ? 'on' : ''} onClick={() => set('family', 'climb')}>Climbing</button>
             </div>
           </div>
 
@@ -125,6 +128,17 @@ export function CreateView() {
                   </div></div>
               </Section>
             </>
+          )}
+
+          {knobs.family === 'climb' && (
+            <Section title="Climbing rules" defaultOpen>
+              <span className="mini-label">All cards are dealt out. Beat the pile with a higher card or pass.</span>
+              <div className="field"><span>Rank order</span>
+                <div className="seg">
+                  <button className={knobs.climbTwosHigh ? 'on' : ''} onClick={() => set('climbTwosHigh', true)}>3 low … 2 high (President)</button>
+                  <button className={!knobs.climbTwosHigh ? 'on' : ''} onClick={() => set('climbTwosHigh', false)}>2 low … Ace high</button>
+                </div></div>
+            </Section>
           )}
 
           {knobs.family === 'shedding' && <>

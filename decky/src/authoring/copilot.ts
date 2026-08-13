@@ -102,6 +102,14 @@ export const offlineTranslator: Translator = {
     const patch: Partial<Knobs> = {};
     const notes: string[] = [];
 
+    // climbing family detection
+    if (/\bclimbing\b|\bpresident\b|\bscum\b|\bbig two\b|\bbeat the (previous|last|pile|card)\b|\bplay(ing)? (a )?higher\b|\bhigher card or pass\b|\bpass or play\b/.test(text)) {
+      patch.family = 'climb';
+      notes.push('Climbing game (beat or pass).');
+      if (/\b2s? (are|is)? ?high|twos high|president\b/.test(text)) patch.climbTwosHigh = true;
+      if (/\bace(s)? high\b/.test(text) && !/president/.test(text)) patch.climbTwosHigh = false;
+    }
+
     // trick-taking family detection (before the shedding rules)
     if (/\btrick(-|\s)?taking\b|\bfollow(s|ing)? suit\b|\btakes? the trick\b|\bwins? the trick\b|\btrump\b|\bmost tricks\b|\bfewest tricks\b/.test(text)) {
       patch.family = 'trick';
@@ -191,7 +199,7 @@ export const offlineTranslator: Translator = {
     const merged = { ...current, ...patch };
     const questions: Question[] = [];
 
-    const isTrick = (patch.family ?? current.family) === 'trick';
+    const isTrick = (patch.family ?? current.family) !== 'shedding';
 
     // 1) draw-pile-empty is a genuinely load-bearing rule people forget (shedding only).
     const mentionedDrawEmpty = /reshuffle|run(s)? out|deck (is )?empty|draw pile/.test(text);
@@ -298,7 +306,8 @@ function describeChange(field: keyof Knobs, value: unknown): string {
     case 'matchSuit': return value ? 'Match by suit' : 'No suit matching';
     case 'matchRank': return value ? 'Match by rank' : 'No rank matching';
     case 'drawUntilCanPlay': return value ? 'Draw until you can play' : 'Draw one card';
-    case 'family': return value === 'trick' ? 'Trick-taking game' : 'Shedding/matching game';
+    case 'family': return value === 'trick' ? 'Trick-taking game' : value === 'climb' ? 'Climbing game' : 'Shedding/matching game';
+    case 'climbTwosHigh': return value ? 'Ranks: 3 low … 2 high' : 'Ranks: 2 low … Ace high';
     case 'trump': return value === 'none' ? 'No trump' : `Trump: ${value}`;
     case 'mustFollowSuit': return value ? 'Must follow suit' : 'Follow suit not required';
     case 'trickScoreBy': return value === 'mostTricks' ? 'Win: most tricks' : 'Win: fewest tricks';

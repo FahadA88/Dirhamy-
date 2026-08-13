@@ -7,7 +7,7 @@ import { Effect, GameDefinition, Predicate, Rank, Suit } from '../engine/types';
 export const RANKS_13: Rank[] = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
 
 export interface Knobs {
-  family: 'shedding' | 'trick';
+  family: 'shedding' | 'trick' | 'climb';
   name: string;
   description: string;
   minPlayers: number;
@@ -17,6 +17,8 @@ export interface Knobs {
   mustFollowSuit: boolean;
   aceHigh: boolean;
   trickScoreBy: 'mostTricks' | 'fewestTricks';
+  // climbing
+  climbTwosHigh: boolean; // President order: 3 low … 2 high (else Ace high)
   // deck
   handSize: number;
   deckCount: number;
@@ -64,6 +66,7 @@ export const defaultKnobs: Knobs = {
   mustFollowSuit: true,
   aceHigh: true,
   trickScoreBy: 'mostTricks',
+  climbTwosHigh: true,
   handSize: 5,
   deckCount: 1,
   excludeRanks: [],
@@ -90,7 +93,36 @@ export const defaultKnobs: Knobs = {
 };
 
 export function buildDefinition(knobs: Knobs, id = 'draft'): GameDefinition {
-  return knobs.family === 'trick' ? buildTrickDefinition(knobs, id) : buildSheddingDefinition(knobs, id);
+  if (knobs.family === 'trick') return buildTrickDefinition(knobs, id);
+  if (knobs.family === 'climb') return buildClimbDefinition(knobs, id);
+  return buildSheddingDefinition(knobs, id);
+}
+
+function buildClimbDefinition(knobs: Knobs, id: string): GameDefinition {
+  const order: Rank[] = knobs.climbTwosHigh
+    ? ['3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A', '2']
+    : ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
+  return {
+    schemaVersion: '1.0',
+    meta: {
+      id, name: knobs.name, description: knobs.description || autoClimbDescription(knobs),
+      players: { min: clampInt(knobs.minPlayers, 2, 8), max: clampInt(knobs.maxPlayers, knobs.minPlayers, 8) },
+      family: 'climbing',
+    },
+    deck: { base: 'standard54', includeJokers: false, deckCount: 1, excludeRanks: knobs.excludeRanks, rankOrder: RANKS_13, tags: {} },
+    zones: [
+      { id: 'draw', type: 'pile', ordered: true, faceDown: true, visibility: 'none', shared: true },
+      { id: 'discard', type: 'pile', ordered: true, faceDown: false, visibility: 'top-public', shared: true },
+      { id: 'hand', type: 'hand', ordered: false, faceDown: true, visibility: 'owner', perPlayer: true },
+    ],
+    setup: [{ op: 'shuffle', zone: 'draw' }, { op: 'dealAll', from: 'draw', to: 'hand' }],
+    turnFlow: { order: knobs.direction, startPlayer: 'first', actionsPerTurn: { min: 1, max: 1 } },
+    actions: [],
+    triggers: [],
+    endConditions: [{ id: 'handEmpty', when: { zoneCount: { zone: 'hand', of: 'anyPlayer', eq: 0 } }, result: 'roundOver' }],
+    scoring: { mode: 'lowestPoints', winner: 'lowestTotal', cardPoints: {}, target: null },
+    climb: { order },
+  };
 }
 
 function buildTrickDefinition(knobs: Knobs, id: string): GameDefinition {
@@ -229,11 +261,12 @@ export function knobsFromDefinition(def: GameDefinition): Knobs {
   const wildRanks = tagRanks('wild').filter((r) => !wildDrawRanks.includes(r));
 
   return {
-    family: def.trick ? 'trick' : 'shedding',
+    family: def.climb ? 'climb' : def.trick ? 'trick' : 'shedding',
     trump: def.trick?.trump ?? 'S',
     mustFollowSuit: def.trick?.mustFollowSuit ?? true,
     aceHigh: def.trick?.aceHigh ?? true,
     trickScoreBy: def.trick?.scoreBy === 'fewestTricks' ? 'fewestTricks' : 'mostTricks',
+    climbTwosHigh: def.climb ? def.climb.order[def.climb.order.length - 1] === '2' : true,
     name: def.meta.name,
     description: def.meta.description,
     minPlayers: def.meta.players.min,
@@ -274,6 +307,11 @@ function autoTrickDescription(k: Knobs): string {
   parts.push('The highest card wins the trick and leads the next.');
   parts.push(k.trickScoreBy === 'mostTricks' ? 'Take the most tricks to win.' : 'Take the fewest tricks to win.');
   return parts.join(' ');
+}
+
+function autoClimbDescription(k: Knobs): string {
+  const order = k.climbTwosHigh ? 'run 3 (low) up to 2 (high)' : 'run 2 (low) up to Ace (high)';
+  return `A climbing game. Beat the card on the pile with a strictly higher one, or pass. When everyone passes, the pile clears and the last player to play leads. Ranks ${order}. First to empty their hand wins.`;
 }
 
 function dedup(rs: Rank[]): Rank[] { return Array.from(new Set(rs)); }
