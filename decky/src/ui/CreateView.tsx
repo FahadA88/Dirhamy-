@@ -197,6 +197,10 @@ export function CreateView() {
                   <button className={knobs.climbTwosHigh ? 'on' : ''} onClick={() => set('climbTwosHigh', true)}>3 low … 2 high (President)</button>
                   <button className={!knobs.climbTwosHigh ? 'on' : ''} onClick={() => set('climbTwosHigh', false)}>2 low … Ace high</button>
                 </div></div>
+              <label className="field row"><Switch on={knobs.climbCombos} onChange={(v) => set('climbCombos', v)} />
+                <span>Allow pairs & triples {knobs.climbCombos ? '(a reply must match the shape)' : '(single cards only)'}</span></label>
+              <label className="field row"><Switch on={knobs.climbBombSize > 0} onChange={(v) => set('climbBombSize', v ? 4 : 0)} />
+                <span>Bombs — four of a kind beats any pile, playable even out of turn</span></label>
             </Section>
           )}
 

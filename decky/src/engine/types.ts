@@ -71,6 +71,10 @@ export interface RummyConfig {
 
 export interface ClimbConfig {
   order: Rank[]; // rank strength, low → high (e.g. 3,4,…,K,A,2)
+  combos?: boolean;   // allow playing 2 or 3 matching-rank cards as a unit; a reply must
+                       // match the same group size (pair beats pair, triple beats triple)
+  bombSize?: number;  // N-of-a-kind that ANY player may play at ANY time, even out of turn,
+                       // beating whatever's on the pile regardless of shape or size (0/undefined = off)
 }
 
 export interface FishConfig {
@@ -193,6 +197,9 @@ export interface MatchState {
   passStreak: number;       // consecutive passes since the last play
   lastPlayer: string | null; // who made the last play (leads when the pile clears)
   finished: string[];       // players who have emptied their hand, in finishing order
+  climbShape: number;       // size of the group currently on the pile (1/2/3/bombSize; 0 = empty)
+  climbTopRank: string | null; // rank of the group currently on the pile
+  climbBombDeclined: Record<string, boolean>; // who has passed on interrupting THIS pile state
   booksWon: Record<string, number>; // fishing: completed books per player
   vars: Record<string, string>;
   scores: Record<string, number>;   // THIS HAND's points, set when the hand ends
@@ -263,6 +270,7 @@ export interface RedactedState {
   lead?: Suit | null;
   tricksWon?: Record<string, number>;
   finished?: string[];
+  climbPile?: Card[]; // the whole current group on the pile (1-3 cards; a single card back-compat)
   booksWon?: Record<string, number>;
   oceanCount?: number;
   bids?: Record<string, number>;

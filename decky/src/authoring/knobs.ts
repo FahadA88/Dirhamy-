@@ -25,6 +25,8 @@ export interface Knobs {
   queenSpadesValue: number;  // penalty for the Queen of Spades (penalty scoring)
   // climbing
   climbTwosHigh: boolean; // President order: 3 low … 2 high (else Ace high)
+  climbCombos: boolean;   // allow playing pairs/triples as a unit (Big Two-style)
+  climbBombSize: number;  // 0 = no bombs; N = N-of-a-kind can interrupt at any time
   // fishing
   bookSize: number;
   // rummy
@@ -91,6 +93,8 @@ export const defaultKnobs: Knobs = {
   heartsValue: 1,
   queenSpadesValue: 13,
   climbTwosHigh: true,
+  climbCombos: false,
+  climbBombSize: 0,
   bookSize: 4,
   rummySetMin: 3,
   rummyRunMin: 3,
@@ -224,7 +228,7 @@ function buildClimbDefinition(knobs: Knobs, id: string): GameDefinition {
     triggers: [],
     endConditions: [{ id: 'handEmpty', when: { zoneCount: { zone: 'hand', of: 'anyPlayer', eq: 0 } }, result: 'roundOver' }],
     scoring: { mode: 'lowestPoints', winner: 'lowestTotal', cardPoints: {}, target: matchTarget(knobs) },
-    climb: { order },
+    climb: { order, combos: knobs.climbCombos || undefined, bombSize: knobs.climbBombSize > 0 ? clampInt(knobs.climbBombSize, 4, 6) : undefined },
   };
 }
 
@@ -399,6 +403,8 @@ export function knobsFromDefinition(def: GameDefinition): Knobs {
     rummyRunMin: def.rummy?.runMin ?? 3,
     warRoundCap: def.war?.roundCap ?? 800,
     climbTwosHigh: def.climb ? def.climb.order[def.climb.order.length - 1] === '2' : true,
+    climbCombos: !!def.climb?.combos,
+    climbBombSize: def.climb?.bombSize ?? 0,
     name: def.meta.name,
     description: def.meta.description,
     minPlayers: def.meta.players.min,
@@ -446,7 +452,13 @@ function autoTrickDescription(k: Knobs): string {
 
 function autoClimbDescription(k: Knobs): string {
   const order = k.climbTwosHigh ? 'run 3 (low) up to 2 (high)' : 'run 2 (low) up to Ace (high)';
-  return `A climbing game. Beat the card on the pile with a strictly higher one, or pass. When everyone passes, the pile clears and the last player to play leads. Ranks ${order}. First to empty their hand wins.`;
+  const beat = k.climbCombos
+    ? 'Lead a single card, a pair or a triple; a reply must match that shape and beat its rank, or pass.'
+    : 'Beat the card on the pile with a strictly higher one, or pass.';
+  const bomb = k.climbBombSize > 0
+    ? ` Four of a kind is a bomb — play it at any moment, even out of turn, and it beats anything.`
+    : '';
+  return `A climbing game. ${beat} When everyone passes, the pile clears and the last player to play leads.${bomb} Ranks ${order}. First to empty their hand wins.`;
 }
 
 function autoFishDescription(k: Knobs): string {

@@ -450,6 +450,14 @@ h2 { font-family: var(--mono); letter-spacing: 1px; color: var(--ink); font-size
 .melds-row { display: flex; flex-wrap: wrap; gap: 4px; max-width: 340px; }
 .meld-mini { transform: scale(0.62); margin: -14px; }
 
+/* climbing */
+.climb-group { display: flex; gap: 4px; }
+.climb-group > * { margin-right: -34px; }
+.climb-group > *:last-child { margin-right: 0; }
+.bomb-btn { background: rgba(220,38,38,0.12); color: #b91c1c; border: 1px solid rgba(220,38,38,0.45); border-radius: 8px; padding: 6px 12px; cursor: pointer; font: inherit; font-size: 13px; font-weight: 700; }
+.bomb-btn:hover { background: linear-gradient(135deg, #ef4444, #b91c1c); color: #fff; border-color: transparent; }
+.bomb-badge { font-family: var(--mono); background: linear-gradient(135deg, #ef4444, #b91c1c); color: #fff; font-weight: 700; padding: 4px 12px; border-radius: 999px; font-size: 12px; box-shadow: 0 4px 14px rgba(185, 28, 28, 0.35); }
+
 /* war */
 .war-center { flex-wrap: wrap; }
 .war-controls { display: flex; align-items: center; gap: 20px; padding: 10px 0; }

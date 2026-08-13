@@ -113,7 +113,9 @@ export function validate(def: GameDefinition): ValidationResult {
   for (const t of def.triggers) checkEffects(t.do, `trigger "${t.on}"`);
 
   // --- end conditions ---
-  if (def.endConditions.length === 0 && !def.scoring.target) {
+  // Special families end on rules the engine enforces itself (all books claimed, all tricks
+  // played, one player left holding cards), so they need no declarative end condition.
+  if (!isSpecial && def.endConditions.length === 0 && !def.scoring.target) {
     err('end.none', 'Game has no end condition and no scoring target — it can never finish.');
   }
   for (const ec of def.endConditions) zoneRef(ec.when.zoneCount.zone, `endCondition "${ec.id}"`);

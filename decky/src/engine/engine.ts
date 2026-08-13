@@ -66,6 +66,9 @@ export function createMatch(
     passStreak: 0,
     lastPlayer: null,
     finished: [],
+    climbShape: 0,
+    climbTopRank: null,
+    climbBombDeclined: {},
     booksWon: Object.fromEntries(players.map((p) => [p, 0])),
     vars: {},
     scores: Object.fromEntries(players.map((p) => [p, 0])),
@@ -279,6 +282,7 @@ function cloneState(state: MatchState): MatchState {
     booksWon: { ...state.booksWon },
     pendingChoice: state.pendingChoice ? { ...state.pendingChoice } : null,
     passChoices: { ...state.passChoices },
+    climbBombDeclined: { ...state.climbBombDeclined },
     log: state.log.slice(),
   };
 }
@@ -615,7 +619,13 @@ export function actingPlayers(state: MatchState): string[] {
   if (state.phase !== 'playing') return [];
   if (state.pendingChoice) return [state.pendingChoice.player];
   if (state.passDirection) return state.players.filter((p) => !(p in state.passChoices));
-  return [state.players[state.turnIndex]];
+  const current = state.players[state.turnIndex];
+  if (state.definition.climb?.bombSize) {
+    // A bomb can interrupt out of turn — anyone holding one is also "acting" right now.
+    const bombers = state.players.filter((p) => p !== current && climbBombMoves(state, p).length > 0);
+    if (bombers.length > 0) return [current, ...bombers];
+  }
+  return [current];
 }
 
 // True once the MATCH has ended: either this game has no points target (a match is exactly
@@ -824,20 +834,52 @@ function climbRank(def: MatchState['definition'], rank: string): number {
   return i < 0 ? -1 : i;
 }
 
-function climbLegalMoves(state: MatchState, playerId: string): Move[] {
-  if (state.players[state.turnIndex] !== playerId) return [];
-  if (state.finished.includes(playerId)) return [];
-  const def = state.definition;
-  const hand = state.zones[`hand:${playerId}`] || [];
-  const discardZone = def.zones.find((z) => z.visibility === 'top-public');
-  const top = discardZone ? topCard(state.zones[discardZone.id]) : undefined;
-
-  if (!top) {
-    // Leading (fresh pile): play any card, no passing.
-    return hand.map((c) => ({ actionId: 'climbPlay', cardId: c.id }));
+// Every group of `size` matching-rank cards currently in a player's hand.
+function climbGroups(hand: Card[], size: number): { rank: string; cards: string[] }[] {
+  const byRank: Record<string, Card[]> = {};
+  for (const c of hand) (byRank[c.rank] ??= []).push(c);
+  const out: { rank: string; cards: string[] }[] = [];
+  for (const [rank, cs] of Object.entries(byRank)) {
+    if (cs.length >= size) out.push({ rank, cards: cs.slice(0, size).map((c) => c.id) });
   }
-  const beat = hand.filter((c) => climbRank(def, c.rank) > climbRank(def, top.rank));
-  const moves: Move[] = beat.map((c) => ({ actionId: 'climbPlay', cardId: c.id }));
+  return out;
+}
+
+// Bomb moves are available to EVERY player, in or out of turn, whenever they hold enough of
+// a rank — this is what lets actingPlayers() surface interrupts.
+function climbBombMoves(state: MatchState, playerId: string): Move[] {
+  const cfg = state.definition.climb!;
+  if (!cfg.bombSize || state.finished.includes(playerId) || state.climbBombDeclined[playerId]) return [];
+  const hand = state.zones[`hand:${playerId}`] || [];
+  return climbGroups(hand, cfg.bombSize).map((g) => ({ actionId: 'climbBomb', cards: g.cards }));
+}
+
+function climbLegalMoves(state: MatchState, playerId: string): Move[] {
+  if (state.finished.includes(playerId)) return [];
+  const bombs = climbBombMoves(state, playerId);
+  if (state.players[state.turnIndex] !== playerId) {
+    // Out of turn: a bomb can interrupt, or the player can decline and let play continue.
+    return bombs.length > 0 ? [...bombs, { actionId: 'climbNoBomb' }] : [];
+  }
+
+  const def = state.definition;
+  const cfg = def.climb!;
+  const hand = state.zones[`hand:${playerId}`] || [];
+  const moves: Move[] = [...bombs];
+
+  if (state.climbShape === 0) {
+    // Leading a fresh pile: play any single, or (if combos are on) any pair/triple. No passing.
+    for (const c of hand) moves.push({ actionId: 'climbPlay', cards: [c.id] });
+    if (cfg.combos) {
+      for (const size of [2, 3]) for (const g of climbGroups(hand, size)) moves.push({ actionId: 'climbPlay', cards: g.cards });
+    }
+    return moves;
+  }
+
+  // Must match the shape already on the pile, and beat its rank.
+  for (const g of climbGroups(hand, state.climbShape)) {
+    if (climbRank(def, g.rank) > climbRank(def, state.climbTopRank!)) moves.push({ actionId: 'climbPlay', cards: g.cards });
+  }
   moves.push({ actionId: 'climbPass' });
   return moves;
 }
@@ -858,8 +900,9 @@ function nextActiveIndex(s: MatchState): number {
 
 function applyClimbMove(s: MatchState, playerId: string, move: Move): MatchState {
   const legal = climbLegalMoves(s, playerId);
-  const chosen = legal.find((m) => m.actionId === move.actionId && m.cardId === move.cardId);
+  const chosen = legal.find((m) => m.actionId === move.actionId && sameCards(m.cards, move.cards));
   if (!chosen) return s;
+  if (move.actionId === 'climbNoBomb') { s.climbBombDeclined[playerId] = true; return s; }
   const def = s.definition;
   const discardZone = def.zones.find((z) => z.visibility === 'top-public')!;
 
@@ -870,6 +913,9 @@ function applyClimbMove(s: MatchState, playerId: string, move: Move): MatchState
     if (s.passStreak >= activeCount(s) - 1 && s.lastPlayer) {
       s.zones[discardZone.id] = [];
       s.passStreak = 0;
+      s.climbShape = 0;
+      s.climbTopRank = null;
+      s.climbBombDeclined = {};
       log(s, null, `Pile cleared — ${short(s.lastPlayer)} leads.`);
       const li = s.players.indexOf(s.lastPlayer);
       s.turnIndex = s.finished.includes(s.lastPlayer) ? nextFromIndex(s, li) : li;
@@ -879,17 +925,28 @@ function applyClimbMove(s: MatchState, playerId: string, move: Move): MatchState
     return s;
   }
 
-  // climbPlay
+  // climbPlay or climbBomb: play a group of matching-rank cards.
   const hand = s.zones[`hand:${playerId}`];
-  const idx = hand.findIndex((c) => c.id === move.cardId);
-  const card = hand[idx];
-  hand.splice(idx, 1);
-  s.zones[discardZone.id].push(card);
+  const ids = new Set(move.cards);
+  const group = hand.filter((c) => ids.has(c.id));
+  s.zones[`hand:${playerId}`] = hand.filter((c) => !ids.has(c.id));
+  s.zones[discardZone.id].push(...group);
   s.lastPlayer = playerId;
   s.passStreak = 0;
-  log(s, playerId, `${short(playerId)} played ${cardLabel(card)}.`);
+  s.climbShape = group.length;
+  s.climbTopRank = group[0]?.rank ?? null;
+  s.climbBombDeclined = {};
 
-  if (hand.length === 0 && !s.finished.includes(playerId)) {
+  if (move.actionId === 'climbBomb') {
+    log(s, playerId, `${short(playerId)} BOMBS with ${group.length}×${group[0]?.rank}!`);
+    // A bomb steals the lead outright — it doesn't need to be this player's turn.
+    s.turnIndex = s.players.indexOf(playerId);
+  } else {
+    log(s, playerId, `${short(playerId)} played ${group.map(cardLabel).join(' ')}.`);
+  }
+
+  const newHand = s.zones[`hand:${playerId}`];
+  if (newHand.length === 0 && !s.finished.includes(playerId)) {
     s.finished.push(playerId);
     log(s, null, `${short(playerId)} is out (#${s.finished.length}).`);
   }
@@ -1293,7 +1350,7 @@ export function redact(state: MatchState, viewer: string): RedactedState {
         ? state.pendingChoice.player === viewer
         : state.passDirection
         ? !(viewer in state.passChoices)
-        : state.players[state.turnIndex] === viewer),
+        : state.players[state.turnIndex] === viewer || climbBombMoves(state, viewer).length > 0),
     pendingChoice: state.pendingChoice,
     scores: { ...state.scores },
     log: state.log.slice(-40),
@@ -1306,6 +1363,13 @@ export function redact(state: MatchState, viewer: string): RedactedState {
     lead: state.definition.trick ? state.lead : undefined,
     tricksWon: state.definition.trick ? { ...state.tricksWon } : undefined,
     finished: state.definition.climb ? state.finished.slice() : undefined,
+    climbPile: state.definition.climb
+      ? (() => {
+          const dz = state.definition.zones.find((z) => z.visibility === 'top-public');
+          const cards = dz ? state.zones[dz.id] || [] : [];
+          return state.climbShape > 0 ? cards.slice(-state.climbShape) : [];
+        })()
+      : undefined,
     booksWon: state.definition.fish ? { ...state.booksWon } : undefined,
     oceanCount: state.definition.fish ? (state.zones[oceanZoneId(state.definition)] || []).length : undefined,
     bids: state.definition.trick?.bidding ? { ...state.bids } : undefined,

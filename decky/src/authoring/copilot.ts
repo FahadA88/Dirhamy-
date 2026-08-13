@@ -124,6 +124,14 @@ export const offlineTranslator: Translator = {
       notes.push('Climbing game (beat or pass).');
       if (/\b2s? (are|is)? ?high|twos high|president\b/.test(text)) patch.climbTwosHigh = true;
       if (/\bace(s)? high\b/.test(text) && !/president/.test(text)) patch.climbTwosHigh = false;
+      if (/\bpairs?\b|\btriples?\b|\bthree of a kind\b|\bcombo(s|es)?\b|\bmatch(ing)? (the )?shape\b|\bbig two\b/.test(text)) {
+        patch.climbCombos = true;
+        notes.push('Pairs and triples allowed — replies must match the shape.');
+      }
+      if (/\bbomb(s|ing)?\b|\bfour of a kind\b|\bquads?\b|\bout of turn\b|\binterrupt\b/.test(text)) {
+        patch.climbBombSize = 4;
+        notes.push('Bombs on — four of a kind beats anything, even out of turn.');
+      }
     }
 
     // trick-taking family detection (before the shedding rules)
@@ -358,6 +366,8 @@ function describeChange(field: keyof Knobs, value: unknown): string {
     case 'rummySetMin': return `Sets of ${value}+`;
     case 'rummyRunMin': return `Runs of ${value}+`;
     case 'climbTwosHigh': return value ? 'Ranks: 3 low … 2 high' : 'Ranks: 2 low … Ace high';
+    case 'climbCombos': return value ? 'Pairs & triples allowed' : 'Single cards only';
+    case 'climbBombSize': return value ? 'Bombs: four of a kind' : 'No bombs';
     case 'trump': return value === 'none' ? 'No trump' : `Trump: ${value}`;
     case 'mustFollowSuit': return value ? 'Must follow suit' : 'Follow suit not required';
     case 'trickScoreBy': return value === 'mostTricks' ? 'Win: most tricks' : 'Win: fewest tricks';

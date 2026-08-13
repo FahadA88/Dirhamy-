@@ -93,16 +93,42 @@ export function chooseMove(
     return { move: best, botSeed };
   }
 
-  // Climbing (President): play the lowest card that beats the pile, else pass.
-  if (moves[0].actionId === 'climbPlay' || moves[0].actionId === 'climbPass') {
+  // Climbing (President/Big Two): play the lowest legal group that beats the pile, else pass.
+  // Out of turn, a bomb is only worth interrupting with if it wins the hand outright.
+  if (moves[0].actionId === 'climbPlay' || moves[0].actionId === 'climbPass'
+    || moves[0].actionId === 'climbBomb' || moves[0].actionId === 'climbNoBomb') {
     if (mode === 'random') { const r = nextRandom(botSeed); return { move: moves[Math.floor(r.value * moves.length)], botSeed: r.state }; }
-    const plays = moves.filter((m) => m.actionId === 'climbPlay');
-    if (plays.length === 0) return { move: moves[0], botSeed };
     const hand = state.zones[`hand:${playerId}`] || [];
     const order = state.definition.climb!.order;
-    const rankOf = (id?: string) => { const c = hand.find((x) => x.id === id); return c ? order.indexOf(c.rank as never) : 999; };
+    const rankOfGroup = (ids?: string[]) => {
+      const c = ids?.[0] ? hand.find((x) => x.id === ids[0]) : undefined;
+      return c ? order.indexOf(c.rank as never) : 999;
+    };
+
+    const bombs = moves.filter((m) => m.actionId === 'climbBomb');
+
+    if (state.players[state.turnIndex] !== playerId) {
+      // Out of turn only bombs (or declining) are legal. Interrupt to go out immediately, or
+      // in an emergency: somebody else is one play from going out, so steal the lead now.
+      const winner = bombs.find((m) => m.cards!.length === hand.length);
+      const urgent = state.players.some(
+        (p) => p !== playerId && !state.finished.includes(p) && (state.zones[`hand:${p}`]?.length ?? 99) <= 2,
+      );
+      const pick = winner ?? (urgent ? bombs[0] : undefined);
+      return { move: pick ?? { actionId: 'climbNoBomb' }, botSeed };
+    }
+
+    const plays = moves.filter((m) => m.actionId === 'climbPlay');
+    // Stuck on your own turn is exactly what a bomb is for — spend it rather than pass.
+    if (plays.length === 0) {
+      if (bombs.length > 0) return { move: bombs[0], botSeed };
+      return { move: moves.find((m) => m.actionId === 'climbPass') ?? moves[0], botSeed };
+    }
+    // When several shapes are legal (leading a fresh pile), shed bigger combos first — a real
+    // Big-Two strategy, and it's what makes pairs/triples actually get played in solo/sim play.
+    const scoreOf = (m: Move) => rankOfGroup(m.cards) - (m.cards?.length ?? 1) * 1000;
     let best = plays[0];
-    for (const m of plays) if (rankOf(m.cardId) < rankOf(best.cardId)) best = m;
+    for (const m of plays) if (scoreOf(m) < scoreOf(best)) best = m;
     return { move: best, botSeed };
   }
 
