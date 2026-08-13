@@ -7,7 +7,7 @@ import { Effect, GameDefinition, Predicate, Rank, Suit } from '../engine/types';
 export const RANKS_13: Rank[] = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
 
 export interface Knobs {
-  family: 'shedding' | 'trick' | 'climb' | 'fish';
+  family: 'shedding' | 'trick' | 'climb' | 'fish' | 'rummy' | 'war';
   name: string;
   description: string;
   minPlayers: number;
@@ -16,9 +16,20 @@ export interface Knobs {
   trump: Suit | 'none';
   mustFollowSuit: boolean;
   aceHigh: boolean;
-  trickScoreBy: 'mostTricks' | 'fewestTricks';
+  trickScoreBy: 'mostTricks' | 'fewestTricks' | 'penalty';
+  trickBidding: boolean;
+  trickPartnerships: boolean;
+  heartsValue: number;       // penalty per heart (penalty scoring)
+  queenSpadesValue: number;  // penalty for the Queen of Spades (penalty scoring)
   // climbing
   climbTwosHigh: boolean; // President order: 3 low … 2 high (else Ace high)
+  // fishing
+  bookSize: number;
+  // rummy
+  rummySetMin: number;
+  rummyRunMin: number;
+  // war
+  warRoundCap: number;
   // deck
   handSize: number;
   deckCount: number;
@@ -66,7 +77,15 @@ export const defaultKnobs: Knobs = {
   mustFollowSuit: true,
   aceHigh: true,
   trickScoreBy: 'mostTricks',
+  trickBidding: false,
+  trickPartnerships: false,
+  heartsValue: 1,
+  queenSpadesValue: 13,
   climbTwosHigh: true,
+  bookSize: 4,
+  rummySetMin: 3,
+  rummyRunMin: 3,
+  warRoundCap: 800,
   handSize: 5,
   deckCount: 1,
   excludeRanks: [],
@@ -96,7 +115,55 @@ export function buildDefinition(knobs: Knobs, id = 'draft'): GameDefinition {
   if (knobs.family === 'trick') return buildTrickDefinition(knobs, id);
   if (knobs.family === 'climb') return buildClimbDefinition(knobs, id);
   if (knobs.family === 'fish') return buildFishDefinition(knobs, id);
+  if (knobs.family === 'rummy') return buildRummyDefinition(knobs, id);
+  if (knobs.family === 'war') return buildWarDefinition(knobs, id);
   return buildSheddingDefinition(knobs, id);
+}
+
+function buildRummyDefinition(knobs: Knobs, id: string): GameDefinition {
+  return {
+    schemaVersion: '1.0',
+    meta: {
+      id, name: knobs.name, description: knobs.description || `A melding game. Deal ${knobs.handSize} cards each. Draw, lay down sets of ${knobs.rummySetMin}+ of a rank and runs of ${knobs.rummyRunMin}+ in sequence, then discard. First to shed every card wins.`,
+      players: { min: clampInt(knobs.minPlayers, 2, 4), max: clampInt(knobs.maxPlayers, knobs.minPlayers, 4) },
+      family: 'rummy',
+    },
+    deck: { base: 'standard54', includeJokers: false, deckCount: 1, excludeRanks: knobs.excludeRanks, rankOrder: RANKS_13, tags: {} },
+    zones: [
+      { id: 'draw', type: 'pile', ordered: true, faceDown: true, visibility: 'none', shared: true },
+      { id: 'discard', type: 'pile', ordered: true, faceDown: false, visibility: 'top-public', shared: true },
+      { id: 'melds', type: 'pile', ordered: true, faceDown: false, visibility: 'all', shared: true },
+      { id: 'hand', type: 'hand', ordered: false, faceDown: true, visibility: 'owner', perPlayer: true },
+    ],
+    setup: [{ op: 'shuffle', zone: 'draw' }, { op: 'deal', from: 'draw', to: 'hand', countPerPlayer: knobs.handSize }, { op: 'move', from: 'draw', to: 'discard', count: 1 }],
+    turnFlow: { order: 'clockwise', startPlayer: 'first', actionsPerTurn: { min: 1, max: 1 } },
+    actions: [], triggers: [],
+    endConditions: [{ id: 'handEmpty', when: { zoneCount: { zone: 'hand', of: 'anyPlayer', eq: 0 } }, result: 'roundOver' }],
+    scoring: { mode: 'lowestPoints', winner: 'lowestTotal', cardPoints: {}, target: null },
+    rummy: { setMin: clampInt(knobs.rummySetMin, 2, 4), runMin: clampInt(knobs.rummyRunMin, 2, 5) },
+  };
+}
+
+function buildWarDefinition(knobs: Knobs, id: string): GameDefinition {
+  return {
+    schemaVersion: '1.0',
+    meta: {
+      id, name: knobs.name, description: knobs.description || 'A comparison game. Split the deck; each flip the higher card takes both, ties trigger a war. Take every card to win.',
+      players: { min: 2, max: 2 }, family: 'comparison',
+    },
+    deck: { base: 'standard54', includeJokers: false, deckCount: 1, excludeRanks: knobs.excludeRanks, rankOrder: RANKS_13, tags: {} },
+    zones: [
+      { id: 'draw', type: 'pile', ordered: true, faceDown: true, visibility: 'none', shared: true },
+      { id: 'battle', type: 'pile', ordered: true, faceDown: false, visibility: 'all', shared: true },
+      { id: 'hand', type: 'hand', ordered: true, faceDown: true, visibility: 'none', perPlayer: true },
+    ],
+    setup: [{ op: 'shuffle', zone: 'draw' }, { op: 'dealAll', from: 'draw', to: 'hand' }],
+    turnFlow: { order: 'clockwise', startPlayer: 'first', actionsPerTurn: { min: 1, max: 1 } },
+    actions: [], triggers: [],
+    endConditions: [{ id: 'handEmpty', when: { zoneCount: { zone: 'hand', of: 'anyPlayer', eq: 0 } }, result: 'roundOver' }],
+    scoring: { mode: 'lowestPoints', winner: 'highestTotal', cardPoints: {}, target: null },
+    war: { aceHigh: knobs.aceHigh, roundCap: clampInt(knobs.warRoundCap, 100, 5000) },
+  };
 }
 
 function buildFishDefinition(knobs: Knobs, id: string): GameDefinition {
@@ -118,7 +185,7 @@ function buildFishDefinition(knobs: Knobs, id: string): GameDefinition {
     triggers: [],
     endConditions: [],
     scoring: { mode: 'lowestPoints', winner: 'highestTotal', cardPoints: {}, target: 13 },
-    fish: { bookSize: 4 },
+    fish: { bookSize: clampInt(knobs.bookSize, 2, 4) },
   };
 }
 
@@ -172,7 +239,15 @@ function buildTrickDefinition(knobs: Knobs, id: string): GameDefinition {
     triggers: [],
     endConditions: [{ id: 'handsEmpty', when: { zoneCount: { zone: 'hand', of: 'anyPlayer', eq: 0 } }, result: 'roundOver' }],
     scoring: { mode: 'lowestPoints', winner: 'highestTotal', cardPoints: {}, target: null },
-    trick: { trump: knobs.trump, mustFollowSuit: knobs.mustFollowSuit, aceHigh: knobs.aceHigh, scoreBy: knobs.trickScoreBy },
+    trick: {
+      trump: knobs.trump, mustFollowSuit: knobs.mustFollowSuit, aceHigh: knobs.aceHigh,
+      scoreBy: knobs.trickScoreBy,
+      penaltyPoints: knobs.trickScoreBy === 'penalty'
+        ? { ...(knobs.heartsValue ? { H: knobs.heartsValue } : {}), ...(knobs.queenSpadesValue ? { SQ: knobs.queenSpadesValue } : {}) }
+        : undefined,
+      bidding: knobs.trickBidding || undefined,
+      partnerships: knobs.trickPartnerships || undefined,
+    },
   };
 }
 
@@ -285,11 +360,19 @@ export function knobsFromDefinition(def: GameDefinition): Knobs {
   const wildRanks = tagRanks('wild').filter((r) => !wildDrawRanks.includes(r));
 
   return {
-    family: def.fish ? 'fish' : def.climb ? 'climb' : def.trick ? 'trick' : 'shedding',
+    family: def.war ? 'war' : def.rummy ? 'rummy' : def.fish ? 'fish' : def.climb ? 'climb' : def.trick ? 'trick' : 'shedding',
     trump: def.trick?.trump ?? 'S',
     mustFollowSuit: def.trick?.mustFollowSuit ?? true,
-    aceHigh: def.trick?.aceHigh ?? true,
-    trickScoreBy: def.trick?.scoreBy === 'fewestTricks' ? 'fewestTricks' : 'mostTricks',
+    aceHigh: def.trick?.aceHigh ?? def.war?.aceHigh ?? true,
+    trickScoreBy: def.trick?.scoreBy ?? 'mostTricks',
+    trickBidding: !!def.trick?.bidding,
+    trickPartnerships: !!def.trick?.partnerships,
+    heartsValue: (def.trick?.penaltyPoints?.H as number) ?? 1,
+    queenSpadesValue: (def.trick?.penaltyPoints?.SQ as number) ?? 13,
+    bookSize: def.fish?.bookSize ?? 4,
+    rummySetMin: def.rummy?.setMin ?? 3,
+    rummyRunMin: def.rummy?.runMin ?? 3,
+    warRoundCap: def.war?.roundCap ?? 800,
     climbTwosHigh: def.climb ? def.climb.order[def.climb.order.length - 1] === '2' : true,
     name: def.meta.name,
     description: def.meta.description,

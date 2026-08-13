@@ -124,9 +124,16 @@ export const offlineTranslator: Translator = {
       const t = detectTrumpSuit(text);
       if (t) { patch.trump = t; notes.push(`${t} is trump.`); }
       if (/\bno trump\b/.test(text)) patch.trump = 'none';
-      if (/\bfewest tricks\b|\bavoid tricks\b|\bavoid taking\b/.test(text)) patch.trickScoreBy = 'fewestTricks';
+      if (/\bpenalty\b|\bavoid\b[^.]*(heart|queen)|\bhearts?\b[^.]*(worth|count|point)|\bqueen of spades\b|\bshoot the moon\b/.test(text)) patch.trickScoreBy = 'penalty';
+      else if (/\bfewest tricks\b|\bavoid tricks\b|\bavoid taking\b/.test(text)) patch.trickScoreBy = 'fewestTricks';
       else if (/\bmost tricks\b/.test(text)) patch.trickScoreBy = 'mostTricks';
+      if (/\bbid(ding|s)?\b/.test(text)) patch.trickBidding = true;
+      if (/\bpartner(ship|s)?\b|\bteams?\b|\b2v2\b|\bteammate/.test(text)) patch.trickPartnerships = true;
     }
+
+    // rummy / war families
+    if (/\brummy\b|\bmelds?\b|\bsets and runs\b|\blay (down|off)\b|\bgin\b/.test(text)) { patch.family = 'rummy'; notes.push('Rummy/melding game.'); }
+    if (/\bgame of war\b|(^|\s)war(\s|$|,|\.)|\bflip[^.]*(higher|highest)[^.]*(take|win)|\bhigher card takes both\b/.test(text)) { patch.family = 'war'; notes.push('Comparison game (War).'); }
 
     // name: "call it X" / "named X" / quoted
     const quoted = description.match(/["“”']([^"“”']{2,40})["“”']/);
@@ -312,7 +319,16 @@ function describeChange(field: keyof Knobs, value: unknown): string {
     case 'matchSuit': return value ? 'Match by suit' : 'No suit matching';
     case 'matchRank': return value ? 'Match by rank' : 'No rank matching';
     case 'drawUntilCanPlay': return value ? 'Draw until you can play' : 'Draw one card';
-    case 'family': return value === 'trick' ? 'Trick-taking game' : value === 'climb' ? 'Climbing game' : value === 'fish' ? 'Fishing game' : 'Shedding/matching game';
+    case 'family': {
+      const names: Record<string, string> = { trick: 'Trick-taking game', climb: 'Climbing game', fish: 'Fishing game', rummy: 'Rummy/melding game', war: 'Comparison game (War)', shedding: 'Shedding/matching game' };
+      return names[value as string] ?? String(value);
+    }
+    case 'trickScoreBy': return value === 'mostTricks' ? 'Win: most tricks' : value === 'fewestTricks' ? 'Win: fewest tricks' : 'Win: fewest penalty points';
+    case 'trickBidding': return value ? 'Bidding before play' : 'No bidding';
+    case 'trickPartnerships': return value ? 'Partnerships (2 teams)' : 'Every player for themselves';
+    case 'bookSize': return `Book = ${value} of a rank`;
+    case 'rummySetMin': return `Sets of ${value}+`;
+    case 'rummyRunMin': return `Runs of ${value}+`;
     case 'climbTwosHigh': return value ? 'Ranks: 3 low … 2 high' : 'Ranks: 2 low … Ace high';
     case 'trump': return value === 'none' ? 'No trump' : `Trump: ${value}`;
     case 'mustFollowSuit': return value ? 'Must follow suit' : 'Follow suit not required';

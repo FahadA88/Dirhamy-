@@ -616,8 +616,9 @@ function resolveTrick(s: MatchState, trickZoneId: string): void {
   if (cfg.scoreBy === 'penalty' && cfg.penaltyPoints) {
     let pts = 0;
     for (const { card } of s.trickPlays) {
-      pts += cfg.penaltyPoints[card.rank] ?? 0;
-      pts += cfg.penaltyPoints[card.suit] ?? 0;
+      pts += cfg.penaltyPoints[card.rank] ?? 0;      // by rank
+      pts += cfg.penaltyPoints[card.suit] ?? 0;      // by suit (e.g. every Heart)
+      pts += cfg.penaltyPoints[card.suit + card.rank] ?? 0; // a specific card (e.g. "SQ")
     }
     s.scores[winner.player] = (s.scores[winner.player] ?? 0) + pts;
   }

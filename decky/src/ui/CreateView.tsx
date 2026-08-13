@@ -10,6 +10,8 @@ import { switchGame } from '../games/switch';
 import { spadesLite } from '../games/spades';
 import { president } from '../games/president';
 import { goFish } from '../games/goFish';
+import { rummy } from '../games/rummy';
+import { war } from '../games/war';
 import { GameDefinition, Rank, Suit } from '../engine/types';
 import { Table } from './Table';
 
@@ -81,6 +83,8 @@ export function CreateView() {
             <button className="chip" onClick={() => startFrom(knobsFromDefinition(spadesLite))}>Spades</button>
             <button className="chip" onClick={() => startFrom(knobsFromDefinition(president))}>President</button>
             <button className="chip" onClick={() => startFrom(knobsFromDefinition(goFish))}>Go Fish</button>
+            <button className="chip" onClick={() => startFrom(knobsFromDefinition(rummy))}>Rummy</button>
+            <button className="chip" onClick={() => startFrom(knobsFromDefinition(war))}>War</button>
           </div>
 
           <div className="field"><span>Game family</span>
@@ -89,6 +93,8 @@ export function CreateView() {
               <button className={knobs.family === 'trick' ? 'on' : ''} onClick={() => set('family', 'trick')}>Trick-taking</button>
               <button className={knobs.family === 'climb' ? 'on' : ''} onClick={() => set('family', 'climb')}>Climbing</button>
               <button className={knobs.family === 'fish' ? 'on' : ''} onClick={() => set('family', 'fish')}>Fishing</button>
+              <button className={knobs.family === 'rummy' ? 'on' : ''} onClick={() => set('family', 'rummy')}>Rummy</button>
+              <button className={knobs.family === 'war' ? 'on' : ''} onClick={() => set('family', 'war')}>War</button>
             </div>
           </div>
 
@@ -122,13 +128,25 @@ export function CreateView() {
                   </select></label>
                 <label className="field row"><Switch on={knobs.mustFollowSuit} onChange={(v) => set('mustFollowSuit', v)} /><span>Must follow the led suit if able</span></label>
                 <label className="field row"><Switch on={knobs.aceHigh} onChange={(v) => set('aceHigh', v)} /><span>Ace is the highest card</span></label>
+                <label className="field row"><Switch on={knobs.trickBidding} onChange={(v) => set('trickBidding', v)} /><span>Players bid tricks before play</span></label>
+                {knobs.minPlayers <= 4 && knobs.maxPlayers >= 4 && (
+                  <label className="field row"><Switch on={knobs.trickPartnerships} onChange={(v) => set('trickPartnerships', v)} /><span>Partnerships (4 players: seats 1&3 vs 2&4)</span></label>
+                )}
               </Section>
               <Section title="Scoring" defaultOpen>
                 <div className="field"><span>Winner is</span>
-                  <div className="seg">
+                  <div className="seg wrap">
                     <button className={knobs.trickScoreBy === 'mostTricks' ? 'on' : ''} onClick={() => set('trickScoreBy', 'mostTricks')}>Most tricks</button>
                     <button className={knobs.trickScoreBy === 'fewestTricks' ? 'on' : ''} onClick={() => set('trickScoreBy', 'fewestTricks')}>Fewest tricks</button>
+                    <button className={knobs.trickScoreBy === 'penalty' ? 'on' : ''} onClick={() => set('trickScoreBy', 'penalty')}>Avoid penalty cards</button>
                   </div></div>
+                {knobs.trickScoreBy === 'penalty' && (
+                  <div className="two">
+                    <NumField label="Points per heart" value={knobs.heartsValue} onChange={(v) => set('heartsValue', v)} />
+                    <NumField label="Queen of spades" value={knobs.queenSpadesValue} onChange={(v) => set('queenSpadesValue', v)} />
+                  </div>
+                )}
+                {knobs.trickScoreBy === 'penalty' && <span className="mini-label">Lowest penalty total wins (this is how Hearts works).</span>}
               </Section>
             </>
           )}
@@ -137,7 +155,28 @@ export function CreateView() {
             <Section title="Fishing rules" defaultOpen>
               <label className="field"><span>Cards dealt each: <b>{knobs.handSize}</b></span>
                 <input type="range" min={5} max={7} value={knobs.handSize} onChange={(e) => set('handSize', +e.target.value)} /></label>
-              <span className="mini-label">Ask opponents for ranks; collect four of a rank for a book. Most books wins.</span>
+              <div className="field"><span>Cards per book</span>
+                <Seg options={[[2, 'Pairs (2)'], [3, 'Threes (3)'], [4, 'Fours (4)']]} value={knobs.bookSize} onChange={(v) => set('bookSize', v)} /></div>
+              <span className="mini-label">Ask opponents for ranks; collect a book of a rank. Most books wins.</span>
+            </Section>
+          )}
+
+          {knobs.family === 'rummy' && (
+            <Section title="Rummy rules" defaultOpen>
+              <label className="field"><span>Cards dealt each: <b>{knobs.handSize}</b></span>
+                <input type="range" min={5} max={13} value={knobs.handSize} onChange={(e) => set('handSize', +e.target.value)} /></label>
+              <div className="field"><span>Set size (same rank)</span>
+                <Seg options={[[2, '2'], [3, '3'], [4, '4']]} value={knobs.rummySetMin} onChange={(v) => set('rummySetMin', v)} /></div>
+              <div className="field"><span>Run length (sequence in a suit)</span>
+                <Seg options={[[2, '2'], [3, '3'], [4, '4'], [5, '5']]} value={knobs.rummyRunMin} onChange={(v) => set('rummyRunMin', v)} /></div>
+              <span className="mini-label">Draw, lay down sets and runs, then discard. First to shed every card wins.</span>
+            </Section>
+          )}
+
+          {knobs.family === 'war' && (
+            <Section title="War rules" defaultOpen>
+              <label className="field row"><Switch on={knobs.aceHigh} onChange={(v) => set('aceHigh', v)} /><span>Ace is the highest card</span></label>
+              <span className="mini-label">2 players. Split the deck, flip; higher card takes both, ties trigger a war. Take every card to win.</span>
             </Section>
           )}
 
@@ -367,6 +406,14 @@ function Seg({ options, value, onChange }: { options: [number, string][]; value:
     <div className="seg">
       {options.map(([val, lbl]) => (<button key={val} className={value === val ? 'on' : ''} onClick={() => onChange(val)}>{lbl}</button>))}
     </div>
+  );
+}
+
+function NumField({ label, value, onChange }: { label: string; value: number; onChange: (v: number) => void }) {
+  return (
+    <label className="field"><span>{label}</span>
+      <input type="number" value={value} onChange={(e) => onChange(parseInt(e.target.value || '0', 10))} />
+    </label>
   );
 }
 
