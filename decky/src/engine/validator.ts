@@ -29,7 +29,9 @@ export function validate(def: GameDefinition): ValidationResult {
   const isTrick = !!def.trick;
   const isClimb = !!def.climb;
   const isFish = !!def.fish;
-  const isSpecial = isTrick || isClimb || isFish;
+  const isRummy = !!def.rummy;
+  const isWar = !!def.war;
+  const isSpecial = isTrick || isClimb || isFish || isRummy || isWar;
 
   // --- players ---
   if (def.meta.players.min < 2) err('players.min', 'A game needs at least 2 players.');

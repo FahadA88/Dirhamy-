@@ -51,6 +51,22 @@ export interface GameDefinition {
   // Present iff this is a fishing game (Go Fish): ask an opponent for a rank you hold; collect
   // sets ("books") of the same rank; most books wins.
   fish?: FishConfig;
+  // Present iff this is a rummy/melding game: draw, lay down sets (same rank) and runs
+  // (consecutive same suit), discard; first to shed their whole hand wins.
+  rummy?: RummyConfig;
+  // Present iff this is a comparison game (War): flip the top card, higher rank wins both;
+  // ties trigger a "war". No decisions — win by taking all the cards.
+  war?: WarConfig;
+}
+
+export interface WarConfig {
+  aceHigh: boolean;
+  roundCap: number; // safety bound: after this many flips, most cards wins
+}
+
+export interface RummyConfig {
+  setMin: number; // cards of equal rank to form a set (usually 3)
+  runMin: number; // consecutive same-suit cards to form a run (usually 3)
 }
 
 export interface ClimbConfig {
@@ -167,6 +183,7 @@ export interface MatchState {
   tricksWon: Record<string, number>;
   bids: Record<string, number>; // trick bids (Spades)
   bidding: boolean;         // true while the bidding phase is open
+  rummyPhase: 'draw' | 'play'; // rummy turn phase
   // climbing state (unused by other families)
   passStreak: number;       // consecutive passes since the last play
   lastPlayer: string | null; // who made the last play (leads when the pile clears)
@@ -193,6 +210,7 @@ export interface Move {
   choice?: string;        // e.g. chosen suit when resolving pendingChoice
   target?: string;        // fishing: the player being asked
   rank?: string;          // fishing: the rank being asked for
+  cards?: string[];       // rummy: the card ids that form a meld
 }
 
 // ---------- Redacted (per-player) view ----------
@@ -219,7 +237,10 @@ export interface RedactedState {
   scores: Record<string, number>;
   log: LogEntry[];
   // family-specific view
-  mode: 'shedding' | 'trick' | 'climb' | 'fish';
+  mode: 'shedding' | 'trick' | 'climb' | 'fish' | 'rummy' | 'war';
+  rummyPhase?: 'draw' | 'play';
+  meldMoves?: { cards: string[]; label: string }[];
+  battle?: Card[];
   trick?: { player: string; card: Card }[];
   lead?: Suit | null;
   tricksWon?: Record<string, number>;

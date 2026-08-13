@@ -56,6 +56,7 @@ export function createMatch(def: GameDefinition, players: string[], seed: number
     tricksWon: Object.fromEntries(players.map((p) => [p, 0])),
     bids: {},
     bidding: !!def.trick?.bidding,
+    rummyPhase: 'draw',
     passStreak: 0,
     lastPlayer: null,
     finished: [],
@@ -211,6 +212,8 @@ export function legalMoves(state: MatchState, playerId: string): Move[] {
   if (state.definition.trick) return trickLegalMoves(state, playerId);
   if (state.definition.climb) return climbLegalMoves(state, playerId);
   if (state.definition.fish) return fishLegalMoves(state, playerId);
+  if (state.definition.rummy) return rummyLegalMoves(state, playerId);
+  if (state.definition.war) return state.players[state.turnIndex] === playerId ? [{ actionId: 'warFlip' }] : [];
 
   // Resolve a pending choice first (e.g. pick a suit after a wild).
   if (state.pendingChoice) {
@@ -381,6 +384,8 @@ export function applyMove(state: MatchState, playerId: string, move: Move): Matc
   if (def.trick) return applyTrickMove(s, playerId, move);
   if (def.climb) return applyClimbMove(s, playerId, move);
   if (def.fish) return applyFishMove(s, playerId, move);
+  if (def.rummy) return applyRummyMove(s, playerId, move);
+  if (def.war) return applyWarMove(s, playerId, move);
 
   // Resolve a pending suit choice.
   if (move.actionId === 'resolveChoice') {
@@ -900,6 +905,200 @@ function endFishRound(s: MatchState): void {
   log(s, null, `Round over — ${short(best)} wins with ${bestN} books.`);
 }
 
+// ---------- rummy / melding family ----------
+
+function rummyZones(def: MatchState['definition']) {
+  return {
+    stock: def.zones.find((z) => z.shared && z.type === 'pile' && z.visibility === 'none')!.id,
+    discard: def.zones.find((z) => z.visibility === 'top-public')!.id,
+    melds: def.zones.find((z) => z.shared && z.visibility === 'all')?.id,
+  };
+}
+
+// Every set (same rank) and run (consecutive same suit) currently layable from a hand.
+function findMelds(state: MatchState, hand: Card[]): { cards: string[]; label: string }[] {
+  const cfg = state.definition.rummy!;
+  const order = state.definition.deck.rankOrder;
+  const out: { cards: string[]; label: string }[] = [];
+
+  // sets: 3+ of a rank
+  const byRank: Record<string, Card[]> = {};
+  for (const c of hand) (byRank[c.rank] ??= []).push(c);
+  for (const [rank, cs] of Object.entries(byRank)) {
+    if (cs.length >= cfg.setMin) out.push({ cards: cs.map((c) => c.id), label: `${cs.length}×${rank}` });
+  }
+
+  // runs: consecutive same-suit sequences
+  for (const suit of ['C', 'D', 'H', 'S']) {
+    const cs = hand.filter((c) => c.suit === suit).sort((a, b) => order.indexOf(a.rank as never) - order.indexOf(b.rank as never));
+    let i = 0;
+    while (i < cs.length) {
+      let j = i + 1;
+      while (j < cs.length && order.indexOf(cs[j].rank as never) === order.indexOf(cs[j - 1].rank as never) + 1) j++;
+      const run = cs.slice(i, j);
+      if (run.length >= cfg.runMin) out.push({ cards: run.map((c) => c.id), label: `${run[0].rank}–${run[run.length - 1].rank}${suitSym(suit)}` });
+      i = j > i + 1 ? j : i + 1;
+    }
+  }
+  return out;
+}
+
+function rummyLegalMoves(state: MatchState, playerId: string): Move[] {
+  if (state.players[state.turnIndex] !== playerId) return [];
+  const z = rummyZones(state.definition);
+  const hand = state.zones[`hand:${playerId}`] || [];
+  if (state.rummyPhase === 'draw') {
+    const moves: Move[] = [{ actionId: 'drawStock' }];
+    if ((state.zones[z.discard] || []).length > 0) moves.push({ actionId: 'drawDiscard' });
+    return moves;
+  }
+  // play phase: lay any meld, or discard to end the turn
+  const moves: Move[] = findMelds(state, hand).map((m) => ({ actionId: 'meld', cards: m.cards }));
+  for (const c of hand) moves.push({ actionId: 'rummyDiscard', cardId: c.id });
+  return moves;
+}
+
+function applyRummyMove(s: MatchState, playerId: string, move: Move): MatchState {
+  const legal = rummyLegalMoves(s, playerId);
+  const ok = legal.find((m) => m.actionId === move.actionId && m.cardId === move.cardId && sameCards(m.cards, move.cards));
+  if (!ok) return s;
+  const z = rummyZones(s.definition);
+  const hand = s.zones[`hand:${playerId}`];
+
+  if (move.actionId === 'drawStock') {
+    if ((s.zones[z.stock] || []).length === 0) {
+      // refill the stock from the discard pile
+      const disc = s.zones[z.discard];
+      if (disc.length > 1) {
+        const keep = disc.pop()!;
+        const { result, rngState } = seededShuffle(disc, s.rngState);
+        s.rngState = rngState;
+        s.zones[z.stock] = result;
+        s.zones[z.discard] = [keep];
+        log(s, null, 'Stock refilled from the discard.');
+      }
+    }
+    const card = s.zones[z.stock].pop();
+    if (card) hand.push(card);
+    s.rummyPhase = 'play';
+    log(s, playerId, `${short(playerId)} draws from the stock.`);
+    return s;
+  }
+  if (move.actionId === 'drawDiscard') {
+    const card = s.zones[z.discard].pop();
+    if (card) hand.push(card);
+    s.rummyPhase = 'play';
+    log(s, playerId, `${short(playerId)} takes the discard.`);
+    return s;
+  }
+  if (move.actionId === 'meld') {
+    const ids = new Set(move.cards);
+    const melded = hand.filter((c) => ids.has(c.id));
+    s.zones[`hand:${playerId}`] = hand.filter((c) => !ids.has(c.id));
+    if (z.melds) s.zones[z.melds].push(...melded);
+    s.stallCount = 0;
+    log(s, playerId, `${short(playerId)} melds ${melded.map(cardLabel).join(' ')}.`);
+    if (s.zones[`hand:${playerId}`].length === 0) endRummyRound(s, playerId);
+    return s;
+  }
+  // rummyDiscard
+  const idx = hand.findIndex((c) => c.id === move.cardId);
+  const card = hand[idx];
+  hand.splice(idx, 1);
+  s.zones[z.discard].push(card);
+  log(s, playerId, `${short(playerId)} discards ${cardLabel(card)}.`);
+  if (hand.length === 0) { endRummyRound(s, playerId); return s; }
+  s.stallCount += 1;
+  s.rummyPhase = 'draw';
+  s.turnIndex = ((s.turnIndex + s.direction) % s.players.length + s.players.length) % s.players.length;
+  if (s.stallCount >= 4 * s.players.length) endRummyRound(s, null); // nobody melding → end by fewest cards
+  return s;
+}
+
+function endRummyRound(s: MatchState, winner: string | null): void {
+  s.phase = 'roundOver';
+  if (!winner) {
+    let best = s.players[0]; let bestN = Infinity;
+    for (const p of s.players) { const n = (s.zones[`hand:${p}`] || []).length; if (n < bestN) { bestN = n; best = p; } }
+    winner = best;
+  }
+  for (const p of s.players) s.scores[p] = (s.zones[`hand:${p}`] || []).length; // fewer left = better
+  s.winner = winner;
+  log(s, null, `Round over — ${short(winner)} goes out.`);
+}
+
+function sameCards(a?: string[], b?: string[]): boolean {
+  if (!a && !b) return true;
+  if (!a || !b || a.length !== b.length) return false;
+  const sa = [...a].sort(); const sb = [...b].sort();
+  return sa.every((x, i) => x === sb[i]);
+}
+
+function suitSym(s: string): string {
+  return { C: '♣', D: '♦', H: '♥', S: '♠' }[s] || '';
+}
+
+// ---------- comparison family (War) ----------
+
+function warStrength(def: MatchState['definition'], rank: string): number {
+  const base = def.deck.rankOrder.indexOf(rank as never);
+  return def.war!.aceHigh && rank === 'A' ? 100 : base;
+}
+
+function applyWarMove(s: MatchState, playerId: string, move: Move): MatchState {
+  if (move.actionId !== 'warFlip' || s.players[s.turnIndex] !== playerId) return s;
+  const [a, b] = s.players;
+  const battleZone = s.definition.zones.find((z) => z.shared && z.visibility === 'all')!.id;
+  const handA = s.zones[`hand:${a}`];
+  const handB = s.zones[`hand:${b}`];
+  s.zones[battleZone] = [];
+  const pot: Card[] = [];
+
+  let guard = 0;
+  while (guard++ < 20) {
+    const ca = handA.shift();
+    const cb = handB.shift();
+    if (!ca || !cb) { if (ca) pot.push(ca); if (cb) pot.push(cb); break; }
+    pot.push(ca, cb);
+    s.zones[battleZone] = [ca, cb];
+    const sa = warStrength(s.definition, ca.rank);
+    const sb = warStrength(s.definition, cb.rank);
+    if (sa !== sb) {
+      const winnerHand = sa > sb ? handA : handB;
+      winnerHand.push(...shuffleForWar(s, pot));
+      log(s, null, `${short(sa > sb ? a : b)} wins ${ca.rank} vs ${cb.rank}.`);
+      break;
+    }
+    // tie → war: 3 face-down each, then flip again
+    log(s, null, `War! ${ca.rank} ties ${cb.rank}.`);
+    for (let k = 0; k < 3; k++) { const x = handA.shift(); const y = handB.shift(); if (x) pot.push(x); if (y) pot.push(y); }
+    if (handA.length === 0 || handB.length === 0) {
+      const winnerHand = handA.length >= handB.length ? handA : handB;
+      winnerHand.push(...shuffleForWar(s, pot));
+      break;
+    }
+  }
+
+  if (handA.length === 0 || handB.length === 0) { endWarRound(s); return s; }
+  s.stallCount += 1;
+  if (s.stallCount >= s.definition.war!.roundCap) { endWarRound(s); return s; }
+  return s;
+}
+
+function shuffleForWar(s: MatchState, cards: Card[]): Card[] {
+  const { result, rngState } = seededShuffle(cards, s.rngState);
+  s.rngState = rngState;
+  return result;
+}
+
+function endWarRound(s: MatchState): void {
+  s.phase = 'roundOver';
+  let best = s.players[0]; let bestN = -1;
+  for (const p of s.players) { const n = (s.zones[`hand:${p}`] || []).length; s.scores[p] = n; if (n > bestN) { bestN = n; best = p; } }
+  s.winner = best;
+  log(s, null, `Game over — ${short(best)} wins with ${bestN} cards.`);
+}
+
 // ---------- redaction (hidden information) ----------
 
 export function redact(state: MatchState, viewer: string): RedactedState {
@@ -954,7 +1153,11 @@ export function redact(state: MatchState, viewer: string): RedactedState {
     pendingChoice: state.pendingChoice,
     scores: { ...state.scores },
     log: state.log.slice(-40),
-    mode: state.definition.trick ? 'trick' : state.definition.climb ? 'climb' : state.definition.fish ? 'fish' : 'shedding',
+    mode: state.definition.trick ? 'trick' : state.definition.climb ? 'climb' : state.definition.fish ? 'fish' : state.definition.rummy ? 'rummy' : state.definition.war ? 'war' : 'shedding',
+    battle: state.definition.war ? (state.zones[state.definition.zones.find((z) => z.shared && z.visibility === 'all')!.id] || []).slice() : undefined,
+    rummyPhase: state.definition.rummy ? state.rummyPhase : undefined,
+    meldMoves: state.definition.rummy && state.players[state.turnIndex] === viewer && state.rummyPhase === 'play'
+      ? findMelds(state, state.zones[`hand:${viewer}`] || []) : undefined,
     trick: state.definition.trick ? state.trickPlays.map((t) => ({ ...t })) : undefined,
     lead: state.definition.trick ? state.lead : undefined,
     tricksWon: state.definition.trick ? { ...state.tricksWon } : undefined,

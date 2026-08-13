@@ -38,7 +38,13 @@ export function Table({ def, seats = 3 }: { def: GameDefinition; seats?: number 
   const canDraw = myLegal.some((m) => m.actionId === 'drawCard');
   const canPass = myLegal.some((m) => m.actionId === 'climbPass');
   const canFishDraw = myLegal.some((m) => m.actionId === 'fishDraw');
-  const playActionId = view.mode === 'trick' ? 'playToTrick' : view.mode === 'climb' ? 'climbPlay' : 'playCard';
+  const canDrawStock = myLegal.some((m) => m.actionId === 'drawStock');
+  const canDrawDiscard = myLegal.some((m) => m.actionId === 'drawDiscard');
+  const isRummy = view.mode === 'rummy';
+  const isWar = view.mode === 'war';
+  const canFlip = myLegal.some((m) => m.actionId === 'warFlip');
+  const myPile = view.players.find((p) => p.id === HUMAN)?.handCount ?? 0;
+  const playActionId = view.mode === 'trick' ? 'playToTrick' : view.mode === 'climb' ? 'climbPlay' : isRummy ? 'rummyDiscard' : 'playCard';
 
   // Bot loop, paced by the user's bot-speed setting.
   useEffect(() => {
@@ -157,6 +163,36 @@ export function Table({ def, seats = 3 }: { def: GameDefinition; seats?: number 
               : 'Waiting…'}
           </div>
         </div>
+      ) : isWar ? (
+        <div className="center war-center">
+          {view.battle && view.battle.length > 0
+            ? view.battle.map((c, i) => (
+                <div key={c.id} className="trick-card">
+                  <CardFace card={c} />
+                  <div className="pile-label">{i % 2 === 0 ? nameOf(view.players[0].id) : nameOf(view.players[1].id)}</div>
+                </div>
+              ))
+            : <div className="trick-empty">Tap Flip to reveal the top cards</div>}
+        </div>
+      ) : isRummy ? (
+        <div className="center rummy-center">
+          <div className="pile">
+            <div className={`${backCls} big`} />
+            <div className="pile-label">Stock · {view.zones.draw?.count ?? 0}</div>
+          </div>
+          <div className="pile">
+            {top ? <CardFace card={top} /> : <div className="card big empty" />}
+            <div className="pile-label">Discard</div>
+          </div>
+          {view.zones.melds && view.zones.melds.cards.length > 0 && (
+            <div className="melds-box">
+              <div className="pile-label">Melds</div>
+              <div className="melds-row">
+                {view.zones.melds.cards.map((c) => <div key={c.id} className="meld-mini"><CardFace card={c} /></div>)}
+              </div>
+            </div>
+          )}
+        </div>
       ) : view.mode === 'climb' ? (
         <div className="center">
           <div className="pile">
@@ -184,7 +220,19 @@ export function Table({ def, seats = 3 }: { def: GameDefinition; seats?: number 
           {canDraw && <button className="draw-btn" onClick={() => submit({ actionId: 'drawCard' })}>Draw a card</button>}
           {canPass && <button className="draw-btn" onClick={() => submit({ actionId: 'climbPass' })}>Pass</button>}
           {canFishDraw && <button className="draw-btn" onClick={() => submit({ actionId: 'fishDraw' })}>Draw from ocean</button>}
+          {canDrawStock && <button className="draw-btn" onClick={() => submit({ actionId: 'drawStock' })}>Draw stock</button>}
+          {canDrawDiscard && <button className="draw-btn" onClick={() => submit({ actionId: 'drawDiscard' })}>Take discard</button>}
+          {isRummy && view.rummyPhase === 'play' && view.meldMoves?.map((m, i) => (
+            <button key={i} className="meld-btn" onClick={() => submit({ actionId: 'meld', cards: m.cards })}>Meld {m.label}</button>
+          ))}
+          {isRummy && view.rummyPhase === 'play' && view.isYourTurn && <span className="rummy-hint">tap a card to discard</span>}
         </div>
+        {isWar ? (
+          <div className="war-controls">
+            <span className="war-pile">Your pile · {myPile} cards</span>
+            {canFlip && <button className="primary" onClick={() => submit({ actionId: 'warFlip' })}>⚔ Flip</button>}
+          </div>
+        ) : (
         <div className={`hand hl-${settings.highlight}`}>
           {hand.map((c) => {
             const playable = playableCardIds.has(c.id);
@@ -202,6 +250,7 @@ export function Table({ def, seats = 3 }: { def: GameDefinition; seats?: number 
           })}
           {hand.length === 0 && <div className="empty-hand">— empty —</div>}
         </div>
+        )}
       </div>
 
       {suitPickerOpen && (

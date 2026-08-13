@@ -27,12 +27,6 @@ export function chooseMove(
     return { move: { actionId: 'resolveChoice', choice: best }, botSeed };
   }
 
-  const plays = moves.filter((m) => m.actionId === 'playCard');
-  if (plays.length === 0) {
-    // Only drawing is possible.
-    return { move: moves[0], botSeed };
-  }
-
   // Bidding (Spades): estimate tricks from high cards + long trump.
   if (moves[0].actionId === 'bid') {
     if (mode === 'random') { const r = nextRandom(botSeed); return { move: moves[Math.floor(r.value * moves.length)], botSeed: r.state }; }
@@ -55,6 +49,35 @@ export function chooseMove(
     const strength = (id?: string) => { const c = hand.find((x) => x.id === id); if (!c) return 0; const b = order.indexOf(c.rank as never); return c.rank === 'A' ? 100 : b; };
     let best = moves[0];
     for (const m of moves) if (strength(m.cardId) < strength(best.cardId)) best = m;
+    return { move: best, botSeed };
+  }
+
+  // Rummy: draw the discard when it connects with the hand; meld greedily; discard the least
+  // useful card (one with no rank-mate and no same-suit neighbour).
+  if (moves[0].actionId === 'drawStock' || moves[0].actionId === 'meld' || moves[0].actionId === 'rummyDiscard') {
+    const hand = state.zones[`hand:${playerId}`] || [];
+    const order = state.definition.deck.rankOrder;
+    const idxOf = (rank: string) => order.indexOf(rank as never);
+    const usefulness = (rank: string, suit: string, self = true) => {
+      const sameRank = hand.filter((c) => c.rank === rank).length - (self ? 1 : 0);
+      const neighbour = hand.some((c) => c.suit === suit && Math.abs(idxOf(c.rank) - idxOf(rank)) === 1) ? 1 : 0;
+      return sameRank * 2 + neighbour;
+    };
+
+    if (moves.some((m) => m.actionId === 'drawStock')) {
+      const discardZone = state.definition.zones.find((z) => z.visibility === 'top-public');
+      const top = discardZone ? state.zones[discardZone.id]?.[state.zones[discardZone.id].length - 1] : undefined;
+      const takeDiscard = !!top && moves.some((m) => m.actionId === 'drawDiscard') && usefulness(top.rank, top.suit, false) > 0;
+      return { move: { actionId: takeDiscard ? 'drawDiscard' : 'drawStock' }, botSeed };
+    }
+
+    const meld = moves.find((m) => m.actionId === 'meld');
+    if (meld) return { move: meld, botSeed };
+    const discards = moves.filter((m) => m.actionId === 'rummyDiscard');
+    if (mode === 'random') { const r = nextRandom(botSeed); return { move: discards[Math.floor(r.value * discards.length)], botSeed: r.state }; }
+    const score = (id?: string) => { const c = hand.find((x) => x.id === id); return c ? usefulness(c.rank, c.suit) * 10 - idxOf(c.rank) : 0; };
+    let best = discards[0];
+    for (const m of discards) if (score(m.cardId) < score(best.cardId)) best = m;
     return { move: best, botSeed };
   }
 
@@ -82,6 +105,10 @@ export function chooseMove(
     for (const m of plays) if (rankOf(m.cardId) < rankOf(best.cardId)) best = m;
     return { move: best, botSeed };
   }
+
+  // From here down is the shedding/matching family.
+  const plays = moves.filter((m) => m.actionId === 'playCard');
+  if (plays.length === 0) return { move: moves[0], botSeed }; // only a draw is available
 
   // Easy mode: pick any legal move uniformly at random.
   if (mode === 'random') {

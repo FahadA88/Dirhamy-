@@ -5,8 +5,9 @@ import { simulate } from '../src/engine/simulator';
 let failed = false;
 
 for (const game of catalog) {
-  const report = simulate(game, 4, 1000);
-  console.log(`\n${game.meta.name} — bot self-play (1000 games, 4 players)`);
+  const seats = Math.max(game.meta.players.min, Math.min(4, game.meta.players.max));
+  const report = simulate(game, seats, 1000);
+  console.log(`\n${game.meta.name} — bot self-play (1000 games, ${seats} players)`);
   console.log(JSON.stringify(report, null, 2));
 
   const ok = report.terminated === report.games && report.winnable && report.maxMovesHit === 0;
