@@ -450,6 +450,10 @@ h2 { font-family: var(--mono); letter-spacing: 1px; color: var(--ink); font-size
 .melds-row { display: flex; flex-wrap: wrap; gap: 4px; max-width: 340px; }
 .meld-mini { transform: scale(0.62); margin: -14px; }
 
+/* a card already committed to a multi-card pass */
+.card-btn.staged { position: relative; opacity: 0.6; transform: translateY(-10px); }
+.card-btn.staged .card.face { box-shadow: 0 0 0 3px var(--green-d), 0 10px 26px var(--glow); }
+
 /* climbing */
 .climb-group { display: flex; gap: 4px; }
 .climb-group > * { margin-right: -34px; }

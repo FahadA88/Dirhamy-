@@ -155,7 +155,23 @@ export function CreateView() {
                     <NumField label="Queen of spades" value={knobs.queenSpadesValue} onChange={(v) => set('queenSpadesValue', v)} />
                   </div>
                 )}
-                {knobs.trickScoreBy === 'penalty' && <span className="mini-label">Lowest penalty total wins (this is how Hearts works).</span>}
+                {knobs.trickScoreBy === 'penalty' && <>
+                  <span className="mini-label">Lowest penalty total wins (this is how Hearts works).</span>
+                  <label className="field row"><Switch on={knobs.shootTheMoon} onChange={(v) => set('shootTheMoon', v)} />
+                    <span>Shooting the moon — take every penalty point and you score 0 while everyone else takes the lot</span></label>
+                  <label className="field row"><Switch on={knobs.brokenSuitLead} onChange={(v) => set('brokenSuitLead', v)} />
+                    <span>Hearts must be broken before they can be led</span></label>
+                </>}
+                <label className="field row"><Switch on={knobs.forceOpeningLead} onChange={(v) => set('forceOpeningLead', v)} />
+                  <span>The 2♣ holder leads the first trick{knobs.trickScoreBy === 'penalty' ? ', and no points may fall on it' : ''}</span></label>
+              </Section>
+              <Section title="Passing">
+                <div className="field"><span>Cards exchanged before each hand</span>
+                  <Seg options={[[0, 'None'], [1, 'One'], [2, 'Two'], [3, 'Three']]}
+                    value={knobs.handPassCount} onChange={(v) => set('handPassCount', v)} /></div>
+                {knobs.handPassCount > 0 && (
+                  <span className="mini-label">Direction rotates every hand: left, right, across, then a hold hand with no pass. Everyone picks at the same time and nobody sees what's coming.</span>
+                )}
               </Section>
             </>
           )}

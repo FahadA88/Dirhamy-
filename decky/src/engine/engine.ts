@@ -10,7 +10,7 @@
 
 import {
   ActionDef, Card, Effect, GameDefinition, MatchState, Move, Predicate,
-  RedactedState, RedactedZone, ScoringDef, ZoneDef,
+  RedactedState, RedactedZone, ScoringDef, TrickConfig, ZoneDef,
 } from './types';
 import { buildDeck, cardColor, cardTags } from './deck';
 import { seededShuffle } from './rng';
@@ -76,7 +76,10 @@ export function createMatch(
     winner: null,
     pendingChoice: null,
     passDirection: null,
+    passCount: 1,
     passChoices: {},
+    passStaged: {},
+    brokenSuitPlayed: false,
     log: [],
     matchScores: carry?.matchScores ?? Object.fromEntries(players.map((p) => [p, 0])),
     handNumber: carry?.handNumber ?? 1,
@@ -139,6 +142,9 @@ export function createMatch(
   if (def.fish) for (const p of players) checkBooks(state, p);
 
   log(state, null, `${def.meta.name} started with ${players.length} players.`);
+  // A pre-hand exchange happens before anyone plays; otherwise open at the designated lead.
+  if (def.handPass) startHandPass(state);
+  if (def.trick && !state.passDirection && !state.bidding) state.turnIndex = openingLeadSeat(state);
   return state;
 }
 
@@ -224,6 +230,16 @@ function stripExistsLegal(p: Predicate): Predicate {
 
 export function legalMoves(state: MatchState, playerId: string): Move[] {
   if (state.phase !== 'playing') return [];
+
+  // A simultaneous pass overrides whose turn it is, in every family — each player who hasn't
+  // finished choosing may pick a card to give away, regardless of the normal turn order.
+  if (state.passDirection) {
+    if (playerId in state.passChoices) return [];
+    const staged = state.passStaged[playerId] || [];
+    const hand = state.zones[`hand:${playerId}`] || [];
+    return hand.filter((c) => !staged.includes(c.id)).map((c) => ({ actionId: 'choosePass', cardId: c.id }));
+  }
+
   if (state.definition.trick) return trickLegalMoves(state, playerId);
   if (state.definition.climb) return climbLegalMoves(state, playerId);
   if (state.definition.fish) return fishLegalMoves(state, playerId);
@@ -236,14 +252,6 @@ export function legalMoves(state: MatchState, playerId: string): Move[] {
     return (['C', 'D', 'H', 'S'] as const).map((suit) => ({
       actionId: 'resolveChoice', choice: suit,
     }));
-  }
-
-  // A simultaneous pass overrides whose turn it is — every player who hasn't chosen yet may
-  // pick a card to give away, regardless of the normal turn order.
-  if (state.passDirection) {
-    if (playerId in state.passChoices) return [];
-    const hand = state.zones[`hand:${playerId}`] || [];
-    return hand.map((c) => ({ actionId: 'choosePass', cardId: c.id }));
   }
 
   if (state.players[state.turnIndex] !== playerId) return [];
@@ -281,7 +289,8 @@ function cloneState(state: MatchState): MatchState {
     finished: state.finished.slice(),
     booksWon: { ...state.booksWon },
     pendingChoice: state.pendingChoice ? { ...state.pendingChoice } : null,
-    passChoices: { ...state.passChoices },
+    passChoices: Object.fromEntries(Object.entries(state.passChoices).map(([k, v]) => [k, v.slice()])),
+    passStaged: Object.fromEntries(Object.entries(state.passStaged).map(([k, v]) => [k, v.slice()])),
     climbBombDeclined: { ...state.climbBombDeclined },
     log: state.log.slice(),
   };
@@ -370,7 +379,9 @@ function runEffects(state: MatchState, effects: Effect[], ctx: Ctx & { playedCar
         // Only players still holding a card can be asked to give one away.
         if (state.players.every((p) => (state.zones[`hand:${p}`] || []).length > 0)) {
           state.passDirection = e.direction;
+          state.passCount = 1;
           state.passChoices = {};
+          state.passStaged = {};
         }
         break;
       }
@@ -414,6 +425,8 @@ export function applyMove(state: MatchState, playerId: string, move: Move): Matc
   const s = cloneState(state);
   const def = s.definition;
 
+  if (move.actionId === 'choosePass') return applyChoosePass(s, playerId, move);
+
   if (def.trick) return applyTrickMove(s, playerId, move);
   if (def.climb) return applyClimbMove(s, playerId, move);
   if (def.fish) return applyFishMove(s, playerId, move);
@@ -427,18 +440,6 @@ export function applyMove(state: MatchState, playerId: string, move: Move): Matc
     log(s, playerId, `${short(playerId)} chose ${suitWord(move.choice!)}.`);
     s.pendingChoice = null;
     advanceAndCheck(s);
-    return s;
-  }
-
-  // Contribute a card to a simultaneous pass. Any player may submit this, in any order —
-  // the swap only resolves once everyone has chosen.
-  if (move.actionId === 'choosePass') {
-    if (!s.passDirection || playerId in s.passChoices) return s;
-    const hand = s.zones[`hand:${playerId}`] || [];
-    if (!hand.some((c) => c.id === move.cardId)) return s;
-    s.passChoices[playerId] = move.cardId!;
-    log(s, playerId, `${short(playerId)} picks a card to pass.`);
-    if (s.players.every((p) => p in s.passChoices)) resolvePassCards(s);
     return s;
   }
 
@@ -477,24 +478,73 @@ export function applyMove(state: MatchState, playerId: string, move: Move): Matc
 // Resolves a fully-collected simultaneous pass: every player's chosen card moves to their
 // neighbor at once, using each player's ORIGINAL choice (nobody can react to what they're
 // about to receive). Then resumes whatever turn flow was paused when the pass began.
+// Contribute to a simultaneous pass. Any player may submit this, in any order, in any family;
+// a multi-card pass stages picks until the full count is in. The swap only resolves once
+// everyone has committed.
+function applyChoosePass(s: MatchState, playerId: string, move: Move): MatchState {
+  if (!s.passDirection || playerId in s.passChoices) return s;
+  const hand = s.zones[`hand:${playerId}`] || [];
+  const staged = s.passStaged[playerId] || [];
+  if (!hand.some((c) => c.id === move.cardId) || staged.includes(move.cardId!)) return s;
+  const next = [...staged, move.cardId!];
+  if (next.length < s.passCount) { s.passStaged[playerId] = next; return s; }
+  delete s.passStaged[playerId];
+  s.passChoices[playerId] = next;
+  log(s, playerId, `${short(playerId)} picks ${next.length === 1 ? 'a card' : `${next.length} cards`} to pass.`);
+  if (s.players.every((p) => p in s.passChoices)) resolvePassCards(s);
+  return s;
+}
+
 function resolvePassCards(s: MatchState): void {
   const dir = s.passDirection!;
   const n = s.players.length;
-  const offset = dir === 'left' ? 1 : -1;
+  const offset = dir === 'left' ? 1 : dir === 'right' ? -1 : Math.floor(n / 2);
   const picks = s.players.map((from, i) => ({
-    from, to: s.players[((i + offset) % n + n) % n], cardId: s.passChoices[from],
+    from, to: s.players[((i + offset) % n + n) % n], cardIds: s.passChoices[from] || [],
   }));
-  for (const { from, to, cardId } of picks) {
+  // Lift every card out first, then deliver — otherwise a pass can hand on a card it just got.
+  const lifted = picks.map(({ from, to, cardIds }) => {
     const hand = s.zones[`hand:${from}`];
-    const idx = hand.findIndex((c) => c.id === cardId);
-    if (idx < 0) continue;
-    const [card] = hand.splice(idx, 1);
-    s.zones[`hand:${to}`].push(card);
-  }
+    const cards: Card[] = [];
+    for (const id of cardIds) {
+      const idx = hand.findIndex((c) => c.id === id);
+      if (idx >= 0) cards.push(...hand.splice(idx, 1));
+    }
+    return { to, cards };
+  });
+  for (const { to, cards } of lifted) s.zones[`hand:${to}`].push(...cards);
   log(s, null, `Cards passed ${dir}.`);
   s.passDirection = null;
   s.passChoices = {};
+  s.passStaged = {};
+  s.passCount = 1;
+  // A pre-hand exchange resumes at the opening lead, not at the next seat in turn order; the
+  // mid-hand sweep effect is the one that resumes normal shedding flow.
+  if (s.definition.trick) { s.turnIndex = openingLeadSeat(s); return; }
   advanceAndCheck(s);
+}
+
+// Who leads trick 1: the holder of the designated lead card (Hearts' 2♣), else seat 0.
+function openingLeadSeat(s: MatchState): number {
+  const lead = s.definition.trick?.leadCard;
+  if (!lead) return 0;
+  const i = s.players.findIndex((p) => (s.zones[`hand:${p}`] || []).some((c) => c.id === lead));
+  return i >= 0 ? i : 0;
+}
+
+// A pre-hand exchange (Hearts): everyone gives `count` cards at once before any trick is played.
+// 'hold' hands skip the exchange entirely.
+function startHandPass(s: MatchState): void {
+  const cfg = s.definition.handPass;
+  if (!cfg || cfg.rotation.length === 0) return;
+  const dir = cfg.rotation[(s.handNumber - 1) % cfg.rotation.length];
+  if (dir === 'hold') { log(s, null, 'No pass this hand.'); return; }
+  if (dir === 'across' && s.players.length % 2 !== 0) return; // no seat directly opposite
+  s.passDirection = dir;
+  s.passCount = Math.max(1, cfg.count);
+  s.passChoices = {};
+  s.passStaged = {};
+  log(s, null, `Pass ${cfg.count} card${cfg.count === 1 ? '' : 's'} ${dir}.`);
 }
 
 function advanceAndCheck(s: MatchState): void {
@@ -693,14 +743,43 @@ function trickLegalMoves(state: MatchState, playerId: string): Move[] {
     const n = (state.zones[`hand:${playerId}`] || []).length;
     return Array.from({ length: n + 1 }, (_, i) => ({ actionId: 'bid', choice: String(i) }));
   }
+  const cfg = def.trick!;
   const hand = state.zones[`hand:${playerId}`] || [];
+  const firstTrick = Object.values(state.tricksWon).reduce((a, b) => a + b, 0) === 0;
+
+  // The designated opening card (Hearts' 2♣) must be led, and nothing else may be.
+  if (firstTrick && cfg.leadCard && state.trickPlays.length === 0) {
+    const forced = hand.find((c) => c.id === cfg.leadCard);
+    if (forced) return [{ actionId: 'playToTrick', cardId: forced.id }];
+  }
+
   let playable = hand;
   // Must follow the led suit if you hold one.
-  if (def.trick!.mustFollowSuit && state.lead) {
+  if (cfg.mustFollowSuit && state.lead) {
     const following = hand.filter((c) => c.suit === state.lead);
     if (following.length) playable = following;
   }
+
+  // Leading the "broken" suit is barred until it has shown up in a trick — unless it's all
+  // you hold.
+  if (cfg.brokenSuit && !state.brokenSuitPlayed && state.trickPlays.length === 0) {
+    const others = playable.filter((c) => c.suit !== cfg.brokenSuit);
+    if (others.length) playable = others;
+  }
+
+  // The opening trick takes no points if the rule is on — again, unless you have nothing else.
+  if (firstTrick && cfg.noPenaltyFirstTrick) {
+    const safe = playable.filter((c) => penaltyOf(cfg, c) === 0);
+    if (safe.length) playable = safe;
+  }
+
   return playable.map((c) => ({ actionId: 'playToTrick', cardId: c.id }));
+}
+
+function penaltyOf(cfg: TrickConfig, card: Card): number {
+  const p = cfg.penaltyPoints;
+  if (!p) return 0;
+  return (p[card.rank] ?? 0) + (p[card.suit] ?? 0) + (p[card.suit + card.rank] ?? 0);
 }
 
 function applyTrickMove(s: MatchState, playerId: string, move: Move): MatchState {
@@ -725,6 +804,11 @@ function applyTrickMove(s: MatchState, playerId: string, move: Move): MatchState
   const trickZone = s.definition.zones.find((z) => z.type === 'trick')!;
   s.zones[trickZone.id].push(card);
   if (s.trickPlays.length === 0) s.lead = card.suit;
+  const brk = s.definition.trick!.brokenSuit;
+  if (brk && card.suit === brk && !s.brokenSuitPlayed) {
+    s.brokenSuitPlayed = true;
+    log(s, null, `${suitName(brk)} are broken.`);
+  }
   s.trickPlays.push({ player: playerId, card });
   log(s, playerId, `${short(playerId)} played ${cardLabel(card)}.`);
 
@@ -811,6 +895,16 @@ function endTrickRound(s: MatchState): void {
 
   let winner = s.players[0];
   if (cfg.scoreBy === 'penalty') {
+    // Shooting the moon: sweep every penalty point and the score inverts — you take nothing
+    // and the rest of the table takes the whole pot.
+    if (cfg.shootTheMoon) {
+      const pot = s.players.reduce((a, p) => a + (s.scores[p] ?? 0), 0);
+      const shooter = pot > 0 ? s.players.find((p) => (s.scores[p] ?? 0) === pot) : undefined;
+      if (shooter) {
+        for (const p of s.players) s.scores[p] = p === shooter ? 0 : pot;
+        log(s, shooter, `${short(shooter)} SHOT THE MOON — everyone else takes ${pot}.`);
+      }
+    }
     let best = Infinity;
     for (const p of s.players) { const v = s.scores[p] ?? 0; if (v < best) { best = v; winner = p; } }
   } else {
@@ -1384,6 +1478,9 @@ export function redact(state: MatchState, viewer: string): RedactedState {
     passDirection: state.passDirection,
     needsPassChoice: !!state.passDirection && !(viewer in state.passChoices),
     passWaitingOn: state.passDirection ? state.players.filter((p) => !(p in state.passChoices)).length : 0,
+    passCount: state.passCount,
+    passStaged: (state.passStaged[viewer] || []).slice(),
+    brokenSuitPlayed: state.definition.trick?.brokenSuit ? state.brokenSuitPlayed : undefined,
   };
 }
 
@@ -1399,6 +1496,10 @@ function short(id: string): string {
 
 function suitWord(s: string): string {
   return { C: 'Clubs', D: 'Diamonds', H: 'Hearts', S: 'Spades' }[s] || s;
+}
+
+function suitName(s: string): string {
+  return { C: 'Clubs', D: 'Diamonds', H: 'Hearts', S: 'Spades' }[s] ?? s;
 }
 
 function cardLabel(c: Card): string {

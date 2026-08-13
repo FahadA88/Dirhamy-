@@ -262,7 +262,13 @@ export function Table({ def, seats = 3 }: { def: GameDefinition; seats?: number 
       <div className={`you ${view.isYourTurn ? 'your-turn' : ''}`}>
         <div className="you-head">
           <span>{settings.playerName === 'You' ? 'Your hand' : `${settings.playerName}’s hand`}{view.mode === 'trick' ? ` · ${view.tricksWon?.[HUMAN] ?? 0} tricks` : ''}{view.mode === 'trick' && view.bids?.[HUMAN] !== undefined ? ` · bid ${view.bids[HUMAN]}` : ''}{isFish ? ` · ${view.booksWon?.[HUMAN] ?? 0} books` : ''}{teamOf(HUMAN) ? ` · ${teamOf(HUMAN)}` : ''}</span>
-          {view.needsPassChoice && <span className="turn-badge">Pick a card to pass {view.passDirection}</span>}
+          {view.needsPassChoice && (
+            <span className="turn-badge">
+              {view.passCount > 1
+                ? `Pass ${view.passCount} ${view.passDirection} · ${view.passStaged.length}/${view.passCount} picked`
+                : `Pick a card to pass ${view.passDirection}`}
+            </span>
+          )}
           {isInterrupt && <span className="bomb-badge">💣 You can bomb out of turn</span>}
           {!view.passDirection && view.isYourTurn && !suitPickerOpen && !isInterrupt && <span className="turn-badge">Your turn</span>}
           {!view.needsPassChoice && view.passDirection && <span className="waiting-badge">Waiting on {view.passWaitingOn} player{view.passWaitingOn === 1 ? '' : 's'}…</span>}
@@ -296,13 +302,14 @@ export function Table({ def, seats = 3 }: { def: GameDefinition; seats?: number 
         <div className={`hand hl-${settings.highlight}`}>
           {hand.map((c) => {
             const playable = playableCardIds.has(c.id);
+            const staged = view.passStaged.includes(c.id);
             return (
               <button
                 key={c.id}
-                className={`card-btn ${playable ? 'playable' : 'dim'} ${(isFish ? c.rank === askRank : selected === c.id) ? 'selected' : ''}`}
+                className={`card-btn ${playable ? 'playable' : 'dim'} ${staged ? 'staged' : ''} ${(isFish ? c.rank === askRank : selected === c.id) ? 'selected' : ''}`}
                 disabled={!playable}
                 onClick={() => clickCard(c.id)}
-                title={playable ? (isFish ? 'Pick this rank to ask for' : view.needsPassChoice ? 'Give this card away' : settings.confirmPlays && selected !== c.id ? 'Click to select' : 'Play this card') : 'Not a legal move right now'}
+                title={staged ? 'Picked to pass' : playable ? (isFish ? 'Pick this rank to ask for' : view.needsPassChoice ? 'Give this card away' : settings.confirmPlays && selected !== c.id ? 'Click to select' : 'Play this card') : 'Not a legal move right now'}
               >
                 <CardFace card={c} />
               </button>

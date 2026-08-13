@@ -45,8 +45,49 @@ export function chooseMove(
   if (moves[0].actionId === 'playToTrick') {
     if (mode === 'random') { const r = nextRandom(botSeed); return { move: moves[Math.floor(r.value * moves.length)], botSeed: r.state }; }
     const hand = state.zones[`hand:${playerId}`] || [];
+    const cfg = state.definition.trick!;
     const order = state.definition.deck.rankOrder;
-    const strength = (id?: string) => { const c = hand.find((x) => x.id === id); if (!c) return 0; const b = order.indexOf(c.rank as never); return c.rank === 'A' ? 100 : b; };
+    const cardOf = (id?: string) => hand.find((x) => x.id === id);
+    const strength = (id?: string) => { const c = cardOf(id); if (!c) return 0; const b = order.indexOf(c.rank as never); return c.rank === 'A' ? 100 : b; };
+
+    // Avoidance games (Hearts): the goal is to lose tricks, and to dump penalties when void.
+    if (cfg.scoreBy === 'penalty') {
+      const pen = (id?: string) => {
+        const c = cardOf(id); if (!c) return 0;
+        const p = cfg.penaltyPoints ?? {};
+        return (p[c.rank] ?? 0) + (p[c.suit] ?? 0) + (p[c.suit + c.rank] ?? 0);
+      };
+      const following = state.lead ? moves.filter((m) => cardOf(m.cardId)?.suit === state.lead) : [];
+      if (state.lead && following.length === 0) {
+        // Void in the led suit — this trick is free, so throw the worst card held.
+        let best = moves[0];
+        for (const m of moves) {
+          const better = pen(m.cardId) > pen(best.cardId)
+            || (pen(m.cardId) === pen(best.cardId) && strength(m.cardId) > strength(best.cardId));
+          if (better) best = m;
+        }
+        return { move: best, botSeed };
+      }
+      if (state.lead) {
+        // Duck: play the highest card that still stays under the current winner; if every
+        // card would take the trick, give up the cheapest one.
+        const high = Math.max(...state.trickPlays.filter((t) => t.card.suit === state.lead)
+          .map((t) => (t.card.rank === 'A' ? 100 : order.indexOf(t.card.rank as never))));
+        const under = following.filter((m) => strength(m.cardId) < high);
+        const pool = under.length > 0 ? under : following;
+        let best = pool[0];
+        for (const m of pool) {
+          const better = under.length > 0 ? strength(m.cardId) > strength(best.cardId) : strength(m.cardId) < strength(best.cardId);
+          if (better) best = m;
+        }
+        return { move: best, botSeed };
+      }
+      // Leading: low cards are safest.
+      let best = moves[0];
+      for (const m of moves) if (strength(m.cardId) < strength(best.cardId)) best = m;
+      return { move: best, botSeed };
+    }
+
     let best = moves[0];
     for (const m of moves) if (strength(m.cardId) < strength(best.cardId)) best = m;
     return { move: best, botSeed };
@@ -132,14 +173,21 @@ export function chooseMove(
     return { move: best, botSeed };
   }
 
-  // Simultaneous pass: give away the least useful card (highest rank, no strategy beyond that).
+  // Simultaneous pass: give away the most dangerous card — the biggest penalty first, then
+  // simply the highest rank.
   if (moves[0].actionId === 'choosePass') {
     if (mode === 'random') { const r = nextRandom(botSeed); return { move: moves[Math.floor(r.value * moves.length)], botSeed: r.state }; }
     const hand = state.zones[`hand:${playerId}`] || [];
     const order = state.definition.deck.rankOrder;
-    const rankOf = (id?: string) => { const c = hand.find((x) => x.id === id); return c ? order.indexOf(c.rank as never) : -1; };
+    const p = state.definition.trick?.penaltyPoints ?? {};
+    const danger = (id?: string) => {
+      const c = hand.find((x) => x.id === id);
+      if (!c) return -1;
+      const pen = (p[c.rank] ?? 0) + (p[c.suit] ?? 0) + (p[c.suit + c.rank] ?? 0);
+      return pen * 100 + order.indexOf(c.rank as never);
+    };
     let best = moves[0];
-    for (const m of moves) if (rankOf(m.cardId) > rankOf(best.cardId)) best = m;
+    for (const m of moves) if (danger(m.cardId) > danger(best.cardId)) best = m;
     return { move: best, botSeed };
   }
 

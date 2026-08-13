@@ -149,6 +149,28 @@ export const offlineTranslator: Translator = {
       if (/\bpartner(ship|s)?\b|\bteams?\b|\b2v2\b|\bteammate/.test(text)) patch.trickPartnerships = true;
       const bustMatch = /\b(?:bust|lose|drops?|falls?)\b[^.]*?-\s*(\d+)/.exec(text) || /-\s*(\d+)\s*(?:and you'?re out|points? you lose|and you lose)/.exec(text);
       if (bustMatch) { patch.bustEnabled = true; patch.bustScore = clampMatchTarget(parseInt(bustMatch[1], 10)); notes.push(`Bust at -${patch.bustScore} — the match ends instantly.`); }
+
+      // Hearts rules.
+      if (/\bshoot(ing)? the moon\b|\ball (26|the points)\b|\btakes? every (point|heart)\b/.test(text)) {
+        patch.shootTheMoon = true;
+        notes.push('Shooting the moon inverts the score.');
+      }
+      if (/\bbroken?\b|\bbreak(ing)? hearts\b|\bcan(no|')?t lead hearts\b/.test(text)) {
+        patch.brokenSuitLead = true;
+        notes.push('Hearts must be broken before they can be led.');
+      }
+      if (/\b2\s*(of\s*)?clubs?\b|\btwo of clubs\b|\bleads? the first trick\b/.test(text)) {
+        patch.forceOpeningLead = true;
+        notes.push('The 2♣ holder leads the opening trick.');
+      }
+    }
+
+    // pre-hand exchange (Hearts): "pass three cards to the left before each hand"
+    const passN = /\bpass(?:ing|es)?\s+(\w+)\s+cards?\b/.exec(text);
+    if (passN && /\bbefore (each|every|the) (hand|round|deal)\b|\bleft.*right.*across\b|\bhearts\b/.test(text)) {
+      const words: Record<string, number> = { one: 1, a: 1, two: 2, three: 3, four: 4, '1': 1, '2': 2, '3': 3, '4': 4 };
+      const n = words[passN[1]] ?? 0;
+      if (n > 0) { patch.handPassCount = n; notes.push(`Exchange ${n} card${n === 1 ? '' : 's'} before each hand.`); }
     }
 
     // rummy / war families
@@ -366,6 +388,10 @@ function describeChange(field: keyof Knobs, value: unknown): string {
     case 'rummySetMin': return `Sets of ${value}+`;
     case 'rummyRunMin': return `Runs of ${value}+`;
     case 'climbTwosHigh': return value ? 'Ranks: 3 low … 2 high' : 'Ranks: 2 low … Ace high';
+    case 'shootTheMoon': return value ? 'Shooting the moon on' : 'No moon shot';
+    case 'brokenSuitLead': return value ? 'Hearts must be broken to lead' : 'Hearts may be led freely';
+    case 'forceOpeningLead': return value ? '2♣ leads the first trick' : 'Any card opens';
+    case 'handPassCount': return value ? `Pass ${value} before each hand` : 'No pre-hand pass';
     case 'climbCombos': return value ? 'Pairs & triples allowed' : 'Single cards only';
     case 'climbBombSize': return value ? 'Bombs: four of a kind' : 'No bombs';
     case 'trump': return value === 'none' ? 'No trump' : `Trump: ${value}`;

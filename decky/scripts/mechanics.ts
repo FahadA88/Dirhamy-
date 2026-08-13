@@ -1,7 +1,9 @@
 // Deterministic proofs for mechanics too rare to be reliably exercised by random self-play.
 // Simulation shows a game terminates; these show a specific rule actually fires correctly.
 import { undertow } from '../src/games/undertow';
-import { createMatch, legalMoves, applyMove, actingPlayers, redact } from '../src/engine/engine';
+import { hearts } from '../src/games/hearts';
+import { createMatch, legalMoves, applyMove, actingPlayers, redact, nextHand } from '../src/engine/engine';
+import { chooseMove } from '../src/bots/randomBot';
 import { Card, MatchState } from '../src/engine/types';
 
 let failed = false;
@@ -65,6 +67,175 @@ section('Climbing — combos and out-of-turn bombs (Undertow)');
   check('the bomb is announced in the log', u.log.some((l) => l.text.includes('BOMBS')));
   const cAfter = legalMoves(u, 'C');
   check('nobody can answer a 4-shape pile with a smaller group', cAfter.length === 1 && cAfter[0].actionId === 'climbPass', cAfter);
+}
+
+// ---------- Hearts: pre-hand pass, forced lead, broken suit, shooting the moon ----------
+section('Trick-taking — Hearts rules');
+{
+  const P = ['A', 'B', 'C', 'D'];
+  const s = createMatch(hearts, P, 7);
+
+  // Every player owes three cards before a single trick is played.
+  check('hand 1 passes left', s.passDirection === 'left', s.passDirection);
+  check('three cards owed', s.passCount === 3);
+  check('all four players must choose', JSON.stringify(actingPlayers(s)) === '["A","B","C","D"]', actingPlayers(s));
+  check('redaction asks the viewer to pass', redact(s, 'C').needsPassChoice === true && redact(s, 'C').passCount === 3);
+
+  // Picks stage until the full count is in — the pass does not resolve early.
+  let t = applyMove(s, 'A', { actionId: 'choosePass', cardId: s.zones['hand:A'][0].id });
+  check('one pick stages, does not commit', (t.passStaged['A'] || []).length === 1 && !('A' in t.passChoices));
+  check('a staged card cannot be picked twice',
+    !legalMoves(t, 'A').some((m) => m.cardId === s.zones['hand:A'][0].id));
+  t = applyMove(t, 'A', { actionId: 'choosePass', cardId: s.zones['hand:A'][1].id });
+  t = applyMove(t, 'A', { actionId: 'choosePass', cardId: s.zones['hand:A'][2].id });
+  check('third pick commits the choice', (t.passChoices['A'] || []).length === 3 && !('A' in t.passStaged));
+  check('a committed player is no longer an actor', !actingPlayers(t).includes('A'), actingPlayers(t));
+  check('pass has not resolved yet', t.passDirection === 'left');
+
+  // Complete the exchange and confirm cards actually moved left.
+  const givenByA = t.passChoices['A'].slice();
+  for (const p of ['B', 'C', 'D']) {
+    for (let i = 0; i < 3; i++) t = applyMove(t, p, { actionId: 'choosePass', cardId: t.zones[`hand:${p}`].filter((c) => !(t.passStaged[p] || []).includes(c.id))[0].id });
+  }
+  check('pass resolved', t.passDirection === null);
+  check('hands are still 13 cards', P.every((p) => t.zones[`hand:${p}`].length === 13), P.map((p) => t.zones[`hand:${p}`].length));
+  check("A's cards landed on B (left)", givenByA.every((id) => t.zones['hand:B'].some((c) => c.id === id)), givenByA);
+  check('A no longer holds them', givenByA.every((id) => !t.zones['hand:A'].some((c) => c.id === id)));
+
+  // The 2♣ holder leads, and it is their only legal card.
+  const holder = P.find((p) => t.zones[`hand:${p}`].some((c) => c.id === 'C2'))!;
+  check('2♣ holder is on lead', t.players[t.turnIndex] === holder, { onLead: t.players[t.turnIndex], holder });
+  const opening = legalMoves(t, holder);
+  check('2♣ is the only legal opening card', opening.length === 1 && opening[0].cardId === 'C2', opening);
+
+  // No penalty card may be discarded on the opening trick.
+  let u = applyMove(t, holder, { actionId: 'playToTrick', cardId: 'C2' });
+  for (const p of P) {
+    if (p === holder) continue;
+    const ms = legalMoves(u, p);
+    if (ms.length === 0) continue;
+    const hand = u.zones[`hand:${p}`];
+    const void0 = !hand.some((c) => c.suit === 'C');
+    if (void0 && hand.some((c) => c.suit === 'H' || c.id === 'SQ') && hand.some((c) => c.suit !== 'H' && c.id !== 'SQ')) {
+      const offered = ms.map((m) => hand.find((c) => c.id === m.cardId)!);
+      check('no points offered on the opening trick', offered.every((c) => c.suit !== 'H' && c.id !== 'SQ'), offered.map((c) => c.id));
+    }
+    u = applyMove(u, p, ms[0]);
+  }
+
+  // Hearts may not be led until broken.
+  check('hearts start unbroken', u.brokenSuitPlayed === false);
+  const leader = u.players[u.turnIndex];
+  const leadHand = u.zones[`hand:${leader}`];
+  if (leadHand.some((c) => c.suit === 'H') && leadHand.some((c) => c.suit !== 'H')) {
+    const offered = legalMoves(u, leader).map((m) => leadHand.find((c) => c.id === m.cardId)!);
+    check('hearts cannot be led while unbroken', offered.every((c) => c.suit !== 'H'), offered.map((c) => c.id));
+  }
+
+  // Play the hand out with bots and confirm hearts do get broken and points are dealt.
+  let seed = 99;
+  let v = u;
+  let guard = 0;
+  while (v.phase === 'playing' && guard++ < 500) {
+    const actor = actingPlayers(v)[0];
+    if (!actor) break;
+    const r = chooseMove(v, actor, seed, 'smart');
+    seed = r.botSeed;
+    v = applyMove(v, actor, r.move);
+  }
+  check('hand completed', v.phase === 'roundOver', { phase: v.phase, guard });
+  check('hearts got broken during play', v.brokenSuitPlayed === true);
+  check('26 points were dealt out', P.reduce((a, p) => a + (v.scores[p] ?? 0), 0) === 26, v.scores);
+
+  // Next hand rotates the pass direction.
+  const h2 = nextHand(v, 21);
+  check('hand 2 passes right', h2.passDirection === 'right', h2.passDirection);
+  const h3 = nextHand(h2, 22);
+  check('hand 3 passes across', h3.passDirection === 'across', h3.passDirection);
+  const h4 = nextHand(h3, 23);
+  check('hand 4 is a hold — no pass at all', h4.passDirection === null, h4.passDirection);
+  check('hold hand opens straight onto the 2♣ holder',
+    h4.zones[`hand:${h4.players[h4.turnIndex]}`].some((c) => c.id === 'C2'));
+  const h5 = nextHand(h4, 24);
+  check('hand 5 wraps back to left', h5.passDirection === 'left', h5.passDirection);
+
+  // 'across' really is the opposite seat, not a neighbour.
+  let a3 = h3;
+  const acrossGift = a3.zones['hand:A'].slice(0, 3).map((c) => c.id);
+  for (const p of P) for (let i = 0; i < 3; i++) {
+    const pick = p === 'A' ? acrossGift[i] : a3.zones[`hand:${p}`].filter((c) => !(a3.passStaged[p] || []).includes(c.id))[0].id;
+    a3 = applyMove(a3, p, { actionId: 'choosePass', cardId: pick });
+  }
+  check("across sends A's cards to C, not B", acrossGift.every((id) => a3.zones['hand:C'].some((c) => c.id === id)), acrossGift);
+}
+
+// Shooting the moon inverts the scores. Bots all play avoidance, so a natural sweep effectively
+// never happens — stack the deal instead and force one.
+section('Trick-taking — shooting the moon');
+{
+  const P = ['A', 'B', 'C', 'D'];
+  // A four-rank Hearts: 16 cards, four tricks, no pass. Aces sweep every suit.
+  const mini: typeof hearts = {
+    ...hearts,
+    meta: { ...hearts.meta, id: 'test-mini-hearts', name: 'Mini Hearts' },
+    deck: { ...hearts.deck, excludeRanks: ['2', '3', '4', '5', '6', '7', '8', '9', '10'] },
+    setup: [{ op: 'shuffle', zone: 'draw' }, { op: 'deal', from: 'draw', to: 'hand', countPerPlayer: 4 }],
+    handPass: undefined,
+    trick: { ...hearts.trick!, leadCard: undefined },
+  };
+
+  const deal = (s: MatchState, hands: Record<string, string[]>) => {
+    const all = Object.values(s.zones).flat();
+    const byId = new Map(all.map((c) => [c.id, c]));
+    for (const p of P) s.zones[`hand:${p}`] = hands[p].map((id) => byId.get(id)!);
+    s.zones['draw'] = [];
+  };
+
+  // A holds every ace, so A leads and takes all four tricks — and with them all 17 points.
+  let s = createMatch(mini, P, 3);
+  deal(s, {
+    A: ['CA', 'DA', 'HA', 'SA'],
+    B: ['CK', 'DK', 'HK', 'SK'],
+    C: ['CQ', 'DQ', 'HQ', 'SQ'],
+    D: ['CJ', 'DJ', 'HJ', 'SJ'],
+  });
+  s.turnIndex = 0;
+
+  let guard = 0;
+  while (s.phase === 'playing' && guard++ < 40) {
+    const actor = actingPlayers(s)[0];
+    if (!actor) break;
+    const ms = legalMoves(s, actor);
+    if (ms.length === 0) break;
+    s = applyMove(s, actor, ms[0]);
+  }
+  check('the stacked hand finished', s.phase === 'roundOver', { phase: s.phase, guard });
+  check('A took every trick', s.tricksWon['A'] === 4, s.tricksWon);
+  check('shooter scores 0', s.scores['A'] === 0, s.scores);
+  check('everyone else takes the whole pot (17)', ['B', 'C', 'D'].every((p) => s.scores[p] === 17), s.scores);
+  check('the moon is announced', s.log.some((l) => l.text.includes('SHOT THE MOON')), s.log.slice(-4).map((l) => l.text));
+  check('the shooter wins the hand', s.winner === 'A', s.winner);
+
+  // A split hand must NOT invert — guard against the moon firing on an ordinary round. Here the
+  // spade trick (13 for the Queen) and the heart trick (4) fall to different players.
+  let t = createMatch(mini, P, 3);
+  deal(t, {
+    A: ['CA', 'DA', 'HA', 'SK'],
+    B: ['CK', 'DK', 'HK', 'SA'],
+    C: ['CQ', 'DQ', 'HQ', 'SQ'],
+    D: ['CJ', 'DJ', 'HJ', 'SJ'],
+  });
+  t.turnIndex = 0;
+  guard = 0;
+  while (t.phase === 'playing' && guard++ < 40) {
+    const actor = actingPlayers(t)[0];
+    const ms = legalMoves(t, actor);
+    if (!actor || ms.length === 0) break;
+    t = applyMove(t, actor, ms[0]);
+  }
+  const pot = P.reduce((a, p) => a + (t.scores[p] ?? 0), 0);
+  check('a split hand still totals 17 points', pot === 17, t.scores);
+  check('a split hand does not invert', !t.log.some((l) => l.text.includes('SHOT THE MOON')), t.scores);
 }
 
 console.log(failed ? '\nMECHANICS: FAILED' : '\nMECHANICS: all checks passed');

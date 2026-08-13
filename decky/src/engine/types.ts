@@ -57,6 +57,8 @@ export interface GameDefinition {
   // Present iff this is a comparison game (War): flip the top card, higher rank wins both;
   // ties trigger a "war". No decisions — win by taking all the cards.
   war?: WarConfig;
+  // Present iff each hand opens with a simultaneous card exchange (Hearts).
+  handPass?: HandPassConfig;
 }
 
 export interface WarConfig {
@@ -89,6 +91,19 @@ export interface TrickConfig {
   penaltyPoints?: Record<string, number>; // card rank/suit → points (Hearts-style), for scoreBy: 'penalty'
   bidding?: boolean;           // players bid tricks before play (Spades); overrides scoreBy with bid scoring
   partnerships?: boolean;      // 4 players in 2 teams (seats 1&3 vs 2&4)
+
+  // Hearts-family rules.
+  brokenSuit?: Suit;           // may not be LED until it has been discarded off-suit ("hearts broken")
+  leadCard?: string;           // card id (e.g. "C2") — its holder leads trick 1 and must play it
+  noPenaltyFirstTrick?: boolean; // no point-carrying card may be discarded on the opening trick
+  shootTheMoon?: boolean;      // taking EVERY penalty point scores you 0 and everyone else the full pot
+}
+
+// A simultaneous pre-hand exchange (Hearts). Direction cycles per hand; 'hold' skips a hand.
+export type PassDir = 'left' | 'right' | 'across' | 'hold';
+export interface HandPassConfig {
+  count: number;               // cards each player passes
+  rotation: PassDir[];         // cycled by hand number: [left, right, across, hold]
 }
 
 export type Visibility = 'none' | 'owner' | 'top-public' | 'all';
@@ -217,8 +232,11 @@ export interface MatchState {
   // the passCards effect. While set, EVERY player (not just whoever's turn it is) may submit
   // a `choosePass` move; once all have chosen, the swap resolves atomically and turn flow
   // resumes from wherever it was paused.
-  passDirection: 'left' | 'right' | null;
-  passChoices: Record<string, string>; // playerId -> chosen cardId, only present once chosen
+  passDirection: PassDir | null;
+  passCount: number;                     // cards each player owes this pass (1 for the sweep effect)
+  passChoices: Record<string, string[]>; // playerId -> chosen cardIds, only once they've picked in full
+  passStaged: Record<string, string[]>;  // partial picks while a multi-card pass is being assembled
+  brokenSuitPlayed: boolean;             // Hearts: has the broken suit been discarded off-suit yet
   log: LogEntry[];
 }
 
@@ -284,7 +302,10 @@ export interface RedactedState {
   matchTarget: number | null;
   matchBust: number | null;
   // simultaneous card pass (see MatchState.passDirection)
-  passDirection: 'left' | 'right' | null;
-  needsPassChoice: boolean; // true iff a pass is pending and this viewer hasn't chosen yet
-  passWaitingOn: number;    // how many players still need to choose
+  passDirection: PassDir | null;
+  needsPassChoice: boolean;  // true iff a pass is pending and this viewer hasn't chosen yet
+  passWaitingOn: number;     // how many players still need to choose
+  passCount: number;         // cards owed this pass
+  passStaged: string[];      // this viewer's picks so far, for a multi-card pass
+  brokenSuitPlayed?: boolean;
 }
