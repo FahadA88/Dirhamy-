@@ -1,11 +1,12 @@
 :root {
-  --bg0: #f2f8f4;
-  --bg1: #ffffff;
-  --panel: rgba(255, 255, 255, 0.72);
+  /* A stone canvas with floating solid panels — not tinted glass on a mint wash. */
+  --bg0: #e8ebe6;
+  --bg1: #f3f5f1;
+  --panel: #ffffff;
   --panel-solid: #ffffff;
-  --panel-brd: rgba(16, 64, 40, 0.12);
-  --ink: #10251b;
-  --muted: #5a7767;
+  --panel-brd: rgba(18, 32, 24, 0.10);
+  --ink: #101512;
+  --muted: #6b7a71;
   --green: #16a34a;
   --green-d: #0e7a37;
   --emerald: #10b981;
@@ -19,25 +20,24 @@
   --glow: rgba(22, 163, 74, 0.35);
   --input-bg: #ffffff;
   --cw: 76px; --ch: 108px; --bw: 56px; --bh: 80px;
-  --panel: rgba(255, 255, 255, 0.86);
+  --r-lg: 20px; --r-md: 12px; --r-pill: 999px;
+  --shadow-panel: 0 1px 2px rgba(16,32,24,0.05), 0 8px 24px rgba(16,32,24,0.07);
 }
 
 /* ---------------- dark theme ---------------- */
 :root[data-theme="dark"] {
-  --bg0: #0a0f14;
-  --bg1: #0f151c;
-  --panel: rgba(22, 30, 40, 0.90);
-  --panel-solid: #141b24;
-  --panel-brd: rgba(255, 255, 255, 0.12);
-  --ink: #e7eef2;
-  --muted: #8aa0a6;
-  --input-bg: #0e161d;
+  --bg0: #0a0b0c;
+  --bg1: #101314;
+  --panel: #171a1c;
+  --panel-solid: #171a1c;
+  --panel-brd: rgba(255, 255, 255, 0.09);
+  --ink: #eef2ef;
+  --muted: #8d9a93;
+  --input-bg: #0e1112;
+  --shadow-panel: 0 1px 2px rgba(0,0,0,0.5), 0 10px 30px rgba(0,0,0,0.4);
 }
 :root[data-theme="dark"] body {
-  background:
-    radial-gradient(1200px 700px at 12% -10%, #123024 0%, transparent 55%),
-    radial-gradient(1000px 700px at 100% 0%, #0f2b2b 0%, transparent 50%),
-    linear-gradient(180deg, var(--bg1), var(--bg0));
+  background: radial-gradient(1000px 640px at 14% -12%, #14201a 0%, transparent 62%), var(--bg0);
 }
 :root[data-theme="dark"] .card.face { border-color: rgba(0,0,0,0.2); }
 :root[data-theme="dark"] .suit-btn { background: #eef2f5; }
@@ -49,16 +49,13 @@ body {
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   color: var(--ink);
   min-height: 100vh;
-  background:
-    radial-gradient(1200px 700px at 12% -10%, #d7f2e1 0%, transparent 55%),
-    radial-gradient(1000px 700px at 100% 0%, #e5f7ec 0%, transparent 50%),
-    linear-gradient(180deg, var(--bg1), var(--bg0));
+  background: radial-gradient(1000px 640px at 14% -12%, #ffffff 0%, transparent 62%), var(--bg0);
   overflow-x: hidden;
 }
 
 /* ---------------- 3D animated backdrop ---------------- */
 .backdrop { position: fixed; inset: 0; z-index: -1; overflow: hidden; perspective: 1000px; }
-.orb { position: absolute; border-radius: 50%; filter: blur(70px); opacity: 0.28; will-change: transform; }
+.orb { position: absolute; border-radius: 50%; filter: blur(90px); opacity: 0.16; will-change: transform; }
 .orb-a { width: 440px; height: 440px; top: -120px; left: -90px;
   background: radial-gradient(circle, var(--lime), transparent 70%); animation: orbA 26s ease-in-out infinite; }
 .orb-b { width: 560px; height: 560px; bottom: -200px; right: -140px;
@@ -99,56 +96,54 @@ body {
 
 header { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 8px; }
 .brand { display: flex; align-items: center; gap: 14px; }
-.logo3d { width: 46px; height: 62px; position: relative; transform-style: preserve-3d; animation: spin3d 7s linear infinite; }
+/* A solid mark, not a spinning card — it reads at any size and never lands edge-on. */
+.logo3d { width: 44px; height: 44px; position: relative; }
 .logo3d span {
-  position: absolute; inset: 0; display: grid; place-items: center; border-radius: 9px; font-size: 26px;
-  background: linear-gradient(135deg, var(--green), var(--emerald)); border: 1px solid rgba(255,255,255,0.6); color: #fff;
-  box-shadow: 0 8px 22px rgba(22, 163, 74, 0.4), inset 0 0 16px rgba(255, 255, 255, 0.25); backface-visibility: hidden;
+  position: absolute; inset: 0; display: grid; place-items: center; border-radius: 13px; font-size: 22px;
+  background: var(--ink); color: var(--bg1); line-height: 1;
+  box-shadow: 0 4px 14px rgba(16,32,24,0.20);
 }
-@keyframes spin3d { to { transform: rotateY(360deg); } }
 header h1 {
-  margin: 0; font-family: var(--mono); font-size: 26px; letter-spacing: 4px; font-weight: 700;
-  background: linear-gradient(90deg, var(--green-d), var(--green) 55%, var(--lime));
-  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  margin: 0; font-family: var(--mono); font-size: 25px; letter-spacing: -0.5px; font-weight: 700;
+  color: var(--ink);
 }
-header .sub { color: var(--muted); font-size: 12.5px; letter-spacing: 0.3px; }
+header .sub { color: var(--muted); font-size: 12.5px; letter-spacing: 0.2px; }
 
+/* Solid, flat controls. Gradients on buttons are the first thing that reads as generic. */
 button.ghost {
-  background: rgba(255, 255, 255, 0.7); color: var(--ink); border: 1px solid var(--panel-brd);
-  border-radius: 10px; padding: 8px 14px; cursor: pointer; font: inherit; transition: 0.16s;
+  background: var(--panel); color: var(--ink); border: 1px solid var(--panel-brd);
+  border-radius: var(--r-pill); padding: 9px 16px; cursor: pointer; font: inherit; font-weight: 500;
+  transition: 0.14s;
 }
-button.ghost:hover { border-color: var(--green); color: var(--green-d); box-shadow: 0 4px 14px rgba(22, 163, 74, 0.15); }
+button.ghost:hover { border-color: var(--ink); }
 button.primary {
-  background: linear-gradient(135deg, var(--emerald), var(--green)); color: #ffffff; border: none;
-  font-weight: 700; padding: 10px 18px; border-radius: 10px; cursor: pointer; font: inherit; font-weight: 700;
-  box-shadow: 0 6px 20px rgba(22, 163, 74, 0.30); transition: 0.16s;
+  background: var(--ink); color: var(--bg1); border: 1px solid var(--ink);
+  padding: 10px 20px; border-radius: var(--r-pill); cursor: pointer; font: inherit; font-weight: 600;
+  transition: 0.14s;
 }
-button.primary:hover { filter: brightness(1.05); transform: translateY(-1px); }
-button.primary:disabled, button.ghost:disabled { opacity: 0.45; cursor: not-allowed; box-shadow: none; transform: none; }
-button.primary.sm, button.ghost.sm { padding: 6px 12px; font-size: 13px; }
+button.primary:hover { background: var(--green-d); border-color: var(--green-d); color: #fff; }
+button.primary:disabled, button.ghost:disabled { opacity: 0.4; cursor: not-allowed; }
+button.primary.sm, button.ghost.sm { padding: 7px 14px; font-size: 13px; }
 
-.tabs { display: flex; gap: 6px; }
+.tabs { display: flex; gap: 4px; padding: 4px; background: var(--panel); border: 1px solid var(--panel-brd); border-radius: var(--r-pill); }
 .tabs button {
-  background: rgba(255, 255, 255, 0.7); color: var(--muted); border: 1px solid var(--panel-brd);
-  padding: 8px 20px; border-radius: 999px; cursor: pointer; font: inherit; font-weight: 600; transition: 0.16s;
+  background: transparent; color: var(--muted); border: none;
+  padding: 8px 20px; border-radius: var(--r-pill); cursor: pointer; font: inherit; font-weight: 600; transition: 0.14s;
 }
 .tabs button:hover { color: var(--ink); }
-.tabs button.on {
-  color: #ffffff; border-color: transparent; background: linear-gradient(135deg, var(--emerald), var(--green));
-  box-shadow: 0 6px 16px rgba(22, 163, 74, 0.35);
-}
+.tabs button.on { color: var(--bg1); background: var(--ink); }
 
 .crumbs { display: flex; align-items: center; gap: 14px; margin: 18px 0; flex-wrap: wrap; }
 .crumb-title { font-family: var(--mono); color: var(--green-d); letter-spacing: 1px; }
 .seat-control { margin-left: auto; display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 13px; }
-.seg-btn { width: 30px; height: 30px; border-radius: 8px; cursor: pointer; font: inherit; background: rgba(255,255,255,0.7); color: var(--ink); border: 1px solid var(--panel-brd); }
-.seg-btn.on { background: linear-gradient(135deg, var(--emerald), var(--green)); color: #fff; border-color: transparent; }
+.seg-btn { width: 30px; height: 30px; border-radius: 9px; cursor: pointer; font: inherit; background: var(--panel); color: var(--ink); border: 1px solid var(--panel-brd); }
+.seg-btn.on { background: var(--ink); color: var(--bg1); border-color: var(--ink); }
 .seg-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 
-.glass { background: var(--panel); border: 1px solid var(--panel-brd); border-radius: 18px; box-shadow: 0 10px 34px rgba(16, 64, 40, 0.07); }
-.section-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
+.glass { background: var(--panel); border: 1px solid var(--panel-brd); border-radius: var(--r-lg); box-shadow: var(--shadow-panel); }
+.section-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
 .muted { color: var(--muted); font-size: 13px; }
-h2 { font-family: var(--mono); letter-spacing: 1px; color: var(--ink); font-size: 17px; margin: 0 0 4px; }
+h2 { font-family: var(--mono); letter-spacing: -0.3px; color: var(--ink); font-size: 18px; font-weight: 700; margin: 0 0 4px; }
 
 /* ---------------- library ---------------- */
 .cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
@@ -156,26 +151,241 @@ h2 { font-family: var(--mono); letter-spacing: 1px; color: var(--ink); font-size
   position: relative; padding: 18px; display: flex; flex-direction: column; gap: 10px;
   transform-style: preserve-3d; transition: transform 0.12s ease-out; will-change: transform; overflow: hidden;
 }
-.game-card-glow {
-  position: absolute; inset: -1px; border-radius: 18px; pointer-events: none; opacity: 0; transition: 0.25s;
-  background: radial-gradient(400px 200px at 50% 0%, rgba(22, 163, 74, 0.16), transparent 70%);
-}
-.game-card:hover .game-card-glow { opacity: 1; }
+.game-card-glow { display: none; }
+.game-card { border-radius: var(--r-lg); padding: 20px; gap: 12px; }
+.game-card:hover { border-color: var(--ink); }
 .game-card-head { display: flex; align-items: center; gap: 8px; }
-.game-card h3 { margin: 0; font-size: 20px; }
-.fam-badge { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.5px; background: rgba(22, 163, 74, 0.10); color: var(--green-d); padding: 3px 9px; border-radius: 999px; border: 1px solid rgba(22, 163, 74, 0.28); }
-.game-card p { color: var(--muted); font-size: 13.5px; line-height: 1.5; flex: 1; margin: 0; }
-.game-card-foot { display: flex; align-items: center; justify-content: space-between; }
-.players { color: var(--muted); font-size: 12px; font-family: var(--mono); }
+.game-card h3 { margin: 0; font-size: 21px; letter-spacing: -0.4px; }
+.fam-badge {
+  font-family: var(--mono); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase;
+  background: transparent; color: var(--muted); padding: 3px 9px;
+  border-radius: var(--r-pill); border: 1px solid var(--panel-brd);
+}
+/* Rules blurbs vary from one line to a paragraph; clamping keeps the grid even. */
+.game-card p {
+  color: var(--muted); font-size: 13.5px; line-height: 1.55; flex: 1; margin: 0;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 5; overflow: hidden;
+}
+.game-card-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.players { color: var(--muted); font-size: 11px; font-family: var(--mono); letter-spacing: 0.04em; }
 
-/* ---------------- table ---------------- */
+/* ---------------- table ----------------
+   Four builds. Each sets its own rail, cloth, markings and light; everything that sits on
+   the cloth reads its colours from --t-* so text stays legible on baize as dark as midnight
+   or as pale as parlour. */
+
+/* Each build brings its own room, not just its own cloth. */
+.table-wrap {
+  margin-top: 8px; padding: var(--room-pad, 0); border-radius: 26px;
+  background: var(--room-bg, transparent);
+}
+.table-wrap:has(.table[data-felt="mahogany"]) {
+  --room-pad: 18px;
+  --room-bg:
+    radial-gradient(80% 100% at 50% 0%, rgba(120,20,30,0.16), transparent 70%),
+    linear-gradient(#241412, #160c0b);
+}
+.table-wrap:has(.table[data-felt="vegas"]) {
+  --room-pad: 16px;
+  --room-bg: repeating-linear-gradient(45deg, #16324a 0 16px, #143047 16px 32px);
+}
+.table-wrap:has(.table[data-felt="parlour"]) {
+  --room-pad: 16px;
+  --room-bg: linear-gradient(#efe6d6, #e4d8c3);
+}
+.table-wrap:has(.table[data-felt="midnight"]) {
+  --room-pad: 22px;
+  --room-bg: radial-gradient(70% 90% at 50% 40%, #12181c, #06090b 75%);
+}
+
 .table {
-  margin-top: 8px; padding: 24px; border-radius: 22px; perspective: 1200px;
+  position: relative;
+  isolation: isolate;
+  padding: var(--rail-w);
+  border-radius: var(--rail-r);
+  background: var(--rail-bg);
+  box-shadow: var(--rail-shadow);
+  perspective: 1200px;
+}
+
+.felt {
+  position: relative;
+  z-index: 1;
+  padding: var(--felt-pad);
+  border-radius: var(--felt-r);
+  background: var(--felt-bg);
+  box-shadow: var(--felt-shadow);
+  color: var(--t-ink);
+}
+
+/* Markings are printed ON the cloth — behind every card and control. */
+.dressing { position: absolute; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; border-radius: var(--felt-r); }
+.dressing > svg, svg.dressing { width: 100%; height: 100%; display: block; }
+.felt-content { position: relative; z-index: 1; }
+/* Rail furniture sits on top of everything — it is physically above the cloth. */
+.rail-furniture { position: absolute; inset: 0; z-index: 3; pointer-events: none; }
+
+/* --- cloth-aware text --- */
+.felt .seat-name, .felt .match-chip b, .felt .you-head > span:first-child, .felt .ms-row { color: var(--t-ink); }
+.felt .count, .felt .pile-label, .felt .trick-empty, .felt .trick-meta, .felt .empty-hand,
+.felt .rummy-hint, .felt .match-chip, .felt .waiting-badge, .felt .mini-label { color: var(--t-muted); }
+.felt .match-hand, .felt .bid-title, .felt .team-tag { color: var(--t-key); }
+.felt .you { border-top-color: var(--t-line); }
+.felt .match-bar { background: var(--t-panel); border-color: var(--t-line); }
+.felt .team-tag { background: var(--t-panel); }
+.felt .waiting-badge { background: var(--t-panel); border-color: var(--t-line); }
+.felt .seat.active { background: var(--t-seat); box-shadow: 0 0 0 1px var(--t-seat-line), 0 6px 20px rgba(0,0,0,0.18); }
+
+/* --- 1 · mahogany : padded leather rail, polished wood, chrome wells --- */
+.table[data-felt="mahogany"], .felt-swatch[data-felt="mahogany"] {
+  --rail-w: 30px; --rail-r: 30px; --felt-r: 16px; --felt-pad: 26px;
+  /* Polished, not corrugated: a soft sheen band across a two-tone stain. */
+  --rail-bg:
+    radial-gradient(120% 60% at 30% 0%, rgba(255,214,178,0.26), transparent 60%),
+    linear-gradient(180deg, rgba(255,236,214,0.10), rgba(0,0,0,0.30) 46%, rgba(0,0,0,0.50)),
+    linear-gradient(120deg, #8a4526 0%, #6d3319 38%, #7c3f21 62%, #4a1d0e 100%);
+  --rail-shadow:
+    inset 0 2px 0 rgba(255,220,190,0.28),
+    inset 0 -3px 8px rgba(0,0,0,0.55),
+    0 26px 60px rgba(28, 10, 4, 0.42);
+  --felt-bg:
+    radial-gradient(120% 90% at 50% -10%, rgba(255,255,255,0.16), transparent 55%),
+    radial-gradient(90% 120% at 50% 120%, rgba(0,0,0,0.42), transparent 60%),
+    linear-gradient(#1d6b3d, #14522e);
+  --felt-shadow: inset 0 0 0 2px rgba(0,0,0,0.45), inset 0 14px 40px rgba(0,0,0,0.40);
+  --t-ink: #eef7f0; --t-muted: rgba(226,242,231,0.62); --t-key: #7dd8a0;
+  --t-line: rgba(255,255,255,0.14); --t-panel: rgba(0,0,0,0.26);
+  --t-seat: rgba(255,255,255,0.09); --t-seat-line: rgba(160,230,185,0.5);
+}
+.rail-furniture .well {
+  position: absolute; width: 22px; height: 22px; margin-left: -11px; border-radius: 50%;
+  background: conic-gradient(from 210deg, #eef1f2, #8f999d 22%, #e3e8ea 42%, #737d82 64%, #d7dde0 84%, #9fa9ad);
+  box-shadow: inset 0 0 0 1.5px rgba(255,255,255,0.5), inset 0 3px 6px rgba(0,0,0,0.8), 0 1px 2px rgba(0,0,0,0.45);
+}
+.rail-furniture .well.top { top: 4px; }
+.rail-furniture .well.bottom { bottom: 4px; }
+.table[data-felt="mahogany"] .spot {
+  position: absolute; inset: 0; border-radius: inherit;
+  background: radial-gradient(58% 74% at 34% 4%, rgba(255,244,214,0.18), transparent 64%);
+}
+
+/* --- 2 · vegas : bright baize, house rules printed across it --- */
+.table[data-felt="vegas"], .felt-swatch[data-felt="vegas"] {
+  --rail-w: 20px; --rail-r: 26px; --felt-r: 12px; --felt-pad: 26px;
+  --rail-bg: linear-gradient(180deg, #d8dde0, #a8b2b8 40%, #78838a);
+  --rail-shadow: inset 0 2px 0 rgba(255,255,255,0.8), 0 16px 38px rgba(20, 50, 35, 0.24);
+  --felt-bg:
+    radial-gradient(150% 100% at 50% 0%, #1f9a55, #128243 62%, #0c6d38);
+  --felt-shadow: inset 0 0 0 2px rgba(255,255,255,0.16);
+  --t-ink: #ffffff; --t-muted: rgba(255,255,255,0.72); --t-key: #ffe9a8;
+  --t-line: rgba(255,255,255,0.28); --t-panel: rgba(255,255,255,0.14);
+  --t-seat: rgba(255,255,255,0.16); --t-seat-line: rgba(255,255,255,0.6);
+}
+.vg-rail { fill: none; stroke: rgba(255,255,255,0.30); stroke-width: 2; }
+.vg-rail.thin { stroke: rgba(255,255,255,0.16); stroke-width: 1; }
+.vg-name {
+  fill: rgba(255,255,255,0.26); font-family: var(--mono); font-weight: 700;
+  font-size: 26px; letter-spacing: 5px;
+}
+.vg-rule { fill: rgba(255,255,255,0.20); font-family: var(--mono); font-size: 11px; letter-spacing: 2.5px; }
+
+/* --- 3 · parlour : pale cloth, oak frame, chalked seat boxes --- */
+.table[data-felt="parlour"], .felt-swatch[data-felt="parlour"] {
+  --rail-w: 22px; --rail-r: 20px; --felt-r: 8px; --felt-pad: 26px;
+  --rail-bg:
+    repeating-linear-gradient(93deg, rgba(255,240,220,0.07) 0 9px, rgba(96,60,26,0.09) 9px 19px),
+    linear-gradient(160deg, #b98552, #9a6a3c 45%, #7d5330);
+  --rail-shadow: inset 0 0 0 1px rgba(255,240,220,0.26), inset 0 -2px 6px rgba(70,42,16,0.4), 0 14px 34px rgba(70,48,22,0.24);
+  --felt-bg: linear-gradient(#3c9d64, #2d8654);
+  --felt-shadow: inset 0 0 0 1px rgba(255,255,255,0.18), inset 0 6px 18px rgba(0,0,0,0.14);
+  --t-ink: #f6fbf7; --t-muted: rgba(244,252,247,0.74); --t-key: #ffffff;
+  --t-line: rgba(255,255,255,0.34); --t-panel: rgba(255,255,255,0.14);
+  --t-seat: rgba(255,255,255,0.18); --t-seat-line: rgba(255,255,255,0.7);
+}
+.dressing.pl::before {
+  content: ''; position: absolute; inset: 13px; border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.20);
+}
+.dressing.pl .pl-ring {
+  position: absolute; left: 50%; top: 44%; width: min(300px, 34%); aspect-ratio: 1.7;
+  transform: translate(-50%, -50%); border-radius: 50%;
+  border: 1px solid rgba(255,255,255,0.15);
+}
+
+/* --- 4 · midnight : black baize, one lit ring --- */
+.table[data-felt="midnight"], .felt-swatch[data-felt="midnight"] {
+  --rail-w: 16px; --rail-r: 999px; --felt-r: 999px; --felt-pad: 34px;
+  --rail-bg: linear-gradient(180deg, #23282b, #101315);
+  --rail-shadow: inset 0 1px 0 rgba(255,255,255,0.10), 0 22px 60px rgba(0,0,0,0.5);
+  --felt-bg:
+    radial-gradient(70% 90% at 50% 34%, #12503a 0%, #0b3728 45%, #06211a 100%);
+  --felt-shadow: inset 0 0 90px rgba(0,0,0,0.75), inset 0 0 0 1px rgba(120,220,170,0.16);
+  --t-ink: #dff4e8; --t-muted: rgba(198,230,213,0.58); --t-key: #5fe0a2;
+  --t-line: rgba(120,220,170,0.20); --t-panel: rgba(0,0,0,0.34);
+  --t-seat: rgba(95,224,162,0.10); --t-seat-line: rgba(95,224,162,0.45);
+}
+.mn-ring { fill: none; stroke: rgba(120,225,175,0.30); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+.mn-ring.faint { stroke: rgba(120,225,175,0.12); }
+
+/* --- the picker: four tables in miniature, built from the same tokens --- */
+.felt-pick { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.felt-opt {
+  display: flex; flex-direction: column; gap: 7px; text-align: left; cursor: pointer;
+  padding: 9px; border-radius: 12px; font: inherit; color: inherit;
+  background: var(--panel); border: 1px solid var(--panel-brd); transition: 0.16s;
+}
+.felt-opt:hover { border-color: rgba(22,163,74,0.45); transform: translateY(-2px); }
+.felt-opt.on { border-color: var(--green); box-shadow: 0 0 0 2px var(--glow), 0 8px 22px rgba(16,64,40,0.14); }
+.felt-swatch {
+  position: relative; display: block; height: 62px; padding: var(--rail-w); overflow: hidden;
+  border-radius: var(--rail-r); background: var(--rail-bg); box-shadow: var(--rail-shadow);
+  --rail-w: 7px;
+}
+.felt-swatch > .felt {
+  display: block; height: 100%; width: 100%; padding: 0;
+  border-radius: var(--felt-r); background: var(--felt-bg); box-shadow: var(--felt-shadow);
+}
+.felt-swatch[data-felt="mahogany"] { --rail-r: 12px; --felt-r: 6px; }
+.felt-swatch[data-felt="vegas"] { --rail-w: 5px; --rail-r: 11px; --felt-r: 5px; }
+.felt-swatch[data-felt="parlour"] { --rail-w: 6px; --rail-r: 9px; --felt-r: 3px; }
+.felt-swatch[data-felt="midnight"] { --rail-w: 4px; --rail-r: 999px; --felt-r: 999px; }
+.felt-swatch .well {
+  position: absolute; top: 1px; width: 9px; height: 9px; margin-left: -4.5px; border-radius: 50%;
+  background: conic-gradient(from 210deg, #f4f6f7, #99a3a7 25%, #e9edef 45%, #7f8a8f 68%, #dfe5e8);
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.7);
+}
+.felt-swatch em { position: absolute; inset: var(--rail-w); pointer-events: none; }
+.felt-swatch .vg-mini {
+  border-radius: var(--felt-r);
   background:
-    radial-gradient(700px 300px at 50% 0%, rgba(22, 163, 74, 0.07), transparent 60%),
-    var(--panel);
-  border: 1px solid var(--panel-brd);
-  box-shadow: 0 14px 40px rgba(16, 64, 40, 0.08), inset 0 0 60px rgba(22, 163, 74, 0.03);
+    linear-gradient(rgba(255,255,255,0.5), rgba(255,255,255,0.5)) 50% 30%/58% 2px no-repeat,
+    linear-gradient(rgba(255,255,255,0.28), rgba(255,255,255,0.28)) 50% 52%/38% 1px no-repeat,
+    radial-gradient(circle 7px at 26% 76%, transparent 5px, rgba(255,255,255,0.3) 5px 6px, transparent 6px),
+    radial-gradient(circle 7px at 50% 76%, transparent 5px, rgba(255,255,255,0.3) 5px 6px, transparent 6px),
+    radial-gradient(circle 7px at 74% 76%, transparent 5px, rgba(255,255,255,0.3) 5px 6px, transparent 6px);
+}
+.felt-swatch .pl-mini {
+  border-radius: var(--felt-r);
+  background:
+    linear-gradient(rgba(255,255,255,0.55), rgba(255,255,255,0.55)) 18% 22%/24% 1px no-repeat,
+    linear-gradient(rgba(255,255,255,0.55), rgba(255,255,255,0.55)) 50% 18%/24% 1px no-repeat,
+    linear-gradient(rgba(255,255,255,0.55), rgba(255,255,255,0.55)) 82% 22%/24% 1px no-repeat,
+    linear-gradient(rgba(255,255,255,0.55), rgba(255,255,255,0.55)) 50% 84%/46% 1px no-repeat;
+}
+.felt-swatch .mn-mini {
+  border-radius: 999px; box-shadow: inset 0 0 0 1px rgba(120,225,175,0.35);
+  margin: 4px;
+}
+.felt-name { font-family: var(--mono); font-size: 12.5px; font-weight: 700; }
+.felt-blurb { color: var(--muted); font-size: 11px; line-height: 1.4; }
+
+/* A round table pinches at the corners, so the content column keeps clear of them. */
+.table[data-felt="midnight"] .felt { padding: 40px 8%; }
+.table[data-felt="midnight"] .felt-content { max-width: 1080px; margin-inline: auto; }
+
+@media (max-width: 760px) {
+  .table[data-felt="midnight"], .felt-swatch[data-felt="midnight"] { --rail-r: 34px; --felt-r: 26px; }
+  .table[data-felt="midnight"] .felt { padding: 22px; }
 }
 .opponents { display: flex; gap: 26px; justify-content: center; flex-wrap: wrap; }
 .seat { text-align: center; padding: 10px 14px; border-radius: 14px; transition: 0.2s; }
@@ -240,7 +450,8 @@ h2 { font-family: var(--mono); letter-spacing: 1px; color: var(--ink); font-size
 .card-btn.playable:hover { transform: translateY(-12px) rotateX(8deg) scale(1.04); }
 .card-btn.selected .card.face { box-shadow: 0 0 0 3px var(--green-d), 0 10px 26px var(--glow); }
 .card-btn.selected { transform: translateY(-10px); }
-.card-btn.dim { opacity: 0.5; cursor: not-allowed; }
+/* Unplayable cards stay opaque — going translucent lets the cloth show straight through them. */
+.card-btn.dim { opacity: 0.94; filter: grayscale(0.4) brightness(0.78); cursor: not-allowed; }
 .empty-hand { color: var(--muted); font-family: var(--mono); }
 
 /* ---------------- modal ---------------- */
@@ -299,8 +510,8 @@ h2 { font-family: var(--mono); letter-spacing: 1px; color: var(--ink); font-size
 .rank-toggle.on { background: linear-gradient(135deg, var(--emerald), var(--green)); color: #fff; border-color: transparent; font-weight: 700; box-shadow: 0 4px 12px rgba(22, 163, 74, 0.3); }
 
 .seg { display: flex; gap: 5px; }
-.seg button { flex: 1; padding: 9px; cursor: pointer; font: inherit; font-size: 13px; background: rgba(255, 255, 255, 0.7); color: var(--muted); border: 1px solid var(--panel-brd); border-radius: 9px; transition: 0.15s; }
-.seg button.on { background: rgba(22, 163, 74, 0.12); color: var(--green-d); border-color: rgba(22, 163, 74, 0.4); font-weight: 600; }
+.seg button { flex: 1; padding: 9px; cursor: pointer; font: inherit; font-size: 13px; background: transparent; color: var(--muted); border: 1px solid var(--panel-brd); border-radius: var(--r-pill); transition: 0.15s; }
+.seg button.on { background: var(--ink); color: var(--bg1); border-color: var(--ink); font-weight: 600; }
 
 .toggle { width: 46px; height: 26px; border-radius: 999px; border: 1px solid var(--panel-brd); background: rgba(16, 64, 40, 0.10); cursor: pointer; position: relative; padding: 0; transition: 0.18s; }
 .toggle .knob { position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.2); transition: 0.18s; }
@@ -392,8 +603,9 @@ h2 { font-family: var(--mono); letter-spacing: 1px; color: var(--ink); font-size
 .swatch.on { border-color: var(--ink); box-shadow: 0 0 0 2px var(--panel-solid), 0 0 0 4px var(--green); }
 
 /* ---------------- table surface variants ---------------- */
-:root[data-surface="glass"] .table { background: var(--panel); box-shadow: inset 0 0 60px rgba(255,255,255,0.04); }
-:root[data-surface="plain"] .table { background: var(--panel-solid); box-shadow: none; backdrop-filter: none; }
+/* The table builds own their own surface, so `surface` applies to the page panels around it. */
+:root[data-surface="glass"] .log { background: var(--panel); backdrop-filter: blur(10px); }
+:root[data-surface="plain"] .log { background: var(--panel-solid); box-shadow: none; backdrop-filter: none; }
 
 /* ---------------- density ---------------- */
 :root[data-density="compact"] .panel { padding: 14px; }

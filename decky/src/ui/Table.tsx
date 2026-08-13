@@ -4,6 +4,7 @@ import { chooseMove } from '../bots/randomBot';
 import { Card, GameDefinition, MatchState, Move } from '../engine/types';
 import { SUIT_SYMBOLS } from '../engine/deck';
 import { CardFace } from './Card';
+import { TableDressing, TableRail } from './TableDressing';
 import { useSettings } from '../settings/SettingsContext';
 import { BOT_SPEED_MS } from '../settings/settings';
 import { playSound } from './sound';
@@ -131,7 +132,12 @@ export function Table({ def, seats = 3 }: { def: GameDefinition; seats?: number 
   const backCls = `card back style-${settings.cardBack}`;
 
   return (
-    <div className="table">
+    <div className="table-wrap">
+    <div className="table" data-felt={settings.tableFelt}>
+      <TableRail felt={settings.tableFelt} />
+      <div className="felt">
+      <TableDressing felt={settings.tableFelt} title={def.meta.name} />
+      <div className="felt-content">
       {view.matchTarget != null && (
         <div className="match-bar">
           <span className="match-hand">Hand {view.handNumber} · race to {view.matchTarget}{view.matchBust != null ? ` (bust at ${view.matchBust})` : ''}</span>
@@ -429,6 +435,10 @@ export function Table({ def, seats = 3 }: { def: GameDefinition; seats?: number 
           </div>
         </div>
       )}
+
+      </div>
+      </div>
+    </div>
 
       {settings.showLog && (
         <div className="log">

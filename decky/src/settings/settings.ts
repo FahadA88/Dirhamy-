@@ -4,6 +4,8 @@
 export type ThemeMode = 'light' | 'dark' | 'system';
 export type AccentId = 'emerald' | 'ocean' | 'violet' | 'teal' | 'rose' | 'amber' | 'slate';
 export type CardBack = 'stripes' | 'grid' | 'dots' | 'solid';
+// Four table builds, each with its own rail, felt, markings and lighting.
+export type TableFelt = 'mahogany' | 'vegas' | 'parlour' | 'midnight';
 export type CardSize = 's' | 'm' | 'l';
 export type Surface = 'soft' | 'glass' | 'plain';
 export type Highlight = 'glow' | 'outline' | 'lift' | 'off';
@@ -16,6 +18,7 @@ export interface Settings {
   theme: ThemeMode;
   accent: AccentId;
   cardBack: CardBack;
+  tableFelt: TableFelt;
   fourColor: boolean;
   cardSize: CardSize;
   surface: Surface;
@@ -42,6 +45,7 @@ export const defaultSettings: Settings = {
   theme: 'light',
   accent: 'emerald',
   cardBack: 'stripes',
+  tableFelt: 'mahogany',
   fourColor: false,
   cardSize: 'm',
   surface: 'soft',
@@ -73,6 +77,15 @@ export const ACCENTS: Record<AccentId, AccentPreset> = {
   rose:    { name: 'Rose',    green: '#e11d48', greenD: '#be123c', emerald: '#f43f5e', lime: '#fb7185' },
   amber:   { name: 'Amber',   green: '#d97706', greenD: '#b45309', emerald: '#f59e0b', lime: '#fbbf24' },
   slate:   { name: 'Slate',   green: '#475569', greenD: '#334155', emerald: '#64748b', lime: '#94a3b8' },
+};
+
+export interface FeltPreset { name: string; blurb: string }
+
+export const FELTS: Record<TableFelt, FeltPreset> = {
+  mahogany: { name: 'Mahogany', blurb: 'Padded leather rail, polished wood, chrome drink wells.' },
+  vegas:    { name: 'Vegas',    blurb: 'Bright baize with the house rules printed across it.' },
+  parlour:  { name: 'Parlour',  blurb: 'Pale cloth in an oak frame, seats marked out in chalk line.' },
+  midnight: { name: 'Midnight', blurb: 'Black baize, one lit ring, nothing else in the room.' },
 };
 
 export const CARD_SIZES: Record<CardSize, { cw: number; ch: number; bw: number; bh: number }> = {

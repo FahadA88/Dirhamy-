@@ -1,5 +1,5 @@
 import { useSettings } from '../settings/SettingsContext';
-import { ACCENTS, AccentId, Settings } from '../settings/settings';
+import { ACCENTS, AccentId, FELTS, Settings, TableFelt } from '../settings/settings';
 
 // The customization drawer: appearance + gameplay, applied live and persisted.
 export function SettingsPanel({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -34,7 +34,28 @@ export function SettingsPanel({ open, onClose }: { open: boolean; onClose: () =>
             options={[['comfortable', 'Comfortable'], ['compact', 'Compact']]} />
         </Group>
 
-        <Group title="Cards & table">
+        <Group title="The table">
+          <div className="felt-pick">
+            {(Object.keys(FELTS) as TableFelt[]).map((id) => (
+              <button key={id}
+                className={`felt-opt ${settings.tableFelt === id ? 'on' : ''}`}
+                onClick={() => set('tableFelt', id)}
+                aria-pressed={settings.tableFelt === id}>
+                <span className="felt-swatch" data-felt={id}>
+                  <span className="felt" />
+                  {id === 'mahogany' && <><i className="well" style={{ left: '18%' }} /><i className="well" style={{ left: '50%' }} /><i className="well" style={{ left: '82%' }} /></>}
+                  {id === 'vegas' && <em className="vg-mini" />}
+                  {id === 'parlour' && <em className="pl-mini" />}
+                  {id === 'midnight' && <em className="mn-mini" />}
+                </span>
+                <span className="felt-name">{FELTS[id].name}</span>
+                <span className="felt-blurb">{FELTS[id].blurb}</span>
+              </button>
+            ))}
+          </div>
+        </Group>
+
+        <Group title="Cards">
           <Seg label="Card back" value={settings.cardBack} onChange={(v) => set('cardBack', v)}
             options={[['stripes', 'Stripes'], ['grid', 'Grid'], ['dots', 'Dots'], ['solid', 'Solid']]} />
           <Seg label="Card size" value={settings.cardSize} onChange={(v) => set('cardSize', v)}
