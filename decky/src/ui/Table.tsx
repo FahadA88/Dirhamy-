@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { applyMove, createMatch, isTerminal, legalMoves, redact } from '../engine/engine';
+import { applyMove, createMatch, isTerminal, legalMoves, nextHand, redact } from '../engine/engine';
 import { chooseMove } from '../bots/randomBot';
 import { Card, GameDefinition, MatchState, Move } from '../engine/types';
 import { SUIT_SYMBOLS } from '../engine/deck';
@@ -66,6 +66,12 @@ export function Table({ def, seats = 3 }: { def: GameDefinition; seats?: number 
     prevPhase.current = state.phase;
   }, [state.phase, settings.sound]);
 
+  function playNextHand() {
+    setState((s) => nextHand(s, rngSeed()));
+    setSelected(null);
+    setAskRank(null);
+  }
+
   function submit(move: Move) {
     if (!view.isYourTurn) return;
     if (move.actionId === 'playCard' || move.actionId === 'playToTrick' || move.actionId === 'climbPlay') playSound('play', settings.sound);
@@ -97,6 +103,18 @@ export function Table({ def, seats = 3 }: { def: GameDefinition; seats?: number 
 
   return (
     <div className="table">
+      {view.matchTarget != null && (
+        <div className="match-bar">
+          <span className="match-hand">Hand {view.handNumber} · race to {view.matchTarget}</span>
+          <div className="match-chips">
+            {view.players.map((p) => (
+              <span key={p.id} className={`match-chip ${p.id === HUMAN ? 'you' : ''}`}>
+                {nameOf(p.id)} <b>{view.matchScores?.[p.id] ?? 0}</b>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
       <div className="opponents">
         {view.players.filter((p) => p.id !== HUMAN).map((p) => {
           const askable = isFish && view.isYourTurn && !!askRank && p.handCount > 0;
@@ -266,12 +284,38 @@ export function Table({ def, seats = 3 }: { def: GameDefinition; seats?: number 
         </div>
       )}
 
-      {view.phase === 'roundOver' && (
+      {view.phase === 'roundOver' && !view.matchOver && (
         <div className="modal">
           <div className="modal-box">
-            <h3>{view.winner === HUMAN ? '🎉 You win!' : `${nameOf(view.winner || '')} wins`}</h3>
+            <h3>{view.winner === HUMAN ? '🎉 You win this hand!' : `${nameOf(view.winner || '')} wins this hand`}</h3>
             <p className="scores">
-              {Object.entries(view.scores).map(([p, s]) => (<span key={p}>{nameOf(p)}: {s} pts&nbsp;&nbsp;</span>))}
+              {Object.entries(view.scores).map(([p, s]) => (<span key={p}>{nameOf(p)}: +{s}&nbsp;&nbsp;</span>))}
+            </p>
+            <div className="match-scoreboard">
+              <div className="ms-title">Race to {view.matchTarget}</div>
+              {view.players
+                .slice()
+                .sort((a, b) => (view.matchScores?.[b.id] ?? 0) - (view.matchScores?.[a.id] ?? 0))
+                .map((p) => (
+                  <div key={p.id} className="ms-row">
+                    <span>{nameOf(p.id)}</span>
+                    <b>{view.matchScores?.[p.id] ?? 0}</b>
+                  </div>
+                ))}
+            </div>
+            <button className="primary" onClick={playNextHand}>Next hand →</button>
+          </div>
+        </div>
+      )}
+
+      {view.phase === 'roundOver' && view.matchOver && (
+        <div className="modal">
+          <div className="modal-box">
+            <h3>{view.matchWinner === HUMAN ? '🏆 You win the match!' : view.winner === HUMAN ? '🎉 You win!' : `${nameOf(view.matchWinner ?? view.winner ?? '')} wins${view.matchTarget != null ? ' the match' : ''}`}</h3>
+            <p className="scores">
+              {Object.entries(view.matchTarget != null ? (view.matchScores ?? view.scores) : view.scores).map(([p, s]) => (
+                <span key={p}>{nameOf(p)}: {s} pts&nbsp;&nbsp;</span>
+              ))}
             </p>
             <button className="primary" onClick={() => { setState(createMatch(def, players, rngSeed())); }}>Play again</button>
           </div>

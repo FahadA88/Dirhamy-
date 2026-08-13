@@ -30,6 +30,6 @@ export const goFish: GameDefinition = {
   actions: [],
   triggers: [],
   endConditions: [],
-  scoring: { mode: 'lowestPoints', winner: 'highestTotal', cardPoints: {}, target: 13 },
+  scoring: { mode: 'lowestPoints', winner: 'highestTotal', cardPoints: {}, target: null },
   fish: { bookSize: 4 },
 };

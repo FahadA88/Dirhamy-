@@ -271,10 +271,17 @@ export function CreateView() {
               <label className="pt-cell"><span>Jok</span>
                 <input type="number" value={knobs.jokerPoints} onChange={(e) => set('jokerPoints', parseInt(e.target.value || '0', 10))} /></label>
             </div>
-            <label className="field"><span>Play to (points target)</span>
-              <input type="number" value={knobs.pointTarget} onChange={(e) => set('pointTarget', parseInt(e.target.value || '0', 10))} /></label>
           </Section>
           </>}
+
+          <Section title="Match play">
+            <span className="mini-label">Play repeated hands with a running score, instead of ending after one hand.</span>
+            <label className="field row"><Switch on={knobs.matchPlay} onChange={(v) => set('matchPlay', v)} /><span>Play to a target score across multiple hands</span></label>
+            {knobs.matchPlay && (
+              <label className="field"><span>Points to win the match</span>
+                <input type="number" value={knobs.pointTarget} onChange={(e) => set('pointTarget', parseInt(e.target.value || '0', 10))} /></label>
+            )}
+          </Section>
         </div>
 
         {/* RIGHT: co-pilot, verify, expert */}

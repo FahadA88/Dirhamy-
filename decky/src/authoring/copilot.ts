@@ -102,6 +102,16 @@ export const offlineTranslator: Translator = {
     const patch: Partial<Knobs> = {};
     const notes: string[] = [];
 
+    // match play: "play to N points", "first to N wins", "across multiple hands"
+    const matchPhrase = /\bplay(s|ing)? to (\d+)\s*points?\b|\bfirst to (\d+)\s*(points?|wins?)\b|\bacross (multiple|several) hands\b|\bmatch play\b|\brunning score\b/;
+    const mm = matchPhrase.exec(text);
+    if (mm) {
+      patch.matchPlay = true;
+      const n = mm[2] || mm[3];
+      if (n) patch.pointTarget = clampMatchTarget(parseInt(n, 10));
+      notes.push(`Match play: race to ${patch.pointTarget ?? current.pointTarget} points across hands.`);
+    }
+
     // fishing family detection
     if (/\bgo fish\b|\bfishing\b|\bask (an?|another|your) (opponent|player)\b|\bask for (a )?rank\b|\bcollect (a )?book\b|\bbooks?\b.*\brank\b/.test(text)) {
       patch.family = 'fish';
@@ -243,6 +253,10 @@ export const offlineTranslator: Translator = {
   },
 };
 
+function clampMatchTarget(n: number): number {
+  return clamp(n, 10, 2000);
+}
+
 function clamp(n: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, n));
 }
@@ -319,6 +333,8 @@ function describeChange(field: keyof Knobs, value: unknown): string {
     case 'matchSuit': return value ? 'Match by suit' : 'No suit matching';
     case 'matchRank': return value ? 'Match by rank' : 'No rank matching';
     case 'drawUntilCanPlay': return value ? 'Draw until you can play' : 'Draw one card';
+    case 'matchPlay': return value ? 'Match play: on' : 'Single hand only';
+    case 'pointTarget': return `Race to ${value} points`;
     case 'family': {
       const names: Record<string, string> = { trick: 'Trick-taking game', climb: 'Climbing game', fish: 'Fishing game', rummy: 'Rummy/melding game', war: 'Comparison game (War)', shedding: 'Shedding/matching game' };
       return names[value as string] ?? String(value);

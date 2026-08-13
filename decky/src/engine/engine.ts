@@ -39,7 +39,13 @@ function propOf(card: Card, prop: 'suit' | 'rank' | 'color'): string {
 
 // ---------- match creation ----------
 
-export function createMatch(def: GameDefinition, players: string[], seed: number): MatchState {
+// `carry` lets a fresh hand continue an existing match's running score (see nextHand()).
+export function createMatch(
+  def: GameDefinition,
+  players: string[],
+  seed: number,
+  carry?: { matchScores: Record<string, number>; handNumber: number },
+): MatchState {
   const state: MatchState = {
     definition: def,
     seed,
@@ -67,6 +73,10 @@ export function createMatch(def: GameDefinition, players: string[], seed: number
     winner: null,
     pendingChoice: null,
     log: [],
+    matchScores: carry?.matchScores ?? Object.fromEntries(players.map((p) => [p, 0])),
+    handNumber: carry?.handNumber ?? 1,
+    matchOver: false,
+    matchWinner: null,
   };
 
   // Initialize zones.
@@ -497,13 +507,15 @@ function endRound(state: MatchState, reason: 'won' | 'stalemate' | 'stuck', winn
   state.winner = winner;
   if (reason === 'won') log(state, null, `${short(winner!)} wins — hand emptied!`);
   else log(state, null, `Round over (${reason}). Winner by fewest points: ${short(winner!)}.`);
+  finalizeMatchProgress(state);
 }
 
 function computeWinner(state: MatchState, winnerHint?: string): string {
   const def = state.definition;
   const s: ScoringDef = def.scoring;
-  if (s.winner === 'firstOut' && winnerHint) return winnerHint;
-  // Sum remaining hand points; lowest or highest wins per scoring.winner.
+  // Always tally remaining hand points into state.scores — even in firstOut mode, where the
+  // hand's WINNER is whoever went out (winnerHint), but everyone's points still need to be
+  // known so a multi-hand match can accumulate them (classic Crazy-Eights-style scoring).
   const highest = s.winner === 'highestTotal';
   let best: string = state.players[0];
   let bestPts = highest ? -Infinity : Infinity;
@@ -513,7 +525,7 @@ function computeWinner(state: MatchState, winnerHint?: string): string {
     state.scores[p] = pts;
     if (highest ? pts > bestPts : pts < bestPts) { bestPts = pts; best = p; }
   }
-  return best;
+  return s.winner === 'firstOut' && winnerHint ? winnerHint : best;
 }
 
 function cardPoints(s: ScoringDef, card: Card): number {
@@ -534,8 +546,46 @@ function rankValue(rank: string): number {
   return Number.isNaN(n) ? 0 : n;
 }
 
+// True once THIS HAND has ended (a family's end-round function ran). A match may continue
+// into another hand after this — check isMatchOver for that.
 export function isTerminal(state: MatchState): boolean {
   return state.phase === 'roundOver';
+}
+
+// True once the MATCH has ended: either this game has no points target (a match is exactly
+// one hand, the legacy behavior), or a player's cumulative score has crossed the target.
+export function isMatchOver(state: MatchState): boolean {
+  return state.phase === 'roundOver' && state.matchOver;
+}
+
+// Every family's end-round function calls this once state.scores (this hand's points) and
+// state.winner are final. It folds the hand into the running match score and decides whether
+// the match continues or someone has crossed the target.
+function finalizeMatchProgress(s: MatchState): void {
+  for (const p of s.players) s.matchScores[p] = (s.matchScores[p] ?? 0) + (s.scores[p] ?? 0);
+  const target = s.definition.scoring.target;
+  if (target == null) { s.matchOver = true; s.matchWinner = s.winner; return; }
+  const crossed = s.players.some((p) => s.matchScores[p] >= target);
+  if (!crossed) { s.matchOver = false; s.matchWinner = null; return; }
+  s.matchOver = true;
+  const highest = s.definition.scoring.winner === 'highestTotal';
+  let best = s.players[0];
+  let bestV = highest ? -Infinity : Infinity;
+  for (const p of s.players) {
+    const v = s.matchScores[p];
+    if (highest ? v > bestV : v < bestV) { bestV = v; best = p; }
+  }
+  s.matchWinner = best;
+  log(s, null, `Match over — ${short(best)} wins with ${bestV} points.`);
+}
+
+// Deals a fresh hand, continuing an in-progress match (running score carries forward).
+// Caller must check !isMatchOver(state) first — this does not check for you.
+export function nextHand(state: MatchState, seed: number): MatchState {
+  return createMatch(state.definition, state.players, seed, {
+    matchScores: { ...state.matchScores },
+    handNumber: state.handNumber + 1,
+  });
 }
 
 // ---------- trick-taking family ----------
@@ -660,6 +710,7 @@ function endTrickRound(s: MatchState): void {
     }
     s.winner = winner;
     log(s, null, `Round over — ${short(winner)}${cfg.partnerships ? "'s team" : ''} wins (${bestScore}).`);
+    finalizeMatchProgress(s);
     return;
   }
 
@@ -678,6 +729,7 @@ function endTrickRound(s: MatchState): void {
   }
   s.winner = winner;
   log(s, null, `Round over — ${short(winner)} wins.`);
+  finalizeMatchProgress(s);
 }
 
 // ---------- climbing family (President / Big Two) ----------
@@ -778,6 +830,7 @@ function endClimbRound(s: MatchState): void {
   s.players.forEach((p, i) => { s.scores[p] = s.finished.indexOf(p) + 1; void i; }); // 1 = President
   s.winner = s.finished[0] ?? s.players[0];
   log(s, null, `Round over — ${short(s.winner)} is President.`);
+  finalizeMatchProgress(s);
 }
 
 // ---------- fishing family (Go Fish) ----------
@@ -904,6 +957,7 @@ function endFishRound(s: MatchState): void {
   }
   s.winner = best;
   log(s, null, `Round over — ${short(best)} wins with ${bestN} books.`);
+  finalizeMatchProgress(s);
 }
 
 // ---------- rummy / melding family ----------
@@ -1026,6 +1080,7 @@ function endRummyRound(s: MatchState, winner: string | null): void {
   for (const p of s.players) s.scores[p] = (s.zones[`hand:${p}`] || []).length; // fewer left = better
   s.winner = winner;
   log(s, null, `Round over — ${short(winner)} goes out.`);
+  finalizeMatchProgress(s);
 }
 
 function sameCards(a?: string[], b?: string[]): boolean {
@@ -1098,6 +1153,7 @@ function endWarRound(s: MatchState): void {
   for (const p of s.players) { const n = (s.zones[`hand:${p}`] || []).length; s.scores[p] = n; if (n > bestN) { bestN = n; best = p; } }
   s.winner = best;
   log(s, null, `Game over — ${short(best)} wins with ${bestN} cards.`);
+  finalizeMatchProgress(s);
 }
 
 // ---------- redaction (hidden information) ----------
@@ -1168,6 +1224,11 @@ export function redact(state: MatchState, viewer: string): RedactedState {
     bids: state.definition.trick?.bidding ? { ...state.bids } : undefined,
     bidding: state.definition.trick?.bidding ? state.bidding : undefined,
     teams: state.definition.trick?.partnerships ? trickTeams(state) : undefined,
+    matchScores: { ...state.matchScores },
+    handNumber: state.handNumber,
+    matchOver: state.matchOver,
+    matchWinner: state.matchWinner,
+    matchTarget: state.definition.scoring.target ?? null,
   };
 }
 

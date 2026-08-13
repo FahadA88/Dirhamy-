@@ -190,9 +190,16 @@ export interface MatchState {
   finished: string[];       // players who have emptied their hand, in finishing order
   booksWon: Record<string, number>; // fishing: completed books per player
   vars: Record<string, string>;
-  scores: Record<string, number>;
+  scores: Record<string, number>;   // THIS HAND's points, set when the hand ends
   phase: 'playing' | 'roundOver';
-  winner: string | null;
+  winner: string | null;            // this hand's winner
+  // match play: when scoring.target is set, a match spans multiple hands, accumulating
+  // scores until someone crosses the target. When it's null, a match is exactly one hand
+  // (matchOver is true as soon as that hand ends) — this is the legacy single-hand behavior.
+  matchScores: Record<string, number>; // cumulative points across all hands played so far
+  handNumber: number;                  // 1-indexed
+  matchOver: boolean;
+  matchWinner: string | null;
   pendingChoice: { type: 'suit'; player: string; setState: string } | null;
   log: LogEntry[];
 }
@@ -250,4 +257,10 @@ export interface RedactedState {
   bids?: Record<string, number>;
   bidding?: boolean;
   teams?: string[][];
+  // match play (see MatchState)
+  matchScores: Record<string, number>;
+  handNumber: number;
+  matchOver: boolean;
+  matchWinner: string | null;
+  matchTarget: number | null;
 }

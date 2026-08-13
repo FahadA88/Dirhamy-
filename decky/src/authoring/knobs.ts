@@ -55,6 +55,9 @@ export interface Knobs {
   direction: 'clockwise' | 'counter-clockwise';
   reshuffleWhenEmpty: boolean;
   winMode: 'firstOut' | 'lowestTotal' | 'highestTotal';
+  // match play: when on, a "game" is played as repeated hands with a running score until
+  // someone crosses pointTarget, instead of ending after a single hand. Applies to every family.
+  matchPlay: boolean;
   pointTarget: number;
   // scoring
   perRankPoints: Record<string, number>;
@@ -106,6 +109,7 @@ export const defaultKnobs: Knobs = {
   direction: 'clockwise',
   reshuffleWhenEmpty: true,
   winMode: 'firstOut',
+  matchPlay: false,
   pointTarget: 100,
   perRankPoints: { ...defaultPoints },
   jokerPoints: 50,
@@ -139,7 +143,7 @@ function buildRummyDefinition(knobs: Knobs, id: string): GameDefinition {
     turnFlow: { order: 'clockwise', startPlayer: 'first', actionsPerTurn: { min: 1, max: 1 } },
     actions: [], triggers: [],
     endConditions: [{ id: 'handEmpty', when: { zoneCount: { zone: 'hand', of: 'anyPlayer', eq: 0 } }, result: 'roundOver' }],
-    scoring: { mode: 'lowestPoints', winner: 'lowestTotal', cardPoints: {}, target: null },
+    scoring: { mode: 'lowestPoints', winner: 'lowestTotal', cardPoints: {}, target: matchTarget(knobs) },
     rummy: { setMin: clampInt(knobs.rummySetMin, 2, 4), runMin: clampInt(knobs.rummyRunMin, 2, 5) },
   };
 }
@@ -161,7 +165,7 @@ function buildWarDefinition(knobs: Knobs, id: string): GameDefinition {
     turnFlow: { order: 'clockwise', startPlayer: 'first', actionsPerTurn: { min: 1, max: 1 } },
     actions: [], triggers: [],
     endConditions: [{ id: 'handEmpty', when: { zoneCount: { zone: 'hand', of: 'anyPlayer', eq: 0 } }, result: 'roundOver' }],
-    scoring: { mode: 'lowestPoints', winner: 'highestTotal', cardPoints: {}, target: null },
+    scoring: { mode: 'lowestPoints', winner: 'highestTotal', cardPoints: {}, target: matchTarget(knobs) },
     war: { aceHigh: knobs.aceHigh, roundCap: clampInt(knobs.warRoundCap, 100, 5000) },
   };
 }
@@ -184,7 +188,7 @@ function buildFishDefinition(knobs: Knobs, id: string): GameDefinition {
     actions: [],
     triggers: [],
     endConditions: [],
-    scoring: { mode: 'lowestPoints', winner: 'highestTotal', cardPoints: {}, target: 13 },
+    scoring: { mode: 'lowestPoints', winner: 'highestTotal', cardPoints: {}, target: matchTarget(knobs) },
     fish: { bookSize: clampInt(knobs.bookSize, 2, 4) },
   };
 }
@@ -211,7 +215,7 @@ function buildClimbDefinition(knobs: Knobs, id: string): GameDefinition {
     actions: [],
     triggers: [],
     endConditions: [{ id: 'handEmpty', when: { zoneCount: { zone: 'hand', of: 'anyPlayer', eq: 0 } }, result: 'roundOver' }],
-    scoring: { mode: 'lowestPoints', winner: 'lowestTotal', cardPoints: {}, target: null },
+    scoring: { mode: 'lowestPoints', winner: 'lowestTotal', cardPoints: {}, target: matchTarget(knobs) },
     climb: { order },
   };
 }
@@ -238,7 +242,13 @@ function buildTrickDefinition(knobs: Knobs, id: string): GameDefinition {
     actions: [],
     triggers: [],
     endConditions: [{ id: 'handsEmpty', when: { zoneCount: { zone: 'hand', of: 'anyPlayer', eq: 0 } }, result: 'roundOver' }],
-    scoring: { mode: 'lowestPoints', winner: 'highestTotal', cardPoints: {}, target: null },
+    scoring: {
+      mode: 'lowestPoints',
+      // Penalty and fewest-tricks scoring both want LOW cumulative scores to win a match
+      // (Hearts-style); most-tricks and bidding want HIGH cumulative scores to win (Spades-style).
+      winner: knobs.trickScoreBy === 'penalty' || knobs.trickScoreBy === 'fewestTricks' ? 'lowestTotal' : 'highestTotal',
+      cardPoints: {}, target: matchTarget(knobs),
+    },
     trick: {
       trump: knobs.trump, mustFollowSuit: knobs.mustFollowSuit, aceHigh: knobs.aceHigh,
       scoreBy: knobs.trickScoreBy,
@@ -333,7 +343,7 @@ function buildSheddingDefinition(knobs: Knobs, id: string): GameDefinition {
     scoring: {
       mode: knobs.winMode === 'firstOut' ? 'firstToEmptyWins' : 'lowestPoints',
       cardPoints,
-      target: knobs.pointTarget,
+      target: matchTarget(knobs),
       winner: knobs.winMode,
     },
   };
@@ -398,6 +408,7 @@ export function knobsFromDefinition(def: GameDefinition): Knobs {
     direction: def.turnFlow.order,
     reshuffleWhenEmpty: def.triggers.some((t) => t.on === 'drawPileEmpty'),
     winMode: def.scoring.winner,
+    matchPlay: typeof def.scoring.target === 'number',
     pointTarget: typeof def.scoring.target === 'number' ? def.scoring.target : 100,
     perRankPoints: perRank,
     jokerPoints: typeof cp.JOKER === 'number' ? (cp.JOKER as number) : 50,
@@ -427,6 +438,11 @@ function autoFishDescription(k: Knobs): string {
 
 function dedup(rs: Rank[]): Rank[] { return Array.from(new Set(rs)); }
 function clampInt(n: number, lo: number, hi: number): number { return Math.max(lo, Math.min(hi, Math.round(n))); }
+// null = a match is exactly one hand (legacy). A number = play repeated hands, accumulating
+// score, until someone crosses it.
+function matchTarget(knobs: Knobs): number | null {
+  return knobs.matchPlay ? clampInt(knobs.pointTarget, 10, 2000) : null;
+}
 
 function autoDescription(k: Knobs): string {
   const list = (rs: Rank[]) => rs.map(rankLabel).join('/');
