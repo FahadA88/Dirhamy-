@@ -44,6 +44,18 @@ export function chooseMove(
     return { move: best, botSeed };
   }
 
+  // Fishing (Go Fish): draw when told to; otherwise ask for the rank you hold most of.
+  if (moves[0].actionId === 'fishDraw' || moves[0].actionId === 'ask') {
+    if (moves[0].actionId === 'fishDraw') return { move: moves[0], botSeed };
+    if (mode === 'random') { const r = nextRandom(botSeed); return { move: moves[Math.floor(r.value * moves.length)], botSeed: r.state }; }
+    const hand = state.zones[`hand:${playerId}`] || [];
+    const counts: Record<string, number> = {};
+    for (const c of hand) counts[c.rank] = (counts[c.rank] ?? 0) + 1;
+    let best = moves[0];
+    for (const m of moves) if ((counts[m.rank!] ?? 0) > (counts[best.rank!] ?? 0)) best = m;
+    return { move: best, botSeed };
+  }
+
   // Climbing (President): play the lowest card that beats the pile, else pass.
   if (moves[0].actionId === 'climbPlay' || moves[0].actionId === 'climbPass') {
     if (mode === 'random') { const r = nextRandom(botSeed); return { move: moves[Math.floor(r.value * moves.length)], botSeed: r.state }; }

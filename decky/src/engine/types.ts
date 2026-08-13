@@ -48,10 +48,17 @@ export interface GameDefinition {
   // Present iff this is a climbing game (President/Big Two): beat the previous play or pass;
   // when everyone passes the pile clears and the last player to play leads again.
   climb?: ClimbConfig;
+  // Present iff this is a fishing game (Go Fish): ask an opponent for a rank you hold; collect
+  // sets ("books") of the same rank; most books wins.
+  fish?: FishConfig;
 }
 
 export interface ClimbConfig {
   order: Rank[]; // rank strength, low → high (e.g. 3,4,…,K,A,2)
+}
+
+export interface FishConfig {
+  bookSize: number; // cards of one rank that form a book (usually 4)
 }
 
 export interface TrickConfig {
@@ -160,6 +167,7 @@ export interface MatchState {
   passStreak: number;       // consecutive passes since the last play
   lastPlayer: string | null; // who made the last play (leads when the pile clears)
   finished: string[];       // players who have emptied their hand, in finishing order
+  booksWon: Record<string, number>; // fishing: completed books per player
   vars: Record<string, string>;
   scores: Record<string, number>;
   phase: 'playing' | 'roundOver';
@@ -179,6 +187,8 @@ export interface Move {
   actionId: string;
   cardId?: string;        // for target: select one
   choice?: string;        // e.g. chosen suit when resolving pendingChoice
+  target?: string;        // fishing: the player being asked
+  rank?: string;          // fishing: the rank being asked for
 }
 
 // ---------- Redacted (per-player) view ----------
@@ -205,9 +215,11 @@ export interface RedactedState {
   scores: Record<string, number>;
   log: LogEntry[];
   // family-specific view
-  mode: 'shedding' | 'trick' | 'climb';
+  mode: 'shedding' | 'trick' | 'climb' | 'fish';
   trick?: { player: string; card: Card }[];
   lead?: Suit | null;
   tricksWon?: Record<string, number>;
   finished?: string[];
+  booksWon?: Record<string, number>;
+  oceanCount?: number;
 }

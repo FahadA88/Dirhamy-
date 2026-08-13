@@ -16,22 +16,28 @@ export function Table({ def, seats = 3 }: { def: GameDefinition; seats?: number 
   const players = useMemo(() => Array.from({ length: seats }, (_, i) => `P${i + 1}`), [seats]);
   const [state, setState] = useState<MatchState>(() => createMatch(def, players, rngSeed()));
   const [selected, setSelected] = useState<string | null>(null);
+  const [askRank, setAskRank] = useState<string | null>(null);
   const botSeed = useRef<number>(rngSeed());
 
   useEffect(() => {
     setState(createMatch(def, players, rngSeed()));
     botSeed.current = rngSeed();
     setSelected(null);
+    setAskRank(null);
   }, [def, players]);
 
   const view = useMemo(() => redact(state, HUMAN), [state]);
   const myLegal = useMemo(() => (view.isYourTurn ? legalMoves(state, HUMAN) : []), [state, view.isYourTurn]);
+  const isFish = view.mode === 'fish';
   const playableCardIds = useMemo(
-    () => new Set(myLegal.filter((m) => m.cardId).map((m) => m.cardId)),
-    [myLegal],
+    () => (isFish
+      ? new Set(view.isYourTurn ? view.hand.map((c) => c.id) : [])
+      : new Set(myLegal.filter((m) => m.cardId).map((m) => m.cardId))),
+    [myLegal, isFish, view.isYourTurn, view.hand],
   );
   const canDraw = myLegal.some((m) => m.actionId === 'drawCard');
   const canPass = myLegal.some((m) => m.actionId === 'climbPass');
+  const canFishDraw = myLegal.some((m) => m.actionId === 'fishDraw');
   const playActionId = view.mode === 'trick' ? 'playToTrick' : view.mode === 'climb' ? 'climbPlay' : 'playCard';
 
   // Bot loop, paced by the user's bot-speed setting.
@@ -57,13 +63,16 @@ export function Table({ def, seats = 3 }: { def: GameDefinition; seats?: number 
   function submit(move: Move) {
     if (!view.isYourTurn) return;
     if (move.actionId === 'playCard' || move.actionId === 'playToTrick' || move.actionId === 'climbPlay') playSound('play', settings.sound);
-    if (move.actionId === 'drawCard') playSound('draw', settings.sound);
+    if (move.actionId === 'drawCard' || move.actionId === 'fishDraw') playSound('draw', settings.sound);
+    if (move.actionId === 'ask') playSound('ui', settings.sound);
     setSelected(null);
+    setAskRank(null);
     setState((s) => applyMove(s, HUMAN, move));
   }
 
   function clickCard(id: string) {
     if (!playableCardIds.has(id)) return;
+    if (isFish) { const c = view.hand.find((x) => x.id === id); if (c) setAskRank(c.rank); playSound('ui', settings.sound); return; }
     if (settings.confirmPlays && selected !== id) { setSelected(id); playSound('ui', settings.sound); return; }
     submit({ actionId: playActionId, cardId: id });
   }
@@ -78,18 +87,25 @@ export function Table({ def, seats = 3 }: { def: GameDefinition; seats?: number 
   return (
     <div className="table">
       <div className="opponents">
-        {view.players.filter((p) => p.id !== HUMAN).map((p) => (
-          <div key={p.id} className={`seat ${p.isTurn ? 'active' : ''}`}>
-            <div className="seat-name">{nameOf(p.id)}{p.isTurn ? ' ⏳' : ''}</div>
-            <div className="fanned">
-              {Array.from({ length: Math.min(p.handCount, 12) }).map((_, i) => (<div key={i} className={backCls} />))}
+        {view.players.filter((p) => p.id !== HUMAN).map((p) => {
+          const askable = isFish && view.isYourTurn && !!askRank && p.handCount > 0;
+          return (
+            <div key={p.id}
+              className={`seat ${p.isTurn ? 'active' : ''} ${askable ? 'askable' : ''}`}
+              onClick={() => { if (askable) submit({ actionId: 'ask', target: p.id, rank: askRank! }); }}>
+              <div className="seat-name">{nameOf(p.id)}{p.isTurn ? ' ⏳' : ''}</div>
+              <div className="fanned">
+                {Array.from({ length: Math.min(p.handCount, 12) }).map((_, i) => (<div key={i} className={backCls} />))}
+              </div>
+              <div className="count">
+                {p.handCount} cards{view.mode === 'trick' ? ` · ${view.tricksWon?.[p.id] ?? 0} tricks` : ''}
+                {isFish ? ` · ${view.booksWon?.[p.id] ?? 0} books` : ''}
+                {view.mode === 'climb' && view.finished?.includes(p.id) ? ` · out #${view.finished.indexOf(p.id) + 1}` : ''}
+              </div>
+              {askable && <div className="ask-hint">Ask for {askRank}s</div>}
             </div>
-            <div className="count">
-              {p.handCount} cards{view.mode === 'trick' ? ` · ${view.tricksWon?.[p.id] ?? 0} tricks` : ''}
-              {view.mode === 'climb' && view.finished?.includes(p.id) ? ` · out #${view.finished.indexOf(p.id) + 1}` : ''}
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {view.mode === 'trick' ? (
@@ -105,6 +121,18 @@ export function Table({ def, seats = 3 }: { def: GameDefinition; seats?: number 
           <div className="trick-meta">
             Trump {SUIT_SYMBOLS[state.definition.trick!.trump] ?? '—'}
             {view.lead ? ` · led ${SUIT_SYMBOLS[view.lead]}` : ''}
+          </div>
+        </div>
+      ) : isFish ? (
+        <div className="center">
+          <div className="pile">
+            <div className={`${backCls} big`} />
+            <div className="pile-label">Ocean · {view.oceanCount ?? 0}</div>
+          </div>
+          <div className="fish-prompt">
+            {view.isYourTurn
+              ? (askRank ? `Asking for ${askRank}s — tap an opponent above` : 'Tap one of your cards to pick a rank, then tap an opponent')
+              : 'Waiting…'}
           </div>
         </div>
       ) : view.mode === 'climb' ? (
@@ -129,10 +157,11 @@ export function Table({ def, seats = 3 }: { def: GameDefinition; seats?: number 
 
       <div className={`you ${view.isYourTurn ? 'your-turn' : ''}`}>
         <div className="you-head">
-          <span>{settings.playerName === 'You' ? 'Your hand' : `${settings.playerName}’s hand`}{view.mode === 'trick' ? ` · ${view.tricksWon?.[HUMAN] ?? 0} tricks` : ''}</span>
+          <span>{settings.playerName === 'You' ? 'Your hand' : `${settings.playerName}’s hand`}{view.mode === 'trick' ? ` · ${view.tricksWon?.[HUMAN] ?? 0} tricks` : ''}{isFish ? ` · ${view.booksWon?.[HUMAN] ?? 0} books` : ''}</span>
           {view.isYourTurn && !suitPickerOpen && <span className="turn-badge">Your turn</span>}
           {canDraw && <button className="draw-btn" onClick={() => submit({ actionId: 'drawCard' })}>Draw a card</button>}
           {canPass && <button className="draw-btn" onClick={() => submit({ actionId: 'climbPass' })}>Pass</button>}
+          {canFishDraw && <button className="draw-btn" onClick={() => submit({ actionId: 'fishDraw' })}>Draw from ocean</button>}
         </div>
         <div className={`hand hl-${settings.highlight}`}>
           {hand.map((c) => {
@@ -140,10 +169,10 @@ export function Table({ def, seats = 3 }: { def: GameDefinition; seats?: number 
             return (
               <button
                 key={c.id}
-                className={`card-btn ${playable ? 'playable' : 'dim'} ${selected === c.id ? 'selected' : ''}`}
+                className={`card-btn ${playable ? 'playable' : 'dim'} ${(isFish ? c.rank === askRank : selected === c.id) ? 'selected' : ''}`}
                 disabled={!playable}
                 onClick={() => clickCard(c.id)}
-                title={playable ? (settings.confirmPlays && selected !== c.id ? 'Click to select' : 'Play this card') : 'Not a legal move right now'}
+                title={playable ? (isFish ? 'Pick this rank to ask for' : settings.confirmPlays && selected !== c.id ? 'Click to select' : 'Play this card') : 'Not a legal move right now'}
               >
                 <CardFace card={c} />
               </button>

@@ -57,6 +57,7 @@ export function createMatch(def: GameDefinition, players: string[], seed: number
     passStreak: 0,
     lastPlayer: null,
     finished: [],
+    booksWon: Object.fromEntries(players.map((p) => [p, 0])),
     vars: {},
     scores: Object.fromEntries(players.map((p) => [p, 0])),
     phase: 'playing',
@@ -115,6 +116,9 @@ export function createMatch(def: GameDefinition, players: string[], seed: number
     const top = topCard(state.zones[discard.id]);
     if (top) state.vars.activeSuit = top.suit;
   }
+
+  // Fishing: a player dealt a full book immediately sets it aside.
+  if (def.fish) for (const p of players) checkBooks(state, p);
 
   log(state, null, `${def.meta.name} started with ${players.length} players.`);
   return state;
@@ -204,6 +208,7 @@ export function legalMoves(state: MatchState, playerId: string): Move[] {
   if (state.phase !== 'playing') return [];
   if (state.definition.trick) return trickLegalMoves(state, playerId);
   if (state.definition.climb) return climbLegalMoves(state, playerId);
+  if (state.definition.fish) return fishLegalMoves(state, playerId);
 
   // Resolve a pending choice first (e.g. pick a suit after a wild).
   if (state.pendingChoice) {
@@ -245,6 +250,7 @@ function cloneState(state: MatchState): MatchState {
     tricksWon: { ...state.tricksWon },
     trickPlays: state.trickPlays.map((t) => ({ ...t })),
     finished: state.finished.slice(),
+    booksWon: { ...state.booksWon },
     pendingChoice: state.pendingChoice ? { ...state.pendingChoice } : null,
     log: state.log.slice(),
   };
@@ -371,6 +377,7 @@ export function applyMove(state: MatchState, playerId: string, move: Move): Matc
 
   if (def.trick) return applyTrickMove(s, playerId, move);
   if (def.climb) return applyClimbMove(s, playerId, move);
+  if (def.fish) return applyFishMove(s, playerId, move);
 
   // Resolve a pending suit choice.
   if (move.actionId === 'resolveChoice') {
@@ -723,6 +730,132 @@ function endClimbRound(s: MatchState): void {
   log(s, null, `Round over — ${short(s.winner)} is President.`);
 }
 
+// ---------- fishing family (Go Fish) ----------
+
+function oceanZoneId(def: MatchState['definition']): string {
+  return def.zones.find((z) => z.shared && z.type === 'pile' && z.visibility === 'none')!.id;
+}
+
+// Legal fishing moves for a player, ignoring whose turn it is.
+function fishMovesFor(state: MatchState, playerId: string): Move[] {
+  const hand = state.zones[`hand:${playerId}`] || [];
+  const ocean = state.zones[oceanZoneId(state.definition)] || [];
+  if (hand.length === 0) return ocean.length > 0 ? [{ actionId: 'fishDraw' }] : [];
+  const ranks = Array.from(new Set(hand.map((c) => c.rank)));
+  const targets = state.players.filter((p) => p !== playerId && (state.zones[`hand:${p}`] || []).length > 0);
+  const moves: Move[] = [];
+  for (const rank of ranks) for (const t of targets) moves.push({ actionId: 'ask', target: t, rank });
+  if (moves.length === 0 && ocean.length > 0) moves.push({ actionId: 'fishDraw' });
+  return moves;
+}
+
+function fishLegalMoves(state: MatchState, playerId: string): Move[] {
+  if (state.players[state.turnIndex] !== playerId) return [];
+  return fishMovesFor(state, playerId);
+}
+
+function checkBooks(state: MatchState, playerId: string): void {
+  const size = state.definition.fish!.bookSize;
+  const hand = state.zones[`hand:${playerId}`];
+  let changed = true;
+  while (changed) {
+    changed = false;
+    const counts: Record<string, number> = {};
+    for (const c of hand) counts[c.rank] = (counts[c.rank] ?? 0) + 1;
+    for (const [rank, n] of Object.entries(counts)) {
+      if (n >= size) {
+        for (let i = hand.length - 1; i >= 0; i--) if (hand[i].rank === rank) hand.splice(i, 1);
+        state.booksWon[playerId] = (state.booksWon[playerId] ?? 0) + 1;
+        log(state, null, `${short(playerId)} completes a book of ${rank}s.`);
+        changed = true;
+        break;
+      }
+    }
+  }
+}
+
+function totalBooks(state: MatchState): number {
+  return Object.values(state.booksWon).reduce((a, b) => a + b, 0);
+}
+
+function nextFishTurn(s: MatchState): void {
+  const n = s.players.length;
+  let i = s.turnIndex;
+  for (let step = 0; step < n; step++) {
+    i = ((i + s.direction) % n + n) % n;
+    if (fishMovesFor(s, s.players[i]).length > 0) { s.turnIndex = i; return; }
+  }
+  endFishRound(s); // nobody can act
+}
+
+function applyFishMove(s: MatchState, playerId: string, move: Move): MatchState {
+  const legal = fishLegalMoves(s, playerId);
+  const ok = legal.find((m) => m.actionId === move.actionId && m.target === move.target && m.rank === move.rank);
+  if (!ok) return s;
+  const def = s.definition;
+  const oceanId = oceanZoneId(def);
+  const hand = s.zones[`hand:${playerId}`];
+
+  if (move.actionId === 'fishDraw') {
+    const card = s.zones[oceanId].pop();
+    if (card) { hand.push(card); log(s, playerId, `${short(playerId)} draws from the ocean.`); checkBooks(s, playerId); s.stallCount = 0; }
+    if (fishMovesFor(s, playerId).length === 0) nextFishTurn(s);
+    finishFishTurnChecks(s);
+    return s;
+  }
+
+  // ask
+  const target = move.target!;
+  const rank = move.rank!;
+  const theirHand = s.zones[`hand:${target}`];
+  const got = theirHand.filter((c) => c.rank === rank);
+  if (got.length > 0) {
+    s.zones[`hand:${target}`] = theirHand.filter((c) => c.rank !== rank);
+    hand.push(...got);
+    log(s, playerId, `${short(playerId)} asks ${short(target)} for ${rank}s — gets ${got.length}.`);
+    checkBooks(s, playerId);
+    s.stallCount = 0;
+    if (fishMovesFor(s, playerId).length === 0) nextFishTurn(s); // else same player goes again
+  } else {
+    log(s, playerId, `${short(playerId)} asks ${short(target)} for ${rank}s — Go Fish!`);
+    const card = s.zones[oceanId].pop();
+    if (card) {
+      hand.push(card);
+      checkBooks(s, playerId);
+      s.stallCount = 0;
+      if (card.rank === rank) log(s, playerId, `${short(playerId)} fished the ${rank} — goes again.`);
+      else nextFishTurn(s);
+    } else {
+      s.stallCount += 1; // pure pass: no cards changed hands and the ocean is empty
+      nextFishTurn(s);
+    }
+  }
+  finishFishTurnChecks(s);
+  return s;
+}
+
+function finishFishTurnChecks(s: MatchState): void {
+  if (s.phase === 'roundOver') return;
+  const bookGoal = 13 - (s.definition.deck.excludeRanks?.length ?? 0);
+  if (totalBooks(s) >= bookGoal) { endFishRound(s); return; }
+  // No progress for a full lap (ocean empty, ranks split so no ask can succeed) → end.
+  if (s.stallCount >= s.players.length) { endFishRound(s); return; }
+  if (fishMovesFor(s, s.players[s.turnIndex]).length === 0) nextFishTurn(s);
+}
+
+function endFishRound(s: MatchState): void {
+  if (s.phase === 'roundOver') return;
+  s.phase = 'roundOver';
+  let best = s.players[0];
+  let bestN = -Infinity;
+  for (const p of s.players) {
+    s.scores[p] = s.booksWon[p] ?? 0;
+    if (s.scores[p] > bestN) { bestN = s.scores[p]; best = p; }
+  }
+  s.winner = best;
+  log(s, null, `Round over — ${short(best)} wins with ${bestN} books.`);
+}
+
 // ---------- redaction (hidden information) ----------
 
 export function redact(state: MatchState, viewer: string): RedactedState {
@@ -777,11 +910,13 @@ export function redact(state: MatchState, viewer: string): RedactedState {
     pendingChoice: state.pendingChoice,
     scores: { ...state.scores },
     log: state.log.slice(-40),
-    mode: state.definition.trick ? 'trick' : state.definition.climb ? 'climb' : 'shedding',
+    mode: state.definition.trick ? 'trick' : state.definition.climb ? 'climb' : state.definition.fish ? 'fish' : 'shedding',
     trick: state.definition.trick ? state.trickPlays.map((t) => ({ ...t })) : undefined,
     lead: state.definition.trick ? state.lead : undefined,
     tricksWon: state.definition.trick ? { ...state.tricksWon } : undefined,
     finished: state.definition.climb ? state.finished.slice() : undefined,
+    booksWon: state.definition.fish ? { ...state.booksWon } : undefined,
+    oceanCount: state.definition.fish ? (state.zones[oceanZoneId(state.definition)] || []).length : undefined,
   };
 }
 

@@ -28,7 +28,8 @@ export function validate(def: GameDefinition): ValidationResult {
   const actionIds = new Set(def.actions.map((a) => a.id));
   const isTrick = !!def.trick;
   const isClimb = !!def.climb;
-  const isSpecial = isTrick || isClimb;
+  const isFish = !!def.fish;
+  const isSpecial = isTrick || isClimb || isFish;
 
   // --- players ---
   if (def.meta.players.min < 2) err('players.min', 'A game needs at least 2 players.');
