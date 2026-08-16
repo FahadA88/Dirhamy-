@@ -23,7 +23,7 @@ export function App() {
         <nav className="tabs">
           <button className={view === 'play' ? 'on' : ''} onClick={() => setView('play')}>Play</button>
           <button className={view === 'create' ? 'on' : ''} onClick={() => setView('create')}>Create</button>
-          <button className="icon-btn" title="Customize" onClick={() => setSettingsOpen(true)}>⚙</button>
+          <button className="icon-btn" title="Customize" aria-label="Customize" onClick={() => setSettingsOpen(true)}>⚙</button>
         </nav>
       </header>
       {view === 'play' ? <PlayView /> : <CreateView />}

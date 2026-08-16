@@ -1,7 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { catalog } from '../games/catalog';
 import { Table } from './Table';
 import { SolitaireTable } from './SolitaireTable';
+import { ErrorBoundary } from './ErrorBoundary';
+import { GameHelp } from './GameHelp';
+import { loadMatch } from '../engine/persist';
 import { GameDefinition } from '../engine/types';
 import { useTilt } from './useTilt';
 import { useSettings } from '../settings/SettingsContext';
@@ -11,6 +14,16 @@ export function PlayView() {
   const { settings } = useSettings();
   const [game, setGame] = useState<GameDefinition | null>(null);
   const [seats, setSeats] = useState(settings.defaultSeats);
+  const [resumable, setResumable] = useState<{ gameId: string; name: string } | null>(null);
+  const [helpFor, setHelpFor] = useState<GameDefinition | null>(null);
+
+  // Offer to pick up an unfinished game rather than silently dropping it.
+  useEffect(() => {
+    const saved = loadMatch();
+    if (!saved) return;
+    const def = catalog.find((g) => g.meta.id === saved.gameId);
+    if (def) setResumable({ gameId: saved.gameId, name: def.meta.name });
+  }, []);
 
   if (game) {
     return (
@@ -18,6 +31,7 @@ export function PlayView() {
         <div className="crumbs">
           <button className="ghost" onClick={() => setGame(null)}>← All games</button>
           <span className="crumb-title">{game.meta.name}</span>
+          <button className="ghost sm" onClick={() => setHelpFor(game)}>Rules</button>
           {!game.solitaire && (
             <div className="seat-control">
               <span>Seats</span>
@@ -29,13 +43,28 @@ export function PlayView() {
             </div>
           )}
         </div>
-        {game.solitaire ? <SolitaireTable def={game} /> : <Table def={game} seats={seats} />}
+        <ErrorBoundary label={game.meta.name}>
+          {game.solitaire ? <SolitaireTable def={game} /> : <Table def={game} seats={seats} />}
+        </ErrorBoundary>
+        {helpFor && <GameHelp def={helpFor} onClose={() => setHelpFor(null)} />}
       </div>
     );
   }
 
   return (
     <div className="library">
+      {resumable && (
+        <div className="resume glass" role="status">
+          <span>You have an unfinished game of <b>{resumable.name}</b>.</span>
+          <div className="resume-actions">
+            <button className="ghost sm" onClick={() => setResumable(null)}>Dismiss</button>
+            <button className="primary sm" onClick={() => {
+              const def = catalog.find((g) => g.meta.id === resumable.gameId);
+              if (def) { setGame(def); setResumable(null); }
+            }}>Resume →</button>
+          </div>
+        </div>
+      )}
       <div className="section-head">
         <h2>Classics</h2>
         <span className="muted">Enforced, playable, and remixable — each one is pure data.</span>

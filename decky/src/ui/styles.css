@@ -327,6 +327,134 @@ h2 { font-family: var(--mono); letter-spacing: -0.3px; color: var(--ink); font-s
 .mn-ring { fill: none; stroke: rgba(120,225,175,0.30); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
 .mn-ring.faint { stroke: rgba(120,225,175,0.12); }
 
+/* ---------------- mobile ----------------
+   The table was built desktop-first: seats stacked into a column you had to scroll past to
+   reach your own hand, cards stayed full size, and Spider ran 345px wider than the viewport. */
+
+@media (max-width: 780px) {
+  .app { padding: 14px 10px 40px; }
+  header { gap: 10px; }
+  header h1 { font-size: 20px; }
+  header .sub { display: none; }
+  .logo3d { width: 34px; height: 34px; }
+  .logo3d span { border-radius: 10px; font-size: 17px; }
+
+  /* Thin the rail — on a narrow screen it was eating a fifth of the width. */
+  .table[data-felt="mahogany"] { --rail-w: 12px; --rail-r: 18px; --felt-pad: 12px; }
+  .table[data-felt="vegas"]    { --rail-w: 8px;  --rail-r: 16px; --felt-pad: 12px; }
+  .table[data-felt="parlour"]  { --rail-w: 9px;  --rail-r: 14px; --felt-pad: 12px; }
+  .table[data-felt="midnight"] { --rail-w: 7px;  --felt-pad: 14px; }
+  .table-wrap { --room-pad: 8px !important; }
+  .rail-furniture { display: none; }
+
+  /* Seats sit side by side and shrink, so your hand is on the first screen. */
+  .opponents { gap: 8px; flex-wrap: nowrap; justify-content: space-between; }
+  .seat { padding: 6px 4px; flex: 1 1 0; min-width: 0; }
+  .seat-name { font-size: 11px; margin-bottom: 4px; }
+  .count { font-size: 9.5px; }
+  .fanned .card.back { width: 14px; height: 21px; margin-left: -8px; }
+  .team-tag { font-size: 9px; padding: 1px 6px; }
+
+  .center { gap: 18px; margin: 18px 0; }
+  .trick-area { gap: 10px; }
+
+  /* One row that scrolls beats four rows that push the table off-screen. */
+  .hand { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 8px; scroll-snap-type: x proximity; }
+  .hand .card-btn { flex: 0 0 auto; scroll-snap-align: center; }
+  .you-head { gap: 8px; }
+  .you-head > span:first-child { font-size: 12px; }
+
+  .bid-buttons { gap: 6px; }
+  .bid-btn { padding: 8px 12px; font-size: 14px; min-width: 40px; }
+
+  .log { max-height: 110px; font-size: 12px; }
+  .modal-box { margin: 16px; padding: 22px 20px; }
+  .drawer { width: min(94vw, 420px); }
+}
+
+/* Solitaire boards are grids of fixed columns, so the cards themselves have to shrink. One
+   ordered ladder — split across the file, the wider rule silently won and Spider ran off screen. */
+@media (max-width: 1100px) {
+  .felt-content.sol { --cw: 58px; --ch: 82px; --bw: 58px; --bh: 82px; }
+}
+@media (max-width: 780px) {
+  .felt-content.sol { --cw: 40px; --ch: 57px; --bw: 40px; --bh: 57px; gap: 10px; }
+  .sol-tableau { gap: 4px; }
+  .sol-top { gap: 8px; }
+  .sol-group { gap: 5px; }
+  .sol-bar { gap: 8px; }
+  .sol-stat { font-size: 11px; }
+}
+@media (max-width: 480px) {
+  .app { padding: 10px 6px 36px; }
+  /* Ten columns plus rail, felt padding and page gutters have to add up to under 390px. */
+  .table[data-felt] { --rail-w: 6px; --felt-pad: 7px; }
+  .table-wrap { --room-pad: 4px !important; }
+  .felt-content.sol { --cw: 27px; --ch: 39px; --bw: 27px; --bh: 39px; }
+  .sol-tableau { gap: 2px; }
+  .sol-group { flex-wrap: wrap; gap: 4px; }
+  .sol-slot.waste { width: calc(var(--cw) * 1.5); }
+  .felt-content.sol .card.face .corner { font-size: 10px; top: 3px; left: 3px; }
+  .felt-content.sol .card.face .corner span { font-size: 8px; }
+  .felt-content.sol .card.face .pip { font-size: 15px; }
+  .felt-content.sol .card.face .pips { display: none; }
+}
+
+/* ---------------- accessibility ---------------- */
+/* Every interactive thing gets a visible keyboard ring. There were two focus rules in the whole
+   stylesheet before this, which made the app unusable without a mouse. */
+:where(button, a, input, select, textarea, [tabindex]):focus-visible {
+  outline: 3px solid var(--green);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+.card-btn:focus-visible, .sol-card:focus-visible { outline-offset: 3px; }
+
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+/* Hover lift is a mouse idea — on touch it just makes cards jump after a tap. */
+@media (hover: none) {
+  .card-btn.playable:hover, .sol-card.live:not(:disabled):hover,
+  .game-card:hover, .felt-opt:hover { transform: none; }
+}
+
+/* ---------------- crash, resume, help ---------------- */
+.crash { padding: 26px 28px; display: flex; flex-direction: column; gap: 12px; align-items: flex-start; }
+.crash h3 { margin: 0; font-family: var(--mono); font-size: 18px; }
+.crash-detail {
+  font-family: var(--mono); font-size: 12px; color: var(--red); background: var(--surface-2, rgba(0,0,0,0.04));
+  padding: 10px 12px; border-radius: 8px; max-width: 100%; overflow-x: auto; margin: 0;
+}
+.crash-actions { display: flex; gap: 10px; }
+
+.resume {
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  padding: 14px 18px; margin-bottom: 18px; font-size: 14px;
+}
+.resume-actions { margin-left: auto; display: flex; gap: 8px; }
+
+.help-box { max-width: 520px; text-align: left; }
+.help-desc { color: var(--muted); font-size: 14px; line-height: 1.6; margin: 0 0 18px; }
+.help-head {
+  font-family: var(--mono); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--muted); margin: 16px 0 8px;
+}
+.help-steps { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; font-size: 14px; }
+.help-facts { margin: 0 0 20px; display: flex; flex-direction: column; gap: 6px; font-size: 13.5px; }
+.help-facts > div { display: flex; gap: 10px; }
+.help-facts dt { font-family: var(--mono); color: var(--muted); min-width: 78px; }
+.help-facts dd { margin: 0; }
+
+.restart-btn {
+  margin-left: 8px; background: transparent; color: var(--t-muted, var(--muted));
+  border: 1px solid var(--t-line, var(--panel-brd)); border-radius: var(--r-pill);
+  padding: 5px 12px; font: inherit; font-size: 12px; cursor: pointer;
+}
+.restart-btn:hover { color: var(--t-ink, var(--ink)); border-color: currentColor; }
+
 /* ---------------- solitaire board ---------------- */
 .felt-content.sol { display: flex; flex-direction: column; gap: 18px; }
 
@@ -384,16 +512,6 @@ h2 { font-family: var(--mono); letter-spacing: -0.3px; color: var(--ink); font-s
 .col-empty { opacity: 0.55; }
 
 .sol-end-actions { display: flex; gap: 10px; justify-content: center; }
-
-/* Ten columns of two decks need smaller cards to stay on one screen. */
-.sol-tableau { --sol-scale: 1; }
-@media (max-width: 1100px) {
-  .felt-content.sol { --cw: 58px; --ch: 82px; --bw: 58px; --bh: 82px; }
-}
-@media (max-width: 760px) {
-  .felt-content.sol { --cw: 42px; --ch: 60px; --bw: 42px; --bh: 60px; }
-  .sol-tableau { gap: 5px; }
-}
 
 /* --- the picker: four tables in miniature, built from the same tokens --- */
 .felt-pick { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
@@ -501,6 +619,27 @@ h2 { font-family: var(--mono); letter-spacing: -0.3px; color: var(--ink); font-s
 .card.face .corner.tl { top: 7px; left: 7px; }
 .card.face .corner.br { bottom: 7px; right: 7px; transform: rotate(180deg); }
 .card.face .pip { position: absolute; inset: 0; display: grid; place-items: center; font-size: 32px; z-index: 1; }
+
+/* Pip arrangements — a real card shows its value as a pattern, not one big symbol. */
+.card.face .pips { position: absolute; inset: 14% 6%; z-index: 1; }
+.card.face .pips .spot {
+  position: absolute; font-size: calc(var(--ch) * 0.17); line-height: 1; display: block;
+}
+/* Court cards get a monogram rather than a lone pip. */
+.card.face .court-art {
+  position: absolute; inset: 0; z-index: 1; display: grid; place-items: center;
+}
+.card.face .court-letter {
+  font-size: calc(var(--ch) * 0.40); font-weight: 800; line-height: 1; letter-spacing: -0.04em;
+  opacity: 0.92;
+}
+.card.face .court-suit {
+  position: absolute; font-size: calc(var(--ch) * 0.62); opacity: 0.10;
+}
+.card.face.court::after {
+  content: ''; position: absolute; inset: 8%; border-radius: 4px;
+  border: 1px solid currentColor; opacity: 0.18; pointer-events: none;
+}
 
 .you { margin-top: 10px; padding-top: 16px; border-top: 1px solid var(--panel-brd); }
 .you-head { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
@@ -631,8 +770,9 @@ h2 { font-family: var(--mono); letter-spacing: -0.3px; color: var(--ink); font-s
 }
 @media (max-width: 560px) {
   .center { gap: 24px; }
-  .card.face, .card.big { width: 60px; height: 86px; }
-  header h1 { font-size: 22px; }
+  /* Shrink the card TOKENS, not the card element — hard-coding width here overrode every
+     per-board size and pushed Spider's ten columns off the screen. */
+  .table .felt-content:not(.sol) { --cw: 60px; --ch: 86px; }
 }
 
 /* ---------------- customization: icon button + drawer ---------------- */

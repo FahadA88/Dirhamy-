@@ -1,14 +1,17 @@
 import { useSettings } from '../settings/SettingsContext';
+import { useDismissable } from './useEscape';
 import { ACCENTS, AccentId, FELTS, Settings, TableFelt } from '../settings/settings';
 
 // The customization drawer: appearance + gameplay, applied live and persisted.
 export function SettingsPanel({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { settings, set, reset } = useSettings();
+  const ref = useDismissable(open, onClose);
   if (!open) return null;
 
   return (
     <div className="drawer-scrim" onClick={onClose}>
-      <aside className="drawer glass" onClick={(e) => e.stopPropagation()}>
+      <aside className="drawer glass" ref={ref} role="dialog" aria-modal="true" aria-label="Customize"
+        onClick={(e) => e.stopPropagation()}>
         <div className="drawer-head">
           <h2>Customize</h2>
           <div className="drawer-head-actions">

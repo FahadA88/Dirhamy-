@@ -8,9 +8,12 @@ import { TableDressing, TableRail } from './TableDressing';
 import { useSettings } from '../settings/SettingsContext';
 import { BOT_SPEED_MS } from '../settings/settings';
 import { playSound } from './sound';
+import { saveMatch, loadMatch, clearMatch } from '../engine/persist';
+
 
 const HUMAN = 'P1';
 const SUIT_ORDER: Record<string, number> = { S: 0, H: 1, C: 2, D: 3, JOKER: 4 };
+const SUIT_NAMES: Record<string, string> = { C: 'Clubs', D: 'Diamonds', H: 'Hearts', S: 'Spades' };
 const SHAPE_NAME: Record<number, string> = { 1: 'single', 2: 'pair', 3: 'triple', 4: 'four', 5: 'five' };
 
 export function Table({ def, seats = 3 }: { def: GameDefinition; seats?: number }) {
@@ -22,11 +25,29 @@ export function Table({ def, seats = 3 }: { def: GameDefinition; seats?: number 
   const botSeed = useRef<number>(rngSeed());
 
   useEffect(() => {
-    setState(createMatch(def, players, rngSeed()));
+    const saved = loadMatch();
+    if (saved && saved.gameId === def.meta.id && saved.state.players.length === players.length) {
+      setState(saved.state);
+    } else {
+      setState(createMatch(def, players, rngSeed()));
+    }
     botSeed.current = rngSeed();
     setSelected(null);
     setAskRank(null);
   }, [def, players]);
+
+  // Snapshot after every change so a refresh resumes instead of restarting.
+  useEffect(() => {
+    if (state.phase === 'playing') saveMatch(def.meta.id, state);
+    else clearMatch();
+  }, [state, def]);
+
+  function restart() {
+    clearMatch();
+    setSelected(null);
+    setAskRank(null);
+    setState(createMatch(def, players, rngSeed()));
+  }
 
   const view = useMemo(() => redact(state, HUMAN), [state]);
   const myLegal = useMemo(() => (view.isYourTurn ? legalMoves(state, HUMAN) : []), [state, view.isYourTurn]);
@@ -357,6 +378,7 @@ export function Table({ def, seats = 3 }: { def: GameDefinition; seats?: number 
             </button>
           ))}
           {isRummy && view.rummyPhase === 'play' && view.isYourTurn && <span className="rummy-hint">tap a card to discard</span>}
+          <button className="restart-btn" onClick={restart} title="Deal a fresh game">Restart</button>
         </div>
         {isWar ? (
           <div className="war-controls">
@@ -387,11 +409,11 @@ export function Table({ def, seats = 3 }: { def: GameDefinition; seats?: number 
 
       {suitPickerOpen && (
         <div className="modal">
-          <div className="modal-box">
+          <div className="modal-box" role="dialog" aria-modal="true" aria-label="Choose a suit">
             <h3>Wild card — choose a suit</h3>
             <div className="suit-choices">
               {(['C', 'D', 'H', 'S'] as const).map((s) => (
-                <button key={s} className={`suit-btn s-${s}`} onClick={() => submit({ actionId: 'resolveChoice', choice: s })}>{SUIT_SYMBOLS[s]}</button>
+                <button key={s} className={`suit-btn s-${s}`} aria-label={SUIT_NAMES[s]} onClick={() => submit({ actionId: 'resolveChoice', choice: s })}>{SUIT_SYMBOLS[s]}</button>
               ))}
             </div>
           </div>
@@ -439,6 +461,10 @@ export function Table({ def, seats = 3 }: { def: GameDefinition; seats?: number 
       </div>
       </div>
     </div>
+
+      <div className="sr-only" role="status" aria-live="polite">
+        {view.log.length > 0 ? view.log[view.log.length - 1].text : ''}
+      </div>
 
       {settings.showLog && (
         <div className="log">
