@@ -57,6 +57,9 @@ export interface GameDefinition {
   // Present iff this is a comparison game (War): flip the top card, higher rank wins both;
   // ties trigger a "war". No decisions — win by taking all the cards.
   war?: WarConfig;
+  // Present iff this is a single-player patience game: build the tableau down, the foundations
+  // up, and win by clearing the deck. No opponents, no turns, no bot.
+  solitaire?: SolitaireConfig;
   // Present iff each hand opens with a simultaneous card exchange (Hearts).
   handPass?: HandPassConfig;
 }
@@ -111,6 +114,36 @@ export interface TrickConfig {
   leadCard?: string;           // card id (e.g. "C2") — its holder leads trick 1 and must play it
   noPenaltyFirstTrick?: boolean; // no point-carrying card may be discarded on the opening trick
   shootTheMoon?: boolean;      // taking EVERY penalty point scores you 0 and everyone else the full pot
+}
+
+// ---------- solitaire / patience ----------
+// The one single-player family. Instead of hands and turns it has a laid-out tableau: columns
+// you build down, foundations you build up, optional free cells, and a stock. The engine
+// synthesises all of those zones from this config, so a definition never lists them by hand.
+
+export type BuildRule = 'alt-color' | 'same-suit' | 'any-suit' | 'down-any';
+export type EmptyRule = 'any' | 'king' | 'none';
+
+export interface SolitaireConfig {
+  decks: number;               // Spider uses two
+  columns: number;
+  deal: 'triangle' | 'even';   // Klondike's 1,2,3… staircase vs an even split
+  faceUp: 'top' | 'all';       // Klondike/Spider show only the top of each column; FreeCell shows all
+
+  // Stacking a card onto a tableau column.
+  build: BuildRule;            // alt-color (Klondike/FreeCell) | down-any (Spider: rank only)
+  // Lifting more than one card at a time.
+  moveRun: 'single' | 'built' | 'same-suit';
+  empty: EmptyRule;            // what may be dropped into an empty column
+
+  freeCells: number;
+  foundations: number;
+  // Spider has no foundations you place onto — a complete K→A same-suit run leaves the board.
+  foundationMode: 'place' | 'auto-run';
+
+  stock: 'none' | 'waste' | 'deal-row';
+  stockTurn: number;           // cards flipped to the waste at a time
+  redeals: number;             // -1 = unlimited
 }
 
 // A trump-naming auction (Euchre). Round 1 offers the turned-up card's suit; round 2 lets each
@@ -269,6 +302,9 @@ export interface MatchState {
   passChoices: Record<string, string[]>; // playerId -> chosen cardIds, only once they've picked in full
   passStaged: Record<string, string[]>;  // partial picks while a multi-card pass is being assembled
   brokenSuitPlayed: boolean;             // Hearts: has the broken suit been discarded off-suit yet
+  faceUp: Record<string, boolean>;       // solitaire: which cards are turned face up
+  redealsLeft: number;                   // solitaire: stock passes remaining (-1 = unlimited)
+  moveCount: number;                     // solitaire: moves made, for scoring/stats
   log: LogEntry[];
 }
 
@@ -287,6 +323,8 @@ export interface Move {
   rank?: string;          // fishing: the rank being asked for
   cards?: string[];       // rummy: the card ids that form a meld
   alone?: boolean;        // euchre: name trump and play the hand without your partner
+  from?: string;          // solitaire: source zone id
+  to?: string;            // solitaire: destination zone id
 }
 
 // ---------- Redacted (per-player) view ----------
@@ -313,7 +351,16 @@ export interface RedactedState {
   scores: Record<string, number>;
   log: LogEntry[];
   // family-specific view
-  mode: 'shedding' | 'trick' | 'climb' | 'fish' | 'rummy' | 'war';
+  mode: 'shedding' | 'trick' | 'climb' | 'fish' | 'rummy' | 'war' | 'solitaire';
+  // solitaire
+  tableau?: { id: string; cards: Card[]; faceDown: number }[];
+  foundations?: { id: string; cards: Card[] }[];
+  freeCells?: { id: string; card: Card | null }[];
+  stockCount?: number;
+  wasteCards?: Card[];
+  redealsLeft?: number;
+  moveCount?: number;
+  solMoves?: Move[];
   rummyPhase?: 'draw' | 'play';
   meldMoves?: { cards: string[]; label: string }[];
   deadwood?: number;       // gin: what this viewer's unmatched cards are currently worth

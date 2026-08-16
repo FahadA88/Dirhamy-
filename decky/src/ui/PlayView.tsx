@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { catalog } from '../games/catalog';
 import { Table } from './Table';
+import { SolitaireTable } from './SolitaireTable';
 import { GameDefinition } from '../engine/types';
 import { useTilt } from './useTilt';
 import { useSettings } from '../settings/SettingsContext';
@@ -17,16 +18,18 @@ export function PlayView() {
         <div className="crumbs">
           <button className="ghost" onClick={() => setGame(null)}>← All games</button>
           <span className="crumb-title">{game.meta.name}</span>
-          <div className="seat-control">
-            <span>Seats</span>
-            {[2, 3, 4, 5, 6].map((n) => (
-              <button key={n} className={`seg-btn ${seats === n ? 'on' : ''}`}
-                disabled={n < game.meta.players.min || n > game.meta.players.max}
-                onClick={() => setSeats(n)}>{n}</button>
-            ))}
-          </div>
+          {!game.solitaire && (
+            <div className="seat-control">
+              <span>Seats</span>
+              {[2, 3, 4, 5, 6].map((n) => (
+                <button key={n} className={`seg-btn ${seats === n ? 'on' : ''}`}
+                  disabled={n < game.meta.players.min || n > game.meta.players.max}
+                  onClick={() => setSeats(n)}>{n}</button>
+              ))}
+            </div>
+          )}
         </div>
-        <Table def={game} seats={seats} />
+        {game.solitaire ? <SolitaireTable def={game} /> : <Table def={game} seats={seats} />}
       </div>
     );
   }

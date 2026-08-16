@@ -4,6 +4,9 @@ import { undertow } from '../src/games/undertow';
 import { hearts } from '../src/games/hearts';
 import { euchre } from '../src/games/euchre';
 import { ginRummy } from '../src/games/ginRummy';
+import { klondike } from '../src/games/klondike';
+import { freecell } from '../src/games/freecell';
+import { spider } from '../src/games/spider';
 import { catalog } from '../src/games/catalog';
 import { createMatch, legalMoves, applyMove, actingPlayers, redact, nextHand } from '../src/engine/engine';
 import { chooseMove } from '../src/bots/randomBot';
@@ -469,6 +472,185 @@ section('Rummy — knocking, deadwood and lay-off (Gin Rummy)');
   check('the 8♠ hangs off the knocker 4-5-6-7♠ run and wipes the defender deadwood',
     laid.winner === 'B', { withLayoff: laid.scores, without: unlaid.scores });
   check('so the lay-off turns a win into an undercut', (laid.scores['B'] ?? 0) === 31, laid.scores);
+}
+
+// ---------- Solitaire: build rules, capacity, harvesting, and the win ----------
+section('Solitaire — Klondike');
+{
+  const s = createMatch(klondike, ['P1'], 4);
+  const cols = Array.from({ length: 7 }, (_, i) => s.zones[`tab${i}`]);
+  check('seven columns dealt as a staircase', cols.every((c, i) => c.length === i + 1), cols.map((c) => c.length));
+  check('only the last card of each column is face up',
+    cols.every((c) => c.every((card, i) => s.faceUp[card.id] === (i === c.length - 1))));
+  check('the rest is stock', s.zones['stock'].length === 24, s.zones['stock'].length);
+  check('the whole deck is accounted for', 28 + 24 === 52);
+  check('four empty foundations', [0, 1, 2, 3].every((i) => s.zones[`found${i}`].length === 0));
+  check('no free cells', s.zones['free0'] === undefined);
+
+  // Build rules: red on black, descending, and only a King into a gap.
+  let t = createMatch(klondike, ['P1'], 4);
+  for (let i = 0; i < 7; i++) t.zones[`tab${i}`] = [];
+  t.zones['tab0'] = [card('S8', '8', 'S')];
+  t.zones['tab1'] = [card('H7', '7', 'H'), card('C6', '6', 'C')];   // red 7, black 6 — a real run
+  t.zones['tab2'] = [];
+  // The king sits on a face-down card, so shifting it actually gains something — the engine
+  // rightly refuses to move a whole column into an empty one for nothing.
+  t.zones['tab3'] = [card('D9', '9', 'D'), card('SK', 'K', 'S')];
+  t.zones['tab4'] = [card('CQ', 'Q', 'C')];
+  t.zones['stock'] = []; t.zones['waste'] = [];
+  for (const z of ['tab0', 'tab1', 'tab4']) for (const c of t.zones[z]) t.faceUp[c.id] = true;
+  t.faceUp['D9'] = false; t.faceUp['SK'] = true;
+
+  const to0 = legalMoves(t, 'P1').filter((m) => m.to === 'tab0');
+  check('a red 7 stacks on a black 8', to0.some((m) => m.cardId === 'H7'), to0.map((m) => m.cardId));
+  check('a black queen does not stack on a black king',
+    !legalMoves(t, 'P1').some((m) => m.cardId === 'CQ' && m.to === 'tab3'));
+  const toEmpty = legalMoves(t, 'P1').filter((m) => m.to === 'tab2');
+  check('only a King may fill an empty column',
+    toEmpty.length > 0 && toEmpty.every((m) => m.cardId === 'SK'), toEmpty.map((m) => m.cardId));
+  check('a built run moves as one unit — the 6♣ travels with the 7♥',
+    to0.some((m) => m.cardId === 'H7'));
+
+  // Foundations take aces first, then their own suit in order.
+  let f = createMatch(klondike, ['P1'], 4);
+  for (let i = 0; i < 7; i++) f.zones[`tab${i}`] = [];
+  f.zones['tab0'] = [card('SA', 'A', 'S')];
+  f.zones['tab1'] = [card('S2', '2', 'S')];
+  f.zones['tab2'] = [card('H2', '2', 'H')];
+  f.zones['stock'] = []; f.zones['waste'] = [];
+  for (const z of ['tab0', 'tab1', 'tab2']) for (const c of f.zones[z]) f.faceUp[c.id] = true;
+  check('an ace may start a foundation', legalMoves(f, 'P1').some((m) => m.cardId === 'SA' && m.to?.startsWith('found')));
+  check('a two may not', !legalMoves(f, 'P1').some((m) => m.cardId === 'S2' && m.to?.startsWith('found')));
+  f = applyMove(f, 'P1', { actionId: 'solMove', cardId: 'SA', from: 'tab0', to: 'found0' });
+  check('the ace is on the foundation', f.zones['found0'].length === 1);
+  check('the 2♠ now goes up', legalMoves(f, 'P1').some((m) => m.cardId === 'S2' && m.to === 'found0'));
+  check('the 2♥ does not — wrong suit', !legalMoves(f, 'P1').some((m) => m.cardId === 'H2' && m.to === 'found0'));
+
+  // Turning a card over is automatic.
+  let u = createMatch(klondike, ['P1'], 4);
+  for (let i = 0; i < 7; i++) u.zones[`tab${i}`] = [];
+  u.zones['tab0'] = [card('D9', '9', 'D'), card('SA', 'A', 'S')];
+  u.faceUp['D9'] = false; u.faceUp['SA'] = true;
+  u.zones['stock'] = []; u.zones['waste'] = [];
+  u = applyMove(u, 'P1', { actionId: 'solMove', cardId: 'SA', from: 'tab0', to: 'found0' });
+  check('the card underneath turns face up', u.faceUp['D9'] === true);
+
+  // Winning: a board one card from home must finish and be declared solved.
+  let w = createMatch(klondike, ['P1'], 4);
+  const all = Object.values(w.zones).flat();
+  const byId = new Map(all.map((c) => [c.id, c]));
+  for (let i = 0; i < 7; i++) w.zones[`tab${i}`] = [];
+  w.zones['stock'] = []; w.zones['waste'] = [];
+  const ranks = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+  ['S', 'H', 'D', 'C'].forEach((suit, fi) => {
+    w.zones[`found${fi}`] = ranks.slice(0, 12).map((r) => byId.get(`${suit}${r}`)!);
+  });
+  w.zones['tab0'] = ['S', 'H', 'D', 'C'].map((suit) => byId.get(`${suit}K`)!);
+  for (const c of w.zones['tab0']) w.faceUp[c.id] = true;
+  let guard = 0;
+  while (w.phase === 'playing' && guard++ < 20) {
+    const ms = legalMoves(w, 'P1').filter((m) => m.to?.startsWith('found'));
+    if (ms.length === 0) break;
+    w = applyMove(w, 'P1', ms[0]);
+  }
+  check('the last four kings go home', w.phase === 'roundOver', { phase: w.phase, guard });
+  check('the game is declared solved', w.winner === 'P1', w.winner);
+  check('all 52 are on the foundations',
+    [0, 1, 2, 3].reduce((a, i) => a + w.zones[`found${i}`].length, 0) === 52);
+  check('the solve is logged', w.log.some((l) => l.text.includes('Solved')), w.log.slice(-2).map((l) => l.text));
+}
+
+section('Solitaire — FreeCell capacity');
+{
+  const s = createMatch(freecell, ['P1'], 9);
+  const cols = Array.from({ length: 8 }, (_, i) => s.zones[`tab${i}`]);
+  check('eight columns hold the whole deck', cols.reduce((a, c) => a + c.length, 0) === 52, cols.map((c) => c.length));
+  check('dealt 7,7,7,7,6,6,6,6', JSON.stringify(cols.map((c) => c.length)) === '[7,7,7,7,6,6,6,6]', cols.map((c) => c.length));
+  check('everything is face up', cols.every((c) => c.every((card) => s.faceUp[card.id])));
+  check('four free cells, all empty', [0, 1, 2, 3].every((i) => s.zones[`free${i}`].length === 0));
+  check('no stock', s.zones['stock'].length === 0);
+
+  // Capacity is (free cells + 1), doubled for every empty column — so the other six columns are
+  // blocked off with low cards that nothing in the run can stack onto.
+  const build = (cells: number) => {
+    const t = createMatch(freecell, ['P1'], 9);
+    for (let i = 0; i < 8; i++) t.zones[`tab${i}`] = [];
+    // A properly built alt-colour run of five, landing on a black 9.
+    t.zones['tab0'] = [card('S9', '9', 'S')];                       // takes the whole 5-run
+    t.zones['tab1'] = [card('H8', '8', 'H'), card('S7', '7', 'S'), card('D6', '6', 'D'), card('C5', '5', 'C'), card('H4', '4', 'H')];
+    t.zones['tab2'] = [card('H6', '6', 'H')];                       // takes the last two
+    t.zones['tab3'] = [card('S5', '5', 'S')];                       // takes the last one
+    ['S2', 'H2', 'D2', 'C2'].forEach((id, i) => { t.zones[`tab${i + 4}`] = [card(id, '2', id[0])]; });
+    for (let i = 0; i < 8; i++) for (const c of t.zones[`tab${i}`]) t.faceUp[c.id] = true;
+    const filler = ['CK', 'DK', 'HK', 'SK'];
+    for (let i = 0; i < cells; i++) { t.zones[`free${i}`] = [card(filler[i], 'K', filler[i][0])]; t.faceUp[filler[i]] = true; }
+    return t;
+  };
+  const open = build(0);
+  check('with four cells free, a five-card run moves in one go',
+    legalMoves(open, 'P1').some((m) => m.cardId === 'H8' && m.to === 'tab0'),
+    legalMoves(open, 'P1').filter((m) => m.to === 'tab0').map((m) => m.cardId));
+  const full = build(4);
+  check('with every cell full, the five-card run cannot move',
+    !legalMoves(full, 'P1').some((m) => m.cardId === 'H8' && m.to === 'tab0'));
+  check('nor can a two-card piece of it',
+    !legalMoves(full, 'P1').some((m) => m.cardId === 'C5' && m.to === 'tab2'));
+  check('but a single card still moves', legalMoves(full, 'P1').some((m) => m.cardId === 'H4' && m.to === 'tab3'));
+  const one = build(3);
+  check('one free cell lifts two cards',
+    legalMoves(one, 'P1').some((m) => m.cardId === 'C5' && m.to === 'tab2'));
+  check('one free cell does not lift five',
+    !legalMoves(one, 'P1').some((m) => m.cardId === 'H8' && m.to === 'tab0'));
+}
+
+section('Solitaire — Spider runs');
+{
+  const s = createMatch(spider, ['P1'], 11);
+  const cols = Array.from({ length: 10 }, (_, i) => s.zones[`tab${i}`]);
+  check('two decks in play', cols.reduce((a, c) => a + c.length, 0) + s.zones['stock'].length === 104);
+  check('54 dealt, 50 left in stock', cols.reduce((a, c) => a + c.length, 0) === 54 && s.zones['stock'].length === 50,
+    { dealt: cols.reduce((a, c) => a + c.length, 0), stock: s.zones['stock'].length });
+  check('dealt 6,6,6,6,5,5,5,5,5,5', JSON.stringify(cols.map((c) => c.length)) === '[6,6,6,6,5,5,5,5,5,5]', cols.map((c) => c.length));
+
+  // Rank alone governs stacking; suit alone governs lifting.
+  let t = createMatch(spider, ['P1'], 11);
+  for (let i = 0; i < 10; i++) t.zones[`tab${i}`] = [];
+  t.zones['stock'] = [];
+  t.zones['tab0'] = [card('S9', '9', 'S')];
+  t.zones['tab1'] = [card('H8', '8', 'H')];
+  t.zones['tab2'] = [card('C7', '7', 'C'), card('D6', '6', 'D')];
+  t.zones['tab3'] = [card('S7', '7', 'S'), card('S6', '6', 'S')];
+  for (const z of ['tab0', 'tab1', 'tab2', 'tab3']) for (const c of t.zones[z]) t.faceUp[c.id] = true;
+  check('any suit stacks on the next rank up', legalMoves(t, 'P1').some((m) => m.cardId === 'H8' && m.to === 'tab0'));
+  check('a mixed-suit pair cannot be lifted', !legalMoves(t, 'P1').some((m) => m.cardId === 'C7' && m.to === 'tab1'));
+  check('a same-suit pair can', legalMoves(t, 'P1').some((m) => m.cardId === 'S7' && m.to === 'tab1'));
+
+  // A finished King-to-Ace suit run leaves the board on its own.
+  let r = createMatch(spider, ['P1'], 11);
+  const byId = new Map(Object.values(r.zones).flat().map((c) => [c.id, c]));
+  for (let i = 0; i < 10; i++) r.zones[`tab${i}`] = [];
+  r.zones['stock'] = [];
+  const ranks = ['K', 'Q', 'J', '10', '9', '8', '7', '6', '5', '4', '3', '2'];
+  r.zones['tab0'] = [card('D5', '5', 'D'), ...ranks.map((x) => byId.get(`S${x}`)!)];
+  r.zones['tab1'] = [byId.get('SA')!];
+  for (const z of ['tab0', 'tab1']) for (const c of r.zones[z]) r.faceUp[c.id] = true;
+  check('the run is one card short, so nothing clears yet', r.zones['found0'].length === 0);
+  r = applyMove(r, 'P1', { actionId: 'solMove', cardId: 'SA', from: 'tab1', to: 'tab0' });
+  check('completing K-to-A clears it off the board', r.zones['found0'].length === 13, r.zones['found0'].length);
+  check('the column keeps what was underneath', r.zones['tab0'].length === 1 && r.zones['tab0'][0].id === 'D5', r.zones['tab0'].map((c) => c.id));
+  check('the clear is logged', r.log.some((l) => l.text.includes('complete')), r.log.slice(-2).map((l) => l.text));
+
+  // Dealing a row puts one card on every column, and is barred while a column is empty.
+  let d = createMatch(spider, ['P1'], 11);
+  check('a fresh deal offers the stock', legalMoves(d, 'P1').some((m) => m.actionId === 'solDeal'));
+  d.zones['tab3'] = [];
+  check('an empty column blocks the deal', !legalMoves(d, 'P1').some((m) => m.actionId === 'solDeal'));
+  let d2 = createMatch(spider, ['P1'], 11);
+  const before = d2.zones['stock'].length;
+  d2 = applyMove(d2, 'P1', { actionId: 'solDeal' });
+  check('dealing lays one card on each of the ten columns', d2.zones['stock'].length === before - 10, d2.zones['stock'].length);
+  check('and turns them all face up',
+    Array.from({ length: 10 }, (_, i) => d2.zones[`tab${i}`].slice(-1)[0]).every((c) => d2.faceUp[c.id]));
 }
 
 // Redaction runs for every seat, in every classic, whether or not that seat is on turn — the

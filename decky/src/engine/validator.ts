@@ -31,19 +31,25 @@ export function validate(def: GameDefinition): ValidationResult {
   const isFish = !!def.fish;
   const isRummy = !!def.rummy;
   const isWar = !!def.war;
-  const isSpecial = isTrick || isClimb || isFish || isRummy || isWar;
+  const isSolitaire = !!def.solitaire;
+  const isSpecial = isTrick || isClimb || isFish || isRummy || isWar || isSolitaire;
 
   // --- players ---
-  if (def.meta.players.min < 2) err('players.min', 'A game needs at least 2 players.');
+  // Patience is played alone; every other family needs an opponent.
+  if (!isSolitaire && def.meta.players.min < 2) err('players.min', 'A game needs at least 2 players.');
   if (def.meta.players.max < def.meta.players.min) {
     err('players.range', 'Max players is below min players.');
   }
 
   // --- zones: engine expectations ---
-  const sharedPile = def.zones.find((z) => z.shared && z.type === 'pile');
-  if (!sharedPile) err('zones.deck', 'Need a shared pile to hold the deck (e.g. a "draw" pile).');
-  const handZone = def.zones.find((z) => z.type === 'hand' && z.perPlayer);
-  if (!handZone) err('zones.hand', 'Need a per-player hand zone.');
+  // Solitaire's board — columns, foundations, cells, stock — is synthesised from its config,
+  // so it declares no zones of its own and these requirements do not apply.
+  if (!isSolitaire) {
+    const sharedPile = def.zones.find((z) => z.shared && z.type === 'pile');
+    if (!sharedPile) err('zones.deck', 'Need a shared pile to hold the deck (e.g. a "draw" pile).');
+    const handZone = def.zones.find((z) => z.type === 'hand' && z.perPlayer);
+    if (!handZone) err('zones.hand', 'Need a per-player hand zone.');
+  }
   if (isTrick && !def.zones.some((z) => z.type === 'trick')) err('zones.trick', 'Trick games need a trick zone.');
   if (isTrick && def.trick!.trump !== 'none' && !['C', 'D', 'H', 'S'].includes(def.trick!.trump)) {
     err('trick.trump', `Trump must be a suit or "none" (got "${def.trick!.trump}").`);
@@ -142,6 +148,20 @@ export function validate(def: GameDefinition): ValidationResult {
   });
   if (!isSpecial && !hasFallback) {
     warn('deadend.fallback', 'No fallback action (e.g. draw or pass) — players may get stuck with no legal move.');
+  }
+
+  // --- solitaire sanity ---
+  if (isSolitaire) {
+    const c = def.solitaire!;
+    if (c.columns < 1) err('sol.columns', 'A patience needs at least one tableau column.');
+    if (c.foundations < 1) err('sol.foundations', 'A patience needs somewhere for finished cards to go.');
+    const size = ((13 - (def.deck.excludeRanks ?? []).length) * 4) * Math.max(1, def.deck.deckCount ?? 1);
+    if (c.foundations * (13 - (def.deck.excludeRanks ?? []).length) > size) {
+      err('sol.unwinnable', `${c.foundations} foundations cannot be filled from a ${size}-card deck.`);
+    }
+    if (c.foundationMode === 'auto-run' && c.moveRun === 'single') {
+      warn('sol.runs', 'Runs clear automatically but cards can only move one at a time — runs will be very hard to assemble.');
+    }
   }
 
   const hasError = issues.some((i) => i.level === 'error');

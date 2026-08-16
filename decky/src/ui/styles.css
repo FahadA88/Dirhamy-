@@ -327,6 +327,74 @@ h2 { font-family: var(--mono); letter-spacing: -0.3px; color: var(--ink); font-s
 .mn-ring { fill: none; stroke: rgba(120,225,175,0.30); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
 .mn-ring.faint { stroke: rgba(120,225,175,0.12); }
 
+/* ---------------- solitaire board ---------------- */
+.felt-content.sol { display: flex; flex-direction: column; gap: 18px; }
+
+.sol-bar { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.sol-stat { font-family: var(--mono); font-size: 12px; color: var(--t-muted); letter-spacing: 0.04em; }
+.sol-actions { margin-left: auto; display: flex; gap: 8px; }
+.felt-content.sol .ghost {
+  background: var(--t-panel); color: var(--t-ink); border-color: var(--t-line);
+}
+.felt-content.sol .ghost:hover:not(:disabled) { border-color: var(--t-ink); }
+
+.sol-top { display: flex; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
+.sol-group { display: flex; gap: 10px; align-items: flex-start; }
+.sol-group.founds { margin-left: auto; }
+
+.sol-slot {
+  width: var(--cw); min-height: var(--ch); border-radius: 9px; padding: 0;
+  background: none; border: none; cursor: default; position: relative;
+}
+.sol-slot.stock { cursor: pointer; }
+.sol-slot.cell, .sol-slot.found { cursor: pointer; }
+.sol-slot.waste { width: calc(var(--cw) * 1.6); }
+.sol-empty {
+  width: var(--cw); height: var(--ch); border-radius: 9px;
+  border: 1px dashed var(--t-line); display: grid; place-items: center;
+  color: var(--t-muted); font-size: 20px; background: rgba(0, 0, 0, 0.10);
+}
+.sol-empty.recycle { font-size: 26px; color: var(--t-ink); }
+.sol-slot.target .sol-empty, .sol-col.target .col-empty {
+  border-style: solid; border-color: var(--lime); box-shadow: 0 0 0 2px var(--glow);
+}
+.sol-count {
+  position: absolute; right: -4px; bottom: -6px; font-family: var(--mono); font-size: 10px;
+  background: var(--t-panel); color: var(--t-ink); border-radius: 999px; padding: 1px 6px;
+  border: 1px solid var(--t-line);
+}
+
+.waste-fan { display: flex; }
+.waste-fan .sol-card + .sol-card { margin-left: calc(var(--cw) * -0.68); }
+
+.sol-card { background: none; border: none; padding: 0; cursor: pointer; border-radius: 9px; display: block; transition: transform 0.1s; }
+.sol-card:disabled { cursor: default; }
+.sol-card.live .card.face { box-shadow: 0 4px 12px rgba(0,0,0,0.35); }
+.sol-card.picked { transform: translateY(-10px); z-index: 5; }
+.sol-card.picked .card.face { box-shadow: 0 0 0 3px var(--lime), 0 10px 24px rgba(0,0,0,0.4); }
+.sol-card.hinted .card.face, .sol-card.hinted .card.back { box-shadow: 0 0 0 3px var(--amber), 0 8px 20px rgba(217,119,6,0.4); }
+.sol-card.live:not(:disabled):hover { transform: translateY(-6px); }
+
+.sol-tableau {
+  display: grid; grid-template-columns: repeat(var(--cols), 1fr); gap: 10px;
+  align-items: start; min-height: calc(var(--ch) * 2.2);
+}
+.sol-col { display: flex; flex-direction: column; align-items: center; min-height: var(--ch); border-radius: 10px; }
+.sol-col .sol-card { position: relative; }
+.col-empty { opacity: 0.55; }
+
+.sol-end-actions { display: flex; gap: 10px; justify-content: center; }
+
+/* Ten columns of two decks need smaller cards to stay on one screen. */
+.sol-tableau { --sol-scale: 1; }
+@media (max-width: 1100px) {
+  .felt-content.sol { --cw: 58px; --ch: 82px; --bw: 58px; --bh: 82px; }
+}
+@media (max-width: 760px) {
+  .felt-content.sol { --cw: 42px; --ch: 60px; --bw: 42px; --bh: 60px; }
+  .sol-tableau { gap: 5px; }
+}
+
 /* --- the picker: four tables in miniature, built from the same tokens --- */
 .felt-pick { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .felt-opt {

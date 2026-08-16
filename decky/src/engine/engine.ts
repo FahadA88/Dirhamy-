@@ -89,12 +89,61 @@ export function createMatch(
     passChoices: {},
     passStaged: {},
     brokenSuitPlayed: false,
+    faceUp: {},
+    redealsLeft: -1,
+    moveCount: 0,
     log: [],
     matchScores: carry?.matchScores ?? Object.fromEntries(players.map((p) => [p, 0])),
     handNumber: carry?.handNumber ?? 1,
     matchOver: false,
     matchWinner: null,
   };
+
+  // Solitaire synthesises its own board: columns, foundations, cells, stock and waste.
+  if (def.solitaire) {
+    const cfg = def.solitaire;
+    for (let i = 0; i < cfg.columns; i++) state.zones[solZones.tab(i)] = [];
+    for (let i = 0; i < cfg.foundations; i++) state.zones[solZones.found(i)] = [];
+    for (let i = 0; i < cfg.freeCells; i++) state.zones[solZones.free(i)] = [];
+    state.zones[solZones.stock] = [];
+    state.zones[solZones.waste] = [];
+    state.redealsLeft = cfg.redeals;
+
+    const { result, rngState } = seededShuffle(buildDeck(def), state.rngState);
+    state.rngState = rngState;
+    const deck = result;
+
+    // Deal: Klondike's staircase, or an even spread across the columns.
+    const counts: number[] = [];
+    if (cfg.deal === 'triangle') {
+      for (let i = 0; i < cfg.columns; i++) counts.push(i + 1);
+    } else {
+      const per = Math.floor(deck.length / cfg.columns);
+      const extra = deck.length % cfg.columns;
+      for (let i = 0; i < cfg.columns; i++) counts.push(per + (i < extra ? 1 : 0));
+    }
+    // Spider deals 54 of 104, not the whole pack.
+    if (cfg.stock === 'deal-row') {
+      const seed = Math.floor((deck.length - cfg.columns * 5) / cfg.columns);
+      for (let i = 0; i < cfg.columns; i++) counts[i] = seed + (i < 4 ? 1 : 0);
+    }
+
+    let k = 0;
+    for (let i = 0; i < cfg.columns; i++) {
+      for (let n = 0; n < counts[i] && k < deck.length; n++, k++) {
+        const card = deck[k];
+        state.zones[solZones.tab(i)].push(card);
+        state.faceUp[card.id] = cfg.faceUp === 'all' || n === counts[i] - 1;
+      }
+    }
+    for (; k < deck.length; k++) {
+      state.zones[solZones.stock].push(deck[k]);
+      state.faceUp[deck[k].id] = false;
+    }
+
+    log(state, null, `${def.meta.name} dealt.`);
+    return state;
+  }
 
   // Initialize zones.
   for (const z of def.zones) {
@@ -258,6 +307,7 @@ export function legalMoves(state: MatchState, playerId: string): Move[] {
     return hand.filter((c) => !staged.includes(c.id)).map((c) => ({ actionId: 'choosePass', cardId: c.id }));
   }
 
+  if (state.definition.solitaire) return solitaireLegalMoves(state);
   if (state.definition.trick) return trickLegalMoves(state, playerId);
   if (state.definition.climb) return climbLegalMoves(state, playerId);
   if (state.definition.fish) return fishLegalMoves(state, playerId);
@@ -310,6 +360,7 @@ function cloneState(state: MatchState): MatchState {
     passChoices: Object.fromEntries(Object.entries(state.passChoices).map(([k, v]) => [k, v.slice()])),
     passStaged: Object.fromEntries(Object.entries(state.passStaged).map(([k, v]) => [k, v.slice()])),
     climbBombDeclined: { ...state.climbBombDeclined },
+    faceUp: { ...state.faceUp },
     log: state.log.slice(),
   };
 }
@@ -445,6 +496,7 @@ export function applyMove(state: MatchState, playerId: string, move: Move): Matc
 
   if (move.actionId === 'choosePass') return applyChoosePass(s, playerId, move);
 
+  if (def.solitaire) return applySolitaireMove(s, move);
   if (def.trick) return applyTrickMove(s, playerId, move);
   if (def.climb) return applyClimbMove(s, playerId, move);
   if (def.fish) return applyFishMove(s, playerId, move);
@@ -1400,6 +1452,288 @@ function endFishRound(s: MatchState): void {
   finalizeMatchProgress(s);
 }
 
+// ---------- solitaire / patience family ----------
+//
+// Zone ids are synthesised from the config: tab0..tabN, found0..foundN, free0..freeN, plus
+// `stock` and `waste`. A definition never lists them, so a nine-column variant is a number
+// change rather than a rewrite.
+
+export const solZones = {
+  tab: (i: number) => `tab${i}`,
+  found: (i: number) => `found${i}`,
+  free: (i: number) => `free${i}`,
+  stock: 'stock',
+  waste: 'waste',
+};
+
+function solRankIndex(s: MatchState, rank: string): number {
+  return s.definition.deck.rankOrder.indexOf(rank as never);
+}
+
+function isRed(c: Card): boolean { return c.suit === 'H' || c.suit === 'D'; }
+
+// May `card` be stacked directly onto `onto` in a tableau column?
+function solCanStack(s: MatchState, card: Card, onto: Card): boolean {
+  const cfg = s.definition.solitaire!;
+  if (solRankIndex(s, card.rank) !== solRankIndex(s, onto.rank) - 1) return false;
+  switch (cfg.build) {
+    case 'alt-color': return isRed(card) !== isRed(onto);
+    case 'same-suit': return card.suit === onto.suit;
+    case 'any-suit': return card.suit !== onto.suit;
+    default: return true;                       // 'down-any' — rank alone (Spider)
+  }
+}
+
+// Is the run starting at `from` in this column liftable as one unit?
+function solRunOk(s: MatchState, col: Card[], from: number): boolean {
+  const cfg = s.definition.solitaire!;
+  if (from >= col.length - 1) return true;      // a single card is always a run of one
+  if (cfg.moveRun === 'single') return false;
+  for (let i = from; i < col.length - 1; i++) {
+    const a = col[i], b = col[i + 1];
+    if (solRankIndex(s, b.rank) !== solRankIndex(s, a.rank) - 1) return false;
+    if (cfg.moveRun === 'same-suit' && a.suit !== b.suit) return false;
+    if (cfg.moveRun === 'built' && !solCanStack(s, b, a)) return false;
+  }
+  return true;
+}
+
+// How many cards can be shifted at once: one, plus a free cell each, doubled per empty column.
+function solMoveCapacity(s: MatchState, toEmptyColumn: boolean): number {
+  const cfg = s.definition.solitaire!;
+  if (cfg.freeCells === 0) return Infinity;     // no cells means no supermove limit to enforce
+  let free = 0;
+  for (let i = 0; i < cfg.freeCells; i++) if ((s.zones[solZones.free(i)] || []).length === 0) free++;
+  let emptyCols = 0;
+  for (let i = 0; i < cfg.columns; i++) if ((s.zones[solZones.tab(i)] || []).length === 0) emptyCols++;
+  if (toEmptyColumn && emptyCols > 0) emptyCols--;
+  return (free + 1) * Math.pow(2, emptyCols);
+}
+
+function solCanDropOnColumn(s: MatchState, card: Card, colId: string): boolean {
+  const cfg = s.definition.solitaire!;
+  const col = s.zones[colId] || [];
+  if (col.length === 0) {
+    if (cfg.empty === 'none') return false;
+    if (cfg.empty === 'king') return solRankIndex(s, card.rank) === s.definition.deck.rankOrder.length - 1;
+    return true;
+  }
+  const top = col[col.length - 1];
+  if (!s.faceUp[top.id]) return false;
+  return solCanStack(s, card, top);
+}
+
+function solCanDropOnFoundation(s: MatchState, card: Card, fId: string): boolean {
+  if (s.definition.solitaire!.foundationMode !== 'place') return false;
+  const f = s.zones[fId] || [];
+  if (f.length === 0) return solRankIndex(s, card.rank) === 0;   // aces start a foundation
+  const top = f[f.length - 1];
+  return card.suit === top.suit && solRankIndex(s, card.rank) === solRankIndex(s, top.rank) + 1;
+}
+
+// Spider: a complete king-to-ace run of one suit sitting on a column leaves the board.
+function solHarvestRuns(s: MatchState): void {
+  const cfg = s.definition.solitaire!;
+  if (cfg.foundationMode !== 'auto-run') return;
+  const len = s.definition.deck.rankOrder.length;
+  for (let i = 0; i < cfg.columns; i++) {
+    const col = s.zones[solZones.tab(i)];
+    if (!col || col.length < len) continue;
+    const run = col.slice(col.length - len);
+    const ok = run.every((c, k) => s.faceUp[c.id] && c.suit === run[0].suit
+      && solRankIndex(s, c.rank) === len - 1 - k);
+    if (!ok) continue;
+    s.zones[solZones.tab(i)] = col.slice(0, col.length - len);
+    const slot = Array.from({ length: cfg.foundations }, (_, k) => solZones.found(k))
+      .find((id) => (s.zones[id] || []).length === 0);
+    if (slot) s.zones[slot] = run;
+    const newTop = s.zones[solZones.tab(i)].slice(-1)[0];
+    if (newTop) s.faceUp[newTop.id] = true;
+    log(s, null, `A complete ${run[0].suit === 'H' ? '♥' : run[0].suit === 'D' ? '♦' : run[0].suit === 'C' ? '♣' : '♠'} run is cleared.`);
+  }
+}
+
+function solTopFaceUpRun(s: MatchState, colId: string): number {
+  const col = s.zones[colId] || [];
+  for (let i = 0; i < col.length; i++) {
+    if (!s.faceUp[col[i].id]) continue;
+    if (solRunOk(s, col, i)) return i;
+  }
+  return col.length;
+}
+
+function solitaireLegalMoves(state: MatchState): Move[] {
+  const cfg = state.definition.solitaire!;
+  const moves: Move[] = [];
+  const cols = Array.from({ length: cfg.columns }, (_, i) => solZones.tab(i));
+  const founds = Array.from({ length: cfg.foundations }, (_, i) => solZones.found(i));
+  const cells = Array.from({ length: cfg.freeCells }, (_, i) => solZones.free(i));
+
+  // Every movable card, with where it came from.
+  const sources: { id: string; card: Card; run: Card[]; from: string }[] = [];
+  for (const colId of cols) {
+    const col = state.zones[colId] || [];
+    const start = solTopFaceUpRun(state, colId);
+    for (let i = start; i < col.length; i++) {
+      if (!state.faceUp[col[i].id] || !solRunOk(state, col, i)) continue;
+      sources.push({ id: col[i].id, card: col[i], run: col.slice(i), from: colId });
+    }
+  }
+  for (const cellId of cells) {
+    const c = (state.zones[cellId] || [])[0];
+    if (c) sources.push({ id: c.id, card: c, run: [c], from: cellId });
+  }
+  if (cfg.stock === 'waste') {
+    const w = state.zones[solZones.waste] || [];
+    const top = w[w.length - 1];
+    if (top) sources.push({ id: top.id, card: top, run: [top], from: solZones.waste });
+  }
+
+  for (const src of sources) {
+    for (const colId of cols) {
+      if (colId === src.from) continue;
+      const empty = (state.zones[colId] || []).length === 0;
+      if (src.run.length > solMoveCapacity(state, empty)) continue;
+      // Shuffling a whole column into an empty one achieves nothing.
+      if (empty && src.from.startsWith('tab') && (state.zones[src.from] || []).length === src.run.length) continue;
+      if (solCanDropOnColumn(state, src.card, colId)) {
+        moves.push({ actionId: 'solMove', cardId: src.id, from: src.from, to: colId });
+      }
+    }
+    if (src.run.length === 1) {
+      for (const fId of founds) {
+        if (solCanDropOnFoundation(state, src.card, fId)) {
+          moves.push({ actionId: 'solMove', cardId: src.id, from: src.from, to: fId });
+          break;                                  // one empty foundation is the same as any other
+        }
+      }
+      for (const cellId of cells) {
+        if (src.from === cellId || (state.zones[cellId] || []).length > 0) continue;
+        moves.push({ actionId: 'solMove', cardId: src.id, from: src.from, to: cellId });
+        break;
+      }
+    }
+  }
+
+  if (cfg.stock === 'waste') {
+    if ((state.zones[solZones.stock] || []).length > 0) moves.push({ actionId: 'solDraw' });
+    else if ((state.zones[solZones.waste] || []).length > 0
+      && (state.redealsLeft > 0 || state.redealsLeft < 0)) moves.push({ actionId: 'solRedeal' });
+  }
+  if (cfg.stock === 'deal-row' && (state.zones[solZones.stock] || []).length > 0) {
+    // Spider refuses to deal onto an empty column.
+    if (cols.every((c) => (state.zones[c] || []).length > 0)) moves.push({ actionId: 'solDeal' });
+  }
+  return moves;
+}
+
+function applySolitaireMove(s: MatchState, move: Move): MatchState {
+  const cfg = s.definition.solitaire!;
+  const legal = solitaireLegalMoves(s);
+  const ok = legal.find((m) => m.actionId === move.actionId && m.cardId === move.cardId
+    && m.from === move.from && m.to === move.to);
+  if (!ok) return s;
+
+  if (move.actionId === 'solDraw') {
+    const stock = s.zones[solZones.stock];
+    for (let i = 0; i < Math.max(1, cfg.stockTurn) && stock.length; i++) {
+      const c = stock.pop()!;
+      s.faceUp[c.id] = true;
+      s.zones[solZones.waste].push(c);
+    }
+    s.moveCount++;
+    return s;
+  }
+
+  if (move.actionId === 'solRedeal') {
+    const waste = s.zones[solZones.waste];
+    s.zones[solZones.stock] = waste.slice().reverse();
+    for (const c of s.zones[solZones.stock]) s.faceUp[c.id] = false;
+    s.zones[solZones.waste] = [];
+    if (s.redealsLeft > 0) s.redealsLeft--;
+    s.moveCount++;
+    log(s, null, 'Stock turned over.');
+    return s;
+  }
+
+  if (move.actionId === 'solDeal') {
+    for (let i = 0; i < cfg.columns; i++) {
+      const c = s.zones[solZones.stock].pop();
+      if (!c) break;
+      s.faceUp[c.id] = true;
+      s.zones[solZones.tab(i)].push(c);
+    }
+    s.moveCount++;
+    solHarvestRuns(s);
+    checkSolitaireEnd(s);
+    return s;
+  }
+
+  // solMove
+  const from = s.zones[move.from!];
+  const idx = from.findIndex((c) => c.id === move.cardId);
+  if (idx < 0) return s;
+  const run = from.splice(idx);
+  s.zones[move.to!].push(...run);
+  for (const c of run) s.faceUp[c.id] = true;
+
+  // Turning over whatever the lifted run was covering is automatic.
+  if (move.from!.startsWith('tab')) {
+    const newTop = from[from.length - 1];
+    if (newTop && !s.faceUp[newTop.id]) s.faceUp[newTop.id] = true;
+  }
+  s.moveCount++;
+  solHarvestRuns(s);
+  checkSolitaireEnd(s);
+  return s;
+}
+
+// The board as the player sees it: columns with their face-down depth, foundations, cells,
+// the stock count, and every legal move so the UI can highlight without re-deriving the rules.
+function solitaireView(s: MatchState): Partial<RedactedState> {
+  const cfg = s.definition.solitaire!;
+  const hidden = (c: Card) => ({ ...c, rank: '?' as Card['rank'], suit: '?' as Card['suit'] });
+  return {
+    tableau: Array.from({ length: cfg.columns }, (_, i) => {
+      const col = s.zones[solZones.tab(i)] || [];
+      const faceDown = col.filter((c) => !s.faceUp[c.id]).length;
+      return { id: solZones.tab(i), cards: col.map((c) => (s.faceUp[c.id] ? c : hidden(c))), faceDown };
+    }),
+    foundations: Array.from({ length: cfg.foundations }, (_, i) => ({
+      id: solZones.found(i), cards: (s.zones[solZones.found(i)] || []).slice(),
+    })),
+    freeCells: Array.from({ length: cfg.freeCells }, (_, i) => ({
+      id: solZones.free(i), card: (s.zones[solZones.free(i)] || [])[0] ?? null,
+    })),
+    stockCount: (s.zones[solZones.stock] || []).length,
+    wasteCards: (s.zones[solZones.waste] || []).slice(-3),
+    redealsLeft: s.redealsLeft,
+    moveCount: s.moveCount,
+    solMoves: s.phase === 'playing' ? solitaireLegalMoves(s) : [],
+  };
+}
+
+function checkSolitaireEnd(s: MatchState): void {
+  const cfg = s.definition.solitaire!;
+  const len = s.definition.deck.rankOrder.length;
+  const need = cfg.foundations * len;
+  let placed = 0;
+  for (let i = 0; i < cfg.foundations; i++) placed += (s.zones[solZones.found(i)] || []).length;
+  if (placed >= need) {
+    s.phase = 'roundOver';
+    s.winner = s.players[0];
+    s.scores[s.players[0]] = s.moveCount;
+    log(s, null, `Solved in ${s.moveCount} moves.`);
+    return;
+  }
+  if (solitaireLegalMoves(s).length === 0) {
+    s.phase = 'roundOver';
+    s.winner = null;
+    s.scores[s.players[0]] = s.moveCount;
+    log(s, null, 'No moves left — the game is blocked.');
+  }
+}
+
 // ---------- rummy / melding family ----------
 
 function rummyZones(def: MatchState['definition']) {
@@ -1900,7 +2234,8 @@ export function redact(state: MatchState, viewer: string): RedactedState {
     pendingChoice: state.pendingChoice,
     scores: { ...state.scores },
     log: state.log.slice(-40),
-    mode: state.definition.trick ? 'trick' : state.definition.climb ? 'climb' : state.definition.fish ? 'fish' : state.definition.rummy ? 'rummy' : state.definition.war ? 'war' : 'shedding',
+    mode: state.definition.solitaire ? 'solitaire' : state.definition.trick ? 'trick' : state.definition.climb ? 'climb' : state.definition.fish ? 'fish' : state.definition.rummy ? 'rummy' : state.definition.war ? 'war' : 'shedding',
+    ...(state.definition.solitaire ? solitaireView(state) : {}),
     battle: state.definition.war ? (state.zones[state.definition.zones.find((z) => z.shared && z.visibility === 'all')!.id] || []).slice() : undefined,
     rummyPhase: state.definition.rummy ? state.rummyPhase : undefined,
     meldMoves: state.definition.rummy && state.definition.rummy.knock === undefined
