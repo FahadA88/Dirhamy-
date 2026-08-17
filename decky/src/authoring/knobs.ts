@@ -7,7 +7,7 @@ import { Effect, GameDefinition, Predicate, Rank, Suit } from '../engine/types';
 export const RANKS_13: Rank[] = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
 
 export interface Knobs {
-  family: 'shedding' | 'trick' | 'climb' | 'fish' | 'rummy' | 'war';
+  family: 'shedding' | 'trick' | 'climb' | 'fish' | 'rummy' | 'war' | 'solitaire';
   name: string;
   description: string;
   minPlayers: number;
@@ -44,6 +44,20 @@ export interface Knobs {
   rummyLayOff: boolean;     // spare cards may extend melds already on the table
   // war
   warRoundCap: number;
+  // solitaire — the board is described, not drawn: these are the dials the engine reads.
+  solColumns: number;
+  solDeal: 'triangle' | 'even';
+  solFaceUp: 'top' | 'all';
+  solBuild: 'alt-color' | 'same-suit' | 'any-suit' | 'down-any';
+  solMoveRun: 'single' | 'built' | 'same-suit';
+  solEmpty: 'any' | 'king' | 'none';
+  solFreeCells: number;
+  solFoundations: number;
+  solAutoRuns: boolean;      // a finished suit run clears itself (Spider) instead of being placed
+  solStock: 'none' | 'waste' | 'deal-row';
+  solStockTurn: number;
+  solRedeals: number;        // -1 = unlimited
+  solDecks: number;
   // deck
   handSize: number;
   deckCount: number;
@@ -119,6 +133,19 @@ export const defaultKnobs: Knobs = {
   rummyKnockAt: 10,
   rummyLayOff: true,
   warRoundCap: 800,
+  solColumns: 7,
+  solDeal: 'triangle',
+  solFaceUp: 'top',
+  solBuild: 'alt-color',
+  solMoveRun: 'built',
+  solEmpty: 'king',
+  solFreeCells: 0,
+  solFoundations: 4,
+  solAutoRuns: false,
+  solStock: 'waste',
+  solStockTurn: 3,
+  solRedeals: -1,
+  solDecks: 1,
   handSize: 5,
   deckCount: 1,
   excludeRanks: [],
@@ -153,7 +180,60 @@ export function buildDefinition(knobs: Knobs, id = 'draft'): GameDefinition {
   if (knobs.family === 'fish') return buildFishDefinition(knobs, id);
   if (knobs.family === 'rummy') return buildRummyDefinition(knobs, id);
   if (knobs.family === 'war') return buildWarDefinition(knobs, id);
+  if (knobs.family === 'solitaire') return buildSolitaireDefinition(knobs, id);
   return buildSheddingDefinition(knobs, id);
+}
+
+// Patience: the engine synthesises the whole board from this config, so the definition only
+// carries the deck and the dials.
+function buildSolitaireDefinition(knobs: Knobs, id: string): GameDefinition {
+  return {
+    schemaVersion: '1.0',
+    meta: {
+      id, name: knobs.name, description: knobs.description || autoSolitaireDescription(knobs),
+      players: { min: 1, max: 1 },
+      family: 'solitaire',
+    },
+    deck: {
+      base: 'standard54', includeJokers: false, deckCount: clampInt(knobs.solDecks, 1, 2),
+      excludeRanks: knobs.excludeRanks, rankOrder: RANKS_13, tags: {},
+    },
+    zones: [], setup: [],
+    turnFlow: { order: 'clockwise', startPlayer: 'first', actionsPerTurn: { min: 1, max: 1 } },
+    actions: [], triggers: [], endConditions: [],
+    scoring: { mode: 'lowestPoints', winner: 'lowestTotal', cardPoints: {}, target: null },
+    solitaire: {
+      decks: clampInt(knobs.solDecks, 1, 2),
+      columns: clampInt(knobs.solColumns, 4, 12),
+      deal: knobs.solDeal,
+      faceUp: knobs.solFaceUp,
+      build: knobs.solBuild,
+      moveRun: knobs.solMoveRun,
+      empty: knobs.solEmpty,
+      freeCells: clampInt(knobs.solFreeCells, 0, 6),
+      foundations: clampInt(knobs.solFoundations, 1, 8),
+      foundationMode: knobs.solAutoRuns ? 'auto-run' : 'place',
+      stock: knobs.solStock,
+      stockTurn: clampInt(knobs.solStockTurn, 1, 3),
+      redeals: knobs.solRedeals,
+    },
+  };
+}
+
+function autoSolitaireDescription(k: Knobs): string {
+  const build = k.solBuild === 'alt-color' ? 'in alternating colours'
+    : k.solBuild === 'same-suit' ? 'in the same suit'
+    : k.solBuild === 'any-suit' ? 'in a different suit' : 'by rank, any suit';
+  const gap = k.solEmpty === 'king' ? 'Only a King may fill an empty column.'
+    : k.solEmpty === 'none' ? 'Empty columns stay empty.' : 'Any card may fill an empty column.';
+  const stock = k.solStock === 'waste'
+    ? ` Turn the stock ${k.solStockTurn} at a time${k.solRedeals < 0 ? ', as many passes as you like' : k.solRedeals === 0 ? ', one pass only' : `, ${k.solRedeals} redeals`}.`
+    : k.solStock === 'deal-row' ? ' When stuck, deal another row across every column.' : '';
+  const cells = k.solFreeCells > 0 ? ` ${k.solFreeCells} free cells each hold one card.` : '';
+  const finish = k.solAutoRuns
+    ? 'Complete a King-to-Ace run in one suit and it clears itself off the board.'
+    : 'Build the foundations up by suit from the aces.';
+  return `A patience laid out in ${k.solColumns} columns. Build the columns downward ${build}. ${finish} ${gap}${cells}${stock}`;
 }
 
 function buildRummyDefinition(knobs: Knobs, id: string): GameDefinition {
@@ -431,7 +511,7 @@ export function knobsFromDefinition(def: GameDefinition): Knobs {
   const wildRanks = tagRanks('wild').filter((r) => !wildDrawRanks.includes(r));
 
   return {
-    family: def.war ? 'war' : def.rummy ? 'rummy' : def.fish ? 'fish' : def.climb ? 'climb' : def.trick ? 'trick' : 'shedding',
+    family: def.solitaire ? 'solitaire' : def.war ? 'war' : def.rummy ? 'rummy' : def.fish ? 'fish' : def.climb ? 'climb' : def.trick ? 'trick' : 'shedding',
     trump: def.trick?.trump ?? 'S',
     mustFollowSuit: def.trick?.mustFollowSuit ?? true,
     aceHigh: def.trick?.aceHigh ?? def.war?.aceHigh ?? true,
@@ -450,6 +530,19 @@ export function knobsFromDefinition(def: GameDefinition): Knobs {
     forceOpeningLead: !!def.trick?.leadCard,
     handPassCount: def.handPass?.count ?? 0,
     bookSize: def.fish?.bookSize ?? 4,
+    solColumns: def.solitaire?.columns ?? 7,
+    solDeal: def.solitaire?.deal ?? 'triangle',
+    solFaceUp: def.solitaire?.faceUp ?? 'top',
+    solBuild: def.solitaire?.build ?? 'alt-color',
+    solMoveRun: def.solitaire?.moveRun ?? 'built',
+    solEmpty: def.solitaire?.empty ?? 'king',
+    solFreeCells: def.solitaire?.freeCells ?? 0,
+    solFoundations: def.solitaire?.foundations ?? 4,
+    solAutoRuns: def.solitaire?.foundationMode === 'auto-run',
+    solStock: def.solitaire?.stock ?? 'waste',
+    solStockTurn: def.solitaire?.stockTurn ?? 3,
+    solRedeals: def.solitaire?.redeals ?? -1,
+    solDecks: def.solitaire?.decks ?? 1,
     rummyKnock: def.rummy?.knock !== undefined,
     rummyKnockAt: def.rummy?.knock ?? 10,
     rummyLayOff: !!def.rummy?.layOff,

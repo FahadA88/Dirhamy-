@@ -183,6 +183,36 @@ export const offlineTranslator: Translator = {
       if (n > 0) { patch.handPassCount = n; notes.push(`Exchange ${n} card${n === 1 ? '' : 's'} before each hand.`); }
     }
 
+    // solitaire — one player against the deal
+    if (/\bsolitaire\b|\bpatience\b|\bklondike\b|\bfreecell\b|\bfree cell\b|\bspider\b|\btableau\b|\bfoundations?\b|\bone[- ]player\b|\bsingle[- ]player\b/.test(text)) {
+      patch.family = 'solitaire';
+      patch.minPlayers = 1; patch.maxPlayers = 1;
+      notes.push('Patience — one player against the deal.');
+      const cols = /\b(\d{1,2})\s+columns?\b/.exec(text);
+      if (cols) { patch.solColumns = clamp(parseInt(cols[1], 10), 4, 12); notes.push(`${patch.solColumns} tableau columns.`); }
+      const cells = /\b(\w+)\s+free ?cells?\b/.exec(text);
+      if (cells) {
+        const words: Record<string, number> = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, '1': 1, '2': 2, '3': 3, '4': 4, '5': 5, '6': 6 };
+        const n = words[cells[1]];
+        if (n) { patch.solFreeCells = n; notes.push(`${n} free cells.`); }
+      }
+      if (/\bfreecell\b|\bfree cell\b/.test(text)) {
+        patch.solColumns = 8; patch.solDeal = 'even'; patch.solFaceUp = 'all';
+        patch.solFreeCells = 4; patch.solEmpty = 'any'; patch.solStock = 'none';
+      }
+      if (/\bspider\b/.test(text)) {
+        patch.solColumns = 10; patch.solDeal = 'even'; patch.solDecks = 2;
+        patch.solBuild = 'down-any'; patch.solMoveRun = 'same-suit'; patch.solEmpty = 'any';
+        patch.solFoundations = 8; patch.solAutoRuns = true; patch.solStock = 'deal-row';
+        notes.push('Two decks, stack by rank, lift by suit, runs clear themselves.');
+      }
+      if (/\bsame suit\b/.test(text)) patch.solBuild = 'same-suit';
+      if (/\balternating colou?rs?\b|\bopposite colou?r\b/.test(text)) patch.solBuild = 'alt-color';
+      if (/\bking\b[^.]*\bempty\b|\bempty\b[^.]*\bkings? only\b/.test(text)) patch.solEmpty = 'king';
+      if (/\bturn (one|1)\b|\bone at a time\b/.test(text)) patch.solStockTurn = 1;
+      if (/\bturn (three|3)\b|\bthree at a time\b/.test(text)) patch.solStockTurn = 3;
+    }
+
     // rummy / war families
     if (/\brummy\b|\bmelds?\b|\bsets and runs\b|\blay (down|off)\b|\bgin\b/.test(text)) {
       patch.family = 'rummy';
@@ -398,7 +428,7 @@ function describeChange(field: keyof Knobs, value: unknown): string {
     case 'matchPlay': return value ? 'Match play: on' : 'Single hand only';
     case 'pointTarget': return `Race to ${value} points`;
     case 'family': {
-      const names: Record<string, string> = { trick: 'Trick-taking game', climb: 'Climbing game', fish: 'Fishing game', rummy: 'Rummy/melding game', war: 'Comparison game (War)', shedding: 'Shedding/matching game' };
+      const names: Record<string, string> = { trick: 'Trick-taking game', climb: 'Climbing game', fish: 'Fishing game', rummy: 'Rummy/melding game', war: 'Comparison game (War)', solitaire: 'Patience (one player)', shedding: 'Shedding/matching game' };
       return names[value as string] ?? String(value);
     }
     case 'trickScoreBy': return value === 'mostTricks' ? 'Win: most tricks' : value === 'fewestTricks' ? 'Win: fewest tricks' : 'Win: fewest penalty points';
@@ -409,6 +439,18 @@ function describeChange(field: keyof Knobs, value: unknown): string {
     case 'passRanks': return (value as Rank[]).length ? `Pass a card on ${ranks(value)}` : 'No card passing';
     case 'passDirectionKnob': return `Pass direction → ${value}`;
     case 'bookSize': return `Book = ${value} of a rank`;
+    case 'solColumns': return `${value} tableau columns`;
+    case 'solFreeCells': return value ? `${value} free cells` : 'No free cells';
+    case 'solFoundations': return `${value} foundations`;
+    case 'solAutoRuns': return value ? 'Runs clear themselves' : 'Place cards on foundations';
+    case 'solBuild': return value === 'alt-color' ? 'Build down in alternating colours'
+      : value === 'same-suit' ? 'Build down in suit' : 'Build down by rank, any suit';
+    case 'solMoveRun': return value === 'single' ? 'Move one card at a time'
+      : value === 'same-suit' ? 'Lift same-suit runs only' : 'Lift built runs';
+    case 'solEmpty': return value === 'king' ? 'Kings only into gaps' : value === 'none' ? 'Gaps stay empty' : 'Any card into a gap';
+    case 'solStock': return value === 'none' ? 'No stock' : value === 'deal-row' ? 'Deal a row from the stock' : 'Turn the stock to a waste';
+    case 'solStockTurn': return `Turn ${value} at a time`;
+    case 'solDecks': return `${value} deck${value === 1 ? '' : 's'}`;
     case 'rummyKnock': return value ? 'Knocking (Gin-style)' : 'Lay melds down as you go';
     case 'rummyKnockAt': return `Knock at ${value} deadwood or less`;
     case 'rummyLayOff': return value ? 'Lay-off allowed' : 'No lay-off';

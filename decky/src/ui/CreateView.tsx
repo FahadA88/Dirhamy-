@@ -12,8 +12,16 @@ import { president } from '../games/president';
 import { goFish } from '../games/goFish';
 import { rummy } from '../games/rummy';
 import { war } from '../games/war';
+import { hearts } from '../games/hearts';
+import { euchre } from '../games/euchre';
+import { ginRummy } from '../games/ginRummy';
+import { undertow } from '../games/undertow';
+import { klondike } from '../games/klondike';
+import { freecell } from '../games/freecell';
+import { spider } from '../games/spider';
 import { GameDefinition, Rank, Suit } from '../engine/types';
 import { Table } from './Table';
+import { SolitaireTable } from './SolitaireTable';
 
 type RankArrayKey = 'wildRanks' | 'skipRanks' | 'reverseRanks' | 'drawRanks' | 'extraTurnRanks' | 'wildDrawRanks' | 'excludeRanks' | 'passRanks';
 
@@ -60,7 +68,7 @@ export function CreateView() {
           <button className="ghost" onClick={() => setPlaytest(false)}>← Back to editor</button>
           <span className="crumb-title">Playtesting · {def.meta.name}</span>
         </div>
-        <Table def={def} seats={Math.min(3, def.meta.players.max)} />
+        {def.solitaire ? <SolitaireTable def={def} /> : <Table def={def} seats={Math.min(3, def.meta.players.max)} />}
       </div>
     );
   }
@@ -85,6 +93,13 @@ export function CreateView() {
             <button className="chip" onClick={() => startFrom(knobsFromDefinition(goFish))}>Go Fish</button>
             <button className="chip" onClick={() => startFrom(knobsFromDefinition(rummy))}>Rummy</button>
             <button className="chip" onClick={() => startFrom(knobsFromDefinition(war))}>War</button>
+            <button className="chip" onClick={() => startFrom(knobsFromDefinition(hearts))}>Hearts</button>
+            <button className="chip" onClick={() => startFrom(knobsFromDefinition(euchre))}>Euchre</button>
+            <button className="chip" onClick={() => startFrom(knobsFromDefinition(ginRummy))}>Gin Rummy</button>
+            <button className="chip" onClick={() => startFrom(knobsFromDefinition(undertow))}>Undertow</button>
+            <button className="chip" onClick={() => startFrom(knobsFromDefinition(klondike))}>Solitaire</button>
+            <button className="chip" onClick={() => startFrom(knobsFromDefinition(freecell))}>FreeCell</button>
+            <button className="chip" onClick={() => startFrom(knobsFromDefinition(spider))}>Spider</button>
           </div>
 
           <div className="field"><span>Game family</span>
@@ -95,6 +110,7 @@ export function CreateView() {
               <button className={knobs.family === 'fish' ? 'on' : ''} onClick={() => set('family', 'fish')}>Fishing</button>
               <button className={knobs.family === 'rummy' ? 'on' : ''} onClick={() => set('family', 'rummy')}>Rummy</button>
               <button className={knobs.family === 'war' ? 'on' : ''} onClick={() => set('family', 'war')}>War</button>
+              <button className={knobs.family === 'solitaire' ? 'on' : ''} onClick={() => set('family', 'solitaire')}>Solitaire</button>
             </div>
           </div>
 
@@ -102,12 +118,16 @@ export function CreateView() {
 
           <Section title="Identity" defaultOpen>
             <label className="field"><span>Name</span><input value={knobs.name} onChange={(e) => set('name', e.target.value)} /></label>
-            <div className="two">
-              <label className="field"><span>Min players: <b>{knobs.minPlayers}</b></span>
-                <input type="range" min={2} max={8} value={knobs.minPlayers} onChange={(e) => set('minPlayers', +e.target.value)} /></label>
-              <label className="field"><span>Max players: <b>{knobs.maxPlayers}</b></span>
-                <input type="range" min={knobs.minPlayers} max={8} value={knobs.maxPlayers} onChange={(e) => set('maxPlayers', +e.target.value)} /></label>
-            </div>
+            {knobs.family === 'solitaire' ? (
+              <span className="mini-label">Patience is played alone — no seat count to set.</span>
+            ) : (
+              <div className="two">
+                <label className="field"><span>Min players: <b>{knobs.minPlayers}</b></span>
+                  <input type="range" min={2} max={8} value={knobs.minPlayers} onChange={(e) => set('minPlayers', +e.target.value)} /></label>
+                <label className="field"><span>Max players: <b>{knobs.maxPlayers}</b></span>
+                  <input type="range" min={knobs.minPlayers} max={8} value={knobs.maxPlayers} onChange={(e) => set('maxPlayers', +e.target.value)} /></label>
+              </div>
+            )}
           </Section>
 
           {knobs.family === 'trick' && (
@@ -222,6 +242,61 @@ export function CreateView() {
                   ? 'Score the gap between the two players’ unmatched cards. No deadwood at all is gin (+25); fail to beat your opponent and they undercut you (+25).'
                   : 'Draw, lay down sets and runs, then discard. First to shed every card wins.'}
               </span>
+            </Section>
+          )}
+
+          {knobs.family === 'solitaire' && (
+            <Section title="The board" defaultOpen>
+              <span className="mini-label">One player against the deal. The engine builds the whole board from these.</span>
+              <label className="field"><span>Tableau columns: <b>{knobs.solColumns}</b></span>
+                <input type="range" min={4} max={12} value={knobs.solColumns} onChange={(e) => set('solColumns', +e.target.value)} /></label>
+              <div className="field"><span>Deal shape</span>
+                <Seg options={[['triangle', 'Staircase (1,2,3…)'], ['even', 'Even split']]} value={knobs.solDeal} onChange={(v) => set('solDeal', v)} /></div>
+              <div className="field"><span>Face up</span>
+                <Seg options={[['top', 'Only the bottom of each column'], ['all', 'Everything']]} value={knobs.solFaceUp} onChange={(v) => set('solFaceUp', v)} /></div>
+              <div className="field"><span>Number of decks</span>
+                <Seg options={[[1, 'One'], [2, 'Two']]} value={knobs.solDecks} onChange={(v) => set('solDecks', v)} /></div>
+            </Section>
+          )}
+
+          {knobs.family === 'solitaire' && (
+            <Section title="Building rules" defaultOpen>
+              <div className="field"><span>Stack a card onto one that is…</span>
+                <div className="seg wrap">
+                  <button className={knobs.solBuild === 'alt-color' ? 'on' : ''} onClick={() => set('solBuild', 'alt-color')}>One higher, other colour</button>
+                  <button className={knobs.solBuild === 'same-suit' ? 'on' : ''} onClick={() => set('solBuild', 'same-suit')}>One higher, same suit</button>
+                  <button className={knobs.solBuild === 'down-any' ? 'on' : ''} onClick={() => set('solBuild', 'down-any')}>One higher, any suit</button>
+                </div></div>
+              <div className="field"><span>You may pick up…</span>
+                <div className="seg wrap">
+                  <button className={knobs.solMoveRun === 'single' ? 'on' : ''} onClick={() => set('solMoveRun', 'single')}>One card</button>
+                  <button className={knobs.solMoveRun === 'built' ? 'on' : ''} onClick={() => set('solMoveRun', 'built')}>A properly built run</button>
+                  <button className={knobs.solMoveRun === 'same-suit' ? 'on' : ''} onClick={() => set('solMoveRun', 'same-suit')}>A same-suit run only</button>
+                </div></div>
+              <div className="field"><span>An empty column takes</span>
+                <Seg options={[['any', 'Any card'], ['king', 'A King only'], ['none', 'Nothing']]} value={knobs.solEmpty} onChange={(v) => set('solEmpty', v)} /></div>
+              <label className="field"><span>Free cells: <b>{knobs.solFreeCells}</b></span>
+                <input type="range" min={0} max={6} value={knobs.solFreeCells} onChange={(e) => set('solFreeCells', +e.target.value)} /></label>
+              {knobs.solFreeCells > 0 && (
+                <span className="mini-label">How many cards you can shift at once is (free cells + 1), doubled for every empty column.</span>
+              )}
+            </Section>
+          )}
+
+          {knobs.family === 'solitaire' && (
+            <Section title="Finishing & stock" defaultOpen>
+              <label className="field"><span>Foundations: <b>{knobs.solFoundations}</b></span>
+                <input type="range" min={1} max={8} value={knobs.solFoundations} onChange={(e) => set('solFoundations', +e.target.value)} /></label>
+              <label className="field row"><Switch on={knobs.solAutoRuns} onChange={(v) => set('solAutoRuns', v)} />
+                <span>Runs clear themselves — finish a King-to-Ace suit run on the table and it leaves the board (Spider)</span></label>
+              <div className="field"><span>Stock</span>
+                <Seg options={[['none', 'None'], ['waste', 'Turn to a waste pile'], ['deal-row', 'Deal a row to every column']]} value={knobs.solStock} onChange={(v) => set('solStock', v)} /></div>
+              {knobs.solStock === 'waste' && <>
+                <div className="field"><span>Cards turned at a time</span>
+                  <Seg options={[[1, 'One'], [3, 'Three']]} value={knobs.solStockTurn} onChange={(v) => set('solStockTurn', v)} /></div>
+                <div className="field"><span>Passes through the stock</span>
+                  <Seg options={[[-1, 'Unlimited'], [0, 'One'], [2, 'Three']]} value={knobs.solRedeals} onChange={(v) => set('solRedeals', v)} /></div>
+              </>}
             </Section>
           )}
 
@@ -404,7 +479,19 @@ export function CreateView() {
 
           <hr />
           <ExpertEditor def={def} onApply={setOverride} isOverride={!!override} />
-          <details className="advanced"><summary>How to play (auto-generated)</summary><p className="howto">{def.meta.description}</p></details>
+          <details className="advanced" open><summary>How to play (auto-generated)</summary><p className="howto">{def.meta.description}</p></details>
+
+          <div className="build-summary">
+            <div className="bs-head">What you've built</div>
+            <dl className="bs-facts">
+              <div><dt>Family</dt><dd>{def.meta.family}</dd></div>
+              <div><dt>Players</dt><dd>{def.meta.players.min === def.meta.players.max ? def.meta.players.min : `${def.meta.players.min}–${def.meta.players.max}`}</dd></div>
+              <div><dt>Deck</dt><dd>{(def.deck.deckCount ?? 1) > 1 ? `${def.deck.deckCount} decks` : 'one deck'}{def.deck.includeJokers ? ' + jokers' : ''}{(def.deck.excludeRanks?.length ?? 0) > 0 ? ` − ${def.deck.excludeRanks!.length} ranks` : ''}</dd></div>
+              <div><dt>Ends</dt><dd>{def.scoring.target != null ? `race to ${def.scoring.target}` : 'a single hand'}</dd></div>
+              {def.solitaire && <div><dt>Board</dt><dd>{def.solitaire.columns} columns · {def.solitaire.foundations} foundations{def.solitaire.freeCells ? ` · ${def.solitaire.freeCells} cells` : ''}</dd></div>}
+              {def.trick && <div><dt>Trump</dt><dd>{def.trick.auction ? 'auctioned each hand' : def.trick.trump === 'none' ? 'none' : def.trick.trump}</dd></div>}
+            </dl>
+          </div>
         </div>
       </div>
     </div>
@@ -473,10 +560,14 @@ function Switch({ on, onChange }: { on: boolean; onChange: (v: boolean) => void 
   return <button className={`toggle ${on ? 'on' : ''}`} onClick={() => onChange(!on)} aria-pressed={on}><span className="knob" /></button>;
 }
 
-function Seg({ options, value, onChange }: { options: [number, string][]; value: number; onChange: (v: number) => void }) {
+// Options can be numbers (deck counts) or strings (deal shapes), so this is generic over both.
+function Seg<T extends string | number>({ options, value, onChange }:
+  { options: [T, string][]; value: T; onChange: (v: T) => void }) {
   return (
-    <div className="seg">
-      {options.map(([val, lbl]) => (<button key={val} className={value === val ? 'on' : ''} onClick={() => onChange(val)}>{lbl}</button>))}
+    <div className="seg wrap">
+      {options.map(([val, lbl]) => (
+        <button key={String(val)} className={value === val ? 'on' : ''} onClick={() => onChange(val)}>{lbl}</button>
+      ))}
     </div>
   );
 }

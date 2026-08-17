@@ -400,6 +400,39 @@ h2 { font-family: var(--mono); letter-spacing: -0.3px; color: var(--ink); font-s
   .felt-content.sol .card.face .pips { display: none; }
 }
 
+.build-summary { margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--panel-brd); }
+.bs-head { font-family: var(--mono); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; }
+.bs-facts { margin: 0; display: flex; flex-direction: column; gap: 7px; font-size: 13.5px; }
+.bs-facts > div { display: flex; gap: 12px; }
+.bs-facts dt { font-family: var(--mono); color: var(--muted); min-width: 68px; font-size: 12px; }
+.bs-facts dd { margin: 0; }
+
+/* ---------------- range inputs ----------------
+   These were browser-default: a near-black unfilled track that read as a broken progress bar
+   against white panels. */
+input[type="range"] {
+  -webkit-appearance: none; appearance: none;
+  width: 100%; height: 22px; background: transparent; cursor: pointer;
+}
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 5px; border-radius: 999px;
+  background: var(--panel-brd);
+}
+input[type="range"]::-moz-range-track {
+  height: 5px; border-radius: 999px; background: var(--panel-brd);
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 17px; height: 17px; margin-top: -6px; border-radius: 50%;
+  background: var(--ink); border: 2px solid var(--panel);
+  box-shadow: 0 1px 4px rgba(16,32,24,0.3);
+}
+input[type="range"]::-moz-range-thumb {
+  width: 17px; height: 17px; border-radius: 50%;
+  background: var(--ink); border: 2px solid var(--panel);
+}
+input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px var(--glow); }
+
 /* ---------------- accessibility ---------------- */
 /* Every interactive thing gets a visible keyboard ring. There were two focus rules in the whole
    stylesheet before this, which made the app unusable without a mouse. */
