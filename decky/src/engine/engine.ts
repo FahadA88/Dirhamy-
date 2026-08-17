@@ -44,7 +44,7 @@ export function createMatch(
   def: GameDefinition,
   players: string[],
   seed: number,
-  carry?: { matchScores: Record<string, number>; handNumber: number },
+  carry?: { matchScores: Record<string, number>; handScores: Record<string, number>[]; handNumber: number },
 ): MatchState {
   const state: MatchState = {
     definition: def,
@@ -96,6 +96,7 @@ export function createMatch(
     bonus: {},
     log: [],
     matchScores: carry?.matchScores ?? Object.fromEntries(players.map((p) => [p, 0])),
+    handScores: carry?.handScores ?? [],
     handNumber: carry?.handNumber ?? 1,
     matchOver: false,
     matchWinner: null,
@@ -1028,6 +1029,11 @@ function finalizeMatchProgress(s: MatchState): void {
     if (s.bonus[p]) s.scores[p] = (s.scores[p] ?? 0) + s.bonus[p];
   }
   s.bonus = {};
+  // The scorepad's row for this hand, written before the roll-up so the column always sums to
+  // the running total rather than merely agreeing with it by construction elsewhere.
+  const row: Record<string, number> = {};
+  for (const p of s.players) row[p] = s.scores[p] ?? 0;
+  s.handScores.push(row);
   for (const p of s.players) s.matchScores[p] = (s.matchScores[p] ?? 0) + (s.scores[p] ?? 0);
   const scoring = s.definition.scoring;
 
@@ -1069,6 +1075,7 @@ function finalizeMatchProgress(s: MatchState): void {
 export function nextHand(state: MatchState, seed: number): MatchState {
   return createMatch(state.definition, state.players, seed, {
     matchScores: { ...state.matchScores },
+    handScores: state.handScores.map((r) => ({ ...r })),
     handNumber: state.handNumber + 1,
   });
 }
@@ -2539,6 +2546,7 @@ export function redact(state: MatchState, viewer: string): RedactedState {
     sittingOut: state.definition.trick?.auction ? state.sittingOut : undefined,
     dealer: state.definition.trick?.auction ? state.players[state.dealerIndex] : undefined,
     matchScores: { ...state.matchScores },
+    handScores: state.handScores.map((r) => ({ ...r })),
     handNumber: state.handNumber,
     matchOver: state.matchOver,
     matchWinner: state.matchWinner,

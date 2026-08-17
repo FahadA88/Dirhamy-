@@ -4,6 +4,7 @@ import { SUIT_SYMBOLS } from '../engine/deck';
 import { CardFace } from './Card';
 import { TableDressing, TableRail } from './TableDressing';
 import { DealMotion } from './DealMotion';
+import { ScorePad } from './ScorePad';
 import { useSettings } from '../settings/SettingsContext';
 import { BOT_SPEED_MS } from '../settings/settings';
 import { playSound } from './sound';
@@ -284,16 +285,8 @@ export function Table({ def, seats = 3, plan }: {
       />
       <div className="felt-content">
       {view.matchTarget != null && (
-        <div className="match-bar">
-          <span className="match-hand">Hand {view.handNumber} <i>to {view.matchTarget}</i></span>
-          <div className="match-chips">
-            {view.players.map((p) => (
-              <span key={p.id} className={`match-chip ${p.id === me ? 'you' : ''}`}>
-                {nameOf(p.id)} <b>{view.matchScores?.[p.id] ?? 0}</b>
-              </span>
-            ))}
-          </div>
-        </div>
+        <ScorePad view={view} me={me} nameOf={nameOf}
+          lowWins={def.scoring.winner === 'lowestTotal'} />
       )}
       <div className="opponents">
         {view.players.filter((p) => p.id !== me).map((p) => {

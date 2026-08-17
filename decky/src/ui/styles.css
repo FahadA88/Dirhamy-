@@ -2765,3 +2765,113 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
   height: 100%; justify-content: flex-start;
 }
 .swatches em { font-size: 10px; }
+
+/* ============================================================
+   THE SCORE PAD
+   Ruled paper on a clip, a column per player, a row per hand,
+   pencil numerals, the running total underlined at the bottom.
+   ============================================================ */
+
+.scorepad {
+  /* Beside the table rather than on top of it: at the top of the felt it lands on whoever is
+     sitting on the right. This is where a pad actually goes — clear of the players, next to
+     the cards in the middle. */
+  position: absolute; top: 24%; right: 12px; z-index: 4;
+  width: 168px;
+  transform: rotate(1.4deg);
+  filter: drop-shadow(0 10px 18px rgba(0,0,0,.34));
+}
+/* The bulldog clip along the top edge. */
+.sp-clip {
+  position: absolute; top: -7px; left: 50%; transform: translateX(-50%);
+  width: 54px; height: 13px; border-radius: 3px; z-index: 2;
+  background: linear-gradient(180deg, #cfd3d8 0%, #8f959d 46%, #b7bcc3 100%);
+  box-shadow: 0 1px 0 rgba(255,255,255,.6) inset, 0 2px 4px rgba(0,0,0,.4);
+}
+.sp-sheet {
+  position: relative; padding: 14px 10px 10px;
+  border-radius: 2px 2px 4px 4px;
+  color: #2b2517;
+  background:
+    /* the ruled lines */
+    repeating-linear-gradient(180deg, transparent 0 19px, rgba(64, 96, 148, .22) 19px 20px),
+    /* the tooth of the paper */
+    repeating-linear-gradient(96deg, rgba(120,100,60,.03) 0 2px, transparent 2px 5px),
+    linear-gradient(178deg, #fdfaf0 0%, #f6f0dd 100%);
+  border: 1px solid rgba(80, 62, 26, .22);
+  box-shadow: 0 1px 0 rgba(255,255,255,.8) inset;
+}
+/* The margin rule down the left, in red, like every pad ever printed. */
+.sp-sheet::before {
+  content: ""; position: absolute; top: 0; bottom: 0; left: 25px; width: 1px;
+  background: rgba(176, 48, 48, .34);
+}
+/* A torn top edge, so it reads as a sheet off a pad rather than a card. */
+.sp-sheet::after {
+  content: ""; position: absolute; left: 0; right: 0; top: 0; height: 3px;
+  background: repeating-linear-gradient(90deg,
+    rgba(0,0,0,.09) 0 2px, transparent 2px 4px, rgba(0,0,0,.05) 4px 7px, transparent 7px 9px);
+}
+
+.sp-title {
+  display: flex; align-items: baseline; gap: 6px; justify-content: center;
+  font-family: var(--serif); font-size: 12.5px; font-weight: 700;
+  margin-bottom: 6px; letter-spacing: -.01em;
+}
+.sp-title em { font-style: normal; font-size: 10.5px; opacity: .6; }
+
+.sp-table {
+  width: 100%; border-collapse: collapse;
+  font-family: var(--mono); font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.sp-table th, .sp-table td { padding: 2px 3px; text-align: center; line-height: 16px; }
+.sp-table thead th {
+  font-size: 9.5px; letter-spacing: .8px; font-weight: 700;
+  color: #6a5c3c; border-bottom: 1px solid rgba(80, 62, 26, .3);
+  padding-bottom: 3px;
+}
+.sp-table thead th.mine { color: var(--card-red); }
+.sp-rowhead { width: 15px; color: #9a8a63; font-size: 9.5px; text-align: right !important; }
+.sp-table tbody td { color: #37301f; }
+.sp-table tbody td.mine { font-weight: 700; }
+.sp-blank td { color: #bdb298; }
+
+.sp-table tfoot td {
+  padding-top: 4px; font-size: 12.5px; font-weight: 700;
+  border-top: 1px solid rgba(80, 62, 26, .34);
+}
+/* A total is underlined twice when it is the one in front — the way you would mark it yourself. */
+.sp-total.ahead {
+  box-shadow: 0 5px 0 -4px rgba(80,62,26,.55), 0 8px 0 -7px rgba(80,62,26,.55);
+}
+.sp-total.mine { color: var(--card-red); }
+
+.sp-won {
+  margin-top: 8px; text-align: center;
+  font-family: var(--serif); font-size: 11.5px; font-style: italic;
+  color: var(--card-red);
+}
+
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+/* The pad is furniture, so it goes when the table is narrow enough that the cards need the room. */
+@media (max-width: 900px) {
+  .scorepad {
+    position: static; width: auto; transform: none; margin: 0 0 12px;
+    filter: drop-shadow(0 4px 10px rgba(0,0,0,.22));
+  }
+  .sp-clip { display: none; }
+  .sp-sheet { padding: 10px 12px; }
+  .sp-table { font-size: 12px; }
+}
+
+/* A modal is paper laid on top of the table, not part of the cloth. The cloth-aware colour
+   rules are scoped to `.felt`, and the modal renders inside it, so the running-score rows came
+   out in the felt's light ink — white text on a white sheet. */
+.felt .modal-box, .felt .modal-box .ms-row, .felt .modal-box .seat-name { color: var(--ink); }
+.felt .modal-box .ms-title { color: var(--oak); }
+.felt .modal-box .scores { color: var(--muted); }

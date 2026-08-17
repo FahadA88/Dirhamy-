@@ -380,6 +380,10 @@ export interface MatchState {
   // scores until someone crosses the target. When it's null, a match is exactly one hand
   // (matchOver is true as soon as that hand ends) — this is the legacy single-hand behavior.
   matchScores: Record<string, number>; // cumulative points across all hands played so far
+  // One row per hand that has finished, in order: what each player scored *that hand*. The
+  // running total is the sum of the column, so nothing here can disagree with matchScores.
+  // Append-only, and written in exactly one place (finalizeMatchProgress).
+  handScores: Record<string, number>[];
   handNumber: number;                  // 1-indexed
   matchOver: boolean;
   matchWinner: string | null;
@@ -476,6 +480,8 @@ export interface RedactedState {
   dealer?: string | null;
   // match play (see MatchState)
   matchScores: Record<string, number>;
+  /** One row per finished hand: what each player scored that hand. The scorepad reads this. */
+  handScores: Record<string, number>[];
   handNumber: number;
   matchOver: boolean;
   matchWinner: string | null;
