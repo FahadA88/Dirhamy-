@@ -1346,39 +1346,83 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
 }
 @media (hover: none) { .sc-play { opacity: 1; transform: none; } }
 
-/* --- the face of a game: real cards, arranged by what kind of game it is --- */
+/* --- the face of a game: a scene, on cloth of its own colour --- */
 .gameart {
-  position: relative; height: 122px; display: flex; align-items: center; justify-content: center;
-  overflow: hidden; border-bottom: 1px solid var(--panel-brd);
+  position: relative; height: 132px; overflow: hidden;
+  border-bottom: 1px solid var(--panel-brd);
+  perspective: 700px; perspective-origin: 50% 40%;
 }
 .ga-felt {
   position: absolute; inset: 0;
   background:
-    radial-gradient(120% 90% at 50% 120%, rgba(214,175,92,0.10), transparent 60%),
-    linear-gradient(165deg, #143026 0%, #0e2419 100%);
+    radial-gradient(120% 90% at 50% 118%, rgba(255,255,255,0.09), transparent 62%),
+    var(--cloth, linear-gradient(150deg, #0e2a1c 0%, #1c4d33 58%, #123a25 100%));
 }
+/* The tooth of the cloth. Without it the gradient reads as plastic. */
+.ga-felt::after {
+  content: ""; position: absolute; inset: 0; opacity: .16;
+  background:
+    repeating-linear-gradient(58deg, rgba(255,255,255,.05) 0 1px, transparent 1px 3px),
+    repeating-linear-gradient(-58deg, rgba(0,0,0,.06) 0 1px, transparent 1px 3px);
+}
+/* Light falls off at the edges, so the cards sit in the middle of a table rather than on a swatch. */
+.ga-vignette {
+  position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(78% 78% at 50% 42%, transparent 42%, rgba(0,0,0,.42) 100%);
+}
+/* The game's monogram, printed on the cloth behind everything. */
+.ga-mark {
+  position: absolute; z-index: 0; line-height: 1; font-weight: 800;
+  color: rgba(255,255,255,.13);
+  text-shadow: 0 1px 0 rgba(0,0,0,.25);
+  pointer-events: none; user-select: none;
+}
+.ga-stage { position: absolute; inset: 0; transform-style: preserve-3d; }
+
 .ga-card {
-  position: relative; width: 42px; height: 60px; border-radius: 5px; flex: 0 0 auto;
-  background: linear-gradient(#fdfbf5, #eee8da);
-  border: 1px solid rgba(0,0,0,0.3);
-  box-shadow: -2px 3px 10px rgba(0,0,0,0.5);
+  position: absolute; width: 40px; height: 57px; border-radius: 5px;
+  background: linear-gradient(158deg, #fffefa 0%, #fbf7ec 46%, #efe8d7 100%);
+  border: 1px solid rgba(0,0,0,0.32);
+  /* Thickness, then the shadow it throws on the cloth. */
+  box-shadow:
+    0 1px 0 #ded6c4,
+    0 2px 0 #c9c0ab,
+    -2px 6px 12px rgba(0,0,0,0.46);
   padding: 4px 5px; font-weight: 800; line-height: 1;
-  transition: transform 260ms cubic-bezier(.2,.9,.3,1.1);
+  transition: transform 300ms cubic-bezier(.2,.9,.3,1.1), box-shadow 300ms;
 }
 .ga-card.red { color: var(--card-red); }
 .ga-card.black { color: #14161a; }
-/* The corner is the only part guaranteed not to be covered by the next card. */
-/* Wide enough for a 10; that is the whole constraint. */
+/* A card in the scene that is context, not subject: still there, not competing. */
+.ga-card.dim { filter: brightness(.86) saturate(.8); }
+/* Face down, in the back the site is dressed in. */
+.ga-card.back {
+  background:
+    repeating-linear-gradient(45deg, rgba(255,255,255,.05) 0 3px, transparent 3px 6px),
+    linear-gradient(160deg, #1d3350 0%, #16283f 100%);
+  border-color: rgba(0,0,0,.5);
+}
+.ga-card.back::after {
+  content: ""; position: absolute; inset: 4px; border-radius: 3px;
+  border: 1px solid rgba(214,175,92,.34);
+}
+/* The corner is the only part guaranteed not to be covered by the next card, and it has to be
+   wide enough for a 10. That is the whole constraint. */
 .ga-corner { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; }
 .ga-corner b { font-size: 10px; letter-spacing: -0.5px; }
 .ga-corner em { font-size: 9px; font-style: normal; }
-.ga-pip {
-  position: absolute; right: 5px; bottom: 3px; font-size: 17px; opacity: 0.9;
+.ga-pip { position: absolute; right: 5px; bottom: 3px; font-size: 17px; opacity: 0.9; }
+
+/* Hovering the shelf card tips the scene towards you and lifts the subject card out of it. */
+.shelfcard:hover .ga-stage, .hero:hover .ga-stage {
+  transform: rotateX(7deg) scale(1.04);
+  transition: transform 320ms cubic-bezier(.2,.9,.3,1.1);
 }
-.shelfcard:hover .shape-fan .ga-card:nth-child(3) { transform: rotate(0deg) translateY(-8px) !important; }
-.shelfcard:hover .shape-duel .ga-card { transform: rotate(0deg) translateY(-4px) !important; }
+.ga-stage { transition: transform 320ms cubic-bezier(.2,.9,.3,1.1); }
+.shelfcard:hover .ga-card.dim { filter: brightness(.7) saturate(.7); }
+
 @media (prefers-reduced-motion: reduce) {
-  .shelfcard:hover .ga-card { transform: none !important; }
+  .shelfcard:hover .ga-stage, .hero:hover .ga-stage { transform: none; }
   .shelfcard:hover { transform: none; }
 }
 
