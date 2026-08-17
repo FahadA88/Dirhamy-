@@ -3,11 +3,16 @@
 // can run. This is what the visual editor edits and what the AI co-pilot writes to.
 
 import { Effect, GameDefinition, Predicate, Rank, Suit } from '../engine/types';
+import { RuleDraft, compileRules } from './ruleKit';
+import { CURRENT_SCHEMA } from '../engine/migrate';
 
 export const RANKS_13: Rank[] = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
 
 export interface Knobs {
   family: 'shedding' | 'trick' | 'climb' | 'fish' | 'rummy' | 'war' | 'solitaire';
+  // Author-written conditional rules. Kept as drafts (ingredient ids + parameters) so the
+  // builder can re-open them; compiled into definition.rules on every build.
+  customRules: RuleDraft[];
   name: string;
   description: string;
   minPlayers: number;
@@ -102,6 +107,7 @@ const defaultPoints: Record<string, number> = {
 
 export const defaultKnobs: Knobs = {
   family: 'shedding',
+  customRules: [],
   name: 'My Card Game',
   description: '',
   minPlayers: 2,
@@ -175,6 +181,14 @@ export const defaultKnobs: Knobs = {
 };
 
 export function buildDefinition(knobs: Knobs, id = 'draft'): GameDefinition {
+  const def = buildFamilyDefinition(knobs, id);
+  // The near-programmable layer rides on top of whichever family this is, so a custom rule
+  // works the same in a trick-taking game as in a shedding one.
+  const rules = compileRules(knobs.customRules ?? []);
+  return rules.length > 0 ? { ...def, rules } : def;
+}
+
+function buildFamilyDefinition(knobs: Knobs, id: string): GameDefinition {
   if (knobs.family === 'trick') return buildTrickDefinition(knobs, id);
   if (knobs.family === 'climb') return buildClimbDefinition(knobs, id);
   if (knobs.family === 'fish') return buildFishDefinition(knobs, id);
@@ -188,7 +202,7 @@ export function buildDefinition(knobs: Knobs, id = 'draft'): GameDefinition {
 // carries the deck and the dials.
 function buildSolitaireDefinition(knobs: Knobs, id: string): GameDefinition {
   return {
-    schemaVersion: '1.0',
+    schemaVersion: CURRENT_SCHEMA,
     meta: {
       id, name: knobs.name, description: knobs.description || autoSolitaireDescription(knobs),
       players: { min: 1, max: 1 },
@@ -238,7 +252,7 @@ function autoSolitaireDescription(k: Knobs): string {
 
 function buildRummyDefinition(knobs: Knobs, id: string): GameDefinition {
   return {
-    schemaVersion: '1.0',
+    schemaVersion: CURRENT_SCHEMA,
     meta: {
       id, name: knobs.name, description: knobs.description || `A melding game. Deal ${knobs.handSize} cards each. Draw, lay down sets of ${knobs.rummySetMin}+ of a rank and runs of ${knobs.rummyRunMin}+ in sequence, then discard. First to shed every card wins.`,
       players: { min: clampInt(knobs.minPlayers, 2, 4), max: clampInt(knobs.maxPlayers, knobs.minPlayers, 4) },
@@ -268,7 +282,7 @@ function buildRummyDefinition(knobs: Knobs, id: string): GameDefinition {
 
 function buildWarDefinition(knobs: Knobs, id: string): GameDefinition {
   return {
-    schemaVersion: '1.0',
+    schemaVersion: CURRENT_SCHEMA,
     meta: {
       id, name: knobs.name, description: knobs.description || 'A comparison game. Split the deck; each flip the higher card takes both, ties trigger a war. Take every card to win.',
       players: { min: 2, max: 2 }, family: 'comparison',
@@ -290,7 +304,7 @@ function buildWarDefinition(knobs: Knobs, id: string): GameDefinition {
 
 function buildFishDefinition(knobs: Knobs, id: string): GameDefinition {
   return {
-    schemaVersion: '1.0',
+    schemaVersion: CURRENT_SCHEMA,
     meta: {
       id, name: knobs.name, description: knobs.description || autoFishDescription(knobs),
       players: { min: clampInt(knobs.minPlayers, 2, 6), max: clampInt(knobs.maxPlayers, knobs.minPlayers, 6) },
@@ -316,7 +330,7 @@ function buildClimbDefinition(knobs: Knobs, id: string): GameDefinition {
     ? ['3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A', '2']
     : ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
   return {
-    schemaVersion: '1.0',
+    schemaVersion: CURRENT_SCHEMA,
     meta: {
       id, name: knobs.name, description: knobs.description || autoClimbDescription(knobs),
       players: { min: clampInt(knobs.minPlayers, 2, 8), max: clampInt(knobs.maxPlayers, knobs.minPlayers, 8) },
@@ -340,7 +354,7 @@ function buildClimbDefinition(knobs: Knobs, id: string): GameDefinition {
 
 function buildTrickDefinition(knobs: Knobs, id: string): GameDefinition {
   return {
-    schemaVersion: '1.0',
+    schemaVersion: CURRENT_SCHEMA,
     meta: {
       id, name: knobs.name, description: knobs.description || autoTrickDescription(knobs),
       players: { min: clampInt(knobs.minPlayers, 2, 8), max: clampInt(knobs.maxPlayers, knobs.minPlayers, 8) },
@@ -446,7 +460,7 @@ function buildSheddingDefinition(knobs: Knobs, id: string): GameDefinition {
   for (const r of RANKS_13) cardPoints[r] = knobs.perRankPoints[r] ?? 0;
 
   return {
-    schemaVersion: '1.0',
+    schemaVersion: CURRENT_SCHEMA,
     meta: {
       id, name: knobs.name, description: knobs.description || autoDescription(knobs),
       players: { min: clampInt(knobs.minPlayers, 2, 8), max: clampInt(knobs.maxPlayers, knobs.minPlayers, 8) },
@@ -512,6 +526,9 @@ export function knobsFromDefinition(def: GameDefinition): Knobs {
 
   return {
     family: def.solitaire ? 'solitaire' : def.war ? 'war' : def.rummy ? 'rummy' : def.fish ? 'fish' : def.climb ? 'climb' : def.trick ? 'trick' : 'shedding',
+    // Compiled rules can't be turned back into the ingredients they were assembled from, so
+    // importing a definition starts the rule list empty rather than pretending otherwise.
+    customRules: [],
     trump: def.trick?.trump ?? 'S',
     mustFollowSuit: def.trick?.mustFollowSuit ?? true,
     aceHigh: def.trick?.aceHigh ?? def.war?.aceHigh ?? true,

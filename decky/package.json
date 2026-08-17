@@ -11,10 +11,12 @@
     "validate": "tsx scripts/validate.ts",
     "mechanics": "tsx scripts/mechanics.ts",
     "phase1": "tsx scripts/phase1.ts",
-    "test": "tsx scripts/selftest.ts && tsx scripts/validate.ts && tsx scripts/mechanics.ts && tsx scripts/phase1.ts",
+    "test": "tsx scripts/selftest.ts && tsx scripts/validate.ts && tsx scripts/mechanics.ts && tsx scripts/phase1.ts && tsx scripts/phase2.ts",
     "typecheck": "tsc --noEmit",
     "smoke": "node scripts/browser/smoke.mjs",
-    "verify:ui": "node scripts/browser/verify.mjs"
+    "verify:ui": "node scripts/browser/verify.mjs",
+    "phase2": "tsx scripts/phase2.ts",
+    "verify:builder": "node scripts/browser/builder.mjs"
   },
   "dependencies": {
     "react": "^18.3.1",

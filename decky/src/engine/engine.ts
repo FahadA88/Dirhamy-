@@ -9,8 +9,8 @@
 //   redact(state, playerId)         -> RedactedState
 
 import {
-  ActionDef, Card, Effect, GameDefinition, MatchState, Move, Predicate,
-  RedactedState, RedactedZone, ScoringDef, Suit, TrickConfig, ZoneDef,
+  ActionDef, Card, CustomRule, Effect, GameDefinition, MatchState, Move, PlayerRef, Predicate,
+  RedactedState, RedactedZone, RuleHook, RuleValue, ScoringDef, Suit, TrickConfig, ZoneDef,
 } from './types';
 import { buildDeck, cardColor, cardTags } from './deck';
 import { seededShuffle } from './rng';
@@ -92,6 +92,8 @@ export function createMatch(
     faceUp: {},
     redealsLeft: -1,
     moveCount: 0,
+    ply: 0,
+    bonus: {},
     log: [],
     matchScores: carry?.matchScores ?? Object.fromEntries(players.map((p) => [p, 0])),
     handNumber: carry?.handNumber ?? 1,
@@ -212,6 +214,7 @@ export function createMatch(
   } else if (def.trick && !state.passDirection && !state.bidding) {
     state.turnIndex = openingLeadSeat(state);
   }
+  fireRules(state, 'handStart', { playerId: state.players[state.turnIndex] });
   return state;
 }
 
@@ -254,7 +257,118 @@ function evalPredicate(state: MatchState, p: Predicate, ctx: Ctx): boolean {
     }
     return false;
   }
+  if ('cmp' in p) {
+    return compareValues(evalValue(state, p.cmp.left, ctx), p.cmp.op, evalValue(state, p.cmp.right, ctx));
+  }
+  if ('rankIn' in p) return !!ctx.targetCard && p.rankIn.includes(ctx.targetCard.rank);
+  if ('suitIn' in p) return !!ctx.targetCard && p.suitIn.includes(ctx.targetCard.suit);
+  if ('colorIs' in p) return !!ctx.targetCard && cardColor(ctx.targetCard) === p.colorIs;
+  if ('handHas' in p) return handMatches(state, p.handHas, ctx.playerId);
+  if ('isFirstTurn' in p) return state.ply === 0;
   return false;
+}
+
+// ---------- rule values (the near-programmable layer) ----------
+//
+// An author-written rule is data, not code. Every value it can read is listed here, so a rule
+// somebody builds in the browser can be evaluated by the engine without ever evaluating a
+// string. That is what keeps a custom game as safe to run as a classic one.
+
+function seatOf(state: MatchState, playerId: string): number {
+  return Math.max(0, state.players.indexOf(playerId));
+}
+
+/** Resolve a player reference to the seats it names. */
+export function refToPlayers(state: MatchState, ref: PlayerRef, me: string): string[] {
+  const n = state.players.length;
+  const i = seatOf(state, me);
+  switch (ref) {
+    case '$me': return [me];
+    case '$next': return [state.players[((i + state.direction) % n + n) % n]];
+    case '$prev': return [state.players[((i - state.direction) % n + n) % n]];
+    case '$all': return state.players.slice();
+    case '$others': return state.players.filter((p) => p !== me);
+    default: return [me];
+  }
+}
+
+function num(v: number | string): number {
+  const n = typeof v === 'number' ? v : parseFloat(v);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function evalValue(state: MatchState, v: RuleValue, ctx: Ctx): number | string {
+  const def = state.definition;
+  if ('lit' in v) return v.lit;
+  if ('stateVar' in v) return state.vars[v.stateVar] ?? '';
+  if ('count' in v) {
+    const key = v.count === '$hand' ? `hand:${ctx.playerId}` : zoneKey(def, v.count, ctx.playerId);
+    return (state.zones[key] || []).length;
+  }
+  if ('cardProp' in v) {
+    const c = ctx.targetCard;
+    if (!c) return '';
+    if (v.cardProp === 'value') return rankIndex(def, c.rank);
+    return propOf(c, v.cardProp);
+  }
+  if ('score' in v) return sumOver(state, v.score, ctx.playerId, (p) => handPoints(state, p));
+  if ('matchScore' in v) return sumOver(state, v.matchScore, ctx.playerId, (p) => state.matchScores[p] ?? 0);
+  if ('tricksWon' in v) return sumOver(state, v.tricksWon, ctx.playerId, (p) => state.tricksWon[p] ?? 0);
+  if ('handNumber' in v) return state.handNumber;
+  if ('playerCount' in v) return state.players.length;
+  if ('add' in v) return num(evalValue(state, v.add[0], ctx)) + num(evalValue(state, v.add[1], ctx));
+  if ('sub' in v) return num(evalValue(state, v.sub[0], ctx)) - num(evalValue(state, v.sub[1], ctx));
+  if ('mul' in v) return num(evalValue(state, v.mul[0], ctx)) * num(evalValue(state, v.mul[1], ctx));
+  if ('min' in v) return Math.min(num(evalValue(state, v.min[0], ctx)), num(evalValue(state, v.min[1], ctx)));
+  if ('max' in v) return Math.max(num(evalValue(state, v.max[0], ctx)), num(evalValue(state, v.max[1], ctx)));
+  return '';
+}
+
+/** This hand's points including anything author rules have awarded so far. */
+function handPoints(state: MatchState, p: string): number {
+  return (state.scores[p] ?? 0) + (state.bonus[p] ?? 0);
+}
+
+function sumOver(state: MatchState, ref: PlayerRef, me: string, get: (p: string) => number): number {
+  const seats = refToPlayers(state, ref, me);
+  return seats.reduce((t, p) => t + get(p), 0);
+}
+
+function rankIndex(def: GameDefinition, rank: string): number {
+  const i = def.deck.rankOrder.indexOf(rank as never);
+  return i < 0 ? 0 : i + 1;   // 1-based so "value > 0" reads naturally
+}
+
+function compareValues(a: number | string, op: string, b: number | string): boolean {
+  // Compare as numbers when both sides look numeric; otherwise as text. An author writing
+  // "activeSuit == hearts" and one writing "hand size >= 3" both get what they meant.
+  const bothNumeric = isNumeric(a) && isNumeric(b);
+  const l = bothNumeric ? num(a) : String(a);
+  const r = bothNumeric ? num(b) : String(b);
+  switch (op) {
+    case '==': return l === r;
+    case '!=': return l !== r;
+    case '>': return l > r;
+    case '>=': return l >= r;
+    case '<': return l < r;
+    case '<=': return l <= r;
+    default: return false;
+  }
+}
+
+function isNumeric(v: number | string): boolean {
+  return typeof v === 'number' || (v !== '' && Number.isFinite(Number(v)));
+}
+
+function handMatches(state: MatchState, q: { rank?: string; suit?: string; color?: string; minCount?: number }, playerId: string): boolean {
+  const hand = state.zones[`hand:${playerId}`] || [];
+  const hits = hand.filter((c) => {
+    if (q.rank && c.rank !== q.rank) return false;
+    if (q.suit && c.suit !== q.suit) return false;
+    if (q.color && cardColor(c) !== q.color) return false;
+    return true;
+  });
+  return hits.length >= (q.minCount ?? 1);
 }
 
 // ---------- legal move enumeration ----------
@@ -454,6 +568,79 @@ function runEffects(state: MatchState, effects: Effect[], ctx: Ctx & { playedCar
         }
         break;
       }
+
+      // ----- near-programmable effects (Phase 2) -----
+      case 'addScore': {
+        const amount = num(evalValue(state, e.amount, ctx));
+        for (const p of refToPlayers(state, e.player, ctx.playerId)) {
+          state.bonus[p] = (state.bonus[p] ?? 0) + amount;
+        }
+        break;
+      }
+      case 'setVarNum': {
+        state.vars[e.var] = String(evalValue(state, e.value, ctx));
+        break;
+      }
+      case 'announce': {
+        log(state, null, e.text);
+        break;
+      }
+      case 'endHand': {
+        // A rule may end the hand outright. Guarded so a rule can't re-end a finished hand.
+        if (state.phase === 'playing') {
+          const hint = e.winner === undefined ? undefined
+            : e.winner === 'highestScore' ? bestBy(state, (p) => handPoints(state, p), 1)
+            : e.winner === 'lowestScore' ? bestBy(state, (p) => handPoints(state, p), -1)
+            : refToPlayers(state, e.winner, ctx.playerId)[0];
+          endRound(state, 'won', hint);
+        }
+        break;
+      }
+      case 'swapHands': {
+        const other = refToPlayers(state, e.withPlayer === 'next' ? '$next' : '$prev', ctx.playerId)[0];
+        const a = `hand:${ctx.playerId}`, b = `hand:${other}`;
+        const tmp = state.zones[a] || [];
+        state.zones[a] = state.zones[b] || [];
+        state.zones[b] = tmp;
+        log(state, ctx.playerId, `${short(ctx.playerId)} swapped hands with ${short(other)}.`);
+        break;
+      }
+      case 'moveMany': {
+        const count = Math.max(0, Math.floor(num(evalValue(state, e.count, ctx))));
+        const from = zoneKey(def, e.from, ctx.playerId);
+        const to = zoneKey(def, e.to, ctx.playerId);
+        for (let i = 0; i < count; i++) {
+          const card = (state.zones[from] || []).pop();
+          if (!card) break;
+          (state.zones[to] = state.zones[to] || []).push(card);
+        }
+        break;
+      }
+      case 'drawTo': {
+        const count = Math.max(0, Math.floor(num(evalValue(state, e.count, ctx))));
+        for (const p of refToPlayers(state, e.player, ctx.playerId)) {
+          for (let i = 0; i < count; i++) {
+            const card = (state.zones[e.from] || []).pop();
+            if (!card) break;
+            state.zones[`hand:${p}`].push(card);
+          }
+        }
+        break;
+      }
+      case 'revealHand': {
+        for (const p of refToPlayers(state, e.player, ctx.playerId)) {
+          const hand = state.zones[`hand:${p}`] || [];
+          log(state, null, `${short(p)} reveals: ${hand.map(cardLabel).join(', ') || '(nothing)'}`);
+        }
+        break;
+      }
+      case 'skipTo': {
+        // Hand the turn straight to a named neighbour rather than stepping round the table.
+        const target = refToPlayers(state, e.player === 'next' ? '$next' : '$prev', ctx.playerId)[0];
+        state.turnIndex = state.players.indexOf(target);
+        state.skipCount = 0;
+        break;
+      }
     }
   }
 }
@@ -496,12 +683,15 @@ export function applyMove(state: MatchState, playerId: string, move: Move): Matc
 
   if (move.actionId === 'choosePass') return applyChoosePass(s, playerId, move);
 
+  // Every family gets the same rule hooks. The handlers below own the mechanics; this wrapper
+  // owns the author's layer, so a rule behaves identically whichever family it rides on.
+  const handBefore = (s.zones[`hand:${playerId}`] || []).slice();
   if (def.solitaire) return applySolitaireMove(s, move);
-  if (def.trick) return applyTrickMove(s, playerId, move);
-  if (def.climb) return applyClimbMove(s, playerId, move);
-  if (def.fish) return applyFishMove(s, playerId, move);
-  if (def.rummy) return applyRummyMove(s, playerId, move);
-  if (def.war) return applyWarMove(s, playerId, move);
+  if (def.trick) return afterFamilyMove(applyTrickMove(s, playerId, move), playerId, handBefore);
+  if (def.climb) return afterFamilyMove(applyClimbMove(s, playerId, move), playerId, handBefore);
+  if (def.fish) return afterFamilyMove(applyFishMove(s, playerId, move), playerId, handBefore);
+  if (def.rummy) return afterFamilyMove(applyRummyMove(s, playerId, move), playerId, handBefore);
+  if (def.war) return afterFamilyMove(applyWarMove(s, playerId, move), playerId, handBefore);
 
   // Resolve a pending suit choice.
   if (move.actionId === 'resolveChoice') {
@@ -529,12 +719,19 @@ export function applyMove(state: MatchState, playerId: string, move: Move): Matc
   if (ctx.playedCard) {
     log(s, playerId, `${short(playerId)} played ${cardLabel(ctx.playedCard)}.`);
     fireTriggers(s, 'cardPlayed', ctx.playedCard, ctx);
+    fireRules(s, 'cardPlayed', ctx);
   } else if (move.actionId === 'drawCard') {
     log(s, playerId, `${short(playerId)} drew a card.`);
+    fireRules(s, 'cardDrawn', ctx);
   }
 
   // Draw-pile-empty triggers (e.g. reshuffle).
   fireDrawPileTriggers(s);
+  if (s.phase !== 'playing') return s;
+
+  s.ply += 1;
+  fireRules(s, 'turnEnd', ctx);
+  if (s.phase !== 'playing') return s;
 
   // If a choice is pending (e.g. wild suit) or a simultaneous pass just started, pause here —
   // turn does not advance until it resolves.
@@ -542,6 +739,7 @@ export function applyMove(state: MatchState, playerId: string, move: Move): Matc
   if (s.passDirection) return s;
 
   advanceAndCheck(s);
+  if (s.phase === 'playing') fireRules(s, 'turnStart', { playerId: s.players[s.turnIndex] });
   return s;
 }
 
@@ -643,6 +841,70 @@ function advanceTurn(s: MatchState): void {
   s.turnIndex = ((s.turnIndex + s.direction * steps) % n + n) % n;
 }
 
+/**
+ * Run the author's hooks after a family handler has done its work.
+ *
+ * Which card was played is worked out by diffing the hand rather than threaded through every
+ * handler: the families move cards in half a dozen different ways, and a diff is true for all
+ * of them without six separate call sites to keep in step.
+ */
+function afterFamilyMove(s: MatchState, playerId: string, handBefore: Card[]): MatchState {
+  s.ply += 1;
+  if (!s.definition.rules?.length || s.phase !== 'playing') return s;
+
+  const after = new Set((s.zones[`hand:${playerId}`] || []).map((c) => c.id));
+  const played = handBefore.find((c) => !after.has(c.id));
+  const ctx: Ctx = { playerId, targetCard: played };
+
+  if (played) fireRules(s, 'cardPlayed', ctx);
+  if (s.phase !== 'playing') return s;
+  fireRules(s, 'turnEnd', ctx);
+  if (s.phase !== 'playing') return s;
+  fireRules(s, 'turnStart', { playerId: s.players[s.turnIndex] });
+  return s;
+}
+
+// ---------- author-written rules ----------
+//
+// The hooks a CustomRule can attach to. These fire the same way for a game somebody built this
+// morning as for Hearts: same engine, same order, same clone-then-mutate discipline.
+
+function fireRules(state: MatchState, hook: RuleHook, ctx: Ctx & { playedCard?: Card }): void {
+  const rules = state.definition.rules;
+  if (!rules || rules.length === 0) return;
+  for (const rule of rules) {
+    if (rule.enabled === false) continue;
+    if (rule.when !== hook) continue;
+    if (rule.cardHasTag) {
+      const card = ctx.targetCard ?? ctx.playedCard;
+      if (!card || !cardTags(state.definition, card).includes(rule.cardHasTag)) continue;
+    }
+    if (rule.if && !evalPredicate(state, rule.if, ctx)) continue;
+    runEffects(state, rule.then, ctx);
+    // A rule that ended the hand stops the rest — nothing should run after the scores are in.
+    if (state.phase !== 'playing') return;
+  }
+}
+
+/** Which player scores best (dir 1) or worst (dir -1) by some measure. */
+function bestBy(state: MatchState, get: (p: string) => number, dir: 1 | -1): string {
+  let best = state.players[0];
+  for (const p of state.players) {
+    if ((get(p) - get(best)) * dir > 0) best = p;
+  }
+  return best;
+}
+
+/** Does this definition carry any author-written rule for a given hook? */
+export function hasRuleHook(def: GameDefinition, hook: RuleHook): boolean {
+  return (def.rules ?? []).some((r) => r.enabled !== false && r.when === hook);
+}
+
+/** The rules an author wrote, for the rules panel. */
+export function customRules(def: GameDefinition): CustomRule[] {
+  return (def.rules ?? []).filter((r) => r.enabled !== false);
+}
+
 // ---------- triggers ----------
 
 function fireTriggers(state: MatchState, on: 'cardPlayed', card: Card, ctx: Ctx): void {
@@ -662,6 +924,7 @@ function fireDrawPileTriggers(state: MatchState): void {
   for (const trig of def.triggers) {
     if (trig.on === 'drawPileEmpty') runEffects(state, trig.do, { playerId: state.players[state.turnIndex] });
   }
+  fireRules(state, 'drawPileEmpty', { playerId: state.players[state.turnIndex] });
 }
 
 // ---------- end conditions & scoring ----------
@@ -759,6 +1022,12 @@ export function isMatchOver(state: MatchState): boolean {
 // state.winner are final. It folds the hand into the running match score and decides whether
 // the match continues or someone has crossed the target.
 function finalizeMatchProgress(s: MatchState): void {
+  // Fold in rule-awarded points before the roll-up. Every family routes through here, so this
+  // is the one place that has to know about it.
+  for (const p of s.players) {
+    if (s.bonus[p]) s.scores[p] = (s.scores[p] ?? 0) + s.bonus[p];
+  }
+  s.bonus = {};
   for (const p of s.players) s.matchScores[p] = (s.matchScores[p] ?? 0) + (s.scores[p] ?? 0);
   const scoring = s.definition.scoring;
 
@@ -1087,6 +1356,8 @@ function resolveTrick(s: MatchState, trickZoneId: string): void {
   s.lead = null;
   s.turnIndex = s.players.indexOf(winner.player); // winner leads the next trick
   log(s, null, `${short(winner.player)} takes the trick (${s.tricksWon[winner.player]}).`);
+  s.ply += 1;
+  fireRules(s, 'trickWon', { playerId: winner.player, targetCard: winner.card });
 
   // Round ends when every hand still in play is empty.
   if (activeSeats(s).every((p) => (s.zones[`hand:${p}`] || []).length === 0)) endTrickRound(s);

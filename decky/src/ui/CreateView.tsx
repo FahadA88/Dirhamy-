@@ -22,10 +22,35 @@ import { spider } from '../games/spider';
 import { GameDefinition, Rank, Suit } from '../engine/types';
 import { Table } from './Table';
 import { SolitaireTable } from './SolitaireTable';
+import { RuleBuilder } from './RuleBuilder';
+import { MiniTable } from './MiniTable';
+import { TEMPLATES } from '../authoring/templates';
+import { RuleDraft } from '../authoring/ruleKit';
+import { explainGame } from '../authoring/explain';
+import { publish, complexityOf, playtimeOf } from '../library/library';
+import { useSettings } from '../settings/SettingsContext';
 
 type RankArrayKey = 'wildRanks' | 'skipRanks' | 'reverseRanks' | 'drawRanks' | 'extraTurnRanks' | 'wildDrawRanks' | 'excludeRanks' | 'passRanks';
 
-export function CreateView() {
+// The builder is a guided flow, not a wall of dials: pick a starting point, shape the game,
+// write your own twists, prove it works, publish it. Every step keeps the live preview on
+// screen so a change is never more than a second away from being visible.
+type Step = 'start' | 'design' | 'twists' | 'test' | 'publish';
+
+const STEPS: { id: Step; label: string; blurb: string }[] = [
+  { id: 'start', label: 'Start', blurb: 'Pick a shape to build on.' },
+  { id: 'design', label: 'Design', blurb: 'Deck, deal, turns and scoring.' },
+  { id: 'twists', label: 'Twists', blurb: 'Rules of your own.' },
+  { id: 'test', label: 'Test', blurb: 'Play it and simulate it.' },
+  { id: 'publish', label: 'Publish', blurb: 'Put it on the shelf.' },
+];
+
+export function CreateView({ onPlay }: { onPlay?: (def: GameDefinition) => void } = {}) {
+  const { settings } = useSettings();
+  const [step, setStep] = useState<Step>('start');
+  const [seats, setSeats] = useState(3);
+  const [tags, setTags] = useState('');
+  const [published, setPublished] = useState<{ id: string; name: string } | null>(null);
   const [knobs, setKnobs] = useState<Knobs>({ ...defaultKnobs });
   const [override, setOverride] = useState<GameDefinition | null>(null);
   const [desc, setDesc] = useState('');
@@ -45,7 +70,23 @@ export function CreateView() {
     const on = knobs[key].includes(r);
     set(key, (on ? knobs[key].filter((x) => x !== r) : [...knobs[key], r]) as Rank[]);
   }
-  function startFrom(k: Knobs) { setKnobs(k); setOverride(null); setReport(null); setProposal(null); }
+  function startFrom(k: Knobs) {
+    setKnobs(k); setOverride(null); setReport(null); setProposal(null); setPublished(null);
+  }
+  function startFromTemplate(k: Knobs) { startFrom({ ...k }); setStep('design'); }
+  function setRules(next: RuleDraft[]) {
+    setKnobs((k) => ({ ...k, customRules: next }));
+    setOverride(null); setReport(null); setPublished(null);
+  }
+  function doPublish() {
+    const g = publish({
+      definition: def,
+      knobs,
+      author: settings.playerName || 'You',
+      tags: tags.split(',').map((t) => t.trim()).filter(Boolean),
+    });
+    setPublished({ id: g.id, name: g.definition.meta.name });
+  }
 
   async function askCopilot() {
     if (!desc.trim()) return;
@@ -73,8 +114,167 @@ export function CreateView() {
     );
   }
 
+  const errors = validation.issues.filter((i) => i.level === 'error');
+
   return (
     <div className="create">
+      <ol className="steprail">
+        {STEPS.map((s, i) => (
+          <li key={s.id} className={`steprail-item ${step === s.id ? 'on' : ''} ${STEPS.findIndex((x) => x.id === step) > i ? 'done' : ''}`}>
+            <button onClick={() => setStep(s.id)}>
+              <span className="steprail-n">{i + 1}</span>
+              <span className="steprail-text"><b>{s.label}</b><em>{s.blurb}</em></span>
+            </button>
+          </li>
+        ))}
+      </ol>
+
+      {step === 'start' && (
+        <div className="startgrid">
+          <div className="startgrid-head">
+            <h2>What are you making?</h2>
+            <p className="muted">Every one of these is already playable. Pick the closest and change it.</p>
+          </div>
+          <div className="template-grid">
+            {TEMPLATES.map((t) => (
+              <button key={t.id} className="template-card" onClick={() => startFromTemplate(t.knobs)}>
+                <span className="tc-name">{t.name}</span>
+                <span className="tc-tag">{t.tagline}</span>
+                <span className="tc-meta">{t.shape}</span>
+                <span className="tc-players">{t.players} players</span>
+              </button>
+            ))}
+          </div>
+          <div className="startgrid-head">
+            <h3>Or start from a classic</h3>
+            <p className="muted">Opens the finished game in the editor, ready to be pulled apart.</p>
+          </div>
+          <div className="starters">
+            <button className="chip" onClick={() => startFromTemplate(knobsFromDefinition(crazyEights))}>Crazy Eights</button>
+            <button className="chip" onClick={() => startFromTemplate(knobsFromDefinition(switchGame))}>Switch</button>
+            <button className="chip" onClick={() => startFromTemplate(knobsFromDefinition(spadesLite))}>Spades</button>
+            <button className="chip" onClick={() => startFromTemplate(knobsFromDefinition(president))}>President</button>
+            <button className="chip" onClick={() => startFromTemplate(knobsFromDefinition(goFish))}>Go Fish</button>
+            <button className="chip" onClick={() => startFromTemplate(knobsFromDefinition(rummy))}>Rummy</button>
+            <button className="chip" onClick={() => startFromTemplate(knobsFromDefinition(war))}>War</button>
+            <button className="chip" onClick={() => startFromTemplate(knobsFromDefinition(hearts))}>Hearts</button>
+            <button className="chip" onClick={() => startFromTemplate(knobsFromDefinition(euchre))}>Euchre</button>
+            <button className="chip" onClick={() => startFromTemplate(knobsFromDefinition(ginRummy))}>Gin Rummy</button>
+            <button className="chip" onClick={() => startFromTemplate(knobsFromDefinition(undertow))}>Undertow</button>
+            <button className="chip" onClick={() => startFromTemplate(knobsFromDefinition(klondike))}>Solitaire</button>
+            <button className="chip" onClick={() => startFromTemplate(knobsFromDefinition(freecell))}>FreeCell</button>
+            <button className="chip" onClick={() => startFromTemplate(knobsFromDefinition(spider))}>Spider</button>
+          </div>
+        </div>
+      )}
+
+      {step === 'twists' && (
+        <div className="editor-grid">
+          <div className="panel glass">
+            <RuleBuilder rules={knobs.customRules ?? []} onChange={setRules} />
+          </div>
+          <div className="panel glass">
+            <div className="panel-head">
+              <h2>Live table</h2>
+              <span className={`status-pill ${validation.status}`}>{validation.status}</span>
+            </div>
+            <MiniTable def={def} seats={seats} />
+            {errors.length > 0 && (
+              <ul className="issue-list">{errors.map((i, k) => <li key={k} className="issue error">{i.message}</li>)}</ul>
+            )}
+            <div className="step-actions">
+              <button className="ghost" onClick={() => setStep('design')}>← Design</button>
+              <button className="primary" onClick={() => setStep('test')}>Test it →</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {step === 'test' && (
+        <div className="editor-grid">
+          <div className="panel glass">
+            <div className="panel-head"><h2>Prove it works</h2>
+              <span className={`status-pill ${validation.status}`}>{validation.status}</span></div>
+            <p className="muted">
+              Playtest sits you at a real table against bots. Simulate runs it {300} times and reports whether
+              it ever finishes, whether it can be won, and whether one seat has an unfair edge.
+            </p>
+            <div className="proposal-actions">
+              <button className="primary" onClick={() => setPlaytest(true)} disabled={!validation.ok}>▶ Playtest now</button>
+              <button className="ghost" onClick={() => setReport(simulate(def, Math.min(4, def.meta.players.max), 300))} disabled={!validation.ok}>Simulate 300 games</button>
+            </div>
+            {errors.length > 0 && (
+              <ul className="issue-list">{errors.map((i, k) => <li key={k} className="issue error">{i.message}</li>)}</ul>
+            )}
+            {report && (
+              <div className={`report ${report.terminated === report.games && report.winnable ? 'good' : 'bad'}`}>
+                <Metric label="Terminates" value={`${report.terminated}/${report.games}`} />
+                <Metric label="Winnable" value={report.winnable ? 'yes' : 'no'} />
+                <Metric label="Avg length" value={`${report.avgMoves.toFixed(1)} moves`} />
+                <Metric label="Seat win-rates" value={report.winRateBySeat.map((w) => (w * 100).toFixed(0) + '%').join(' / ')} />
+                {report.maxMovesHit > 0 && <div className="warn">⚠️ {report.maxMovesHit} games hit the move cap.</div>}
+              </div>
+            )}
+            <div className="step-actions">
+              <button className="ghost" onClick={() => setStep('twists')}>← Twists</button>
+              <button className="primary" onClick={() => setStep('publish')} disabled={!validation.ok}>Publish →</button>
+            </div>
+          </div>
+          <div className="panel glass">
+            <div className="panel-head"><h2>Live table</h2></div>
+            <MiniTable def={def} seats={seats} />
+          </div>
+        </div>
+      )}
+
+      {step === 'publish' && (
+        <div className="editor-grid">
+          <div className="panel glass">
+            <div className="panel-head"><h2>Publish</h2>
+              <span className={`status-pill ${validation.status}`}>{validation.status}</span></div>
+            {!validation.ok ? (
+              <>
+                <p className="muted">Fix these before publishing:</p>
+                <ul className="issue-list">{errors.map((i, k) => <li key={k} className="issue error">{i.message}</li>)}</ul>
+              </>
+            ) : published ? (
+              <div className="published-ok">
+                <div className="pub-mark">✓</div>
+                <h3>{published.name} is on the shelf</h3>
+                <p className="muted">It now appears in Play alongside the classics, and can be favourited, rated and remixed.</p>
+                <div className="proposal-actions">
+                  {onPlay && <button className="primary" onClick={() => onPlay(def)}>Play it now</button>}
+                  <button className="ghost" onClick={() => setPublished(null)}>Publish an update</button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <label className="field"><span>Name</span>
+                  <input value={knobs.name} onChange={(e) => set('name', e.target.value)} /></label>
+                <label className="field"><span>Description</span>
+                  <input value={knobs.description} placeholder={def.meta.description}
+                    onChange={(e) => set('description', e.target.value)} /></label>
+                <label className="field"><span>Tags (comma separated)</span>
+                  <input value={tags} placeholder="fast, party, 4 players" onChange={(e) => setTags(e.target.value)} /></label>
+                <dl className="bs-facts">
+                  <div><dt>Complexity</dt><dd>{'●'.repeat(complexityOf(def))}{'○'.repeat(5 - complexityOf(def))}</dd></div>
+                  <div><dt>Playtime</dt><dd>~{playtimeOf(def)} min</dd></div>
+                  <div><dt>Twists</dt><dd>{(def.rules ?? []).length}</dd></div>
+                </dl>
+                <div className="proposal-actions">
+                  <button className="primary" onClick={doPublish}>Publish to the shelf</button>
+                </div>
+              </>
+            )}
+          </div>
+          <div className="panel glass">
+            <div className="panel-head"><h2>What players will read</h2></div>
+            <ul className="explain-list">{explainGame(def).map((line, i) => <li key={i}>{line}</li>)}</ul>
+          </div>
+        </div>
+      )}
+
+      {step === 'design' && (
       <div className="editor-grid">
         {/* LEFT: knobs */}
         <div className="panel glass">
@@ -84,22 +284,8 @@ export function CreateView() {
           </div>
 
           <div className="starters">
-            <span className="mini-label">Start from</span>
-            <button className="chip" onClick={() => startFrom({ ...defaultKnobs })}>Blank</button>
-            <button className="chip" onClick={() => startFrom(knobsFromDefinition(crazyEights))}>Crazy Eights</button>
-            <button className="chip" onClick={() => startFrom(knobsFromDefinition(switchGame))}>Switch</button>
-            <button className="chip" onClick={() => startFrom(knobsFromDefinition(spadesLite))}>Spades</button>
-            <button className="chip" onClick={() => startFrom(knobsFromDefinition(president))}>President</button>
-            <button className="chip" onClick={() => startFrom(knobsFromDefinition(goFish))}>Go Fish</button>
-            <button className="chip" onClick={() => startFrom(knobsFromDefinition(rummy))}>Rummy</button>
-            <button className="chip" onClick={() => startFrom(knobsFromDefinition(war))}>War</button>
-            <button className="chip" onClick={() => startFrom(knobsFromDefinition(hearts))}>Hearts</button>
-            <button className="chip" onClick={() => startFrom(knobsFromDefinition(euchre))}>Euchre</button>
-            <button className="chip" onClick={() => startFrom(knobsFromDefinition(ginRummy))}>Gin Rummy</button>
-            <button className="chip" onClick={() => startFrom(knobsFromDefinition(undertow))}>Undertow</button>
-            <button className="chip" onClick={() => startFrom(knobsFromDefinition(klondike))}>Solitaire</button>
-            <button className="chip" onClick={() => startFrom(knobsFromDefinition(freecell))}>FreeCell</button>
-            <button className="chip" onClick={() => startFrom(knobsFromDefinition(spider))}>Spider</button>
+            <span className="mini-label">Started from a template.</span>
+            <button className="chip" onClick={() => setStep('start')}>Change starting point</button>
           </div>
 
           <div className="field"><span>Game family</span>
@@ -424,8 +610,27 @@ export function CreateView() {
           </Section>
         </div>
 
-        {/* RIGHT: co-pilot, verify, expert */}
+        {/* RIGHT: live table, co-pilot, verify, expert */}
         <div className="panel glass">
+          <div className="panel-head">
+            <h2>Live table</h2>
+            {!def.solitaire && (
+              <div className="seat-control sm">
+                <span>Seats</span>
+                {[2, 3, 4, 5, 6].map((n) => (
+                  <button key={n} className={`seg-btn ${seats === n ? 'on' : ''}`}
+                    disabled={n < def.meta.players.min || n > def.meta.players.max}
+                    onClick={() => setSeats(n)}>{n}</button>
+                ))}
+              </div>
+            )}
+          </div>
+          <MiniTable def={def} seats={seats} />
+          <div className="step-actions">
+            <button className="ghost" onClick={() => setStep('start')}>← Start</button>
+            <button className="primary" onClick={() => setStep('twists')}>Add twists →</button>
+          </div>
+          <hr />
           <h2>AI co-pilot</h2>
           <p className="hint">Describe rules in plain English. It fills the knobs and interviews you on gaps — you approve every change.</p>
           <textarea className="desc" rows={3} value={desc}
@@ -494,6 +699,7 @@ export function CreateView() {
           </div>
         </div>
       </div>
+      )}
     </div>
   );
 }

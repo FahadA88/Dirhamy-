@@ -1,0 +1,294 @@
+import { GameDefinition } from '../engine/types';
+import { Knobs } from '../authoring/knobs';
+import { migrate } from '../engine/migrate';
+
+// The shelf: games people published, and what this device knows about them.
+//
+// Everything here is local. There is no server behind it yet, and the code is written so that
+// swapping the storage for one is a matter of replacing readAll/writeAll — the shape of a
+// published game, the stats, and the search are all transport-agnostic on purpose.
+//
+// Honest about what "community" means today: these are YOUR published games and your own
+// ratings and play counts. Nothing is fetched from anyone else. The moment there is a backend,
+// this file gains a fetch and loses nothing else.
+
+export interface PublishedGame {
+  id: string;
+  definition: GameDefinition;
+  /** The builder state, so the author — or anyone forking — can re-open it rather than read JSON. */
+  knobs?: Knobs;
+  author: string;
+  createdAt: number;
+  updatedAt: number;
+  version: number;
+  tags: string[];
+  forkedFrom?: string;
+  stats: GameStats;
+}
+
+export interface GameStats {
+  plays: number;
+  favourites: number;
+  ratingSum: number;
+  ratingCount: number;
+}
+
+export interface Review {
+  gameId: string;
+  author: string;
+  rating: number;       // 1-5
+  text: string;
+  at: number;
+}
+
+const GAMES = 'decky.library.v1';
+const REVIEWS = 'decky.reviews.v1';
+const FAVS = 'decky.favourites.v1';
+const PLAYS = 'decky.playhistory.v1';
+
+// ---------- storage plumbing ----------
+
+function read<T>(key: string, fallback: T): T {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? (JSON.parse(raw) as T) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function write(key: string, value: unknown): void {
+  try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* quota; not worth breaking play */ }
+}
+
+// ---------- games ----------
+
+export function allPublished(): PublishedGame[] {
+  const raw = read<PublishedGame[]>(GAMES, []);
+  // A game stored by an older build still has to open. Migration runs on read, not on write,
+  // so an upgrade never has to rewrite the whole shelf at once.
+  return raw.flatMap((g) => {
+    try {
+      return [{ ...g, definition: migrate(g.definition).definition }];
+    } catch {
+      return [];   // a definition from a future version this build cannot read
+    }
+  });
+}
+
+export function getPublished(id: string): PublishedGame | undefined {
+  return allPublished().find((g) => g.id === id);
+}
+
+export interface PublishInput {
+  definition: GameDefinition;
+  knobs?: Knobs;
+  author: string;
+  tags?: string[];
+  forkedFrom?: string;
+  /** Publishing over an existing id updates it in place and bumps the version. */
+  id?: string;
+}
+
+export function publish(input: PublishInput): PublishedGame {
+  const games = read<PublishedGame[]>(GAMES, []);
+  const now = Date.now();
+  const id = input.id ?? slugId(input.definition.meta.name, games);
+  const existing = games.find((g) => g.id === id);
+
+  const definition: GameDefinition = {
+    ...JSON.parse(JSON.stringify(input.definition)),
+    meta: { ...input.definition.meta, id },
+  };
+
+  const game: PublishedGame = {
+    id,
+    definition,
+    knobs: input.knobs,
+    author: input.author,
+    createdAt: existing?.createdAt ?? now,
+    updatedAt: now,
+    version: (existing?.version ?? 0) + 1,
+    tags: dedupe([...(input.tags ?? []), definition.meta.family]),
+    forkedFrom: input.forkedFrom ?? existing?.forkedFrom,
+    stats: existing?.stats ?? { plays: 0, favourites: 0, ratingSum: 0, ratingCount: 0 },
+  };
+
+  const next = existing ? games.map((g) => (g.id === id ? game : g)) : [...games, game];
+  write(GAMES, next);
+  return game;
+}
+
+export function unpublish(id: string): void {
+  write(GAMES, read<PublishedGame[]>(GAMES, []).filter((g) => g.id !== id));
+}
+
+/** A copy of somebody's game, credited, that the forker can edit freely. */
+export function fork(id: string, author: string): PublishedGame | undefined {
+  const src = getPublished(id);
+  if (!src) return undefined;
+  const definition = JSON.parse(JSON.stringify(src.definition)) as GameDefinition;
+  definition.meta.name = `${src.definition.meta.name} (remix)`;
+  return publish({
+    definition,
+    knobs: src.knobs,
+    author,
+    tags: src.tags,
+    forkedFrom: src.id,
+  });
+}
+
+// ---------- stats ----------
+
+function mutate(id: string, fn: (g: PublishedGame) => void): void {
+  const games = read<PublishedGame[]>(GAMES, []);
+  const g = games.find((x) => x.id === id);
+  if (!g) return;
+  fn(g);
+  write(GAMES, games);
+}
+
+export function recordPlay(id: string): void {
+  mutate(id, (g) => { g.stats.plays += 1; });
+  const hist = read<Record<string, number>>(PLAYS, {});
+  hist[id] = Date.now();
+  write(PLAYS, hist);
+}
+
+export function lastPlayed(id: string): number | undefined {
+  return read<Record<string, number>>(PLAYS, {})[id];
+}
+
+export function favourites(): string[] { return read<string[]>(FAVS, []); }
+export function isFavourite(id: string): boolean { return favourites().includes(id); }
+
+export function toggleFavourite(id: string): boolean {
+  const favs = favourites();
+  const on = favs.includes(id);
+  const next = on ? favs.filter((x) => x !== id) : [...favs, id];
+  write(FAVS, next);
+  mutate(id, (g) => { g.stats.favourites = Math.max(0, g.stats.favourites + (on ? -1 : 1)); });
+  return !on;
+}
+
+// ---------- reviews ----------
+
+export function reviewsFor(id: string): Review[] {
+  return read<Review[]>(REVIEWS, []).filter((r) => r.gameId === id).sort((a, b) => b.at - a.at);
+}
+
+export function myReview(id: string, author: string): Review | undefined {
+  return read<Review[]>(REVIEWS, []).find((r) => r.gameId === id && r.author === author);
+}
+
+/** One review per person per game — rating again replaces the old one rather than stacking. */
+export function review(gameId: string, author: string, rating: number, text: string): void {
+  const clamped = Math.min(5, Math.max(1, Math.round(rating)));
+  const all = read<Review[]>(REVIEWS, []);
+  const prev = all.find((r) => r.gameId === gameId && r.author === author);
+  const next: Review = { gameId, author, rating: clamped, text: text.trim(), at: Date.now() };
+  write(REVIEWS, prev ? all.map((r) => (r === prev ? next : r)) : [...all, next]);
+
+  mutate(gameId, (g) => {
+    if (prev) {
+      g.stats.ratingSum += clamped - prev.rating;
+    } else {
+      g.stats.ratingSum += clamped;
+      g.stats.ratingCount += 1;
+    }
+  });
+}
+
+export function averageRating(stats: GameStats): number | null {
+  return stats.ratingCount > 0 ? stats.ratingSum / stats.ratingCount : null;
+}
+
+// ---------- search ----------
+
+export type SortKey = 'trending' | 'newest' | 'top-rated' | 'most-played' | 'name';
+
+export interface Filters {
+  query?: string;
+  tags?: string[];
+  players?: number;         // must seat exactly this many
+  family?: string;
+  favouritesOnly?: boolean;
+  maxComplexity?: number;   // 1-5
+}
+
+/**
+ * Complexity, estimated rather than asked for. Authors are the worst judges of how hard their
+ * own game is, so this counts what the definition actually contains.
+ */
+export function complexityOf(def: GameDefinition): number {
+  let score = 1;
+  if (def.trick?.bidding || def.trick?.auction) score += 1;
+  if (def.rummy) score += 1;
+  if (def.climb?.combos) score += 0.5;
+  if (def.handPass) score += 0.5;
+  if (def.solitaire && def.solitaire.freeCells > 0) score += 0.5;
+  score += Math.min(2, (def.rules ?? []).length * 0.4);
+  score += Math.min(1, Object.keys(def.deck.tags).length * 0.25);
+  return Math.max(1, Math.min(5, Math.round(score)));
+}
+
+/** Rough playtime in minutes, from hand size, player count and whether it's a race to a target. */
+export function playtimeOf(def: GameDefinition): number {
+  const seats = def.meta.players.max;
+  const hands = def.scoring.target ? Math.max(2, Math.round(def.scoring.target / 25)) : 1;
+  const base = def.solitaire ? 8 : def.trick ? 4 + seats : 3 + seats * 1.5;
+  return Math.max(3, Math.round(base * hands));
+}
+
+export function searchLibrary(games: PublishedGame[], filters: Filters, sort: SortKey): PublishedGame[] {
+  const q = (filters.query ?? '').trim().toLowerCase();
+  const favs = favourites();
+
+  const hits = games.filter((g) => {
+    const d = g.definition;
+    if (q) {
+      const hay = `${d.meta.name} ${d.meta.description} ${g.author} ${g.tags.join(' ')}`.toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    if (filters.family && d.meta.family !== filters.family) return false;
+    if (filters.tags?.length && !filters.tags.every((t) => g.tags.includes(t))) return false;
+    if (filters.players && (d.meta.players.min > filters.players || d.meta.players.max < filters.players)) return false;
+    if (filters.favouritesOnly && !favs.includes(g.id)) return false;
+    if (filters.maxComplexity && complexityOf(d) > filters.maxComplexity) return false;
+    return true;
+  });
+
+  const rating = (g: PublishedGame) => averageRating(g.stats) ?? 0;
+  const sorters: Record<SortKey, (a: PublishedGame, b: PublishedGame) => number> = {
+    // Trending leans on recency as well as plays, so a good new game isn't buried by an old one.
+    trending: (a, b) => trendScore(b) - trendScore(a),
+    newest: (a, b) => b.createdAt - a.createdAt,
+    'top-rated': (a, b) => rating(b) - rating(a) || b.stats.ratingCount - a.stats.ratingCount,
+    'most-played': (a, b) => b.stats.plays - a.stats.plays,
+    name: (a, b) => a.definition.meta.name.localeCompare(b.definition.meta.name),
+  };
+  return hits.sort(sorters[sort]);
+}
+
+function trendScore(g: PublishedGame): number {
+  const ageDays = (Date.now() - g.updatedAt) / 86400000;
+  const heat = g.stats.plays + g.stats.favourites * 2 + g.stats.ratingSum;
+  return heat / Math.pow(ageDays + 2, 0.6);
+}
+
+// ---------- helpers ----------
+
+function slugId(name: string, existing: PublishedGame[]): string {
+  const base = `custom-${name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'game'}`;
+  let id = base;
+  let n = 2;
+  while (existing.some((g) => g.id === id)) id = `${base}-${n++}`;
+  return id;
+}
+
+function dedupe(xs: string[]): string[] { return Array.from(new Set(xs.filter(Boolean))); }
+
+/** Everything a game can be tagged with, gathered from what has actually been published. */
+export function allTags(games: PublishedGame[]): string[] {
+  return dedupe(games.flatMap((g) => g.tags)).sort();
+}

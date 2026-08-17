@@ -62,6 +62,9 @@ export interface GameDefinition {
   solitaire?: SolitaireConfig;
   // Present iff each hand opens with a simultaneous card exchange (Hearts).
   handPass?: HandPassConfig;
+  // Author-written conditional rules, layered on top of whichever family this game is.
+  // Present on custom games; the classics don't need any.
+  rules?: CustomRule[];
 }
 
 export interface WarConfig {
@@ -195,7 +198,54 @@ export type Predicate =
   | { matches: MatchPredicate }
   | { cardHasTag: string }
   | { existsLegal: string }        // is action <id> currently legal for the player?
-  | { always: true };
+  | { always: true }
+  // ----- near-programmable additions (Phase 2) -----
+  // Everything below exists so a rule an author writes in the builder is expressible as data.
+  // They are all pure reads of state, so they stay safe to evaluate inside the engine.
+  | { cmp: Comparison }            // arbitrary numeric/string comparison between two values
+  | { rankIn: Rank[] }             // the card in play is one of these ranks
+  | { suitIn: Suit[] }             // ...one of these suits
+  | { colorIs: 'red' | 'black' }
+  | { handHas: HandQuery }         // does the acting player's hand contain N of something
+  | { isFirstTurn: true };         // nobody has played a card yet this hand
+
+/** Two values and an operator. The workhorse of author-written conditions. */
+export interface Comparison {
+  left: RuleValue;
+  op: '==' | '!=' | '>' | '>=' | '<' | '<=';
+  right: RuleValue;
+}
+
+/** "at least 3 hearts", "exactly one Ace", "any card above a 10". */
+export interface HandQuery {
+  rank?: Rank;
+  suit?: Suit;
+  color?: 'red' | 'black';
+  minCount?: number;               // default 1
+}
+
+/**
+ * A value inside a rule. Deliberately a closed set: an author can compose arithmetic over
+ * things the engine already knows, and nothing else. No strings are ever evaluated as code.
+ */
+export type RuleValue =
+  | { lit: number | string }
+  | { stateVar: string }                       // a game variable, e.g. activeSuit
+  | { count: string }                          // cards in a zone; '$hand' = the actor's hand
+  | { cardProp: 'rank' | 'suit' | 'color' | 'value' }   // of the card in play
+  | { score: PlayerRef }                       // that player's points THIS hand
+  | { matchScore: PlayerRef }                  // ...across the match
+  | { handNumber: true }
+  | { playerCount: true }
+  | { tricksWon: PlayerRef }
+  | { add: [RuleValue, RuleValue] }
+  | { sub: [RuleValue, RuleValue] }
+  | { mul: [RuleValue, RuleValue] }
+  | { min: [RuleValue, RuleValue] }
+  | { max: [RuleValue, RuleValue] };
+
+/** Who a rule is talking about. */
+export type PlayerRef = '$me' | '$next' | '$prev' | '$all' | '$others';
 
 export interface MatchPredicate {
   cardProp: 'suit' | 'rank' | 'color'; // color = red (H/D) vs black (C/S)
@@ -218,13 +268,50 @@ export type Effect =
   | { op: 'reshuffleDiscardInto'; zone: string; keepTop: boolean }
   | { op: 'extraTurn' }                              // current player takes another turn
   | { op: 'drawUntilPlayable'; from: string }        // draw until a legal play appears
-  | { op: 'passCards'; direction: 'left' | 'right' }; // every player passes one hand card to a neighbor, simultaneously
+  | { op: 'passCards'; direction: 'left' | 'right' } // every player passes one hand card to a neighbor, simultaneously
+  // ----- near-programmable additions (Phase 2) -----
+  | { op: 'addScore'; player: PlayerRef; amount: RuleValue }
+  | { op: 'setVarNum'; var: string; value: RuleValue }
+  | { op: 'announce'; text: string }              // a line in the game log, in the author's words
+  | { op: 'endHand'; winner?: PlayerRef | 'highestScore' | 'lowestScore' }
+  | { op: 'swapHands'; withPlayer: 'next' | 'prev' }
+  | { op: 'moveMany'; from: string; to: string; count: RuleValue }
+  | { op: 'drawTo'; player: PlayerRef; from: string; count: RuleValue }
+  | { op: 'revealHand'; player: PlayerRef }
+  | { op: 'skipTo'; player: 'next' | 'prev' };
 
 export interface TriggerDef {
   on: 'drawPileEmpty' | 'cardPlayed';
   cardHasTag?: string;
   do: Effect[];
 }
+
+/**
+ * An author-written rule: WHEN something happens, IF a condition holds, THEN do these things.
+ *
+ * This is the near-programmable layer. A CustomRule is ordinary data — it is stored in the
+ * definition, pinned into a match like everything else, and interpreted by the same engine, so
+ * a game somebody builds in the browser runs by exactly the same referee as Hearts does.
+ */
+export interface CustomRule {
+  id: string;
+  name: string;                     // the author's label, shown in the builder and the log
+  when: RuleHook;
+  cardHasTag?: string;              // narrow a cardPlayed rule to tagged cards
+  if?: Predicate;                   // omitted = always
+  then: Effect[];
+  note?: string;                    // the author's own explanation, surfaced in the rules panel
+  enabled?: boolean;                // default true; lets an author park a rule without deleting it
+}
+
+export type RuleHook =
+  | 'handStart'      // once, as the hand is dealt
+  | 'turnStart'      // before the acting player chooses
+  | 'turnEnd'        // after their move resolves
+  | 'cardPlayed'     // a card left a hand for a shared zone
+  | 'cardDrawn'
+  | 'trickWon'       // trick-taking only
+  | 'drawPileEmpty';
 
 export interface EndConditionDef {
   id: string;
@@ -283,6 +370,10 @@ export interface MatchState {
   booksWon: Record<string, number>; // fishing: completed books per player
   vars: Record<string, string>;
   scores: Record<string, number>;   // THIS HAND's points, set when the hand ends
+  // Points handed out by author-written rules DURING the hand. Kept separately because each
+  // family computes state.scores from scratch when the hand ends; this is folded in afterwards
+  // so a rule's points are never quietly overwritten by the family's own scoring.
+  bonus: Record<string, number>;
   phase: 'playing' | 'roundOver';
   winner: string | null;            // this hand's winner
   // match play: when scoring.target is set, a match spans multiple hands, accumulating
@@ -305,6 +396,7 @@ export interface MatchState {
   faceUp: Record<string, boolean>;       // solitaire: which cards are turned face up
   redealsLeft: number;                   // solitaire: stock passes remaining (-1 = unlimited)
   moveCount: number;                     // solitaire: moves made, for scoring/stats
+  ply: number;                           // moves resolved this hand, all families (rules read it)
   log: LogEntry[];
 }
 

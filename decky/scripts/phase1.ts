@@ -111,8 +111,11 @@ section('Server-authoritative moves');
   check('a made-up card is refused', !bogus.ok);
   check('and it says why', !!bogus.reason && bogus.reason.length > 0, bogus.reason);
 
-  const notYours = svc.submit(m.matchId, 'P1', { actionId: 'choosePass', cardId: 'C2' });
-  check('a card you do not hold is refused', !notYours.ok, notYours.reason);
+  // Pick a card that provably is NOT in this hand rather than naming one and hoping.
+  const mine = new Set(view.hand.map((c) => c.id));
+  const theirs = ['C2', 'D7', 'HK', 'SA', 'S9', 'H3', 'D2', 'C10'].find((id) => !mine.has(id))!;
+  const notYours = svc.submit(m.matchId, 'P1', { actionId: 'choosePass', cardId: theirs });
+  check('a card you do not hold is refused', !notYours.ok, { theirs, reason: notYours.reason });
 
   let seatErr = '';
   try { svc.view(m.matchId, 'P9'); } catch (e) { seatErr = (e as Error).message; }

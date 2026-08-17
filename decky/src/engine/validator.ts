@@ -4,7 +4,7 @@
 //
 // Returns structured issues. `errors` block publishing; `warnings` are advisory.
 
-import { Effect, GameDefinition, Predicate } from './types';
+import { CustomRule, Effect, GameDefinition, Predicate, RuleHook } from './types';
 
 export interface Issue {
   level: 'error' | 'warning';
@@ -17,6 +17,8 @@ export interface ValidationResult {
   issues: Issue[];
   status: 'green' | 'amber' | 'red';
 }
+
+const HOOKS_ALL: RuleHook[] = ['handStart', 'turnStart', 'turnEnd', 'cardPlayed', 'cardDrawn', 'trickWon', 'drawPileEmpty'];
 
 export function validate(def: GameDefinition): ValidationResult {
   const issues: Issue[] = [];
@@ -164,6 +166,48 @@ export function validate(def: GameDefinition): ValidationResult {
     }
   }
 
+  // --- author-written rules (the near-programmable layer) ---
+  // These come from the builder, so the checks are phrased as things an author can act on.
+  const ruleIds = new Set<string>();
+  for (const rule of def.rules ?? []) {
+    if (ruleIds.has(rule.id)) err('rule.duplicate', `Two rules share the id "${rule.id}".`);
+    ruleIds.add(rule.id);
+
+    if (rule.then.length === 0) {
+      warn('rule.empty', `"${rule.name}" has a condition but does nothing.`);
+    }
+    if (rule.cardHasTag && !tagNames.has(rule.cardHasTag)) {
+      err('rule.tag', `"${rule.name}" reacts to "${rule.cardHasTag}" cards, but no card is tagged that.`);
+    }
+    if (!HOOKS_ALL.includes(rule.when)) {
+      err('rule.hook', `"${rule.name}" fires on "${rule.when}", which is not a thing that happens.`);
+    }
+    if (rule.when === 'trickWon' && !isTrick) {
+      warn('rule.hook.unreachable', `"${rule.name}" waits for a trick, but this game has no tricks — it will never fire.`);
+    }
+    if ((rule.when === 'cardDrawn' || rule.when === 'drawPileEmpty') && isSolitaire) {
+      warn('rule.hook.unreachable', `"${rule.name}" will never fire in a patience game.`);
+    }
+    if (rule.if) checkPredicate(rule.if, `rule "${rule.name}"`);
+    for (const eff of rule.then) checkRuleEffect(rule, eff);
+  }
+
+  function checkRuleEffect(rule: CustomRule, e: Effect): void {
+    const zoneOk = (z: string) => zoneIds.has(z) || z === '$hand' || z.startsWith('hand');
+    if (e.op === 'moveMany') {
+      if (!zoneOk(e.from)) err('rule.zone', `"${rule.name}" moves cards from "${e.from}", which is not a pile in this game.`);
+      if (!zoneOk(e.to)) err('rule.zone', `"${rule.name}" moves cards to "${e.to}", which is not a pile in this game.`);
+    }
+    if (e.op === 'drawTo' && !zoneOk(e.from)) {
+      err('rule.zone', `"${rule.name}" draws from "${e.from}", which is not a pile in this game.`);
+    }
+    if (e.op === 'announce' && e.text.trim() === '') {
+      warn('rule.announce', `"${rule.name}" announces an empty message.`);
+    }
+    if (e.op === 'if') { for (const sub of [...e.then, ...(e.else ?? [])]) checkRuleEffect(rule, sub); }
+  }
+
+  // Computed last, so every check above — including the rule checks — counts.
   const hasError = issues.some((i) => i.level === 'error');
   const hasWarn = issues.some((i) => i.level === 'warning');
   return {
