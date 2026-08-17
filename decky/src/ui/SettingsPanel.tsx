@@ -1,6 +1,56 @@
 import { useSettings } from '../settings/SettingsContext';
 import { useDismissable } from './useEscape';
-import { ACCENTS, AccentId, FELTS, Settings, TableFelt } from '../settings/settings';
+import {
+  ACCENTS, AccentId, BACKS, CardBack, CardFace, CustomBack, FACES, FELTS, Settings, TableFelt,
+} from '../settings/settings';
+
+const DEFAULT_CUSTOM_BACK: CustomBack = { pattern: 'lattice', ink: '#d6af5c', ground: '#123b28', emblem: '♠' };
+
+const PATTERNS: [CustomBack['pattern'], string][] = [
+  ['lattice', 'Lattice'], ['stripe', 'Stripe'], ['dots', 'Dots'],
+  ['checker', 'Checker'], ['wave', 'Wave'], ['plain', 'Plain'],
+];
+const EMBLEMS = ['', '♠', '♥', '♦', '♣', '★', '✦', '❖', '⚜'];
+
+/**
+ * Make your own back. Deliberately four dials rather than a canvas: a back has to stay legible
+ * at thumbnail size across a whole table, and an open drawing tool produces mud.
+ */
+function BackDesigner({ value, onChange }: { value: CustomBack; onChange: (v: CustomBack) => void }) {
+  const patch = (p: Partial<CustomBack>) => onChange({ ...value, ...p });
+  return (
+    <div className="designer">
+      <div className="dz-preview">
+        <span className="sw-back big mine" data-cbpattern={value.pattern}
+          style={{ ['--cb-ink' as string]: value.ink, ['--cb-ground' as string]: value.ground }}>
+          {value.emblem}
+        </span>
+      </div>
+      <div className="dz-controls">
+        <div className="field"><span>Pattern</span>
+          <div className="seg wrap">
+            {PATTERNS.map(([p, label]) => (
+              <button key={p} className={value.pattern === p ? 'on' : ''} onClick={() => patch({ pattern: p })}>{label}</button>
+            ))}
+          </div>
+        </div>
+        <div className="two">
+          <label className="field"><span>Ink</span>
+            <input type="color" value={value.ink} onChange={(e) => patch({ ink: e.target.value })} /></label>
+          <label className="field"><span>Card</span>
+            <input type="color" value={value.ground} onChange={(e) => patch({ ground: e.target.value })} /></label>
+        </div>
+        <div className="field"><span>Emblem</span>
+          <div className="seg wrap">
+            {EMBLEMS.map((g) => (
+              <button key={g || 'none'} className={value.emblem === g ? 'on' : ''} onClick={() => patch({ emblem: g })}>{g || 'None'}</button>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // The customization drawer: appearance + gameplay, applied live and persisted.
 export function SettingsPanel({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -63,20 +113,62 @@ export function SettingsPanel({ open, onClose }: { open: boolean; onClose: () =>
         </Group>
 
         <Group title="Cards">
-          <Seg label="Card back" value={settings.cardBack} onChange={(v) => set('cardBack', v)}
-            options={[['stripes', 'Stripes'], ['grid', 'Grid'], ['dots', 'Dots'], ['solid', 'Solid']]} />
+          <div className="field"><span>Card face</span>
+            <div className="swatches faces">
+              {(Object.keys(FACES) as CardFace[]).map((f) => (
+                <button key={f} className={`swatch ${settings.cardFace === f ? 'on' : ''}`}
+                  title={FACES[f].note} aria-pressed={settings.cardFace === f}
+                  onClick={() => set('cardFace', f)}>
+                  <span className={`sw-card card face f-${f} ${f === 'block' || f === 'neon' ? 'black' : 'red'}`}>
+                    <span className="corner tl">A<span>♥</span></span>
+                  </span>
+                  <em>{FACES[f].name}</em>
+                </button>
+              ))}
+            </div>
+          </div>
+          <p className="set-note">{FACES[settings.cardFace].note}</p>
+
+          <div className="field"><span>Card back</span>
+            <div className="swatches backs">
+              {(Object.keys(BACKS) as Exclude<CardBack, 'custom'>[]).map((bk) => (
+                <button key={bk} className={`swatch ${settings.cardBack === bk ? 'on' : ''}`}
+                  title={BACKS[bk].name} aria-pressed={settings.cardBack === bk}
+                  onClick={() => set('cardBack', bk)}>
+                  <span className="sw-back" data-back={bk}>{bk === 'monogram' ? '♠' : ''}</span>
+                  <em>{BACKS[bk].name}</em>
+                </button>
+              ))}
+              <button className={`swatch ${settings.cardBack === 'custom' ? 'on' : ''}`}
+                aria-pressed={settings.cardBack === 'custom'}
+                onClick={() => { if (!settings.customBack) set('customBack', DEFAULT_CUSTOM_BACK); set('cardBack', 'custom'); }}>
+                <span className="sw-back mine" data-cbpattern={settings.customBack?.pattern}
+                  style={settings.customBack ? { ['--cb-ink' as string]: settings.customBack.ink, ['--cb-ground' as string]: settings.customBack.ground } : undefined}>
+                  {settings.customBack?.emblem || '+'}
+                </span>
+                <em>Yours</em>
+              </button>
+            </div>
+          </div>
+          {settings.cardBack === 'custom' && (
+            <BackDesigner value={settings.customBack ?? DEFAULT_CUSTOM_BACK} onChange={(v) => set('customBack', v)} />
+          )}
+
           <Seg label="Card size" value={settings.cardSize} onChange={(v) => set('cardSize', v)}
             options={[['s', 'Small'], ['m', 'Medium'], ['l', 'Large']]} />
-          <Seg label="Card face" value={settings.cardFace} onChange={(v) => set('cardFace', v)}
-            options={[['classic', 'Classic'], ['four-color', 'Four colours'], ['letters', 'Suit letters'], ['big-index', 'Big index']]} />
-          <p className="set-note">
-            {settings.cardFace === 'classic' ? 'The traditional deck — two colours, full pips.'
-              : settings.cardFace === 'four-color' ? 'A colour per suit, so hearts and diamonds never look alike.'
-              : settings.cardFace === 'letters' ? 'Each suit is spelled out. Readable without telling any colours apart.'
-              : 'One large rank in the corner and no pips. Easiest to read on a phone.'}
-          </p>
-          <Seg label="Table surface" value={settings.surface} onChange={(v) => set('surface', v)}
-            options={[['soft', 'Soft'], ['glass', 'Glass'], ['plain', 'Plain']]} />
+          <div className="field"><span>The table</span>
+            <div className="swatches tables">
+              {(Object.keys(FELTS) as TableFelt[]).map((t) => (
+                <button key={t} className={`swatch wide ${settings.tableFelt === t ? 'on' : ''}`}
+                  title={FELTS[t].blurb} aria-pressed={settings.tableFelt === t}
+                  onClick={() => set('tableFelt', t)}>
+                  <span className="felt-swatch" data-felt={t}><span className="fs-rail"><span className="fs-felt" /></span></span>
+                  <em>{FELTS[t].name}</em>
+                </button>
+              ))}
+            </div>
+          </div>
+          <p className="set-note">{FELTS[settings.tableFelt].blurb}</p>
         </Group>
 
         <Group title="Motion & background">

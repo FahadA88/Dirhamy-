@@ -36,8 +36,9 @@ export function CardFace({ card }: { card: Card }) {
   const label = card.rank === 'JOKER' ? '★' : card.rank;
   const face = settings.cardFace;
   // Four-colour and letter-coded both recolour the suits; letters additionally spell them out.
-  const style = face === 'four-color' || face === 'letters'
-    ? { color: FOUR_COLOR[card.suit] } : undefined;
+  // Faces that give every suit its own colour rather than the traditional two.
+  const FOUR = face === 'four-color' || face === 'letters' || face === 'shapes';
+  const style = FOUR ? { color: FOUR_COLOR[card.suit] } : undefined;
   const pips = PIPS[card.rank];
   const isCourt = card.rank === 'J' || card.rank === 'Q' || card.rank === 'K';
 
@@ -50,7 +51,11 @@ export function CardFace({ card }: { card: Card }) {
         {face === 'letters' && <b className="suitletter">{SUIT_LETTER[card.suit]}</b>}
       </div>
 
-      {pips ? (
+      {face === 'shapes' ? (
+        // A shape carries the suit for anyone who cannot separate two colours, and unlike a
+        // letter it still reads at a glance from across the table.
+        <div className="shapemark" data-suit={card.suit} aria-hidden="true" />
+      ) : pips ? (
         <div className="pips" aria-hidden="true">
           {pips.map((p, i) => (
             <span key={i} className="spot"
@@ -69,7 +74,7 @@ export function CardFace({ card }: { card: Card }) {
       )}
 
       <div className="corner br">{label}<span>{sym}</span>
-        {face === 'letters' && <b className="suitletter">{SUIT_LETTER[card.suit]}</b>}
+        {(face === 'letters' || face === 'shapes') && <b className="suitletter">{SUIT_LETTER[card.suit]}</b>}
       </div>
     </div>
   );
