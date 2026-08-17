@@ -55,7 +55,7 @@ export const defaultSettings: Settings = {
   theme: 'dark',
   accent: 'emerald',
   cardBack: 'stripes',
-  tableFelt: 'mahogany',
+  tableFelt: 'parlour',
   cardFace: 'classic',
   cardSize: 'm',
   textSize: 'm',
