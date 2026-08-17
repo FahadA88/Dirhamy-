@@ -42,7 +42,7 @@ export interface Settings {
 }
 
 export const defaultSettings: Settings = {
-  theme: 'light',
+  theme: 'dark',
   accent: 'emerald',
   cardBack: 'stripes',
   tableFelt: 'mahogany',

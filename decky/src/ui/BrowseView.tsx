@@ -13,6 +13,7 @@ import {
 } from '../social/safety';
 import { leaderboard } from '../social/records';
 import { useSettings } from '../settings/SettingsContext';
+import { GameArt } from './GameArt';
 
 
 // The shelf.
@@ -118,7 +119,7 @@ export function BrowseView({ onPlay, onSetup, onRemix }: {
           </select>
           <button className={`chip ${filters.favouritesOnly ? 'on' : ''}`}
             onClick={() => setFilters((f) => ({ ...f, favouritesOnly: !f.favouritesOnly }))}>
-            ★ Favourites
+            ♥ Favourites
           </button>
           {shown && (
             <select value={sort} aria-label="Sort by" onChange={(e) => setSort(e.target.value as SortKey)}>
@@ -136,18 +137,13 @@ export function BrowseView({ onPlay, onSetup, onRemix }: {
           {hero && (
             <button className="hero" onClick={() => setDetail(hero.id)}>
               <div className="hero-body">
-                <span className="hero-kicker">Featured today</span>
+                <span className="hero-kicker">Tonight's table</span>
                 <h2>{hero.definition.meta.name}</h2>
-                <p>{hero.definition.meta.description}</p>
-                <div className="hero-meta">
-                  <Meta game={hero} />
-                </div>
+                <Meta game={hero} />
+                <span className="hero-cta">Deal me in ▶</span>
               </div>
-              <div className="hero-art" aria-hidden>
-                <span className="hero-suit s-S">♠</span>
-                <span className="hero-suit s-H">♥</span>
-                <span className="hero-suit s-D">♦</span>
-                <span className="hero-suit s-C">♣</span>
+              <div className="hero-art">
+                <GameArt def={hero.definition} id={hero.id} />
               </div>
             </button>
           )}
@@ -159,19 +155,14 @@ export function BrowseView({ onPlay, onSetup, onRemix }: {
       ) : results.length === 0 ? (
         <div className="empty-shelf">
           <div className="empty-mark">🂠</div>
-          <h3>Nothing matches that</h3>
-          <p>
-            {filters.favouritesOnly
-              ? 'You have not starred anything yet — the ★ on any game card adds it here.'
-              : 'Try fewer filters, or build the game you were looking for.'}
-          </p>
-          <button className="ghost" onClick={() => setFilters({})}>Clear filters</button>
+          <h3>{filters.favouritesOnly ? 'No favourites yet' : 'Nothing here'}</h3>
+          <p>{filters.favouritesOnly ? 'Tap ♥ on any game.' : 'Try fewer filters.'}</p>
+          <button className="ghost" onClick={() => setFilters({})}>Clear</button>
         </div>
       ) : (
         <>
           <div className="section-head">
             <h2>{results.length} game{results.length === 1 ? '' : 's'}</h2>
-            <span className="muted">Sorted by {SORTS.find((s) => s.key === sort)?.label.toLowerCase()}.</span>
           </div>
           <div className="shelf-grid">
             {results.map((g) => (
@@ -196,7 +187,6 @@ function Shelf({ collection, onOpen, onPlay, onChanged }: {
     <section className="shelf">
       <div className="section-head">
         <h2>{collection.title}</h2>
-        <span className="muted">{collection.blurb}</span>
       </div>
       <div className="shelf-rail">
         {collection.games.map((g) => (
@@ -215,20 +205,17 @@ function ShelfCard({ game, onOpen, onPlay, onChanged }: {
   return (
     <div className="shelfcard">
       <button className="sc-main" onClick={onOpen}>
-        <div className="sc-top">
-          <span className="fam-badge">{def.meta.family}</span>
-          {game.staffPick && <span className="pick-badge">staff pick</span>}
+        <GameArt def={def} id={game.id} />
+        <div className="sc-body">
+          <h3>{def.meta.name}</h3>
+          <Meta game={game} />
         </div>
-        <h3>{def.meta.name}</h3>
-        <p>{def.meta.description}</p>
-        <Meta game={game} />
+        {game.staffPick && <span className="pick-badge" title="Staff pick">★</span>}
       </button>
-      <div className="sc-foot">
-        <button className={`star ${fav ? 'on' : ''}`} aria-pressed={fav}
-          aria-label={fav ? 'Remove from favourites' : 'Add to favourites'}
-          onClick={() => { toggleFavourite(game.id); onChanged(); }}>★</button>
-        <button className="primary sm" onClick={onPlay}>Play</button>
-      </div>
+      <button className={`star ${fav ? 'on' : ''}`} aria-pressed={fav}
+        aria-label={fav ? 'Remove from favourites' : 'Add to favourites'}
+        onClick={() => { toggleFavourite(game.id); onChanged(); }}>♥</button>
+      <button className="sc-play" onClick={onPlay} aria-label={`Play ${def.meta.name}`}>▶</button>
     </div>
   );
 }
@@ -237,15 +224,15 @@ function Meta({ game }: { game: PublishedGame }) {
   const def = game.definition;
   const rating = averageRating(game.stats);
   const p = def.meta.players;
+  const weight = complexityOf(def);
   return (
     <div className="sc-meta">
-      <span>{p.min === p.max ? `${p.min}p` : `${p.min}–${p.max}p`}</span>
-      <span>~{playtimeOf(def)} min</span>
-      <span title={`Complexity ${complexityOf(def)} of 5`}>
-        {'●'.repeat(complexityOf(def))}{'○'.repeat(5 - complexityOf(def))}
+      <span title="Players">♟ {p.min === p.max ? p.min : `${p.min}–${p.max}`}</span>
+      <span title="Typical length">◷ {playtimeOf(def)}m</span>
+      <span title={`Weight ${weight} of 5`} className="sc-weight">
+        {'▮'.repeat(weight)}<i>{'▮'.repeat(5 - weight)}</i>
       </span>
-      {rating !== null && <span className="sc-rating">★ {rating.toFixed(1)}</span>}
-      {game.stats.plays > 0 && <span>{game.stats.plays} plays</span>}
+      {rating !== null && <span className="sc-rating" title="Rating">★ {rating.toFixed(1)}</span>}
     </div>
   );
 }

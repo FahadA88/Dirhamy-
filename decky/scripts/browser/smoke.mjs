@@ -55,9 +55,12 @@ console.log(bad.length === 0 ? `\nALL ${report.length} GAMES CLEAN` : `\n${bad.l
 await browser.close();
 process.exit(bad.length ? 1 : 0);
 
-/** The library is a shelf now: search for a game, then play it from its card. */
+/** The library is a shelf now: search, pick the card whose name matches exactly, play it. */
 async function openGame(page, name) {
   await page.locator('.searchbox').fill(name);
-  await page.waitForTimeout(280);
-  await page.locator('.shelf-grid .shelfcard').first().locator('.sc-foot button.primary').click();
+  await page.waitForTimeout(320);
+  const card = page.locator('.shelf-grid .shelfcard').filter({
+    has: page.locator('.sc-main h3', { hasText: new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`) }),
+  }).first();
+  await card.locator('.sc-play').click({ force: true });
 }

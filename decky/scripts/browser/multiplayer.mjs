@@ -62,9 +62,13 @@ ok(`${plays} moves were played`, plays > 4);
 await p.screenshot({ path: '/tmp/mp-table.png' });
 
 console.log('\nThe move history');
-// Clear whatever the loop left on screen — a hand-off waiting on the next player counts.
-const pending = p.locator('.handoff button.primary');
-if (await pending.count()) { await pending.click(); await p.waitForTimeout(200); }
+// Clear whatever the loop left on screen — a hand-off, a suit picker, or a hand-over modal.
+for (let i = 0; i < 4; i++) {
+  const overlay = p.locator('.modal .primary, .suit-btn');
+  if (!(await overlay.count())) break;
+  await overlay.first().click({ timeout: 2000 }).catch(() => {});
+  await p.waitForTimeout(250);
+}
 await p.locator('.restart-btn', { hasText: 'History' }).click();
 await p.waitForSelector('.movelist');
 const rows = await p.locator('.movelist li').count();

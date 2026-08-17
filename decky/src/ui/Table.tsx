@@ -273,7 +273,7 @@ export function Table({ def, seats = 3, plan }: {
       <div className="felt-content">
       {view.matchTarget != null && (
         <div className="match-bar">
-          <span className="match-hand">Hand {view.handNumber} · race to {view.matchTarget}{view.matchBust != null ? ` (bust at ${view.matchBust})` : ''}</span>
+          <span className="match-hand">Hand {view.handNumber} <i>to {view.matchTarget}</i></span>
           <div className="match-chips">
             {view.players.map((p) => (
               <span key={p.id} className={`match-chip ${p.id === me ? 'you' : ''}`}>
@@ -295,7 +295,7 @@ export function Table({ def, seats = 3, plan }: {
                 {Array.from({ length: Math.min(p.handCount, 12) }).map((_, i) => (<div key={i} className={backCls} />))}
               </div>
               <div className="count">
-                {p.handCount} cards{view.mode === 'trick' ? ` · ${view.tricksWon?.[p.id] ?? 0} tricks` : ''}
+                {p.handCount}{view.mode === 'trick' && (view.tricksWon?.[p.id] ?? 0) > 0 ? ` · ${view.tricksWon?.[p.id]} won` : ''}
                 {view.mode === 'trick' && view.bids?.[p.id] !== undefined ? ` · bid ${view.bids[p.id]}` : ''}
                 {isFish ? ` · ${view.booksWon?.[p.id] ?? 0} books` : ''}
                 {view.mode === 'climb' && view.finished?.includes(p.id) ? ` · out #${view.finished.indexOf(p.id) + 1}` : ''}
@@ -319,8 +319,8 @@ export function Table({ def, seats = 3, plan }: {
             <div className="bid-panel">
               <div className="bid-title">
                 {view.auctionRound === 1
-                  ? `Order it up — make ${view.upcard ? SUIT_SYMBOLS[view.upcard.suit] : ''} trump?`
-                  : 'Name a trump suit'}
+                  ? <>Trump {view.upcard ? SUIT_SYMBOLS[view.upcard.suit] : ''}?</>
+                  : 'Name trump'}
               </div>
               <div className="bid-buttons">
                 {auctionMoves.filter((m) => !m.alone).map((m, i) => (
@@ -340,15 +340,15 @@ export function Table({ def, seats = 3, plan }: {
               )}
               {canPassBid
                 ? <button className="draw-btn" onClick={() => submit({ actionId: 'passBid' })}>Pass</button>
-                : <span className="mini-label">You're the dealer on the last call — you have to name one.</span>}
+                : <span className="mini-label">Dealer must call.</span>}
             </div>
-          ) : <div className="trick-empty">Bidding for trump… waiting for other players</div>}
+          ) : <div className="trick-empty">Bidding…</div>}
         </div>
       ) : view.mode === 'trick' && view.bidding ? (
         <div className="center bid-area">
           {view.isYourTurn ? (
             <div className="bid-panel">
-              <div className="bid-title">How many tricks will you take?</div>
+              <div className="bid-title">Your bid</div>
               <div className="bid-buttons">
                 {Array.from({ length: view.hand.length + 1 }, (_, n) => (
                   <button key={n} className="bid-btn" onClick={() => submit({ actionId: 'bid', choice: String(n) })}>
@@ -357,7 +357,7 @@ export function Table({ def, seats = 3, plan }: {
                 ))}
               </div>
             </div>
-          ) : <div className="trick-empty">Bidding… waiting for other players</div>}
+          ) : <div className="trick-empty">Bidding…</div>}
         </div>
       ) : view.mode === 'trick' ? (
         <div className="center trick-area">
@@ -368,7 +368,7 @@ export function Table({ def, seats = 3, plan }: {
                   <div className="pile-label">{nameOf(t.player)}</div>
                 </div>
               ))
-            : <div className="trick-empty">Trick is empty — {view.isYourTurn ? 'your lead' : 'waiting…'}</div>}
+            : <div className="trick-empty">{view.isYourTurn ? 'Your lead' : '…'}</div>}
           <div className="trick-meta">
             Trump {view.trumpSuit && view.trumpSuit !== 'none' ? SUIT_SYMBOLS[view.trumpSuit] : '—'}
             {view.lead ? ` · led ${SUIT_SYMBOLS[view.lead]}` : ''}
@@ -383,8 +383,8 @@ export function Table({ def, seats = 3, plan }: {
           </div>
           <div className="fish-prompt">
             {view.isYourTurn
-              ? (askRank ? `Asking for ${askRank}s — tap an opponent above` : 'Tap one of your cards to pick a rank, then tap an opponent')
-              : 'Waiting…'}
+              ? (askRank ? `Ask who for ${askRank}s?` : 'Pick a rank')
+              : '…'}
           </div>
         </div>
       ) : isWar ? (
@@ -396,7 +396,7 @@ export function Table({ def, seats = 3, plan }: {
                   <div className="pile-label">{i % 2 === 0 ? nameOf(view.players[0].id) : nameOf(view.players[1].id)}</div>
                 </div>
               ))
-            : <div className="trick-empty">Tap Flip to reveal the top cards</div>}
+            : <div className="trick-empty">Flip</div>}
         </div>
       ) : isRummy ? (
         <div className="center rummy-center">
@@ -427,8 +427,8 @@ export function Table({ def, seats = 3, plan }: {
             ) : <div className="card big empty" />}
             <div className="pile-label">
               {!view.climbPile || view.climbPile.length === 0
-                ? 'Empty — lead any shape'
-                : `Pile to beat · ${SHAPE_NAME[view.climbPile.length] ?? `${view.climbPile.length} cards`}`}
+                ? 'Lead anything'
+                : SHAPE_NAME[view.climbPile.length] ?? `${view.climbPile.length} cards`}
             </div>
           </div>
         </div>
@@ -447,23 +447,23 @@ export function Table({ def, seats = 3, plan }: {
 
       <div className={`you ${view.isYourTurn ? 'your-turn' : ''}`}>
         <div className="you-head">
-          <span>{settings.playerName === 'You' ? 'Your hand' : `${settings.playerName}’s hand`}{view.mode === 'trick' ? ` · ${view.tricksWon?.[me] ?? 0} tricks` : ''}{view.mode === 'trick' && view.bids?.[me] !== undefined ? ` · bid ${view.bids[HUMAN]}` : ''}{isFish ? ` · ${view.booksWon?.[me] ?? 0} books` : ''}{teamOf(me) ? ` · ${teamOf(me)}` : ''}</span>
+          <span>{settings.playerName === 'You' ? 'Your hand' : `${settings.playerName}’s hand`}{view.mode === 'trick' && (view.tricksWon?.[me] ?? 0) > 0 ? ` · ${view.tricksWon?.[me]} won` : ''}{view.mode === 'trick' && view.bids?.[me] !== undefined ? ` · bid ${view.bids[HUMAN]}` : ''}{isFish ? ` · ${view.booksWon?.[me] ?? 0} books` : ''}{teamOf(me) ? ` · ${teamOf(me)}` : ''}</span>
           {view.needsPassChoice && (
             <span className="turn-badge">
               {view.passCount > 1
-                ? `Pass ${view.passCount} ${view.passDirection} · ${view.passStaged.length}/${view.passCount} picked`
-                : `Pick a card to pass ${view.passDirection}`}
+                ? `Pass ${view.passStaged.length}/${view.passCount} ${view.passDirection}`
+                : `Pass ${view.passDirection}`}
             </span>
           )}
-          {isInterrupt && <span className="bomb-badge">💣 You can bomb out of turn</span>}
-          {discardMoves.length > 0 && <span className="turn-badge">You took the upcard — tap a card to discard</span>}
+          {isInterrupt && <span className="bomb-badge">💣 Bomb?</span>}
+          {discardMoves.length > 0 && <span className="turn-badge">Discard one</span>}
           {!view.passDirection && view.isYourTurn && !suitPickerOpen && !isInterrupt && <span className="turn-badge">Your turn</span>}
-          {!view.needsPassChoice && view.passDirection && <span className="waiting-badge">Waiting on {view.passWaitingOn} player{view.passWaitingOn === 1 ? '' : 's'}…</span>}
-          {canDraw && <button className="draw-btn" onClick={() => submit({ actionId: 'drawCard' })}>Draw a card</button>}
+          {!view.needsPassChoice && view.passDirection && <span className="waiting-badge">Waiting on {view.passWaitingOn}…</span>}
+          {canDraw && <button className="draw-btn" onClick={() => submit({ actionId: 'drawCard' })}>Draw</button>}
           {canPass && <button className="draw-btn" onClick={() => submit({ actionId: 'climbPass' })}>Pass</button>}
-          {canFishDraw && <button className="draw-btn" onClick={() => submit({ actionId: 'fishDraw' })}>Draw from ocean</button>}
-          {canDrawStock && <button className="draw-btn" onClick={() => submit({ actionId: 'drawStock' })}>Draw stock</button>}
-          {canDrawDiscard && <button className="draw-btn" onClick={() => submit({ actionId: 'drawDiscard' })}>Take discard</button>}
+          {canFishDraw && <button className="draw-btn" onClick={() => submit({ actionId: 'fishDraw' })}>Draw</button>}
+          {canDrawStock && <button className="draw-btn" onClick={() => submit({ actionId: 'drawStock' })}>Stock</button>}
+          {canDrawDiscard && <button className="draw-btn" onClick={() => submit({ actionId: 'drawDiscard' })}>Take</button>}
           {isRummy && view.rummyPhase === 'play' && view.meldMoves?.map((m, i) => (
             <button key={i} className="meld-btn" onClick={() => submit({ actionId: 'meld', cards: m.cards })}>Meld {m.label}</button>
           ))}
@@ -477,7 +477,7 @@ export function Table({ def, seats = 3, plan }: {
               💣 Bomb · {m.cards!.length}×{rankOfId(m.cards![0])}
             </button>
           ))}
-          {canDeclineBomb && <button className="draw-btn" onClick={() => submit({ actionId: 'climbNoBomb' })}>Hold my bomb</button>}
+          {canDeclineBomb && <button className="draw-btn" onClick={() => submit({ actionId: 'climbNoBomb' })}>Hold</button>}
           {layOffMoves.map((m, i) => (
             <button key={`lay${i}`} className="meld-btn" onClick={() => submit(m)}>
               Lay off {rankOfId(m.cardId!)}
@@ -489,7 +489,7 @@ export function Table({ def, seats = 3, plan }: {
               Knock — throw {rankOfId(m.cardId!)}
             </button>
           ))}
-          {isRummy && view.rummyPhase === 'play' && view.isYourTurn && <span className="rummy-hint">tap a card to discard</span>}
+          {isRummy && view.rummyPhase === 'play' && view.isYourTurn && <span className="rummy-hint">discard</span>}
           {view.isYourTurn && <button className="restart-btn" onClick={showHint} title="Suggest a move">Hint</button>}
           <button className="restart-btn" onClick={openHistory} title="Every move so far">History</button>
           {view.phase === 'playing' && !takeback && (
@@ -584,7 +584,7 @@ export function Table({ def, seats = 3, plan }: {
           <div className="modal-box">
             <div className="handoff-mark">🃏</div>
             <h3>Pass the device to {nameOfSeat(handoff)}</h3>
-            <p className="scores">Everyone else, look away — their hand is about to be dealt onto the screen.</p>
+            <p className="scores">Everyone else, look away.</p>
             <button className="primary" onClick={() => takeSeat(handoff)}>
               I'm {nameOfSeat(handoff)} — show my hand
             </button>

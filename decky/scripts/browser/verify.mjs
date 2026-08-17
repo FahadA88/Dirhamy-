@@ -15,7 +15,12 @@ const open = async (name) => {
   await p.waitForSelector('.table-wrap');
 };
 await p.goto(base, { waitUntil: 'networkidle' });
-await p.evaluate(() => { const r = JSON.parse(localStorage.getItem('decky.settings.v1') || '{}'); localStorage.setItem('decky.settings.v1', JSON.stringify({ ...r, botSpeed: 'instant' })); });
+await p.evaluate(() => {
+  // A clean slate: otherwise a previous run's play counts decide which card sorts first.
+  localStorage.clear();
+  localStorage.setItem('decky.settings.v1', JSON.stringify({ botSpeed: 'instant' }));
+});
+await p.goto(base, { waitUntil: 'networkidle' });
 
 console.log('\nWar plays through the service');
 await open('War');
@@ -69,9 +74,12 @@ ok('and it is the same deal', logAfter.slice(-1)[0] === logBefore.slice(-1)[0]);
 console.log('\npageerrors: ' + JSON.stringify(errs));
 await b.close();
 
-/** The library is a shelf now: search for a game, then play it from its card. */
+/** The library is a shelf now: search, pick the card whose name matches exactly, play it. */
 async function openGame(page, name) {
   await page.locator('.searchbox').fill(name);
-  await page.waitForTimeout(280);
-  await page.locator('.shelf-grid .shelfcard').first().locator('.sc-foot button.primary').click();
+  await page.waitForTimeout(320);
+  const card = page.locator('.shelf-grid .shelfcard').filter({
+    has: page.locator('.sc-main h3', { hasText: new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`) }),
+  }).first();
+  await card.locator('.sc-play').click({ force: true });
 }

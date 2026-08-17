@@ -42,7 +42,7 @@ console.log('\nAn empty state that says something useful');
 await p.locator('.chip', { hasText: 'Favourites' }).click();
 await p.waitForTimeout(300);
 const emptyText = await p.locator('.empty-shelf p').textContent();
-ok('the favourites shelf explains itself when empty', /starred/.test(emptyText), emptyText);
+ok('the empty favourites shelf says what to do', /Tap ♥/.test(emptyText), emptyText);
 await p.locator('.chip', { hasText: 'Favourites' }).click();
 await p.waitForTimeout(250);
 
@@ -83,7 +83,7 @@ await p.locator('button', { hasText: 'Browse' }).first().click();
 await p.waitForSelector('.filterbar');
 await p.locator('.searchbox').fill('FreeCell');
 await p.waitForTimeout(300);
-await p.locator('.shelf-grid .shelfcard').first().locator('.sc-foot button.primary').click();
+await p.locator('.shelf-grid .shelfcard').first().locator('.sc-play').click({ force: true });
 await p.waitForSelector('.table-wrap');
 const stats = await p.evaluate(() => JSON.parse(localStorage.getItem('decky.builtinstats.v1') || '{}'));
 ok('playing a game counted', Object.values(stats).some((s) => s.plays >= 1), JSON.stringify(stats));

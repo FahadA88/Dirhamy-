@@ -115,7 +115,7 @@ export function SolitaireTable({ def }: { def: GameDefinition }) {
             <div className="sol-bar">
               <span className="sol-stat">{view.moveCount ?? 0} moves</span>
               {cfg.stock === 'waste' && (view.redealsLeft ?? -1) >= 0 && (
-                <span className="sol-stat">{view.redealsLeft} redeals left</span>
+                <span className="sol-stat">{view.redealsLeft} redeals</span>
               )}
               <div className="sol-actions">
                 <button className="ghost sm" onClick={undo} disabled={!canUndo}>Undo</button>
@@ -128,7 +128,7 @@ export function SolitaireTable({ def }: { def: GameDefinition }) {
               <div className="sol-group">
                 {cfg.stock !== 'none' && (
                   <button className="sol-slot stock" onClick={() => { if (drawMove) commit(drawMove); else if (redealMove) commit(redealMove); else if (dealMove) commit(dealMove); }}
-                    title={dealMove ? 'Deal a row' : drawMove ? 'Turn the stock' : redealMove ? 'Turn the waste back over' : 'Stock is empty'}>
+                    title={dealMove ? 'Deal a row' : drawMove ? 'Turn the stock' : redealMove ? 'Recycle' : 'Empty'}>
                     {(view.stockCount ?? 0) > 0
                       ? <div className={`${backCls} big`} />
                       : <div className={`sol-empty ${redealMove ? 'recycle' : ''}`}>{redealMove ? '↻' : ''}</div>}
@@ -211,7 +211,7 @@ export function SolitaireTable({ def }: { def: GameDefinition }) {
             <p className="scores">
               {view.winner
                 ? 'Every card is home.'
-                : 'This deal is blocked — undo a few moves, or take a fresh one.'}
+                : 'Blocked. Undo, or take a fresh deal.'}
             </p>
             <div className="sol-end-actions">
               {!view.winner && <button className="ghost" onClick={undo} disabled={!canUndo}>Undo</button>}

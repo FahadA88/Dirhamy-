@@ -15,10 +15,7 @@ export function App() {
       <header>
         <div className="brand">
           <div className="logo3d"><span>♠</span></div>
-          <div>
-            <h1>DECKY</h1>
-            <div className="sub">a card-game engine · the referee lives in the machine</div>
-          </div>
+          <h1>DECKY</h1>
         </div>
         <nav className="tabs">
           <button className={view === 'play' ? 'on' : ''} onClick={() => setView('play')}>Play</button>
