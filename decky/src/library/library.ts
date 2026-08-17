@@ -1,6 +1,7 @@
 import { GameDefinition } from '../engine/types';
 import { Knobs } from '../authoring/knobs';
 import { migrate } from '../engine/migrate';
+import { catalog } from '../games/catalog';
 
 // The shelf: games people published, and what this device knows about them.
 //
@@ -24,6 +25,9 @@ export interface PublishedGame {
   tags: string[];
   forkedFrom?: string;
   stats: GameStats;
+  /** Shipped with the app. Can be played, favourited, rated and forked; cannot be deleted. */
+  builtIn?: boolean;
+  staffPick?: boolean;
 }
 
 export interface GameStats {
@@ -45,6 +49,8 @@ const GAMES = 'decky.library.v1';
 const REVIEWS = 'decky.reviews.v1';
 const FAVS = 'decky.favourites.v1';
 const PLAYS = 'decky.playhistory.v1';
+const FOLLOWS = 'decky.follows.v1';
+const BUILTIN_STATS = 'decky.builtinstats.v1';
 
 // ---------- storage plumbing ----------
 
@@ -77,7 +83,36 @@ export function allPublished(): PublishedGame[] {
 }
 
 export function getPublished(id: string): PublishedGame | undefined {
-  return allPublished().find((g) => g.id === id);
+  return allGames().find((g) => g.id === id);
+}
+
+/**
+ * The classics, presented on the same shelf as everything else.
+ *
+ * They are not a separate concept: a shipped game and a published one differ only in who wrote
+ * it and whether it can be deleted. Making them the same type means search, filters, ratings,
+ * favourites and remixing all work on both without a single special case.
+ */
+export function builtIns(): PublishedGame[] {
+  const stats = read<Record<string, GameStats>>(BUILTIN_STATS, {});
+  const staff = new Set(['classic-hearts', 'classic-klondike', 'classic-crazy-eights', 'classic-gin-rummy']);
+  return catalog.map((def, i) => ({
+    id: def.meta.id,
+    definition: def,
+    author: 'Decky',
+    createdAt: 1_700_000_000_000 + i * 1000,
+    updatedAt: 1_700_000_000_000 + i * 1000,
+    version: 1,
+    tags: [def.meta.family, 'classic'],
+    stats: stats[def.meta.id] ?? { plays: 0, favourites: 0, ratingSum: 0, ratingCount: 0 },
+    builtIn: true,
+    staffPick: staff.has(def.meta.id),
+  }));
+}
+
+/** Everything on the shelf: what shipped, plus what has been published here. */
+export function allGames(): PublishedGame[] {
+  return [...builtIns(), ...allPublished()];
 }
 
 export interface PublishInput {
@@ -143,9 +178,16 @@ export function fork(id: string, author: string): PublishedGame | undefined {
 function mutate(id: string, fn: (g: PublishedGame) => void): void {
   const games = read<PublishedGame[]>(GAMES, []);
   const g = games.find((x) => x.id === id);
-  if (!g) return;
-  fn(g);
-  write(GAMES, games);
+  if (g) { fn(g); write(GAMES, games); return; }
+
+  // A built-in's definition is code, but the counts people generate about it are not, so they
+  // live in their own bucket rather than being lost.
+  if (!catalog.some((d) => d.meta.id === id)) return;
+  const stats = read<Record<string, GameStats>>(BUILTIN_STATS, {});
+  const shell = { stats: stats[id] ?? { plays: 0, favourites: 0, ratingSum: 0, ratingCount: 0 } } as PublishedGame;
+  fn(shell);
+  stats[id] = shell.stats;
+  write(BUILTIN_STATS, stats);
 }
 
 export function recordPlay(id: string): void {
@@ -201,6 +243,102 @@ export function review(gameId: string, author: string, rating: number, text: str
 
 export function averageRating(stats: GameStats): number | null {
   return stats.ratingCount > 0 ? stats.ratingSum / stats.ratingCount : null;
+}
+
+// ---------- creators ----------
+
+export function follows(): string[] { return read<string[]>(FOLLOWS, []); }
+export function isFollowing(author: string): boolean { return follows().includes(author); }
+
+export function toggleFollow(author: string): boolean {
+  const cur = follows();
+  const on = cur.includes(author);
+  write(FOLLOWS, on ? cur.filter((a) => a !== author) : [...cur, author]);
+  return !on;
+}
+
+export interface Creator {
+  name: string;
+  games: PublishedGame[];
+  plays: number;
+  rating: number | null;
+}
+
+export function creator(name: string, games: PublishedGame[]): Creator {
+  const mine = games.filter((g) => g.author === name);
+  const sum = mine.reduce((t, g) => t + g.stats.ratingSum, 0);
+  const count = mine.reduce((t, g) => t + g.stats.ratingCount, 0);
+  return {
+    name,
+    games: mine,
+    plays: mine.reduce((t, g) => t + g.stats.plays, 0),
+    rating: count > 0 ? sum / count : null,
+  };
+}
+
+export function creators(games: PublishedGame[]): Creator[] {
+  return dedupe(games.map((g) => g.author)).map((a) => creator(a, games))
+    .sort((a, b) => b.games.length - a.games.length);
+}
+
+// ---------- collections ----------
+
+export interface Collection {
+  id: string;
+  title: string;
+  blurb: string;
+  games: PublishedGame[];
+}
+
+/**
+ * The shelves on the front page. Derived rather than curated by hand, so they are never stale
+ * and never empty for the wrong reason — a shelf with nothing in it is simply not shown.
+ */
+export function collections(games: PublishedGame[]): Collection[] {
+  const played = read<Record<string, number>>(PLAYS, {});
+  const favs = favourites();
+  const out: Collection[] = [
+    {
+      id: 'continue', title: 'Pick up where you left off',
+      blurb: 'Games you have played recently.',
+      games: games.filter((g) => played[g.id]).sort((a, b) => played[b.id] - played[a.id]).slice(0, 6),
+    },
+    {
+      id: 'staff', title: 'Staff picks',
+      blurb: 'A good place to start.',
+      games: games.filter((g) => g.staffPick),
+    },
+    {
+      id: 'favourites', title: 'Your favourites',
+      blurb: 'Everything you starred.',
+      games: games.filter((g) => favs.includes(g.id)),
+    },
+    {
+      id: 'quick', title: 'Quick games',
+      blurb: 'Under ten minutes.',
+      games: games.filter((g) => playtimeOf(g.definition) <= 10).slice(0, 8),
+    },
+    {
+      id: 'solo', title: 'On your own',
+      blurb: 'One player, one deck.',
+      games: games.filter((g) => g.definition.meta.players.max === 1),
+    },
+    {
+      id: 'community', title: 'Built here',
+      blurb: 'Games people made in the builder.',
+      games: games.filter((g) => !g.builtIn).sort((a, b) => b.updatedAt - a.updatedAt).slice(0, 8),
+    },
+  ];
+  return out.filter((c) => c.games.length > 0);
+}
+
+/** The one game to put at the top today. Rotates daily so the front page isn't frozen. */
+export function featured(games: PublishedGame[]): PublishedGame | undefined {
+  const pool = games.filter((g) => g.staffPick || (averageRating(g.stats) ?? 0) >= 4);
+  const list = pool.length > 0 ? pool : games;
+  if (list.length === 0) return undefined;
+  const day = Math.floor(Date.now() / 86400000);
+  return list[day % list.length];
 }
 
 // ---------- search ----------

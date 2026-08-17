@@ -19,7 +19,8 @@
     "verify:builder": "node scripts/browser/builder.mjs",
     "phase3": "tsx scripts/phase3.ts",
     "host": "tsx scripts/host.ts",
-    "verify:mp": "node scripts/browser/multiplayer.mjs"
+    "verify:mp": "node scripts/browser/multiplayer.mjs",
+    "verify:shelf": "node scripts/browser/shelf.mjs"
   },
   "dependencies": {
     "react": "^18.3.1",

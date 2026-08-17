@@ -8,8 +8,9 @@ import { resumableSession } from '../server/local';
 import { Seat } from '../server/matchService';
 import { SeatSetup } from './SeatSetup';
 import { GameDefinition } from '../engine/types';
-import { useTilt } from './useTilt';
 import { useSettings } from '../settings/SettingsContext';
+import { BrowseView } from './BrowseView';
+import { recordPlay } from '../library/library';
 
 // Discover + play the classics library (and, once wired, published community games).
 export function PlayView() {
@@ -83,40 +84,15 @@ export function PlayView() {
           </div>
         </div>
       )}
-      <div className="section-head">
-        <h2>Classics</h2>
-        <span className="muted">Enforced, playable, and remixable — each one is pure data.</span>
-      </div>
-      <div className="cards-grid">
-        {catalog.map((g) => (
-          <GameCard key={g.meta.id} game={g}
-            onPlay={() => { setPlan(null); setSeats(Math.min(Math.max(settings.defaultSeats, g.meta.players.min), g.meta.players.max)); setGame(g); }}
-            onSetup={g.solitaire ? undefined : () => setSetupFor(g)} />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function GameCard({ game, onPlay, onSetup }: {
-  game: GameDefinition; onPlay: () => void; onSetup?: () => void;
-}) {
-  const { ref, onMouseMove, onMouseLeave } = useTilt(10);
-  return (
-    <div className="game-card glass" ref={ref} onMouseMove={onMouseMove} onMouseLeave={onMouseLeave}>
-      <div className="game-card-glow" />
-      <div className="game-card-head">
-        <span className="fam-badge">{game.meta.family}</span>
-      </div>
-      <h3>{game.meta.name}</h3>
-      <p>{game.meta.description}</p>
-      <div className="game-card-foot">
-        <span className="players">{game.meta.players.min}–{game.meta.players.max} players</span>
-        <div className="gc-actions">
-          {onSetup && <button className="ghost sm" onClick={onSetup}>Set up table</button>}
-          <button className="primary sm" onClick={onPlay}>Play solo →</button>
-        </div>
-      </div>
+      <BrowseView
+        onPlay={(def) => {
+          recordPlay(def.meta.id);
+          setPlan(null);
+          setSeats(Math.min(Math.max(settings.defaultSeats, def.meta.players.min), def.meta.players.max));
+          setGame(def);
+        }}
+        onSetup={(def) => { recordPlay(def.meta.id); setSetupFor(def); }}
+      />
     </div>
   );
 }
