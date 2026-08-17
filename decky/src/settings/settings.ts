@@ -74,7 +74,8 @@ export interface Settings {
 }
 
 export const defaultSettings: Settings = {
-  theme: 'dark',
+  // Sunlit Parlour is the house look: cream paper, oak, ink. Dark is a choice, not the default.
+  theme: 'light',
   accent: 'emerald',
   cardBack: 'monogram',
   tableFelt: 'parlour',

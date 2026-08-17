@@ -40,6 +40,13 @@
   --cw: 76px; --ch: 108px; --bw: 56px; --bh: 80px;
   --r-lg: 16px; --r-md: 11px; --r-pill: 999px;
   --shadow-panel: 0 1px 2px rgba(58,44,20,.06), 0 10px 30px rgba(58,44,20,.10);
+
+  /* The palette before this one called the accent "gold". Plenty of rules still ask for it by
+     that name, and an undefined custom property makes the whole declaration invalid — so the
+     old names are aliases onto oak rather than dead references. */
+  --gold: var(--oak);
+  --gold-hi: var(--oak-hi);
+  --gold-dim: var(--oak-dim);
 }
 
 /* Evening in the same room. Same furniture, the lamp on. */
@@ -2026,3 +2033,260 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
   width: 100%; height: 32px; padding: 2px; border-radius: 7px;
   border: 1px solid var(--panel-brd); background: var(--input-bg); cursor: pointer;
 }
+
+/* ============================================================
+   THE FRONT PAGE
+   A carousel of boards being turned through, tabs for the kind
+   of game you are in the mood for, shelves under that, and one
+   button that drops the whole library into a grid.
+   ============================================================ */
+
+.carousel {
+  position: relative;
+  margin-bottom: 26px;
+  perspective: 1600px;
+  perspective-origin: 50% 40%;
+}
+.carousel-stage {
+  position: relative;
+  min-height: 260px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* The slides either side, lying behind the live one so the stack has depth. */
+.hero-peek {
+  position: absolute; top: 12px; bottom: 34px; width: 26%;
+  border-radius: 22px; overflow: hidden;
+  border: 1px solid rgba(214,175,92,0.18);
+  background: linear-gradient(150deg, #0d241a 0%, #103224 100%);
+  box-shadow: 0 14px 34px rgba(0,0,0,0.34);
+  opacity: 0.5;
+  display: none;
+  pointer-events: none;
+}
+.hero-peek.left  { left: -6%;  transform: rotateY(19deg)  translateZ(-130px) scale(.94); }
+.hero-peek.right { right: -6%; transform: rotateY(-19deg) translateZ(-130px) scale(.94); }
+.hero-peek .gameart { transform: scale(1.25); opacity: .8; }
+@media (min-width: 1100px) { .hero-peek { display: block; } }
+
+.hero-slide { position: relative; width: 100%; z-index: 1; }
+.hero-slide .hero { margin-bottom: 0; }
+
+/* Turning to the next board: it swings in on the axis, it does not slide like a banner. */
+@keyframes deal-in-fwd {
+  from { opacity: 0; transform: rotateY(-16deg) translateX(6%) translateZ(-90px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes deal-in-back {
+  from { opacity: 0; transform: rotateY(16deg) translateX(-6%) translateZ(-90px); }
+  to   { opacity: 1; transform: none; }
+}
+.hero-slide.turn-fwd  { animation: deal-in-fwd 460ms cubic-bezier(.2,.85,.3,1) both; }
+.hero-slide.turn-back { animation: deal-in-back 460ms cubic-bezier(.2,.85,.3,1) both; }
+
+.hero-blurb {
+  margin: 0; max-width: 46ch; color: rgba(255,255,255,0.74);
+  font-size: 15px; line-height: 1.5;
+}
+/* The call to action is its own button now — you cannot nest one button in another. */
+.hero-slide .hero-cta {
+  position: absolute; left: 36px; bottom: 26px; z-index: 2;
+  margin: 0; border: 0; cursor: pointer;
+  box-shadow: 0 8px 20px rgba(0,0,0,.34);
+  transition: transform 160ms cubic-bezier(.2,.9,.3,1.2), box-shadow 160ms;
+}
+.hero-slide .hero-cta:hover { transform: translateY(-2px); box-shadow: 0 12px 26px rgba(0,0,0,.42); }
+.hero-slide .hero { padding-bottom: 84px; }
+
+.car-arrow {
+  position: absolute; top: 50%; transform: translateY(-50%); z-index: 4;
+  width: 42px; height: 42px; border-radius: 50%;
+  display: grid; place-items: center;
+  font-size: 24px; line-height: 1; cursor: pointer;
+  color: #f4f1e8; background: rgba(12,26,20,0.72);
+  border: 1px solid rgba(214,175,92,0.34);
+  backdrop-filter: blur(6px);
+  transition: background 160ms, transform 160ms;
+}
+.car-arrow:hover { background: rgba(20,44,32,0.92); }
+.car-arrow.prev { left: 10px; }
+.car-arrow.next { right: 10px; }
+.car-arrow.prev:hover { transform: translateY(-50%) translateX(-2px); }
+.car-arrow.next:hover { transform: translateY(-50%) translateX(2px); }
+
+.car-dots { display: flex; gap: 8px; justify-content: center; margin-top: 14px; }
+.car-dot {
+  width: 8px; height: 8px; padding: 0; border-radius: 50%; cursor: pointer;
+  border: 1px solid var(--panel-brd); background: transparent;
+  transition: width 200ms, background 200ms, border-color 200ms;
+}
+.car-dot.on { width: 26px; border-radius: 999px; background: var(--gold); border-color: var(--gold); }
+
+/* --- tabs: what kind of game --- */
+.kindtabs {
+  display: flex; gap: 8px; overflow-x: auto; padding: 0 0 12px;
+  margin-bottom: 22px; scrollbar-width: thin;
+  border-bottom: 1px solid var(--panel-brd);
+}
+.kindtab {
+  flex: 0 0 auto; display: inline-flex; align-items: center; gap: 8px;
+  padding: 9px 15px; border-radius: 999px; cursor: pointer; font-size: 13px;
+  border: 1px solid var(--panel-brd); background: var(--panel); color: inherit;
+  transition: border-color 160ms, background 160ms, transform 160ms;
+}
+.kindtab:hover { transform: translateY(-1px); border-color: var(--gold); }
+.kindtab.on { border-color: var(--gold); background: var(--gold-dim); color: var(--gold-hi); }
+.kt-mark { font-size: 17px; line-height: 1; }
+.kt-label { white-space: nowrap; }
+.kt-count {
+  font-family: var(--mono); font-size: 10px; opacity: .62;
+  padding: 1px 6px; border-radius: 999px; border: 1px solid currentColor;
+}
+
+/* --- one button to the whole library --- */
+.seeall-row { display: flex; justify-content: center; margin: 8px 0 40px; }
+.seeall {
+  padding: 13px 30px; border-radius: 999px; cursor: pointer;
+  font-size: 14px; font-weight: 700; letter-spacing: -0.01em;
+  color: inherit; background: var(--panel);
+  border: 1px solid var(--panel-brd);
+  transition: transform 180ms cubic-bezier(.2,.9,.3,1.2), border-color 180ms, box-shadow 180ms;
+}
+.seeall:hover {
+  transform: translateY(-2px);
+  border-color: var(--gold);
+  box-shadow: 0 10px 24px rgba(40,28,10,.18);
+}
+
+@media (max-width: 700px) {
+  .carousel-stage { min-height: 0; }
+  .hero-slide .hero { padding-bottom: 76px; }
+  .hero-slide .hero-cta { left: 22px; bottom: 20px; }
+  .hero-blurb { display: none; }
+  .car-arrow { width: 34px; height: 34px; font-size: 20px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero-slide.turn-fwd, .hero-slide.turn-back { animation: none; }
+}
+.sc-kind {
+  font-family: var(--mono); font-size: 9px; letter-spacing: 1.3px; text-transform: uppercase;
+  padding: 2px 7px; border-radius: 999px;
+  border: 1px solid var(--panel-brd); opacity: .78;
+}
+
+/* --- front page, second pass --- */
+/* The hero takes the first three lines of the description and stops; the whole thing is a
+   trailer, not the rulebook. */
+.hero-blurb {
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3;
+  overflow: hidden;
+}
+.hero-body { max-width: 58%; }
+.hero-slide .hero { padding: 30px 34px 78px; align-items: flex-start; min-height: 300px; }
+.hero-body h2 { font-size: clamp(30px, 4vw, 46px); line-height: 1.02; }
+.hero-art { align-self: center; }
+
+/* The peeks read as the next board waiting, not as a cropped screenshot. */
+.hero-peek { top: 26px; bottom: 52px; width: 22%; opacity: .38; }
+.hero-peek.left  { left: -3%;  }
+.hero-peek.right { right: -3%; }
+.hero-peek::after {
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(90deg, rgba(8,20,15,.72), rgba(8,20,15,0));
+}
+.hero-peek.right::after { background: linear-gradient(270deg, rgba(8,20,15,.72), rgba(8,20,15,0)); }
+
+/* Meta on one line: it is a spec strip, and a wrapped one looks broken. */
+.sc-meta { display: flex; align-items: center; gap: 10px; flex-wrap: nowrap; overflow: hidden; }
+.sc-meta > span { white-space: nowrap; }
+.sc-weight { letter-spacing: .5px; }
+.shelfcard .sc-kind { max-width: 92px; overflow: hidden; text-overflow: ellipsis; }
+
+/* The tab strip fades at the right so it is obvious there is more of it. */
+.kindtabs { -webkit-mask-image: linear-gradient(90deg, #000 88%, transparent 100%);
+            mask-image: linear-gradient(90deg, #000 88%, transparent 100%); }
+
+/* --- front page, third pass: the slide in normal flow --- */
+.carousel { padding: 0 58px; }          /* room for the arrows outside the board */
+.hero-slide .hero {
+  cursor: default; padding: 30px 34px; min-height: 296px;
+  align-items: center;
+}
+.hero-slide .hero:hover { transform: none; }
+.hero-title {
+  padding: 0; border: 0; background: none; color: #fff; cursor: pointer;
+  font: inherit; text-align: left;
+  text-decoration-color: transparent; text-decoration-line: underline;
+  text-underline-offset: 6px; text-decoration-thickness: 2px;
+  transition: text-decoration-color 180ms;
+}
+.hero-title:hover { text-decoration-color: var(--gold); }
+
+.hero-actions { display: flex; gap: 10px; align-items: center; margin-top: 14px; }
+.hero-slide .hero-cta {
+  position: static; margin: 0; border: 0; cursor: pointer;
+  box-shadow: 0 8px 20px rgba(0,0,0,.3);
+  transition: transform 160ms cubic-bezier(.2,.9,.3,1.2), box-shadow 160ms;
+}
+.hero-slide .hero-cta:hover { transform: translateY(-2px); box-shadow: 0 12px 26px rgba(0,0,0,.4); }
+.hero-more {
+  padding: 11px 20px; border-radius: 999px; cursor: pointer; font-size: 13px; font-weight: 600;
+  color: rgba(255,255,255,.86); background: rgba(255,255,255,.07);
+  border: 1px solid rgba(255,255,255,.18);
+  transition: background 160ms, border-color 160ms;
+}
+.hero-more:hover { background: rgba(255,255,255,.14); border-color: rgba(214,175,92,.6); }
+
+/* Arrows live beside the board, not on top of the words. */
+.car-arrow.prev { left: 4px; }
+.car-arrow.next { right: 4px; }
+
+/* Peeks: the next board waiting its turn, in the same green as the live one. */
+.hero-peek {
+  width: 54px; top: 40px; bottom: 40px; opacity: 1;
+  background: linear-gradient(150deg, #0d241a 0%, #103826 100%);
+  border-radius: 18px;
+}
+.hero-peek.left  { left: 40px;  transform: rotateY(24deg) translateZ(-90px); transform-origin: right center; }
+.hero-peek.right { right: 40px; transform: rotateY(-24deg) translateZ(-90px); transform-origin: left center; }
+.hero-peek .gameart { display: none; }
+.hero-peek::after { background: linear-gradient(90deg, rgba(0,0,0,.42), rgba(0,0,0,0)); }
+.hero-peek.right::after { background: linear-gradient(270deg, rgba(0,0,0,.42), rgba(0,0,0,0)); }
+
+/* The kind badge reads in full or not at all. */
+.shelfcard .sc-kind { max-width: none; font-size: 8px; letter-spacing: 1px; padding: 2px 6px; }
+
+@media (max-width: 820px) {
+  .carousel { padding: 0; }
+  .hero-body { max-width: 100%; }
+  .hero-slide .hero { min-height: 0; }
+}
+
+/* --- front page, fourth pass --- */
+/* The board is dark whatever the page is, so its buttons carry their own colours rather than
+   the theme's — on the cream world `--gold` is an ink-brown and vanishes here. */
+.hero-slide .hero-cta {
+  background: linear-gradient(180deg, #e6c273 0%, #cfa74f 100%);
+  color: #1a1508;
+}
+.hero-slide .hero-cta:hover { background: linear-gradient(180deg, #f0cf85 0%, #d9b45c 100%); }
+
+/* Meta wraps rather than truncates: a clipped "SHEDDI…" tells you nothing. */
+.sc-meta { flex-wrap: wrap; row-gap: 6px; overflow: visible; }
+.sc-kind { flex: 0 0 auto; }
+.shelfcard .sc-kind { overflow: visible; text-overflow: clip; }
+
+/* The board keeps its own light-on-dark accent — oak is an ink colour and dies on green. */
+.hero .hero-kicker { color: #d9ba6d; }
+.hero .sc-kind { border-color: rgba(255,255,255,.28); color: rgba(255,255,255,.8); }
+.hero .sc-rating { color: #d9ba6d; }
+
+/* A rail of cards is a shelf: they line up at the top and the bottom, whether or not one
+   game's meta strip wraps onto a second line. */
+.shelf-rail, .shelf-grid { align-items: stretch; }
+.shelfcard { display: flex; flex-direction: column; }
+.shelfcard .sc-main { flex: 1 1 auto; display: flex; flex-direction: column; }
+.shelfcard .sc-body { flex: 1 1 auto; display: flex; flex-direction: column; gap: 8px; }
+.shelfcard .sc-meta { margin-top: auto; }

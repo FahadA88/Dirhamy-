@@ -334,11 +334,55 @@ export function collections(games: PublishedGame[]): Collection[] {
 
 /** The one game to put at the top today. Rotates daily so the front page isn't frozen. */
 export function featured(games: PublishedGame[]): PublishedGame | undefined {
+  return featuredSet(games, 1)[0];
+}
+
+/**
+ * The games the carousel turns through. Same daily rotation as `featured`, so slide one is
+ * today's pick and the rest follow it — the carousel is the feature, widened, not a second
+ * unrelated shortlist.
+ */
+export function featuredSet(games: PublishedGame[], n: number): PublishedGame[] {
   const pool = games.filter((g) => g.staffPick || (averageRating(g.stats) ?? 0) >= 4);
   const list = pool.length > 0 ? pool : games;
-  if (list.length === 0) return undefined;
+  if (list.length === 0) return [];
   const day = Math.floor(Date.now() / 86400000);
-  return list[day % list.length];
+  const out: PublishedGame[] = [];
+  for (let i = 0; i < Math.min(n, list.length); i++) out.push(list[(day + i) % list.length]);
+  return out;
+}
+
+/** The kinds of game, as a player would name them rather than as the engine names them. */
+export const KINDS: { id: string; label: string; mark: string }[] = [
+  { id: '', label: 'Everything', mark: '🂠' },
+  { id: 'shedding', label: 'Shedding', mark: '🂡' },
+  { id: 'trick', label: 'Trick-taking', mark: '🂭' },
+  { id: 'climb', label: 'Climbing', mark: '🂮' },
+  { id: 'fish', label: 'Asking', mark: '🃁' },
+  { id: 'rummy', label: 'Melding', mark: '🃋' },
+  { id: 'war', label: 'Flipping', mark: '🃞' },
+  { id: 'solitaire', label: 'Patience', mark: '🂨' },
+];
+
+/**
+ * What kind of game this is, read the same way the interpreter reads it — off the optional
+ * block the definition carries, not off `meta.family`, which is a free-text label an author
+ * writes for humans ("shedding-matching", "comparison") and cannot be filtered on.
+ */
+export function kindOf(def: GameDefinition): string {
+  if (def.solitaire) return 'solitaire';
+  if (def.trick) return 'trick';
+  if (def.climb) return 'climb';
+  if (def.fish) return 'fish';
+  if (def.rummy) return 'rummy';
+  if (def.war) return 'war';
+  return 'shedding';
+}
+
+/** The player-facing name of that kind, for a badge or a tab. */
+export function kindLabel(def: GameDefinition): string {
+  const k = kindOf(def);
+  return KINDS.find((x) => x.id === k)?.label ?? k;
 }
 
 // ---------- search ----------
@@ -388,7 +432,7 @@ export function searchLibrary(games: PublishedGame[], filters: Filters, sort: So
       const hay = `${d.meta.name} ${d.meta.description} ${g.author} ${g.tags.join(' ')}`.toLowerCase();
       if (!hay.includes(q)) return false;
     }
-    if (filters.family && d.meta.family !== filters.family) return false;
+    if (filters.family && kindOf(d) !== filters.family) return false;
     if (filters.tags?.length && !filters.tags.every((t) => g.tags.includes(t))) return false;
     if (filters.players && (d.meta.players.min > filters.players || d.meta.players.max < filters.players)) return false;
     if (filters.favouritesOnly && !favs.includes(g.id)) return false;

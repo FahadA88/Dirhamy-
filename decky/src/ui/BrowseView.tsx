@@ -1,9 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { GameDefinition } from '../engine/types';
 import {
-  Collection, Filters, PublishedGame, SortKey,
-  allGames, averageRating, collections, complexityOf, creator, featured, fork,
-  isFavourite, isFollowing, myReview, playtimeOf, review, reviewsFor,
+  Collection, Filters, KINDS, PublishedGame, SortKey,
+  allGames, averageRating, collections, complexityOf, creator, featuredSet, fork,
+  isFavourite, isFollowing, kindLabel, kindOf, myReview, playtimeOf, review, reviewsFor,
   searchLibrary, toggleFavourite, toggleFollow, unpublish,
 } from '../library/library';
 import { explainGame } from '../authoring/explain';
@@ -23,8 +23,10 @@ import { GameArt } from './GameArt';
 // filters — there is no "official" section and "user-generated" ghetto. Second, filters are
 // quiet: they sit in one line and stay out of the way until used, because browsing is the
 // default activity here and searching is the exception.
-
-const FAMILIES = ['shedding', 'trick', 'climb', 'fish', 'rummy', 'war', 'solitaire'] as const;
+//
+// The front page is three things stacked: a carousel of what to play tonight, a row of tabs
+// for the kind of game you are in the mood for, and shelves under that. "See all games" drops
+// the lot into one dense grid for people who would rather scan than be curated at.
 
 const SORTS: { key: SortKey; label: string }[] = [
   { key: 'trending', label: 'Trending' },
@@ -47,11 +49,17 @@ export function BrowseView({ onPlay, onSetup, onRemix }: {
   const [detail, setDetail] = useState<string | null>(null);
   const [profile, setProfile] = useState<string | null>(null);
 
+  const [kind, setKind] = useState('');            // the tab across the top of the front page
+
   // A blocked creator's games are gone from every shelf, not greyed out — the point of blocking
   // is not seeing them.
   const games = useMemo(() => allGames().filter((g) => !isBlocked(g.author)), [tick]);
-  const shelves = useMemo(() => collections(games), [games, tick]);
-  const hero = useMemo(() => featured(games), [games]);
+  const inKind = useMemo(
+    () => (kind ? games.filter((g) => kindOf(g.definition) === kind) : games),
+    [games, kind],
+  );
+  const shelves = useMemo(() => collections(inKind), [inKind, tick]);
+  const spotlight = useMemo(() => featuredSet(inKind, 5), [inKind]);
   const results = useMemo(() => searchLibrary(games, filters, sort), [games, filters, sort, tick]);
 
   const refresh = () => setTick((t) => t + 1);
@@ -102,7 +110,7 @@ export function BrowseView({ onPlay, onSetup, onRemix }: {
           <select value={filters.family ?? ''} aria-label="Kind of game"
             onChange={(e) => setFilters((f) => ({ ...f, family: e.target.value || undefined }))}>
             <option value="">Any kind</option>
-            {FAMILIES.map((f) => <option key={f} value={f}>{f}</option>)}
+            {KINDS.filter((k) => k.id).map((k) => <option key={k.id} value={k.id}>{k.label}</option>)}
           </select>
           <select value={filters.players ?? ''} aria-label="Number of players"
             onChange={(e) => setFilters((f) => ({ ...f, players: e.target.value ? +e.target.value : undefined }))}>
@@ -134,23 +142,26 @@ export function BrowseView({ onPlay, onSetup, onRemix }: {
 
       {!shown ? (
         <>
-          {hero && (
-            <button className="hero" onClick={() => setDetail(hero.id)}>
-              <div className="hero-body">
-                <span className="hero-kicker">Tonight's table</span>
-                <h2>{hero.definition.meta.name}</h2>
-                <Meta game={hero} />
-                <span className="hero-cta">Deal me in ▶</span>
-              </div>
-              <div className="hero-art">
-                <GameArt def={hero.definition} id={hero.id} />
-              </div>
-            </button>
-          )}
+          <Carousel games={spotlight} onOpen={setDetail} onPlay={(g) => onPlay(g.definition)} />
 
-          {shelves.map((c) => (
+          <KindTabs value={kind} onChange={setKind} games={games} />
+
+          {shelves.length === 0 ? (
+            <div className="empty-shelf">
+              <div className="empty-mark">🂠</div>
+              <h3>Nothing of that kind yet</h3>
+              <p>Pick another tab, or build one in Create.</p>
+            </div>
+          ) : shelves.map((c) => (
             <Shelf key={c.id} collection={c} onOpen={setDetail} onPlay={(g) => onPlay(g.definition)} onChanged={refresh} />
           ))}
+
+          <div className="seeall-row">
+            <button className="seeall" onClick={() => { setFilters(kind ? { family: kind } : {}); setBrowsing(true); }}>
+              See all {inKind.length} game{inKind.length === 1 ? '' : 's'}
+              <span aria-hidden="true"> →</span>
+            </button>
+          </div>
         </>
       ) : results.length === 0 ? (
         <div className="empty-shelf">
@@ -171,6 +182,137 @@ export function BrowseView({ onPlay, onSetup, onRemix }: {
           </div>
         </>
       )}
+    </div>
+  );
+}
+
+// ---------- the carousel ----------
+
+/**
+ * Tonight's table, turning. The slide either side is drawn behind and to the side of the live
+ * one so the thing reads as a physical stack of boards being turned through rather than a
+ * banner that swaps images. It advances on its own until you touch it, then stops — nothing is
+ * more annoying than a page that moves while you are reading it.
+ */
+function Carousel({ games, onOpen, onPlay }: {
+  games: PublishedGame[];
+  onOpen: (id: string) => void;
+  onPlay: (g: PublishedGame) => void;
+}) {
+  const [i, setI] = useState(0);
+  const [dir, setDir] = useState<1 | -1>(1);
+  const [held, setHeld] = useState(false);
+  const n = games.length;
+  const wrap = (k: number) => (n === 0 ? 0 : ((k % n) + n) % n);
+
+  const go = (d: 1 | -1) => { setDir(d); setI((k) => wrap(k + d)); };
+
+  // Switching tabs hands us a shorter list; without this the index left over from the old one
+  // points past the end and there is no slide to draw.
+  const key = games.map((g) => g.id).join(',');
+  useEffect(() => { setI(0); setDir(1); }, [key]);
+
+  const stop = useRef(false);
+  useEffect(() => {
+    if (n < 2 || held) return;
+    const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    if (reduced || stop.current) return;
+    const t = window.setInterval(() => { setDir(1); setI((k) => wrap(k + 1)); }, 7000);
+    return () => window.clearInterval(t);
+  }, [n, held]);
+
+  if (n === 0) return null;
+  const at = wrap(i);                          // the reset above lands next render; hold until then
+  const live = games[at];
+  const prev = n > 1 ? games[wrap(at - 1)] : null;
+  const next = n > 2 ? games[wrap(at + 1)] : null;
+
+  const hold = () => { stop.current = true; setHeld(true); };
+
+  return (
+    <div
+      className="carousel"
+      onPointerDown={hold}
+      onFocusCapture={hold}
+      onKeyDown={(e) => {
+        if (e.key === 'ArrowLeft') { hold(); go(-1); }
+        if (e.key === 'ArrowRight') { hold(); go(1); }
+      }}
+      role="region"
+      aria-roledescription="carousel"
+      aria-label="Featured games"
+    >
+      <div className="carousel-stage">
+        {prev && <div className="hero-peek left" aria-hidden="true"><GameArt def={prev.definition} id={prev.id} /></div>}
+        {next && <div className="hero-peek right" aria-hidden="true"><GameArt def={next.definition} id={next.id} /></div>}
+
+        <div key={live.id} className={`hero-slide turn-${dir > 0 ? 'fwd' : 'back'}`}>
+          <div className="hero">
+            <div className="hero-body">
+              <span className="hero-kicker">{at === 0 ? "Tonight's table" : 'Also worth a deal'}</span>
+              <h2><button className="hero-title" onClick={() => onOpen(live.id)}>{live.definition.meta.name}</button></h2>
+              <p className="hero-blurb">{live.definition.meta.description}</p>
+              <Meta game={live} />
+              <div className="hero-actions">
+                <button className="hero-cta" onClick={() => onPlay(live)}>Deal me in ▶</button>
+                <button className="hero-more" onClick={() => onOpen(live.id)}>How it plays</button>
+              </div>
+            </div>
+            <div className="hero-art">
+              <GameArt def={live.definition} id={live.id} />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {n > 1 && (
+        <>
+          <button className="car-arrow prev" aria-label="Previous game" onClick={() => { hold(); go(-1); }}>‹</button>
+          <button className="car-arrow next" aria-label="Next game" onClick={() => { hold(); go(1); }}>›</button>
+          <div className="car-dots">
+            {games.map((g, k) => (
+              <button
+                key={g.id}
+                className={`car-dot ${k === at ? 'on' : ''}`}
+                aria-label={g.definition.meta.name}
+                aria-current={k === at}
+                onClick={() => { hold(); setDir(k > at ? 1 : -1); setI(k); }}
+              />
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ---------- the kind tabs ----------
+
+/** What sort of game are you in the mood for. Kinds with nothing in them are not offered. */
+function KindTabs({ value, onChange, games }: {
+  value: string; onChange: (k: string) => void; games: PublishedGame[];
+}) {
+  const counts = useMemo(() => {
+    const m: Record<string, number> = {};
+    for (const g of games) { const k = kindOf(g.definition); m[k] = (m[k] ?? 0) + 1; }
+    return m;
+  }, [games]);
+  const tabs = KINDS.filter((k) => k.id === '' || (counts[k.id] ?? 0) > 0);
+  return (
+    <div className="kindtabs" role="tablist" aria-label="Kind of game">
+      {tabs.map((k) => (
+        <button
+          key={k.id || 'all'}
+          role="tab"
+          aria-selected={value === k.id}
+          className={`kindtab ${value === k.id ? 'on' : ''}`}
+          onClick={() => onChange(k.id)}
+        >
+          <span className="kt-mark" aria-hidden="true">{k.mark}</span>
+          <span className="kt-label">{k.label}</span>
+          <span className="kt-count">{k.id ? counts[k.id] : games.length}</span>
+        </button>
+      ))}
     </div>
   );
 }
@@ -227,6 +369,7 @@ function Meta({ game }: { game: PublishedGame }) {
   const weight = complexityOf(def);
   return (
     <div className="sc-meta">
+      <span className="sc-kind" title="Kind of game">{kindLabel(def)}</span>
       <span title="Players">♟ {p.min === p.max ? p.min : `${p.min}–${p.max}`}</span>
       <span title="Typical length">◷ {playtimeOf(def)}m</span>
       <span title={`Weight ${weight} of 5`} className="sc-weight">
