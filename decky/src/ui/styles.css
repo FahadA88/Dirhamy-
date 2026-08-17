@@ -1471,3 +1471,45 @@ button.primary:hover { background: var(--gold-hi); }
 /* Names on the table read as names, not as terminal output. */
 .match-hand, .seat-name, .you-head > span:first-child { font-family: inherit; }
 .you-head > span:first-child { font-weight: 700; font-size: 15px; }
+
+/* ============================================================
+   READABILITY — card faces and text
+   ============================================================ */
+
+.set-note { margin: -4px 0 10px; font-size: 12px; line-height: 1.45; color: var(--muted); }
+
+/* Suit letters. Colour-blind players can read a suit without separating any two colours. */
+.suitletter {
+  display: block; font-size: 0.62em; font-weight: 800; letter-spacing: 0.5px;
+  line-height: 1; margin-top: 1px; opacity: 0.9;
+}
+
+/* Big index: one large rank in the corner, nothing in the middle. Easiest to read small. */
+.card.face.f-big-index .pips,
+.card.face.f-big-index .pip,
+.card.face.f-big-index .court-art { display: none; }
+.card.face.f-big-index .corner.tl {
+  font-size: calc(var(--cw) * 0.42); line-height: 0.92; top: 6%; left: 8%;
+}
+.card.face.f-big-index .corner.tl span { font-size: 0.62em; }
+.card.face.f-big-index .corner.br { font-size: calc(var(--cw) * 0.2); }
+
+/* Text scale. Everything that isn't a card grows together, so nothing overlaps. */
+body { font-size: calc(15px * var(--text-scale, 1)); }
+:root[data-text="l"] .sc-meta, :root[data-text="xl"] .sc-meta { font-size: 12px; }
+
+/* Easier-to-read text: weight and tracking, no font swap — a font people don't have is a
+   silent fallback, and a fallback is not an accessibility feature. */
+:root[data-legible="on"] body {
+  letter-spacing: 0.012em;
+  word-spacing: 0.06em;
+  -webkit-font-smoothing: auto;
+}
+:root[data-legible="on"] p,
+:root[data-legible="on"] .ds,
+:root[data-legible="on"] li { line-height: 1.7; font-weight: 500; }
+:root[data-legible="on"] .muted,
+:root[data-legible="on"] .sc-meta,
+:root[data-legible="on"] .mini-label { color: var(--ink); opacity: 0.82; }
+:root[data-legible="on"] i,
+:root[data-legible="on"] em { font-style: normal; font-weight: 600; }

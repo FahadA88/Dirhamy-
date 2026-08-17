@@ -7,6 +7,13 @@ export type CardBack = 'stripes' | 'grid' | 'dots' | 'solid';
 // Four table builds, each with its own rail, felt, markings and lighting.
 export type TableFelt = 'mahogany' | 'vegas' | 'parlour' | 'midnight';
 export type CardSize = 's' | 'm' | 'l';
+/**
+ * How a card face is drawn. The first is the traditional deck; the rest exist because a deck
+ * that only distinguishes suits by colour excludes about one man in twelve, and because a
+ * classic face is hard to read at phone size.
+ */
+export type CardFace = 'classic' | 'four-color' | 'letters' | 'big-index';
+export type TextSize = 's' | 'm' | 'l' | 'xl';
 export type Surface = 'soft' | 'glass' | 'plain';
 export type Highlight = 'glow' | 'outline' | 'lift' | 'off';
 export type SortMode = 'off' | 'rank' | 'suit';
@@ -19,8 +26,11 @@ export interface Settings {
   accent: AccentId;
   cardBack: CardBack;
   tableFelt: TableFelt;
-  fourColor: boolean;
+  cardFace: CardFace;
   cardSize: CardSize;
+  textSize: TextSize;
+  /** Heavier strokes, looser letter-spacing, no italics — for low vision and dyslexia. */
+  legibleText: boolean;
   surface: Surface;
   ambient3d: boolean;
   orbs: boolean;
@@ -46,8 +56,10 @@ export const defaultSettings: Settings = {
   accent: 'emerald',
   cardBack: 'stripes',
   tableFelt: 'mahogany',
-  fourColor: false,
+  cardFace: 'classic',
   cardSize: 'm',
+  textSize: 'm',
+  legibleText: false,
   surface: 'soft',
   ambient3d: true,
   orbs: true,
@@ -94,6 +106,9 @@ export const CARD_SIZES: Record<CardSize, { cw: number; ch: number; bw: number; 
   l: { cw: 92, ch: 130, bw: 68, bh: 96 },
 };
 
+/** Multiplies every type size in the app. Cards scale separately, via Card size. */
+export const TEXT_SCALE: Record<TextSize, number> = { s: 0.92, m: 1, l: 1.14, xl: 1.3 };
+
 export const BOT_SPEED_MS: Record<BotSpeed, number> = { slow: 1100, normal: 600, fast: 280, instant: 40 };
 
 const KEY = 'decky.settings.v1';
@@ -102,7 +117,13 @@ export function loadSettings(): Settings {
   try {
     const raw = localStorage.getItem(KEY);
     if (!raw) return { ...defaultSettings };
-    return { ...defaultSettings, ...(JSON.parse(raw) as Partial<Settings>) };
+    const saved = JSON.parse(raw) as Partial<Settings> & { fourColor?: boolean };
+    // `fourColor` was a boolean before card faces became a choice of four. Anyone who had it on
+    // keeps the deck they chose rather than being silently reset to classic.
+    if (saved.cardFace === undefined && saved.fourColor !== undefined) {
+      saved.cardFace = saved.fourColor ? 'four-color' : 'classic';
+    }
+    return { ...defaultSettings, ...saved };
   } catch {
     return { ...defaultSettings };
   }
@@ -134,4 +155,8 @@ export function applySettings(s: Settings): void {
   root.setAttribute('data-motion', s.motion);
   root.setAttribute('data-density', s.density);
   root.setAttribute('data-surface', s.surface);
+  root.setAttribute('data-face', s.cardFace);
+  root.setAttribute('data-text', s.textSize);
+  root.setAttribute('data-legible', s.legibleText ? 'on' : 'off');
+  root.style.setProperty('--text-scale', String(TEXT_SCALE[s.textSize]));
 }

@@ -33,6 +33,10 @@ export function SettingsPanel({ open, onClose }: { open: boolean; onClose: () =>
               ))}
             </div>
           </Field>
+          <Seg label="Text size" value={settings.textSize} onChange={(v) => set('textSize', v)}
+            options={[['s', 'Small'], ['m', 'Default'], ['l', 'Large'], ['xl', 'Largest']]} />
+          <Toggle label="Easier-to-read text" on={settings.legibleText} onChange={(v) => set('legibleText', v)} />
+          <p className="set-note">Heavier strokes, more space between letters, no italics.</p>
           <Seg label="Interface density" value={settings.density} onChange={(v) => set('density', v)}
             options={[['comfortable', 'Comfortable'], ['compact', 'Compact']]} />
         </Group>
@@ -63,8 +67,14 @@ export function SettingsPanel({ open, onClose }: { open: boolean; onClose: () =>
             options={[['stripes', 'Stripes'], ['grid', 'Grid'], ['dots', 'Dots'], ['solid', 'Solid']]} />
           <Seg label="Card size" value={settings.cardSize} onChange={(v) => set('cardSize', v)}
             options={[['s', 'Small'], ['m', 'Medium'], ['l', 'Large']]} />
-          <Seg label="Suit colors" value={settings.fourColor ? 'four' : 'classic'} onChange={(v) => set('fourColor', v === 'four')}
-            options={[['classic', 'Classic (2)'], ['four', 'Four-color']]} />
+          <Seg label="Card face" value={settings.cardFace} onChange={(v) => set('cardFace', v)}
+            options={[['classic', 'Classic'], ['four-color', 'Four colours'], ['letters', 'Suit letters'], ['big-index', 'Big index']]} />
+          <p className="set-note">
+            {settings.cardFace === 'classic' ? 'The traditional deck — two colours, full pips.'
+              : settings.cardFace === 'four-color' ? 'A colour per suit, so hearts and diamonds never look alike.'
+              : settings.cardFace === 'letters' ? 'Each suit is spelled out. Readable without telling any colours apart.'
+              : 'One large rank in the corner and no pips. Easiest to read on a phone.'}
+          </p>
           <Seg label="Table surface" value={settings.surface} onChange={(v) => set('surface', v)}
             options={[['soft', 'Soft'], ['glass', 'Glass'], ['plain', 'Plain']]} />
         </Group>
