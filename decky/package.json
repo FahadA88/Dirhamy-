@@ -10,8 +10,11 @@
     "selftest": "tsx scripts/selftest.ts",
     "validate": "tsx scripts/validate.ts",
     "mechanics": "tsx scripts/mechanics.ts",
-    "test": "tsx scripts/selftest.ts && tsx scripts/validate.ts && tsx scripts/mechanics.ts",
-    "typecheck": "tsc --noEmit"
+    "phase1": "tsx scripts/phase1.ts",
+    "test": "tsx scripts/selftest.ts && tsx scripts/validate.ts && tsx scripts/mechanics.ts && tsx scripts/phase1.ts",
+    "typecheck": "tsc --noEmit",
+    "smoke": "node scripts/browser/smoke.mjs",
+    "verify:ui": "node scripts/browser/verify.mjs"
   },
   "dependencies": {
     "react": "^18.3.1",

@@ -1,63 +1,72 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { applyMove, createMatch, isTerminal, redact } from '../engine/engine';
-import { chooseSolitaireMove, positionKey } from '../bots/solitaireBot';
-import { GameDefinition, MatchState, Move } from '../engine/types';
+import { useEffect, useRef, useState } from 'react';
+import { GameDefinition, Move, RedactedState } from '../engine/types';
 import { CardFace } from './Card';
 import { TableDressing, TableRail } from './TableDressing';
 import { useSettings } from '../settings/SettingsContext';
 import { playSound } from './sound';
+import { service } from '../server/local';
 
 const ME = 'P1';
 
 // Patience has no opponents and no turns, so it gets its own board: foundations and cells along
 // the top, columns fanned below. Interaction is pick-then-place, with a double-tap shortcut
 // straight to the foundations — the move you make most.
+//
+// Like the multiplayer table, this holds a match id and a redacted view. Face-down cards stay
+// face down on the service's side of the line: undo and hint are service calls, not local
+// replays of a state this component was trusted with.
 export function SolitaireTable({ def }: { def: GameDefinition }) {
   const { settings } = useSettings();
-  const [state, setState] = useState<MatchState>(() => createMatch(def, [ME], rngSeed()));
+  const [board, setBoard] = useState<{ matchId: string; view: RedactedState }>(() => boot(def));
   const [pick, setPick] = useState<{ zone: string; cardId: string } | null>(null);
-  const history = useRef<MatchState[]>([]);
   const [hint, setHint] = useState<Move | null>(null);
+  const [canUndo, setCanUndo] = useState(false);
 
+  const { matchId, view } = board;
+  const gameId = def.meta.id;
+  const first = useRef(gameId);
   useEffect(() => {
-    setState(createMatch(def, [ME], rngSeed()));
-    history.current = [];
-    setPick(null);
-    setHint(null);
-  }, [def]);
+    if (first.current === gameId) return;
+    first.current = gameId;
+    newDeal();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gameId]);
 
-  const view = useMemo(() => redact(state, ME), [state]);
   const moves = view.solMoves ?? [];
   const cfg = def.solitaire!;
 
+  function refresh(id: string) {
+    setBoard({ matchId: id, view: service.view(id, ME) });
+    setCanUndo(service.canUndo(id));
+  }
+
   function commit(m: Move) {
-    history.current.push(state);
     setPick(null);
     setHint(null);
+    const res = service.submit(matchId, ME, m);
+    if (!res.ok) { playSound('ui', settings.sound); return; }
     playSound(m.to?.startsWith('found') ? 'win' : 'play', settings.sound);
-    setState((s) => applyMove(s, ME, m));
+    refresh(matchId);
   }
 
   function undo() {
-    const prev = history.current.pop();
-    if (!prev) return;
+    if (!service.undo(matchId, ME).ok) return;
     setPick(null);
     setHint(null);
     playSound('ui', settings.sound);
-    setState(prev);
+    refresh(matchId);
   }
 
   function newDeal() {
-    history.current = [];
     setPick(null);
     setHint(null);
-    setState(createMatch(def, [ME], rngSeed()));
+    setCanUndo(false);
+    try { service.end(matchId); } catch { /* already gone */ }
+    setBoard(boot(def));
   }
 
   function showHint() {
-    const seen = new Set([positionKey(state)]);
-    const m = chooseSolitaireMove(state, seen, (st, mv) => applyMove(st, ME, mv));
-    setHint(m);
+    setHint(service.hint(matchId, ME));
     playSound('ui', settings.sound);
   }
 
@@ -109,7 +118,7 @@ export function SolitaireTable({ def }: { def: GameDefinition }) {
                 <span className="sol-stat">{view.redealsLeft} redeals left</span>
               )}
               <div className="sol-actions">
-                <button className="ghost sm" onClick={undo} disabled={history.current.length === 0}>Undo</button>
+                <button className="ghost sm" onClick={undo} disabled={!canUndo}>Undo</button>
                 <button className="ghost sm" onClick={showHint} disabled={moves.length === 0}>Hint</button>
                 <button className="ghost sm" onClick={newDeal}>New deal</button>
               </div>
@@ -195,17 +204,17 @@ export function SolitaireTable({ def }: { def: GameDefinition }) {
         </div>
       </div>
 
-      {isTerminal(state) && (
+      {view.phase === 'roundOver' && (
         <div className="modal">
           <div className="modal-box">
-            <h3>{state.winner ? `🏆 Solved in ${view.moveCount} moves` : 'No moves left'}</h3>
+            <h3>{view.winner ? `🏆 Solved in ${view.moveCount} moves` : 'No moves left'}</h3>
             <p className="scores">
-              {state.winner
+              {view.winner
                 ? 'Every card is home.'
                 : 'This deal is blocked — undo a few moves, or take a fresh one.'}
             </p>
             <div className="sol-end-actions">
-              {!state.winner && <button className="ghost" onClick={undo} disabled={history.current.length === 0}>Undo</button>}
+              {!view.winner && <button className="ghost" onClick={undo} disabled={!canUndo}>Undo</button>}
               <button className="primary" onClick={newDeal}>New deal</button>
             </div>
           </div>
@@ -222,6 +231,7 @@ export function SolitaireTable({ def }: { def: GameDefinition }) {
   );
 }
 
-function rngSeed(): number {
-  return (Date.now() ^ Math.floor(Math.random() * 0xffffffff)) >>> 0;
+function boot(def: GameDefinition): { matchId: string; view: RedactedState } {
+  const m = service.create(def, def.meta.id, [ME]);
+  return { matchId: m.matchId, view: service.view(m.matchId, ME) };
 }

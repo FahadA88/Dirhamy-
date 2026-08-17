@@ -4,7 +4,7 @@ import { Table } from './Table';
 import { SolitaireTable } from './SolitaireTable';
 import { ErrorBoundary } from './ErrorBoundary';
 import { GameHelp } from './GameHelp';
-import { loadMatch } from '../engine/persist';
+import { resumableSession } from '../server/local';
 import { GameDefinition } from '../engine/types';
 import { useTilt } from './useTilt';
 import { useSettings } from '../settings/SettingsContext';
@@ -19,7 +19,7 @@ export function PlayView() {
 
   // Offer to pick up an unfinished game rather than silently dropping it.
   useEffect(() => {
-    const saved = loadMatch();
+    const saved = resumableSession();
     if (!saved) return;
     const def = catalog.find((g) => g.meta.id === saved.gameId);
     if (def) setResumable({ gameId: saved.gameId, name: def.meta.name });

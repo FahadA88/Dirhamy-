@@ -1,15 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { actingPlayers, applyMove, createMatch, isTerminal, legalMoves, nextHand, redact } from '../engine/engine';
-import { chooseMove } from '../bots/randomBot';
-import { Card, GameDefinition, MatchState, Move } from '../engine/types';
+import { Card, GameDefinition, Move, RedactedState } from '../engine/types';
 import { SUIT_SYMBOLS } from '../engine/deck';
 import { CardFace } from './Card';
 import { TableDressing, TableRail } from './TableDressing';
 import { useSettings } from '../settings/SettingsContext';
 import { BOT_SPEED_MS } from '../settings/settings';
 import { playSound } from './sound';
-import { saveMatch, loadMatch, clearMatch } from '../engine/persist';
+import { service, rememberSession, forgetSession, resumableSession } from '../server/local';
 
+// This component holds a match id and a redacted view — never a MatchState. Every move it wants
+// to make goes to the service as an intent; the service decides, and hands back the board as
+// this player is allowed to see it. Opponents' hands are not in this file's reach, and a move
+// the rules don't allow comes back refused with a reason rather than silently doing nothing.
 
 const HUMAN = 'P1';
 const SUIT_ORDER: Record<string, number> = { S: 0, H: 1, C: 2, D: 3, JOKER: 4 };
@@ -19,38 +21,40 @@ const SHAPE_NAME: Record<number, string> = { 1: 'single', 2: 'pair', 3: 'triple'
 export function Table({ def, seats = 3 }: { def: GameDefinition; seats?: number }) {
   const { settings } = useSettings();
   const players = useMemo(() => Array.from({ length: seats }, (_, i) => `P${i + 1}`), [seats]);
-  const [state, setState] = useState<MatchState>(() => createMatch(def, players, rngSeed()));
+  const [board, setBoard] = useState<Board>(() => boot(def, players, false));
+  const [refused, setRefused] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [askRank, setAskRank] = useState<string | null>(null);
-  const botSeed = useRef<number>(rngSeed());
 
-  useEffect(() => {
-    const saved = loadMatch();
-    if (saved && saved.gameId === def.meta.id && saved.state.players.length === players.length) {
-      setState(saved.state);
-    } else {
-      setState(createMatch(def, players, rngSeed()));
-    }
-    botSeed.current = rngSeed();
+  const { matchId, view } = board;
+  const myLegal = board.legal;
+
+  function deal(fresh: boolean) {
     setSelected(null);
     setAskRank(null);
-  }, [def, players]);
-
-  // Snapshot after every change so a refresh resumes instead of restarting.
-  useEffect(() => {
-    if (state.phase === 'playing') saveMatch(def.meta.id, state);
-    else clearMatch();
-  }, [state, def]);
-
-  function restart() {
-    clearMatch();
-    setSelected(null);
-    setAskRank(null);
-    setState(createMatch(def, players, rngSeed()));
+    setRefused(null);
+    // Don't leave the abandoned match sitting in the store.
+    if (fresh) { try { service.end(matchId); } catch { /* already gone */ } }
+    setBoard(boot(def, players, fresh));
   }
 
-  const view = useMemo(() => redact(state, HUMAN), [state]);
-  const myLegal = useMemo(() => (view.isYourTurn ? legalMoves(state, HUMAN) : []), [state, view.isYourTurn]);
+  // Re-deal when the game or the seat count changes — but not on the first render, which the
+  // lazy initializer above already handled.
+  const bootKey = `${def.meta.id}:${players.length}`;
+  const lastKey = useRef(bootKey);
+  useEffect(() => {
+    if (lastKey.current === bootKey) return;
+    lastKey.current = bootKey;
+    deal(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bootKey]);
+
+  // The pointer is only worth keeping while there is something to come back to.
+  useEffect(() => {
+    if (view.phase !== 'playing') forgetSession();
+  }, [view.phase]);
+
+  function restart() { deal(true); }
   const isFish = view.mode === 'fish';
   // Climbing moves carry a card group rather than a single cardId; a one-card group is still
   // a plain tap-to-play, so fold those in alongside the normal cardId moves.
@@ -94,43 +98,62 @@ export function Table({ def, seats = 3 }: { def: GameDefinition; seats?: number 
     : discardMoves.length > 0 ? 'dealerDiscard'
     : view.mode === 'trick' ? 'playToTrick' : view.mode === 'climb' ? 'climbPlay' : isRummy ? 'rummyDiscard' : 'playCard';
 
-  // Bot loop, paced by the user's bot-speed setting. Usually one actor is waiting (whoever's
-  // turn it is); a simultaneous pass can leave several bots waiting at once — this drives one
-  // per tick, which naturally cascades through all of them.
+  // Bot loop, paced by the user's bot-speed setting. Bots move inside the service — the client
+  // asks it to advance one seat and gets back its own view, so a bot's hand never crosses the
+  // boundary just to be played. A simultaneous pass can leave several bots waiting at once;
+  // one per tick cascades through all of them.
   useEffect(() => {
-    if (isTerminal(state)) return;
-    const actor = actingPlayers(state).find((p) => p !== HUMAN);
-    if (!actor) return;
+    if (view.phase !== 'playing') return;
+    const waiting = service.pending(matchId).some((p) => p !== HUMAN);
+    if (!waiting) return;
     const timer = setTimeout(() => {
-      const r = chooseMove(state, actor, botSeed.current, settings.botDiff);
-      botSeed.current = r.botSeed;
-      setState((s) => applyMove(s, actor, r.move));
+      const r = service.botStep(matchId, [HUMAN], settings.botDiff);
+      if (r.moved) setBoard(read(matchId));
     }, BOT_SPEED_MS[settings.botSpeed]);
     return () => clearTimeout(timer);
-  }, [state, settings.botSpeed, settings.botDiff]);
+  }, [board, matchId, view.phase, settings.botSpeed, settings.botDiff]);
 
   // Win sound.
-  const prevPhase = useRef(state.phase);
+  const prevPhase = useRef(view.phase);
   useEffect(() => {
-    if (prevPhase.current !== 'roundOver' && state.phase === 'roundOver') playSound('win', settings.sound);
-    prevPhase.current = state.phase;
-  }, [state.phase, settings.sound]);
+    if (prevPhase.current !== 'roundOver' && view.phase === 'roundOver') playSound('win', settings.sound);
+    prevPhase.current = view.phase;
+  }, [view.phase, settings.sound]);
 
   function playNextHand() {
-    setState((s) => nextHand(s, rngSeed()));
+    // Guarded because the button can be hit twice before the modal unmounts; the second call
+    // finds the hand already dealt and would otherwise throw out of an event handler.
+    try { service.nextHand(matchId); } catch { /* already dealt */ }
+    setBoard(read(matchId));
     setSelected(null);
     setAskRank(null);
+    setRefused(null);
   }
 
   function submit(move: Move) {
-    if (!view.isYourTurn) return;
+    const res = service.submit(matchId, HUMAN, move);
+    if (!res.ok) {
+      // The rules said no. Say why, instead of letting the tap disappear.
+      setRefused(res.reason ?? 'That move is not legal here.');
+      playSound('ui', settings.sound);
+      setSelected(null);
+      return;
+    }
     if (move.actionId === 'playCard' || move.actionId === 'playToTrick' || move.actionId === 'climbPlay' || move.actionId === 'climbBomb') playSound('play', settings.sound);
     if (move.actionId === 'drawCard' || move.actionId === 'fishDraw') playSound('draw', settings.sound);
     if (move.actionId === 'ask') playSound('ui', settings.sound);
+    setRefused(null);
     setSelected(null);
     setAskRank(null);
-    setState((s) => applyMove(s, HUMAN, move));
+    setBoard(read(matchId));
   }
+
+  // A refusal is a nudge, not a state to live in.
+  useEffect(() => {
+    if (!refused) return;
+    const t = setTimeout(() => setRefused(null), 3200);
+    return () => clearTimeout(t);
+  }, [refused]);
 
   function clickCard(id: string) {
     if (!playableCardIds.has(id)) return;
@@ -143,7 +166,7 @@ export function Table({ def, seats = 3 }: { def: GameDefinition; seats?: number 
   const hand = useMemo(() => sortHand(view.hand, def, settings.sort), [view.hand, def, settings.sort]);
   const top = view.zones.discard?.cards[0];
   const activeSuit = view.vars.activeSuit;
-  const suitPickerOpen = !!state.pendingChoice && state.pendingChoice.player === HUMAN;
+  const suitPickerOpen = !!view.pendingChoice && view.pendingChoice.player === HUMAN;
   const nameOf = (id: string) => (id === HUMAN ? settings.playerName : settings.botLabels ? `Bot ${id.slice(1)}` : id);
   const teamOf = (id: string): string | null => {
     if (!view.teams) return null;
@@ -453,7 +476,7 @@ export function Table({ def, seats = 3 }: { def: GameDefinition; seats?: number 
                 <span key={p}>{nameOf(p)}: {s} pts&nbsp;&nbsp;</span>
               ))}
             </p>
-            <button className="primary" onClick={() => { setState(createMatch(def, players, rngSeed())); }}>Play again</button>
+            <button className="primary" onClick={restart}>Play again</button>
           </div>
         </div>
       )}
@@ -461,6 +484,12 @@ export function Table({ def, seats = 3 }: { def: GameDefinition; seats?: number 
       </div>
       </div>
     </div>
+
+      {refused && (
+        <div className="refused" role="alert">
+          <span className="refused-mark">✕</span>{refused}
+        </div>
+      )}
 
       <div className="sr-only" role="status" aria-live="polite">
         {view.log.length > 0 ? view.log[view.log.length - 1].text : ''}
@@ -476,6 +505,31 @@ export function Table({ def, seats = 3 }: { def: GameDefinition; seats?: number 
   );
 }
 
+// Everything the component knows about the match: an id, the board as this player may see it,
+// and what the service says this player may do. Nothing hidden, nothing authoritative.
+interface Board {
+  matchId: string;
+  view: RedactedState;
+  legal: Move[];
+}
+
+function read(matchId: string): Board {
+  const view = service.view(matchId, HUMAN);
+  return { matchId, view, legal: view.isYourTurn ? service.legal(matchId, HUMAN) : [] };
+}
+
+function boot(def: GameDefinition, players: string[], fresh: boolean): Board {
+  if (!fresh) {
+    const resume = resumableSession();
+    if (resume && resume.gameId === def.meta.id && resume.seats === players.length) {
+      try { return read(resume.matchId); } catch { /* record went away; deal a new one */ }
+    }
+  }
+  const m = service.create(def, def.meta.id, players);
+  rememberSession(m.matchId, def.meta.id, players.length);
+  return read(m.matchId);
+}
+
 function sortHand(hand: Card[], def: GameDefinition, mode: 'off' | 'rank' | 'suit'): Card[] {
   if (mode === 'off') return hand;
   const rankIdx = (r: string) => { const i = def.deck.rankOrder.indexOf(r as never); return i < 0 ? 99 : i; };
@@ -484,5 +538,3 @@ function sortHand(hand: Card[], def: GameDefinition, mode: 'off' | 'rank' | 'sui
   else copy.sort((a, b) => SUIT_ORDER[a.suit] - SUIT_ORDER[b.suit] || rankIdx(a.rank) - rankIdx(b.rank));
   return copy;
 }
-
-function rngSeed(): number { return (Math.random() * 2 ** 31) | 0; }
