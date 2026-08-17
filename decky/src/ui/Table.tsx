@@ -8,6 +8,7 @@ import { BOT_SPEED_MS } from '../settings/settings';
 import { playSound } from './sound';
 import { service, rememberSession, forgetSession, resumableSession } from '../server/local';
 import { Seat, MoveRecord } from '../server/matchService';
+import { recordResult } from '../social/records';
 
 // This component holds a match id and a redacted view — never a MatchState. Every move it wants
 // to make goes to the service as an intent; the service decides, and hands back the board as
@@ -40,6 +41,7 @@ export function Table({ def, seats = 3, plan }: {
   const [me, setMe] = useState(localSeats[0] ?? HUMAN);
   const [handoff, setHandoff] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState(false);
+  const [hint, setHint] = useState<string | null>(null);
   const [history, setHistory] = useState<MoveRecord[]>([]);
   const [board, setBoard] = useState<Board>(() => boot(def, players, localSeats[0] ?? HUMAN, false));
   // One toast, two tones: a refusal is a red ✕, a status note is not.
@@ -153,6 +155,15 @@ export function Table({ def, seats = 3, plan }: {
     setBoard(read(matchId, seat));
   }
 
+  // A beginner hint asks the service what it would do. It is the same advisor the bots use, so
+  // it can only suggest something this player is actually allowed to play.
+  function showHint() {
+    const m = service.hint(matchId, me);
+    if (!m) { setToast({ text: 'No legal move to suggest right now.', tone: 'info' }); return; }
+    setHint(m.cardId ?? m.cards?.[0] ?? null);
+    setToast({ text: m.cardId || m.cards?.length ? 'Try the glowing card.' : `Try "${m.actionId}".`, tone: 'info' });
+  }
+
   function openHistory() {
     setHistory(service.history(matchId));
     setShowHistory(true);
@@ -169,10 +180,28 @@ export function Table({ def, seats = 3, plan }: {
   const takeback = view.phase === 'playing' ? service.pendingTakeback(matchId) : null;
   const nameOfSeat = (id: string) => plan?.find((s) => s.id === id)?.name ?? id;
 
-  // Win sound.
+  useEffect(() => { setHint(null); }, [board]);
+
+  // Win sound, and the result that feeds the leaderboards.
   const prevPhase = useRef(view.phase);
   useEffect(() => {
-    if (prevPhase.current !== 'roundOver' && view.phase === 'roundOver') playSound('win', settings.sound);
+    if (prevPhase.current !== 'roundOver' && view.phase === 'roundOver') {
+      playSound('win', settings.sound);
+      const scores = view.matchTarget != null ? (view.matchScores ?? view.scores) : view.scores;
+      const highWins = view.matchTarget != null;
+      const standings = view.players
+        .map((p) => ({ name: nameOf(p.id), score: scores[p.id] ?? 0, isYou: localSeats.includes(p.id) }))
+        .sort((a, b) => (highWins ? b.score - a.score : a.score - b.score));
+      const winner = view.matchWinner ?? view.winner;
+      recordResult({
+        gameId: def.meta.id,
+        gameName: def.meta.name,
+        at: Date.now(),
+        seats: view.players.length,
+        standings,
+        youWon: !!winner && localSeats.includes(winner),
+      });
+    }
     prevPhase.current = view.phase;
   }, [view.phase, settings.sound]);
 
@@ -461,6 +490,7 @@ export function Table({ def, seats = 3, plan }: {
             </button>
           ))}
           {isRummy && view.rummyPhase === 'play' && view.isYourTurn && <span className="rummy-hint">tap a card to discard</span>}
+          {view.isYourTurn && <button className="restart-btn" onClick={showHint} title="Suggest a move">Hint</button>}
           <button className="restart-btn" onClick={openHistory} title="Every move so far">History</button>
           {view.phase === 'playing' && !takeback && (
             <button className="restart-btn" onClick={askTakeback} title="Ask the table to take your last move back">Take back</button>
@@ -480,7 +510,7 @@ export function Table({ def, seats = 3, plan }: {
             return (
               <button
                 key={c.id}
-                className={`card-btn ${playable ? 'playable' : 'dim'} ${staged ? 'staged' : ''} ${(isFish ? c.rank === askRank : selected === c.id) ? 'selected' : ''}`}
+                className={`card-btn ${playable ? 'playable' : 'dim'} ${staged ? 'staged' : ''} ${hint === c.id ? 'hinted' : ''} ${(isFish ? c.rank === askRank : selected === c.id) ? 'selected' : ''}`}
                 disabled={!playable}
                 onClick={() => clickCard(c.id)}
                 title={staged ? 'Picked to pass' : playable ? (isFish ? 'Pick this rank to ask for' : view.needsPassChoice ? 'Give this card away' : settings.confirmPlays && selected !== c.id ? 'Click to select' : 'Play this card') : 'Not a legal move right now'}

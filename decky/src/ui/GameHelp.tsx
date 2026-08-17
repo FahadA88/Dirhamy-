@@ -1,3 +1,4 @@
+import { explainGame } from '../authoring/explain';
 import { GameDefinition } from '../engine/types';
 import { useDismissable } from './useEscape';
 
@@ -45,6 +46,9 @@ const FAMILY_HOW: Record<string, string[]> = {
 export function GameHelp({ def, onClose }: { def: GameDefinition; onClose: () => void }) {
   const ref = useDismissable(true, onClose);
   const steps = FAMILY_HOW[def.meta.family] ?? [];
+  // A game built in the builder has no family blurb, and any game may carry author-written
+  // rules. explainGame() covers both, so the rules panel is never wrong about a custom game.
+  const summary = explainGame(def);
   const cfg = def.solitaire;
 
   return (
@@ -53,6 +57,11 @@ export function GameHelp({ def, onClose }: { def: GameDefinition; onClose: () =>
         aria-label={`How to play ${def.meta.name}`} onClick={(e) => e.stopPropagation()}>
         <h3>{def.meta.name}</h3>
         <p className="help-desc">{def.meta.description}</p>
+
+        <div className="help-head">In short</div>
+        <ul className="help-list">
+          {summary.map((line, i) => <li key={i}>{line}</li>)}
+        </ul>
 
         {steps.length > 0 && (
           <>

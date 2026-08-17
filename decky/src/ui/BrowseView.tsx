@@ -7,6 +7,11 @@ import {
   searchLibrary, toggleFavourite, toggleFollow, unpublish,
 } from '../library/library';
 import { explainGame } from '../authoring/explain';
+import {
+  REPORT_REASONS, ReportReason, checkText, hasReported, isBlocked, isMuted,
+  report as fileReport, toggleBlock, toggleMute,
+} from '../social/safety';
+import { leaderboard } from '../social/records';
 import { useSettings } from '../settings/SettingsContext';
 
 
@@ -41,7 +46,9 @@ export function BrowseView({ onPlay, onSetup, onRemix }: {
   const [detail, setDetail] = useState<string | null>(null);
   const [profile, setProfile] = useState<string | null>(null);
 
-  const games = useMemo(() => allGames(), [tick]);
+  // A blocked creator's games are gone from every shelf, not greyed out — the point of blocking
+  // is not seeing them.
+  const games = useMemo(() => allGames().filter((g) => !isBlocked(g.author)), [tick]);
   const shelves = useMemo(() => collections(games), [games, tick]);
   const hero = useMemo(() => featured(games), [games]);
   const results = useMemo(() => searchLibrary(games, filters, sort), [games, filters, sort, tick]);
@@ -259,12 +266,20 @@ function GameDetail({ game, me, onBack, onPlay, onSetup, onChanged, onProfile, o
   const [stars, setStars] = useState(mine?.rating ?? 0);
   const [text, setText] = useState(mine?.text ?? '');
   const [saved, setSaved] = useState(false);
-  const reviews = reviewsFor(game.id);
+  const [reporting, setReporting] = useState(false);
+  const [reason, setReason] = useState<ReportReason>('broken');
+  const [note, setNote] = useState('');
+  const [textError, setTextError] = useState<string | null>(null);
+  const reviews = reviewsFor(game.id).filter((r) => !isMuted(r.author));
+  const board = leaderboard(game.id).slice(0, 5);
   const fav = isFavourite(game.id);
   const rating = averageRating(game.stats);
 
   function submit() {
     if (stars < 1) return;
+    const screen = checkText(text);
+    if (!screen.ok) { setTextError(screen.reason ?? 'That review cannot be posted.'); return; }
+    setTextError(null);
     review(game.id, me, stars, text);
     setSaved(true);
     onChanged();
@@ -314,6 +329,39 @@ function GameDetail({ game, me, onBack, onPlay, onSetup, onChanged, onProfile, o
             )}
           </div>
 
+          {!game.builtIn && (
+            <div className="safety">
+              {reporting ? (
+                <div className="safety-form">
+                  <span className="mini-label">What's wrong with this game?</span>
+                  <select value={reason} onChange={(e) => setReason(e.target.value as ReportReason)} aria-label="Reason">
+                    {REPORT_REASONS.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
+                  </select>
+                  <input value={note} placeholder="Anything else we should know (optional)"
+                    onChange={(e) => setNote(e.target.value)} />
+                  <div className="proposal-actions">
+                    <button className="primary sm" onClick={() => { fileReport('game', game.id, reason, note); setReporting(false); onChanged(); }}>
+                      Send report
+                    </button>
+                    <button className="ghost sm" onClick={() => setReporting(false)}>Cancel</button>
+                  </div>
+                </div>
+              ) : (
+                <div className="safety-row">
+                  {hasReported(game.id)
+                    ? <span className="muted">Reported. Thank you — we look at every one.</span>
+                    : <button className="linkish" onClick={() => setReporting(true)}>Report this game</button>}
+                  <button className="linkish" onClick={() => { toggleBlock(game.author); onChanged(); onBack(); }}>
+                    Block {game.author}
+                  </button>
+                  <button className="linkish" onClick={() => { toggleMute(game.author); onChanged(); }}>
+                    {isMuted(game.author) ? 'Unmute' : 'Mute'} their reviews
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
           <h3 className="gd-sub">How it plays</h3>
           <ul className="explain-list">
             {explainGame(game.definition).map((line, i) => <li key={i}>{line}</li>)}
@@ -340,6 +388,22 @@ function GameDetail({ game, me, onBack, onPlay, onSetup, onChanged, onProfile, o
             </button>
             {saved && <span className="muted">Saved.</span>}
           </div>
+          {textError && <div className="issue error">{textError}</div>}
+
+          {board.length > 0 && (
+            <>
+              <h3 className="gd-sub">Leaderboard</h3>
+              <ol className="leaderboard">
+                {board.map((row, i) => (
+                  <li key={row.name}>
+                    <span className="lb-rank">{i + 1}</span>
+                    <span className="lb-name">{row.name}</span>
+                    <span className="lb-stat">{Math.round(row.winRate * 100)}% of {row.played}</span>
+                  </li>
+                ))}
+              </ol>
+            </>
+          )}
 
           <ul className="reviewlist">
             {reviews.length === 0 && <li className="muted">No reviews yet. Yours would be the first.</li>}

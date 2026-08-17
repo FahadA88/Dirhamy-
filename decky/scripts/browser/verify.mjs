@@ -11,7 +11,7 @@ const ok = (l, c) => console.log(`  ${c ? 'PASS' : 'FAIL'}  ${l}`);
 const open = async (name) => {
   await p.goto(base, { waitUntil: 'networkidle' });
   const d = p.locator('.resume-actions .ghost'); if (await d.count()) await d.first().click();
-  await p.locator('.cards-grid > *', { hasText: name }).first().locator('button', { hasText: /play/i }).first().click();
+  await openGame(p, name);
   await p.waitForSelector('.table-wrap');
 };
 await p.goto(base, { waitUntil: 'networkidle' });
@@ -68,3 +68,10 @@ ok('and it is the same deal', logAfter.slice(-1)[0] === logBefore.slice(-1)[0]);
 
 console.log('\npageerrors: ' + JSON.stringify(errs));
 await b.close();
+
+/** The library is a shelf now: search for a game, then play it from its card. */
+async function openGame(page, name) {
+  await page.locator('.searchbox').fill(name);
+  await page.waitForTimeout(280);
+  await page.locator('.shelf-grid .shelfcard').first().locator('.sc-foot button.primary').click();
+}

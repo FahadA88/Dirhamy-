@@ -86,12 +86,22 @@ console.log('\nStep 6 — playtest it at a real table');
 await p.locator('button', { hasText: 'Playtest now' }).click();
 await p.waitForSelector('.table-wrap', { timeout: 10000 });
 let plays = 0;
-for (let i = 0; i < 14; i++) {
+// The log is per hand, and the loop may roll into a new one, so collect as we go rather than
+// reading whatever happens to be on screen at the end.
+const seen = new Set();
+for (let i = 0; i < 26; i++) {
+  for (const line of await p.locator('.log-row').allTextContents()) seen.add(line);
+  // A matching game stops for a wild-suit choice; clear whatever is on top before playing.
+  const suit = p.locator('.suit-btn');
+  if (await suit.count()) { await suit.first().click({ timeout: 1500 }).catch(() => {}); await p.waitForTimeout(150); continue; }
+  const modalBtn = p.locator('.modal .primary');
+  if (await modalBtn.count()) { await modalBtn.first().click({ timeout: 1500 }).catch(() => {}); await p.waitForTimeout(150); continue; }
   const c = p.locator('.card-btn.playable, .draw-btn');
   if (await c.count()) { await c.first().click({ timeout: 1500 }).catch(() => {}); plays++; }
-  await p.waitForTimeout(260);
+  await p.waitForTimeout(200);
 }
-const log = await p.locator('.log-row').allTextContents();
+for (const line of await p.locator('.log-row').allTextContents()) seen.add(line);
+const log = [...seen];
 ok(`played ${plays} times at the table`, plays > 5);
 ok('the author-written rules fired in play', log.some((l) => /Queen|Last card|Too many|reveals/i.test(l)), JSON.stringify(log.slice(0, 4)));
 await p.screenshot({ path: '/tmp/builder-playtest.png' });

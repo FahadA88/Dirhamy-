@@ -362,8 +362,17 @@ export class MatchService {
     const handSeed = deriveSeed(rec.serverSeed, rec.clientSeed, rec.nonce);
     rec.handSeeds.push(handSeed);
     rec.state = nextHand(rec.state, handSeed);
+    // The move record spans the match, not the hand — people ask "what happened last hand?"
+    // far more often than they ask about the current one. A marker separates them; the 500-move
+    // cap keeps it bounded.
+    rec.moves.push({
+      n: rec.moves.length + 1,
+      seat: '',
+      move: { actionId: 'handStart' },
+      at: Date.now(),
+      text: `— Hand ${rec.state.handNumber} —`,
+    });
     rec.history = [];
-    rec.moves = [];
     rec.takeback = null;
     this.store.set(matchId, rec);
     return this.summary(rec);

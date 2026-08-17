@@ -28,6 +28,7 @@ import { TEMPLATES } from '../authoring/templates';
 import { RuleDraft } from '../authoring/ruleKit';
 import { explainGame } from '../authoring/explain';
 import { publish, complexityOf, playtimeOf } from '../library/library';
+import { checkName, checkText } from '../social/safety';
 import { useSettings } from '../settings/SettingsContext';
 
 type RankArrayKey = 'wildRanks' | 'skipRanks' | 'reverseRanks' | 'drawRanks' | 'extraTurnRanks' | 'wildDrawRanks' | 'excludeRanks' | 'passRanks';
@@ -51,6 +52,7 @@ export function CreateView({ onPlay }: { onPlay?: (def: GameDefinition) => void 
   const [seats, setSeats] = useState(3);
   const [tags, setTags] = useState('');
   const [published, setPublished] = useState<{ id: string; name: string } | null>(null);
+  const [publishError, setPublishError] = useState<string | null>(null);
   const [knobs, setKnobs] = useState<Knobs>({ ...defaultKnobs });
   const [override, setOverride] = useState<GameDefinition | null>(null);
   const [desc, setDesc] = useState('');
@@ -79,6 +81,12 @@ export function CreateView({ onPlay }: { onPlay?: (def: GameDefinition) => void 
     setOverride(null); setReport(null); setPublished(null);
   }
   function doPublish() {
+    // Screen before it reaches the shelf: no slurs, and nothing that can pretend to be official.
+    const nameCheck = checkName(knobs.name);
+    if (!nameCheck.ok) { setPublishError(nameCheck.reason ?? 'That name cannot be published.'); return; }
+    const descCheck = checkText(knobs.description);
+    if (!descCheck.ok) { setPublishError(descCheck.reason ?? 'That description cannot be published.'); return; }
+    setPublishError(null);
     const g = publish({
       definition: def,
       knobs,
@@ -261,6 +269,7 @@ export function CreateView({ onPlay }: { onPlay?: (def: GameDefinition) => void 
                   <div><dt>Playtime</dt><dd>~{playtimeOf(def)} min</dd></div>
                   <div><dt>Twists</dt><dd>{(def.rules ?? []).length}</dd></div>
                 </dl>
+                {publishError && <div className="issue error">{publishError}</div>}
                 <div className="proposal-actions">
                   <button className="primary" onClick={doPublish}>Publish to the shelf</button>
                 </div>

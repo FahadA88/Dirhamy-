@@ -1301,3 +1301,28 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
   .hero { padding: 24px 22px; }
   .hero-body h2 { font-size: 24px; }
 }
+
+/* ============================================================
+   PHASE 5 — hints, leaderboards, safety
+   ============================================================ */
+
+/* The hinted card glows rather than moving, so the layout never jumps under a beginner. */
+.card-btn.hinted { outline: 3px solid var(--amber); outline-offset: 2px; border-radius: 10px; animation: hint-pulse 1.4s ease-in-out infinite; }
+@keyframes hint-pulse { 0%, 100% { outline-color: rgba(217, 119, 6, 0.95); } 50% { outline-color: rgba(217, 119, 6, 0.35); } }
+@media (prefers-reduced-motion: reduce) { .card-btn.hinted { animation: none; } }
+
+.leaderboard { list-style: none; padding: 0; margin: 8px 0 0; }
+.leaderboard li { display: flex; gap: 10px; align-items: baseline; padding: 6px 0; border-bottom: 1px solid var(--panel-brd); font-size: 13px; }
+.leaderboard li:last-child { border-bottom: 0; }
+.lb-rank { font-family: var(--mono); font-size: 11px; color: var(--muted); width: 16px; }
+.lb-name { flex: 1 1 auto; font-weight: 600; }
+.lb-stat { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+
+.safety { margin: 4px 0 18px; padding-top: 12px; border-top: 1px solid var(--panel-brd); }
+.safety-row { display: flex; gap: 16px; flex-wrap: wrap; font-size: 12.5px; }
+.safety-row .linkish { color: var(--muted); }
+.safety-row .linkish:hover { color: var(--red); }
+.safety-form { display: flex; flex-direction: column; gap: 8px; }
+
+.help-list { margin: 6px 0 14px; padding-left: 18px; }
+.help-list li { font-size: 13px; line-height: 1.55; color: var(--muted); margin-bottom: 4px; }

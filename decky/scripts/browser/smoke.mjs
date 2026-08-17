@@ -20,14 +20,17 @@ await page.evaluate(() => {
 });
 await page.reload({ waitUntil: 'networkidle' });
 
-const names = await page.$$eval('.cards-grid h3', (els) => els.map((e) => e.textContent.trim()));
+// The front page shows curated shelves; "Browse all" is the full grid.
+await page.locator('.chip', { hasText: 'Browse all' }).click();
+await page.waitForSelector('.shelf-grid');
+const names = await page.$$eval('.shelf-grid .sc-main h3', (els) => els.map((e) => e.textContent.trim()));
 const report = [];
 for (const name of names) {
   errors.length = 0;
   await page.goto(base, { waitUntil: 'networkidle' });
   const d = page.locator('.resume-actions .ghost');
   if (await d.count()) await d.first().click();
-  await page.locator('.cards-grid > *', { hasText: name }).first().locator('button', { hasText: /play/i }).first().click();
+  await openGame(page, name);
   await page.waitForSelector('.table-wrap', { timeout: 8000 });
 
   let moves = 0, refusals = 0, roundsSeen = 0;
@@ -51,3 +54,10 @@ const bad = report.filter((r) => r.errors.length || r.crashed);
 console.log(bad.length === 0 ? `\nALL ${report.length} GAMES CLEAN` : `\n${bad.length} PROBLEM(S)`);
 await browser.close();
 process.exit(bad.length ? 1 : 0);
+
+/** The library is a shelf now: search for a game, then play it from its card. */
+async function openGame(page, name) {
+  await page.locator('.searchbox').fill(name);
+  await page.waitForTimeout(280);
+  await page.locator('.shelf-grid .shelfcard').first().locator('.sc-foot button.primary').click();
+}

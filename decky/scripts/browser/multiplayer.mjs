@@ -20,8 +20,11 @@ await p.evaluate(() => {
 await p.goto(base, { waitUntil: 'networkidle' });
 
 console.log('\nSetting up a pass-and-play table');
-await p.locator('.cards-grid > *', { hasText: 'Crazy Eights' }).first()
-  .locator('button', { hasText: 'Set up table' }).click();
+await p.locator('.searchbox').fill('Crazy Eights');
+await p.waitForTimeout(300);
+await p.locator('.shelf-grid .shelfcard').first().locator('.sc-main').click();
+await p.waitForSelector('.gd-actions');
+await p.locator('.gd-actions button', { hasText: 'Set up a table' }).click();
 await p.waitForSelector('.seatlist');
 ok('a seat list appeared', (await p.locator('.seatrow').count()) >= 2);
 
