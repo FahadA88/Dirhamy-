@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { GameDefinition, Move, RedactedState } from '../engine/types';
 import { CardFace } from './Card';
 import { TableDressing, TableRail } from './TableDressing';
+import { DealMotion } from './DealMotion';
 import { useSettings } from '../settings/SettingsContext';
 import { playSound } from './sound';
 import { service } from '../server/local';
@@ -18,6 +19,7 @@ const ME = 'P1';
 export function SolitaireTable({ def }: { def: GameDefinition }) {
   const { settings } = useSettings();
   const [board, setBoard] = useState<{ matchId: string; view: RedactedState }>(() => boot(def));
+  const [dealing, setDealing] = useState(false);
   const [pick, setPick] = useState<{ zone: string; cardId: string } | null>(null);
   const [hint, setHint] = useState<Move | null>(null);
   const [canUndo, setCanUndo] = useState(false);
@@ -108,8 +110,10 @@ export function SolitaireTable({ def }: { def: GameDefinition }) {
     <div className="table-wrap">
       <div className="table" data-felt={settings.tableFelt}>
         <TableRail felt={settings.tableFelt} />
-        <div className="felt">
+        <div className={`felt ${dealing ? 'dealing' : ''}`}>
           <TableDressing felt={settings.tableFelt} title={def.meta.name} />
+          {/* Patience is dealt to columns, not to seats: one flick per column. */}
+          <DealMotion seats={7} aim={['.sol-col']} round={matchId} onStart={() => setDealing(true)} onDone={() => setDealing(false)} />
           <div className="felt-content sol">
 
             <div className="sol-bar">

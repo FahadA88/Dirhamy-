@@ -3,6 +3,7 @@ import { Card, GameDefinition, Move, RedactedState } from '../engine/types';
 import { SUIT_SYMBOLS } from '../engine/deck';
 import { CardFace } from './Card';
 import { TableDressing, TableRail } from './TableDressing';
+import { DealMotion } from './DealMotion';
 import { useSettings } from '../settings/SettingsContext';
 import { BOT_SPEED_MS } from '../settings/settings';
 import { playSound } from './sound';
@@ -48,6 +49,10 @@ export function Table({ def, seats = 3, plan }: {
   const [toast, setToast] = useState<{ text: string; tone: 'bad' | 'info' } | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [askRank, setAskRank] = useState<string | null>(null);
+  // True while the dealer's hands are working. The cards are already in the view by then —
+  // this only holds them back on screen so they appear to arrive rather than to have been
+  // there all along.
+  const [dealing, setDealing] = useState(false);
 
   const { matchId, view } = board;
   const passAndPlay = localSeats.length > 1;
@@ -268,8 +273,15 @@ export function Table({ def, seats = 3, plan }: {
     <div className="table-wrap">
     <div className="table" data-felt={settings.tableFelt}>
       <TableRail felt={settings.tableFelt} />
-      <div className="felt">
+      <div className={`felt ${dealing ? 'dealing' : ''}`}>
       <TableDressing felt={settings.tableFelt} title={def.meta.name} />
+      <DealMotion
+        seats={view.players.length}
+        aim={['.opponents .seat', '.hand']}
+        round={`${matchId}:${view.handNumber}`}
+        onStart={() => setDealing(true)}
+        onDone={() => setDealing(false)}
+      />
       <div className="felt-content">
       {view.matchTarget != null && (
         <div className="match-bar">

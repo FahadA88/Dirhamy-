@@ -2290,3 +2290,222 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
 .shelfcard .sc-main { flex: 1 1 auto; display: flex; flex-direction: column; }
 .shelfcard .sc-body { flex: 1 1 auto; display: flex; flex-direction: column; gap: 8px; }
 .shelfcard .sc-meta { margin-top: auto; }
+
+/* ============================================================
+   THE DEALER'S HANDS
+   A riffle, then a card to each seat in turn. Everything is a
+   transform on a div wearing the player's own card back, so it
+   costs one paint and no downloads, and it sits over the felt
+   without ever taking a click.
+   ============================================================ */
+
+.dealmotion {
+  position: absolute; inset: 0; z-index: 6;
+  pointer-events: none;
+  perspective: 1500px;
+  perspective-origin: 50% 42%;
+  display: grid; place-items: center;
+}
+.dm-riffle, .dm-deal {
+  position: relative; width: 100%; height: 100%;
+  display: grid; place-items: center;
+  transform-style: preserve-3d;
+}
+
+/* A card in the dealer's hands: the player's own back, with real thickness. */
+.dm-card {
+  position: absolute;
+  width: var(--bw); height: var(--bh);
+  border-radius: 7px;
+  background:
+    linear-gradient(160deg, rgba(255,255,255,.14), rgba(0,0,0,.16)),
+    var(--cb-ground, #123b28);
+  border: 1px solid color-mix(in srgb, var(--cb-ground, #123b28) 60%, #000);
+  box-shadow:
+    0 1px 0 var(--card-edge),
+    0 2px 0 color-mix(in srgb, var(--card-edge) 72%, #000),
+    0 6px 12px rgba(20, 14, 4, .34);
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+}
+.dm-card::before {
+  content: ""; position: absolute; inset: 4px; border-radius: 4px;
+  border: 1px solid color-mix(in srgb, var(--cb-ink, #d6af5c) 55%, transparent);
+  opacity: .8;
+}
+
+/* --- beat one: the riffle --- */
+/* Two halves lift apart, bow, and bridge back together. The odd cards come from the right
+   hand and the even from the left, which is what makes the interleave read. */
+@keyframes riffle-left {
+  0%   { transform: translate3d(0,0,calc(var(--n) * 0.7px)) rotate(0deg); }
+  26%  { transform: translate3d(-46px, calc(var(--n) * -1.6px), 30px) rotate(-9deg); }
+  52%  { transform: translate3d(-52px, calc(var(--n) * -1.1px), 40px) rotate(-13deg); }
+  78%  { transform: translate3d(-8px, calc(var(--n) * -0.4px), 14px) rotate(-3deg); }
+  100% { transform: translate3d(0,0,calc(var(--n) * 0.7px)) rotate(0deg); }
+}
+@keyframes riffle-right {
+  0%   { transform: translate3d(0,0,calc(var(--n) * 0.7px)) rotate(0deg); }
+  26%  { transform: translate3d(46px, calc(var(--n) * -1.6px), 30px) rotate(9deg); }
+  52%  { transform: translate3d(52px, calc(var(--n) * -1.1px), 40px) rotate(13deg); }
+  78%  { transform: translate3d(8px, calc(var(--n) * -0.4px), 14px) rotate(3deg); }
+  100% { transform: translate3d(0,0,calc(var(--n) * 0.7px)) rotate(0deg); }
+}
+.dm-riff {
+  animation-duration: 620ms;
+  animation-timing-function: cubic-bezier(.34,.72,.28,1);
+  animation-fill-mode: both;
+  animation-delay: calc(var(--n) * -14ms);   /* the cards nearest the thumb move first */
+}
+.dm-riff.left  { animation-name: riffle-left; }
+.dm-riff.right { animation-name: riffle-right; }
+
+/* --- beat two: round the table --- */
+.dm-stock { position: absolute; transform-style: preserve-3d; }
+.dm-stockcard {
+  position: absolute; left: 50%; top: 50%;
+  margin-left: calc(var(--bw) / -2); margin-top: calc(var(--bh) / -2);
+  transform: translate3d(0, calc(var(--i) * -1.4px), calc(var(--i) * 1.4px)) rotate(calc(var(--i) * 0.6deg));
+  animation: stock-settle 900ms ease-out both;
+}
+@keyframes stock-settle { from { opacity: .96; } to { opacity: .5; } }
+
+/* A card leaves the deck, turns over in the air, and slides in flat where it lands. */
+@keyframes deal-fly {
+  0%   { opacity: 0; transform: translate3d(0,0,60px) rotateX(0deg) rotate(0deg) scale(1); }
+  8%   { opacity: 1; }
+  55%  { transform: translate3d(calc(var(--tx) * 0.62), calc(var(--ty) * 0.62), 120px)
+                     rotateX(34deg) rotate(calc(var(--spin) * 0.7)) scale(1.06); }
+  88%  { opacity: 1; }
+  100% { opacity: 0;
+         transform: translate3d(var(--tx), var(--ty), 0)
+                    rotateX(58deg) rotate(var(--spin)) scale(.9); }
+}
+.dm-fly {
+  left: 50%; top: 50%;
+  margin-left: calc(var(--bw) / -2); margin-top: calc(var(--bh) / -2);
+  animation: deal-fly 400ms cubic-bezier(.26,.7,.35,1) both;
+}
+
+/* The felt has to be the frame the motion is measured against. */
+.felt { position: relative; }
+
+@media (prefers-reduced-motion: reduce) {
+  .dealmotion { display: none; }
+}
+:root[data-motion="reduced"] .dealmotion { display: none; }
+
+/* The cards arrive rather than having been there all along: the felt's contents are held at
+   nothing while the dealer works, then come up as the last card is still in the air. */
+.felt .hand, .felt .fanned, .felt .trick-area, .felt .pile,
+.felt .sol-col, .felt .waste-fan, .felt .melds-row, .felt .climb-group {
+  transition: opacity 340ms ease 40ms, transform 340ms cubic-bezier(.2,.9,.3,1.1) 40ms;
+}
+.felt.dealing .hand, .felt.dealing .fanned, .felt.dealing .trick-area, .felt.dealing .pile,
+.felt.dealing .sol-col, .felt.dealing .waste-fan, .felt.dealing .melds-row,
+.felt.dealing .climb-group {
+  opacity: 0;
+  transform: translateY(8px) scale(.985);
+  transition-duration: 0ms;
+}
+
+/* The dealer's cards are the same size as the ones on the table — a half-size prop reads as a
+   different deck. */
+.dm-card { width: var(--cw); height: var(--ch); border-radius: 9px; }
+.dm-stockcard, .dm-fly {
+  margin-left: calc(var(--cw) / -2); margin-top: calc(var(--ch) / -2);
+}
+
+/* A riffle you can see: the halves come properly apart before they bridge. */
+@keyframes riffle-left {
+  0%   { transform: translate3d(0,0,calc(var(--n) * 0.8px)) rotate(0deg); }
+  22%  { transform: translate3d(-74px, calc(var(--n) * -2.4px), 40px) rotate(-11deg); }
+  46%  { transform: translate3d(-92px, calc(var(--n) * -1.7px), 56px) rotate(-16deg); }
+  72%  { transform: translate3d(-26px, calc(var(--n) * -0.6px), 22px) rotate(-4deg); }
+  88%  { transform: translate3d(3px, calc(var(--n) * 0.2px), 6px) rotate(1deg); }
+  100% { transform: translate3d(0,0,calc(var(--n) * 0.8px)) rotate(0deg); }
+}
+@keyframes riffle-right {
+  0%   { transform: translate3d(0,0,calc(var(--n) * 0.8px)) rotate(0deg); }
+  22%  { transform: translate3d(74px, calc(var(--n) * -2.4px), 40px) rotate(11deg); }
+  46%  { transform: translate3d(92px, calc(var(--n) * -1.7px), 56px) rotate(16deg); }
+  72%  { transform: translate3d(26px, calc(var(--n) * -0.6px), 22px) rotate(4deg); }
+  88%  { transform: translate3d(-3px, calc(var(--n) * 0.2px), 6px) rotate(-1deg); }
+  100% { transform: translate3d(0,0,calc(var(--n) * 0.8px)) rotate(0deg); }
+}
+
+/* --- the riffle, made legible --- */
+/* A packet of cards bows: each one further from the thumb is turned a little more and lifted a
+   little higher. Without that the nine cards in a half sit on top of each other and the whole
+   flourish reads as two cards waggling. The pivot is the bottom corner nearest the other half,
+   which is where a real packet hinges. */
+.dm-riff { transform-origin: 50% 92%; }
+.dm-riff.left  { transform-origin: 88% 96%; }
+.dm-riff.right { transform-origin: 12% 96%; }
+
+@keyframes riffle-left {
+  0%   { transform: translate3d(0, calc(var(--n) * -1px), calc(var(--n) * 0.8px)) rotate(0deg); }
+  20%  { transform: translate3d(-64px, calc(var(--n) * -3.4px - 6px), 40px)
+                    rotate(calc(-7deg - var(--n) * 1.6deg)); }
+  44%  { transform: translate3d(-80px, calc(var(--n) * -3.9px - 10px), 58px)
+                    rotate(calc(-10deg - var(--n) * 2.1deg)); }
+  70%  { transform: translate3d(-22px, calc(var(--n) * -2.2px - 3px), 24px)
+                    rotate(calc(-3deg - var(--n) * 0.7deg)); }
+  100% { transform: translate3d(0, calc(var(--n) * -1px), calc(var(--n) * 0.8px)) rotate(0deg); }
+}
+@keyframes riffle-right {
+  0%   { transform: translate3d(0, calc(var(--n) * -1px), calc(var(--n) * 0.8px)) rotate(0deg); }
+  20%  { transform: translate3d(64px, calc(var(--n) * -3.4px - 6px), 40px)
+                    rotate(calc(7deg + var(--n) * 1.6deg)); }
+  44%  { transform: translate3d(80px, calc(var(--n) * -3.9px - 10px), 58px)
+                    rotate(calc(10deg + var(--n) * 2.1deg)); }
+  70%  { transform: translate3d(22px, calc(var(--n) * -2.2px - 3px), 24px)
+                    rotate(calc(3deg + var(--n) * 0.7deg)); }
+  100% { transform: translate3d(0, calc(var(--n) * -1px), calc(var(--n) * 0.8px)) rotate(0deg); }
+}
+/* Cards nearest the thumb lead, the rest follow — that stagger is the riffle sound made visible. */
+.dm-riff { animation-delay: calc(var(--n) * -18ms); }
+
+/* Ink on the back, so a card in the air is recognisably the back the player chose. */
+.dm-card::after {
+  content: ""; position: absolute; inset: 11px; border-radius: 3px;
+  border: 1px solid color-mix(in srgb, var(--cb-ink, #d6af5c) 34%, transparent);
+}
+
+/* --- the dealer deals the deck you chose --- */
+/* `.dm-card` is now only a position and a transform; the thing you see is a real `.card.back`,
+   so the monogram, the lattice or the back somebody drew themselves is what flies. */
+.dm-card {
+  background: none; border: 0; box-shadow: none;
+}
+.dm-card::before, .dm-card::after { content: none; }
+.dm-card > .card.back {
+  width: 100%; height: 100%;
+  box-shadow:
+    0 1px 0 var(--card-edge),
+    0 2px 0 color-mix(in srgb, var(--card-edge) 74%, #000),
+    0 3px 0 color-mix(in srgb, var(--card-edge) 60%, #000),
+    0 10px 18px rgba(20, 14, 4, .38);
+}
+
+/* The halves come properly apart before they bridge. */
+@keyframes riffle-left {
+  0%   { transform: translate3d(0, calc(var(--n) * -1px), calc(var(--n) * 0.8px)) rotate(0deg); }
+  20%  { transform: translate3d(-86px, calc(var(--n) * -3.4px - 6px), 40px)
+                    rotate(calc(-5deg - var(--n) * 1.5deg)); }
+  44%  { transform: translate3d(-104px, calc(var(--n) * -3.9px - 10px), 58px)
+                    rotate(calc(-7deg - var(--n) * 2deg)); }
+  70%  { transform: translate3d(-28px, calc(var(--n) * -2.2px - 3px), 24px)
+                    rotate(calc(-2deg - var(--n) * 0.7deg)); }
+  100% { transform: translate3d(0, calc(var(--n) * -1px), calc(var(--n) * 0.8px)) rotate(0deg); }
+}
+@keyframes riffle-right {
+  0%   { transform: translate3d(0, calc(var(--n) * -1px), calc(var(--n) * 0.8px)) rotate(0deg); }
+  20%  { transform: translate3d(86px, calc(var(--n) * -3.4px - 6px), 40px)
+                    rotate(calc(5deg + var(--n) * 1.5deg)); }
+  44%  { transform: translate3d(104px, calc(var(--n) * -3.9px - 10px), 58px)
+                    rotate(calc(7deg + var(--n) * 2deg)); }
+  70%  { transform: translate3d(28px, calc(var(--n) * -2.2px - 3px), 24px)
+                    rotate(calc(2deg + var(--n) * 0.7deg)); }
+  100% { transform: translate3d(0, calc(var(--n) * -1px), calc(var(--n) * 0.8px)) rotate(0deg); }
+}
