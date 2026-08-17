@@ -1112,3 +1112,57 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
   .rb-params, .rb-effect, .rb-hint { margin-left: 0; }
   .rb-kw { width: auto; }
 }
+
+/* ============================================================
+   PHASE 3 — multiplayer surfaces
+   ============================================================ */
+
+.gc-actions { display: flex; gap: 8px; align-items: center; }
+
+/* --- seat setup --- */
+.seatsetup .panel { max-width: 680px; margin: 0 auto; }
+.seatlist { list-style: none; padding: 0; margin: 18px 0 6px; display: flex; flex-direction: column; gap: 8px; }
+.seatrow {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 10px 12px; border-radius: 10px; border: 1px solid var(--panel-brd); background: var(--panel);
+}
+.seatrow.local { border-color: rgba(22, 163, 74, 0.45); }
+.seatrow-n { font-family: var(--mono); font-size: 11px; color: var(--muted); width: 16px; }
+.seatrow-name { flex: 1 1 140px; min-width: 110px; }
+.seat-note { margin: 12px 0 0; font-size: 13px; line-height: 1.5; }
+
+/* --- pass-and-play hand-off --- */
+.handoff .modal-box { text-align: center; max-width: 420px; }
+.handoff-mark { font-size: 34px; margin-bottom: 6px; }
+
+/* --- takeback --- */
+.takeback-bar {
+  position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%); z-index: 60;
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap; justify-content: center;
+  padding: 12px 18px; border-radius: 14px; max-width: min(94vw, 560px);
+  background: var(--panel); border: 1px solid var(--green-d);
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.2); font-size: 14px;
+}
+.tb-actions { display: flex; gap: 8px; }
+
+/* --- move history --- */
+.modal-box.wide { max-width: 560px; width: min(94vw, 560px); }
+.movelist { list-style: none; padding: 0; margin: 10px 0 18px; max-height: 46vh; overflow-y: auto; text-align: left; }
+.movelist li { display: flex; gap: 10px; padding: 6px 4px; border-bottom: 1px solid var(--panel-brd); font-size: 13px; line-height: 1.4; }
+.movelist li:last-child { border-bottom: 0; }
+.ml-n { font-family: var(--mono); font-size: 11px; color: var(--muted); width: 24px; flex: 0 0 auto; text-align: right; }
+.ml-seat { font-weight: 600; flex: 0 0 auto; min-width: 70px; }
+.ml-text { color: var(--muted); }
+
+@media (max-width: 560px) {
+  .seatrow { gap: 6px; }
+  .seatrow-name { flex-basis: 100%; }
+}
+
+/* A status note is not a refusal — same shape, different weight. */
+.refused.info {
+  background: var(--panel); color: inherit; border-color: var(--green-d);
+}
+.refused.info .refused-mark {
+  background: var(--green-d); font-family: var(--mono); font-style: italic;
+}

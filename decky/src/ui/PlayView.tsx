@@ -5,6 +5,8 @@ import { SolitaireTable } from './SolitaireTable';
 import { ErrorBoundary } from './ErrorBoundary';
 import { GameHelp } from './GameHelp';
 import { resumableSession } from '../server/local';
+import { Seat } from '../server/matchService';
+import { SeatSetup } from './SeatSetup';
 import { GameDefinition } from '../engine/types';
 import { useTilt } from './useTilt';
 import { useSettings } from '../settings/SettingsContext';
@@ -16,6 +18,8 @@ export function PlayView() {
   const [seats, setSeats] = useState(settings.defaultSeats);
   const [resumable, setResumable] = useState<{ gameId: string; name: string } | null>(null);
   const [helpFor, setHelpFor] = useState<GameDefinition | null>(null);
+  const [plan, setPlan] = useState<Seat[] | null>(null);
+  const [setupFor, setSetupFor] = useState<GameDefinition | null>(null);
 
   // Offer to pick up an unfinished game rather than silently dropping it.
   useEffect(() => {
@@ -25,14 +29,26 @@ export function PlayView() {
     if (def) setResumable({ gameId: saved.gameId, name: def.meta.name });
   }, []);
 
+  if (setupFor) {
+    return (
+      <SeatSetup
+        def={setupFor}
+        defaultSeats={Math.min(Math.max(settings.defaultSeats, setupFor.meta.players.min), setupFor.meta.players.max)}
+        defaultName={settings.playerName}
+        onCancel={() => setSetupFor(null)}
+        onStart={(seatPlan) => { setPlan(seatPlan); setSeats(seatPlan.length); setGame(setupFor); setSetupFor(null); }}
+      />
+    );
+  }
+
   if (game) {
     return (
       <div>
         <div className="crumbs">
-          <button className="ghost" onClick={() => setGame(null)}>← All games</button>
+          <button className="ghost" onClick={() => { setGame(null); setPlan(null); }}>← All games</button>
           <span className="crumb-title">{game.meta.name}</span>
           <button className="ghost sm" onClick={() => setHelpFor(game)}>Rules</button>
-          {!game.solitaire && (
+          {!game.solitaire && !plan && (
             <div className="seat-control">
               <span>Seats</span>
               {[2, 3, 4, 5, 6].map((n) => (
@@ -44,7 +60,9 @@ export function PlayView() {
           )}
         </div>
         <ErrorBoundary label={game.meta.name}>
-          {game.solitaire ? <SolitaireTable def={game} /> : <Table def={game} seats={seats} />}
+          {game.solitaire
+            ? <SolitaireTable def={game} />
+            : <Table def={game} seats={seats} plan={plan ?? undefined} />}
         </ErrorBoundary>
         {helpFor && <GameHelp def={helpFor} onClose={() => setHelpFor(null)} />}
       </div>
@@ -71,14 +89,18 @@ export function PlayView() {
       </div>
       <div className="cards-grid">
         {catalog.map((g) => (
-          <GameCard key={g.meta.id} game={g} onPlay={() => { setSeats(Math.min(Math.max(settings.defaultSeats, g.meta.players.min), g.meta.players.max)); setGame(g); }} />
+          <GameCard key={g.meta.id} game={g}
+            onPlay={() => { setPlan(null); setSeats(Math.min(Math.max(settings.defaultSeats, g.meta.players.min), g.meta.players.max)); setGame(g); }}
+            onSetup={g.solitaire ? undefined : () => setSetupFor(g)} />
         ))}
       </div>
     </div>
   );
 }
 
-function GameCard({ game, onPlay }: { game: GameDefinition; onPlay: () => void }) {
+function GameCard({ game, onPlay, onSetup }: {
+  game: GameDefinition; onPlay: () => void; onSetup?: () => void;
+}) {
   const { ref, onMouseMove, onMouseLeave } = useTilt(10);
   return (
     <div className="game-card glass" ref={ref} onMouseMove={onMouseMove} onMouseLeave={onMouseLeave}>
@@ -90,7 +112,10 @@ function GameCard({ game, onPlay }: { game: GameDefinition; onPlay: () => void }
       <p>{game.meta.description}</p>
       <div className="game-card-foot">
         <span className="players">{game.meta.players.min}–{game.meta.players.max} players</span>
-        <button className="primary sm" onClick={onPlay}>Play solo →</button>
+        <div className="gc-actions">
+          {onSetup && <button className="ghost sm" onClick={onSetup}>Set up table</button>}
+          <button className="primary sm" onClick={onPlay}>Play solo →</button>
+        </div>
       </div>
     </div>
   );

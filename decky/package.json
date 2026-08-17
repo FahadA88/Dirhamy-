@@ -11,12 +11,15 @@
     "validate": "tsx scripts/validate.ts",
     "mechanics": "tsx scripts/mechanics.ts",
     "phase1": "tsx scripts/phase1.ts",
-    "test": "tsx scripts/selftest.ts && tsx scripts/validate.ts && tsx scripts/mechanics.ts && tsx scripts/phase1.ts && tsx scripts/phase2.ts",
+    "test": "tsx scripts/selftest.ts && tsx scripts/validate.ts && tsx scripts/mechanics.ts && tsx scripts/phase1.ts && tsx scripts/phase2.ts && tsx scripts/phase3.ts",
     "typecheck": "tsc --noEmit",
     "smoke": "node scripts/browser/smoke.mjs",
     "verify:ui": "node scripts/browser/verify.mjs",
     "phase2": "tsx scripts/phase2.ts",
-    "verify:builder": "node scripts/browser/builder.mjs"
+    "verify:builder": "node scripts/browser/builder.mjs",
+    "phase3": "tsx scripts/phase3.ts",
+    "host": "tsx scripts/host.ts",
+    "verify:mp": "node scripts/browser/multiplayer.mjs"
   },
   "dependencies": {
     "react": "^18.3.1",
@@ -26,10 +29,12 @@
     "@types/node": "^26.2.0",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
+    "@types/ws": "^8.18.1",
     "@vitejs/plugin-react": "^4.3.4",
     "playwright": "^1.62.1",
     "tsx": "^4.19.2",
     "typescript": "^5.6.3",
-    "vite": "^5.4.11"
+    "vite": "^5.4.11",
+    "ws": "^8.21.3"
   }
 }

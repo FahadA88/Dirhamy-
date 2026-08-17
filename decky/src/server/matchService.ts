@@ -26,15 +26,44 @@ import { chooseSolitaireMove, positionKey } from '../bots/solitaireBot';
 // guarantee arrives with the network hop.
 // ---------------------------------------------------------------------------
 
+/**
+ * Who is sitting where.
+ *
+ * A seat is not a person — it is a place at the table with a kind. That distinction is what lets
+ * one match be pass-and-play, single-player-versus-bots, an async game with three people in
+ * three time zones, or any mixture, without the engine or the rules knowing the difference.
+ */
+export interface Seat {
+  id: string;                 // the player id the engine knows, e.g. 'P1'
+  name: string;               // what people see
+  kind: 'local' | 'remote' | 'bot';
+  difficulty?: 'smart' | 'random';   // bots only
+  connected?: boolean;        // remote seats: are they here right now
+  lastSeen?: number;
+}
+
+/** One resolved move, kept for the history panel and for takebacks. */
+export interface MoveRecord {
+  n: number;
+  seat: string;
+  move: Move;
+  at: number;
+  text: string;               // the log line this move produced, for a readable history
+}
+
 export interface MatchSummary {
   matchId: string;
   gameId: string;
   fingerprint: string;
   players: string[];
+  seats: Seat[];
   handNumber: number;
   phase: MatchState['phase'];
   matchOver: boolean;
   fair: FairCommit;
+  /** Seats that owe a move right now — the basis of every "your turn" indicator. */
+  waitingOn: string[];
+  inviteCode: string;
 }
 
 export interface MoveResult {
@@ -56,9 +85,25 @@ export interface MatchRecord {
   handSeeds: number[];
   botSeed: number;
   createdAt: number;
+  seats: Seat[];
+  inviteCode: string;
+  moves: MoveRecord[];
+  takeback: TakebackRequest | null;
   // Prior states, for undo. Only kept where taking a move back can't reveal anything an
-  // opponent has since acted on — patience, which has no opponents. Never persisted.
+  // opponent has since acted on — patience, and a takeback everyone has agreed to.
   history: MatchState[];
+}
+
+/**
+ * A takeback in a game with opponents is a rules event, not a UI affordance: it rewinds
+ * information other people have already seen. So it is asked for, and everyone else has to say
+ * yes. One outstanding request at a time.
+ */
+export interface TakebackRequest {
+  by: string;
+  needed: string[];
+  agreed: string[];
+  at: number;
 }
 
 const UNDO_LIMIT = 400;
@@ -93,13 +138,16 @@ export class MatchService {
   create(
     rawDefinition: unknown,
     gameId: string,
-    players: string[],
+    // Either bare player ids (one local human at P1, bots elsewhere) or a full seating plan.
+    players: string[] | Seat[],
     clientSeed?: string,
     // A host with its own CSPRNG (or a test that needs determinism) may supply the secret.
     injectedServerSeed?: string,
   ): MatchSummary {
     const { definition } = migrate(rawDefinition);
     const pinned = pinDefinition(definition);
+    const seats = normaliseSeats(players);
+    const ids = seats.map((s) => s.id);
 
     const serverSeed = injectedServerSeed ?? newServerSeed();
     const seed0 = clientSeed ?? newClientSeed();
@@ -111,7 +159,7 @@ export class MatchService {
       gameId,
       definition: pinned,
       fingerprint: definitionFingerprint(pinned),
-      state: createMatch(pinned, players, handSeed),
+      state: createMatch(pinned, ids, handSeed),
       serverSeed,
       commit: commitTo(serverSeed),
       clientSeed: seed0,
@@ -119,6 +167,10 @@ export class MatchService {
       handSeeds: [handSeed],
       botSeed: (handSeed ^ 0x9e3779b9) >>> 0,
       createdAt: Date.now(),
+      seats,
+      inviteCode: newInviteCode(),
+      moves: [],
+      takeback: null,
       history: [],
     };
     this.store.set(rec.matchId, rec);
@@ -161,9 +213,107 @@ export class MatchService {
     }
 
     this.remember(rec);
+    const before = rec.state.log.length;
     rec.state = applyMove(rec.state, playerId, match);
+    this.recordMove(rec, playerId, match, before);
     this.store.set(matchId, rec);
     return { ok: true, view: redact(rec.state, playerId) };
+  }
+
+  /** The move history, as sentences. Safe to show anyone — it is the public record of the hand. */
+  history(matchId: string, limit = 100): MoveRecord[] {
+    const rec = this.require(matchId);
+    return rec.moves.slice(-limit);
+  }
+
+  /** The seating plan. Names and kinds only; never a hand. */
+  seats(matchId: string): Seat[] {
+    return this.require(matchId).seats.map((s) => ({ ...s }));
+  }
+
+  /** Mark a remote seat present. Async play needs to know who is actually here. */
+  touch(matchId: string, playerId: string, connected = true): void {
+    const rec = this.require(matchId);
+    const seat = rec.seats.find((s) => s.id === playerId);
+    if (!seat) return;
+    seat.connected = connected;
+    seat.lastSeen = Date.now();
+    this.store.set(matchId, rec);
+  }
+
+  /** Rename a seat, or hand it to a bot when somebody drops out. */
+  setSeat(matchId: string, playerId: string, patch: Partial<Omit<Seat, 'id'>>): Seat[] {
+    const rec = this.require(matchId);
+    const seat = rec.seats.find((s) => s.id === playerId);
+    if (seat) Object.assign(seat, patch);
+    this.store.set(matchId, rec);
+    return this.seats(matchId);
+  }
+
+  // ----- takeback, by consent -----
+
+  /**
+   * Ask to take a move back. Everyone else at the table who is a person has to agree, because
+   * an undo rewinds information they have already acted on.
+   */
+  requestTakeback(matchId: string, playerId: string): TakebackRequest | null {
+    const rec = this.require(matchId);
+    this.requireSeat(rec, playerId);
+    if (rec.history.length === 0) return null;
+    const others = rec.seats.filter((s) => s.kind !== 'bot' && s.id !== playerId).map((s) => s.id);
+    rec.takeback = { by: playerId, needed: others, agreed: [], at: Date.now() };
+    this.store.set(matchId, rec);
+    // A table of one human and bots needs nobody's permission; resolve it straight away.
+    if (others.length === 0) { this.applyTakeback(rec); return null; }
+    return { ...rec.takeback };
+  }
+
+  agreeTakeback(matchId: string, playerId: string): { pending: TakebackRequest | null; applied: boolean } {
+    const rec = this.require(matchId);
+    const req = rec.takeback;
+    if (!req || !req.needed.includes(playerId) || req.agreed.includes(playerId)) {
+      return { pending: req ? { ...req } : null, applied: false };
+    }
+    req.agreed.push(playerId);
+    if (req.agreed.length < req.needed.length) {
+      this.store.set(matchId, rec);
+      return { pending: { ...req }, applied: false };
+    }
+    this.applyTakeback(rec);
+    this.store.set(matchId, rec);
+    return { pending: null, applied: true };
+  }
+
+  declineTakeback(matchId: string): void {
+    const rec = this.require(matchId);
+    rec.takeback = null;
+    this.store.set(matchId, rec);
+  }
+
+  pendingTakeback(matchId: string): TakebackRequest | null {
+    const t = this.require(matchId).takeback;
+    return t ? { ...t } : null;
+  }
+
+  private applyTakeback(rec: MatchRecord): void {
+    const prev = rec.history.pop();
+    if (prev) {
+      rec.state = prev;
+      rec.moves.pop();
+      log(rec, 'The table agreed to take that move back.');
+    }
+    rec.takeback = null;
+  }
+
+  /**
+   * The table as somebody who is NOT playing may see it: no hands at all, just the public board.
+   * Spectating has to be a different call, not a view with a flag, so there is no way to leak a
+   * hand by passing the wrong id.
+   */
+  spectate(matchId: string): RedactedState {
+    const rec = this.require(matchId);
+    // Redacting for a name nobody holds gives exactly the public position.
+    return redact(rec.state, '__spectator__');
   }
 
   /**
@@ -173,7 +323,7 @@ export class MatchService {
    */
   canUndo(matchId: string): boolean {
     const rec = this.require(matchId);
-    return rec.history.length > 0;
+    return !!rec.definition.solitaire && rec.history.length > 0;
   }
 
   undo(matchId: string, playerId: string): MoveResult {
@@ -213,6 +363,8 @@ export class MatchService {
     rec.handSeeds.push(handSeed);
     rec.state = nextHand(rec.state, handSeed);
     rec.history = [];
+    rec.moves = [];
+    rec.takeback = null;
     this.store.set(matchId, rec);
     return this.summary(rec);
   }
@@ -237,16 +389,20 @@ export class MatchService {
    * table from inside the boundary — the client never receives a bot's hand in order to move it,
    * which is the other half of not leaking hidden information.
    */
-  botStep(matchId: string, humanSeats: string[], difficulty: 'smart' | 'random' = 'smart'):
+  botStep(matchId: string, humanSeats?: string[], difficulty: 'smart' | 'random' = 'smart'):
     { moved: boolean; seat?: string; view: RedactedState } {
     const rec = this.require(matchId);
-    const viewer = humanSeats[0] ?? rec.state.players[0];
+    // The seat table is the authority on who is a bot; the humanSeats argument stays supported
+    // for callers that predate seats.
+    const humans = humanSeats ?? rec.seats.filter((s) => s.kind !== 'bot').map((s) => s.id);
+    const viewer = humans[0] ?? rec.state.players[0];
     if (rec.state.phase !== 'playing') return { moved: false, view: redact(rec.state, viewer) };
 
-    const seat = actingPlayers(rec.state).find((p) => !humanSeats.includes(p));
+    const seat = actingPlayers(rec.state).find((p) => !humans.includes(p));
     if (!seat) return { moved: false, view: redact(rec.state, viewer) };
 
-    const r = chooseMove(rec.state, seat, rec.botSeed, difficulty);
+    const seatDiff = rec.seats.find((s) => s.id === seat)?.difficulty ?? difficulty;
+    const r = chooseMove(rec.state, seat, rec.botSeed, seatDiff);
     rec.botSeed = r.botSeed;
     // A bot goes through exactly the same validation as a person.
     const allowed = legalMoves(rec.state, seat);
@@ -254,7 +410,9 @@ export class MatchService {
     if (!picked) return { moved: false, view: redact(rec.state, viewer) };
 
     this.remember(rec);
+    const before = rec.state.log.length;
     rec.state = applyMove(rec.state, seat, picked);
+    this.recordMove(rec, seat, picked, before);
     this.store.set(matchId, rec);
     return { moved: true, seat, view: redact(rec.state, viewer) };
   }
@@ -280,18 +438,37 @@ export class MatchService {
       gameId: rec.gameId,
       fingerprint: rec.fingerprint,
       players: rec.state.players.slice(),
+      seats: rec.seats.map((s) => ({ ...s })),
       handNumber: rec.state.handNumber,
       phase: rec.state.phase,
       matchOver: rec.state.matchOver,
       fair: { commit: rec.commit, clientSeed: rec.clientSeed, nonce: rec.nonce },
+      waitingOn: rec.state.phase === 'playing' ? actingPlayers(rec.state) : [],
+      inviteCode: rec.inviteCode,
     };
   }
 
-  /** Snapshot the position before a move, where the game allows taking one back. */
+  /**
+   * Snapshot the position before a move. Patience keeps a deep stack for free undo; a table with
+   * opponents keeps a shallow one, because the only thing it can serve is a takeback the whole
+   * table agreed to, and that is always the most recent move.
+   */
   private remember(rec: MatchRecord): void {
-    if (!rec.definition.solitaire) return;
+    const limit = rec.definition.solitaire ? UNDO_LIMIT : 1;
     rec.history.push(rec.state);
-    if (rec.history.length > UNDO_LIMIT) rec.history.shift();
+    while (rec.history.length > limit) rec.history.shift();
+  }
+
+  private recordMove(rec: MatchRecord, seat: string, move: Move, logLenBefore: number): void {
+    const added = rec.state.log.slice(logLenBefore);
+    rec.moves.push({
+      n: rec.moves.length + 1,
+      seat,
+      move,
+      at: Date.now(),
+      text: added.length > 0 ? added.map((l) => l.text).join(' ') : describeMove(move),
+    });
+    if (rec.moves.length > 500) rec.moves.shift();
   }
 
   private require(matchId: string): MatchRecord {
@@ -305,6 +482,36 @@ export class MatchService {
       throw new Error(`${playerId} is not seated at this match.`);
     }
   }
+}
+
+/** Accept either bare ids or a full seating plan, so old callers keep working. */
+function normaliseSeats(players: string[] | Seat[]): Seat[] {
+  if (players.length === 0) throw new Error('A match needs at least one seat.');
+  if (typeof players[0] === 'string') {
+    return (players as string[]).map((id, i) => ({
+      id,
+      name: i === 0 ? 'You' : `Bot ${i + 1}`,
+      kind: i === 0 ? 'local' : 'bot',
+      difficulty: 'smart' as const,
+    }));
+  }
+  return (players as Seat[]).map((s) => ({ ...s }));
+}
+
+/** Short, unambiguous, easy to read down a phone line. No 0/O or 1/I. */
+function newInviteCode(): string {
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let out = '';
+  for (let i = 0; i < 6; i++) out += alphabet[Math.floor(Math.random() * alphabet.length)];
+  return out;
+}
+
+function log(rec: MatchRecord, text: string): void {
+  rec.state.log.push({ t: rec.state.log.length, player: null, text });
+}
+
+function describeMove(move: Move): string {
+  return move.cardId ? `${move.actionId} ${move.cardId}` : move.actionId;
 }
 
 function sameMove(a: Move, b: Move): boolean {

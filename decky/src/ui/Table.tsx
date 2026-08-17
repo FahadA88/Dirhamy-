@@ -7,6 +7,7 @@ import { useSettings } from '../settings/SettingsContext';
 import { BOT_SPEED_MS } from '../settings/settings';
 import { playSound } from './sound';
 import { service, rememberSession, forgetSession, resumableSession } from '../server/local';
+import { Seat, MoveRecord } from '../server/matchService';
 
 // This component holds a match id and a redacted view — never a MatchState. Every move it wants
 // to make goes to the service as an intent; the service decides, and hands back the board as
@@ -18,24 +19,46 @@ const SUIT_ORDER: Record<string, number> = { S: 0, H: 1, C: 2, D: 3, JOKER: 4 };
 const SUIT_NAMES: Record<string, string> = { C: 'Clubs', D: 'Diamonds', H: 'Hearts', S: 'Spades' };
 const SHAPE_NAME: Record<number, string> = { 1: 'single', 2: 'pair', 3: 'triple', 4: 'four', 5: 'five' };
 
-export function Table({ def, seats = 3 }: { def: GameDefinition; seats?: number }) {
+export function Table({ def, seats = 3, plan }: {
+  def: GameDefinition;
+  seats?: number;
+  /** Who is sitting where. Omitted means the classic single human against bots. */
+  plan?: Seat[];
+}) {
   const { settings } = useSettings();
-  const players = useMemo(() => Array.from({ length: seats }, (_, i) => `P${i + 1}`), [seats]);
-  const [board, setBoard] = useState<Board>(() => boot(def, players, false));
-  const [refused, setRefused] = useState<string | null>(null);
+  const players = useMemo(
+    () => plan ?? Array.from({ length: seats }, (_, i) => `P${i + 1}`),
+    [seats, plan],
+  );
+  // Which local seat is looking at the screen. With one human this never changes; with
+  // pass-and-play it follows whoever is owed a move, behind a hand-off screen so the next
+  // player doesn't see the last one's cards.
+  const localSeats = useMemo(
+    () => (plan ? plan.filter((s) => s.kind === 'local').map((s) => s.id) : [HUMAN]),
+    [plan],
+  );
+  const [me, setMe] = useState(localSeats[0] ?? HUMAN);
+  const [handoff, setHandoff] = useState<string | null>(null);
+  const [showHistory, setShowHistory] = useState(false);
+  const [history, setHistory] = useState<MoveRecord[]>([]);
+  const [board, setBoard] = useState<Board>(() => boot(def, players, localSeats[0] ?? HUMAN, false));
+  // One toast, two tones: a refusal is a red ✕, a status note is not.
+  const [toast, setToast] = useState<{ text: string; tone: 'bad' | 'info' } | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [askRank, setAskRank] = useState<string | null>(null);
 
   const { matchId, view } = board;
+  const passAndPlay = localSeats.length > 1;
   const myLegal = board.legal;
 
   function deal(fresh: boolean) {
     setSelected(null);
     setAskRank(null);
-    setRefused(null);
+    setToast(null);
     // Don't leave the abandoned match sitting in the store.
     if (fresh) { try { service.end(matchId); } catch { /* already gone */ } }
-    setBoard(boot(def, players, fresh));
+    setBoard(boot(def, players, localSeats[0] ?? HUMAN, fresh));
+    setMe(localSeats[0] ?? HUMAN);
   }
 
   // Re-deal when the game or the seat count changes — but not on the first render, which the
@@ -82,7 +105,7 @@ export function Table({ def, seats = 3 }: { def: GameDefinition; seats?: number 
   );
   const bombMoves = useMemo(() => myLegal.filter((m) => m.actionId === 'climbBomb'), [myLegal]);
   const canDeclineBomb = myLegal.some((m) => m.actionId === 'climbNoBomb');
-  const isInterrupt = isClimb && view.isYourTurn && !view.players.find((p) => p.id === HUMAN)?.isTurn;
+  const isInterrupt = isClimb && view.isYourTurn && !view.players.find((p) => p.id === me)?.isTurn;
   const rankOfId = (id: string) => view.hand.find((c) => c.id === id)?.rank ?? '?';
   const auctionMoves = useMemo(
     () => myLegal.filter((m) => m.actionId === 'orderUp' || m.actionId === 'nameTrump'),
@@ -93,7 +116,7 @@ export function Table({ def, seats = 3 }: { def: GameDefinition; seats?: number 
   const layOffMoves = useMemo(() => myLegal.filter((m) => m.actionId === 'layOff'), [myLegal]);
   const discardMoves = useMemo(() => myLegal.filter((m) => m.actionId === 'dealerDiscard'), [myLegal]);
   const canFlip = myLegal.some((m) => m.actionId === 'warFlip');
-  const myPile = view.players.find((p) => p.id === HUMAN)?.handCount ?? 0;
+  const myPile = view.players.find((p) => p.id === me)?.handCount ?? 0;
   const playActionId = view.needsPassChoice ? 'choosePass'
     : discardMoves.length > 0 ? 'dealerDiscard'
     : view.mode === 'trick' ? 'playToTrick' : view.mode === 'climb' ? 'climbPlay' : isRummy ? 'rummyDiscard' : 'playCard';
@@ -104,14 +127,47 @@ export function Table({ def, seats = 3 }: { def: GameDefinition; seats?: number 
   // one per tick cascades through all of them.
   useEffect(() => {
     if (view.phase !== 'playing') return;
-    const waiting = service.pending(matchId).some((p) => p !== HUMAN);
+    const waiting = service.pending(matchId).some((p) => !localSeats.includes(p));
     if (!waiting) return;
     const timer = setTimeout(() => {
-      const r = service.botStep(matchId, [HUMAN], settings.botDiff);
-      if (r.moved) setBoard(read(matchId));
+      const r = service.botStep(matchId, localSeats, settings.botDiff);
+      if (r.moved) setBoard(read(matchId, me));
     }, BOT_SPEED_MS[settings.botSpeed]);
     return () => clearTimeout(timer);
-  }, [board, matchId, view.phase, settings.botSpeed, settings.botDiff]);
+  }, [board, matchId, me, localSeats, view.phase, settings.botSpeed, settings.botDiff]);
+
+  // Pass-and-play: when the table is waiting on a different local seat, put a hand-off screen up
+  // rather than swapping the cards under the person still looking at them.
+  useEffect(() => {
+    if (!passAndPlay || view.phase !== 'playing' || handoff) return;
+    const waiting = service.pending(matchId).filter((p) => localSeats.includes(p));
+    if (waiting.length === 0 || waiting.includes(me)) return;
+    setHandoff(waiting[0]);
+  }, [board, passAndPlay, view.phase, handoff, matchId, me, localSeats]);
+
+  function takeSeat(seat: string) {
+    setHandoff(null);
+    setSelected(null);
+    setAskRank(null);
+    setMe(seat);
+    setBoard(read(matchId, seat));
+  }
+
+  function openHistory() {
+    setHistory(service.history(matchId));
+    setShowHistory(true);
+  }
+
+  function askTakeback() {
+    const req = service.requestTakeback(matchId, me);
+    setBoard(read(matchId, me));
+    setToast(req
+      ? { text: `Asked the table to take that back — waiting on ${req.needed.length}.`, tone: 'info' }
+      : { text: 'Move taken back.', tone: 'info' });
+  }
+
+  const takeback = view.phase === 'playing' ? service.pendingTakeback(matchId) : null;
+  const nameOfSeat = (id: string) => plan?.find((s) => s.id === id)?.name ?? id;
 
   // Win sound.
   const prevPhase = useRef(view.phase);
@@ -124,17 +180,17 @@ export function Table({ def, seats = 3 }: { def: GameDefinition; seats?: number 
     // Guarded because the button can be hit twice before the modal unmounts; the second call
     // finds the hand already dealt and would otherwise throw out of an event handler.
     try { service.nextHand(matchId); } catch { /* already dealt */ }
-    setBoard(read(matchId));
+    setBoard(read(matchId, me));
     setSelected(null);
     setAskRank(null);
-    setRefused(null);
+    setToast(null);
   }
 
   function submit(move: Move) {
-    const res = service.submit(matchId, HUMAN, move);
+    const res = service.submit(matchId, me, move);
     if (!res.ok) {
       // The rules said no. Say why, instead of letting the tap disappear.
-      setRefused(res.reason ?? 'That move is not legal here.');
+      setToast({ text: res.reason ?? 'That move is not legal here.', tone: 'bad' });
       playSound('ui', settings.sound);
       setSelected(null);
       return;
@@ -142,18 +198,18 @@ export function Table({ def, seats = 3 }: { def: GameDefinition; seats?: number 
     if (move.actionId === 'playCard' || move.actionId === 'playToTrick' || move.actionId === 'climbPlay' || move.actionId === 'climbBomb') playSound('play', settings.sound);
     if (move.actionId === 'drawCard' || move.actionId === 'fishDraw') playSound('draw', settings.sound);
     if (move.actionId === 'ask') playSound('ui', settings.sound);
-    setRefused(null);
+    setToast(null);
     setSelected(null);
     setAskRank(null);
-    setBoard(read(matchId));
+    setBoard(read(matchId, me));
   }
 
-  // A refusal is a nudge, not a state to live in.
+  // A toast is a nudge, not a state to live in.
   useEffect(() => {
-    if (!refused) return;
-    const t = setTimeout(() => setRefused(null), 3200);
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 3600);
     return () => clearTimeout(t);
-  }, [refused]);
+  }, [toast]);
 
   function clickCard(id: string) {
     if (!playableCardIds.has(id)) return;
@@ -166,8 +222,12 @@ export function Table({ def, seats = 3 }: { def: GameDefinition; seats?: number 
   const hand = useMemo(() => sortHand(view.hand, def, settings.sort), [view.hand, def, settings.sort]);
   const top = view.zones.discard?.cards[0];
   const activeSuit = view.vars.activeSuit;
-  const suitPickerOpen = !!view.pendingChoice && view.pendingChoice.player === HUMAN;
-  const nameOf = (id: string) => (id === HUMAN ? settings.playerName : settings.botLabels ? `Bot ${id.slice(1)}` : id);
+  const suitPickerOpen = !!view.pendingChoice && view.pendingChoice.player === me;
+  const nameOf = (id: string) => {
+    const seat = plan?.find((s) => s.id === id);
+    if (seat) return seat.id === me ? `${seat.name} (you)` : seat.name;
+    return id === me ? settings.playerName : settings.botLabels ? `Bot ${id.slice(1)}` : id;
+  };
   const teamOf = (id: string): string | null => {
     if (!view.teams) return null;
     const i = view.teams.findIndex((t) => t.includes(id));
@@ -187,7 +247,7 @@ export function Table({ def, seats = 3 }: { def: GameDefinition; seats?: number 
           <span className="match-hand">Hand {view.handNumber} · race to {view.matchTarget}{view.matchBust != null ? ` (bust at ${view.matchBust})` : ''}</span>
           <div className="match-chips">
             {view.players.map((p) => (
-              <span key={p.id} className={`match-chip ${p.id === HUMAN ? 'you' : ''}`}>
+              <span key={p.id} className={`match-chip ${p.id === me ? 'you' : ''}`}>
                 {nameOf(p.id)} <b>{view.matchScores?.[p.id] ?? 0}</b>
               </span>
             ))}
@@ -195,7 +255,7 @@ export function Table({ def, seats = 3 }: { def: GameDefinition; seats?: number 
         </div>
       )}
       <div className="opponents">
-        {view.players.filter((p) => p.id !== HUMAN).map((p) => {
+        {view.players.filter((p) => p.id !== me).map((p) => {
           const askable = isFish && view.isYourTurn && !!askRank && p.handCount > 0;
           return (
             <div key={p.id}
@@ -358,7 +418,7 @@ export function Table({ def, seats = 3 }: { def: GameDefinition; seats?: number 
 
       <div className={`you ${view.isYourTurn ? 'your-turn' : ''}`}>
         <div className="you-head">
-          <span>{settings.playerName === 'You' ? 'Your hand' : `${settings.playerName}’s hand`}{view.mode === 'trick' ? ` · ${view.tricksWon?.[HUMAN] ?? 0} tricks` : ''}{view.mode === 'trick' && view.bids?.[HUMAN] !== undefined ? ` · bid ${view.bids[HUMAN]}` : ''}{isFish ? ` · ${view.booksWon?.[HUMAN] ?? 0} books` : ''}{teamOf(HUMAN) ? ` · ${teamOf(HUMAN)}` : ''}</span>
+          <span>{settings.playerName === 'You' ? 'Your hand' : `${settings.playerName}’s hand`}{view.mode === 'trick' ? ` · ${view.tricksWon?.[me] ?? 0} tricks` : ''}{view.mode === 'trick' && view.bids?.[me] !== undefined ? ` · bid ${view.bids[HUMAN]}` : ''}{isFish ? ` · ${view.booksWon?.[me] ?? 0} books` : ''}{teamOf(me) ? ` · ${teamOf(me)}` : ''}</span>
           {view.needsPassChoice && (
             <span className="turn-badge">
               {view.passCount > 1
@@ -401,6 +461,10 @@ export function Table({ def, seats = 3 }: { def: GameDefinition; seats?: number 
             </button>
           ))}
           {isRummy && view.rummyPhase === 'play' && view.isYourTurn && <span className="rummy-hint">tap a card to discard</span>}
+          <button className="restart-btn" onClick={openHistory} title="Every move so far">History</button>
+          {view.phase === 'playing' && !takeback && (
+            <button className="restart-btn" onClick={askTakeback} title="Ask the table to take your last move back">Take back</button>
+          )}
           <button className="restart-btn" onClick={restart} title="Deal a fresh game">Restart</button>
         </div>
         {isWar ? (
@@ -446,7 +510,7 @@ export function Table({ def, seats = 3 }: { def: GameDefinition; seats?: number 
       {view.phase === 'roundOver' && !view.matchOver && (
         <div className="modal">
           <div className="modal-box">
-            <h3>{view.winner === HUMAN ? '🎉 You win this hand!' : `${nameOf(view.winner || '')} wins this hand`}</h3>
+            <h3>{view.winner === me ? '🎉 You win this hand!' : `${nameOf(view.winner || '')} wins this hand`}</h3>
             <p className="scores">
               {Object.entries(view.scores).map(([p, s]) => (<span key={p}>{nameOf(p)}: +{s}&nbsp;&nbsp;</span>))}
             </p>
@@ -470,7 +534,7 @@ export function Table({ def, seats = 3 }: { def: GameDefinition; seats?: number 
       {view.phase === 'roundOver' && view.matchOver && (
         <div className="modal">
           <div className="modal-box">
-            <h3>{view.matchWinner === HUMAN ? '🏆 You win the match!' : view.winner === HUMAN ? '🎉 You win!' : `${nameOf(view.matchWinner ?? view.winner ?? '')} wins${view.matchTarget != null ? ' the match' : ''}`}</h3>
+            <h3>{view.matchWinner === me ? '🏆 You win the match!' : view.winner === me ? '🎉 You win!' : `${nameOf(view.matchWinner ?? view.winner ?? '')} wins${view.matchTarget != null ? ' the match' : ''}`}</h3>
             <p className="scores">
               {Object.entries(view.matchTarget != null ? (view.matchScores ?? view.scores) : view.scores).map(([p, s]) => (
                 <span key={p}>{nameOf(p)}: {s} pts&nbsp;&nbsp;</span>
@@ -485,9 +549,53 @@ export function Table({ def, seats = 3 }: { def: GameDefinition; seats?: number 
       </div>
     </div>
 
-      {refused && (
-        <div className="refused" role="alert">
-          <span className="refused-mark">✕</span>{refused}
+      {handoff && (
+        <div className="modal handoff">
+          <div className="modal-box">
+            <div className="handoff-mark">🃏</div>
+            <h3>Pass the device to {nameOfSeat(handoff)}</h3>
+            <p className="scores">Everyone else, look away — their hand is about to be dealt onto the screen.</p>
+            <button className="primary" onClick={() => takeSeat(handoff)}>
+              I'm {nameOfSeat(handoff)} — show my hand
+            </button>
+          </div>
+        </div>
+      )}
+
+      {takeback && takeback.needed.includes(me) && (
+        <div className="takeback-bar" role="alert">
+          <span>{nameOfSeat(takeback.by)} wants to take their last move back.</span>
+          <div className="tb-actions">
+            <button className="ghost sm" onClick={() => { service.declineTakeback(matchId); setBoard(read(matchId, me)); }}>No</button>
+            <button className="primary sm" onClick={() => { service.agreeTakeback(matchId, me); setBoard(read(matchId, me)); }}>
+              Allow it ({takeback.agreed.length}/{takeback.needed.length})
+            </button>
+          </div>
+        </div>
+      )}
+
+      {showHistory && (
+        <div className="modal" onClick={() => setShowHistory(false)}>
+          <div className="modal-box wide" onClick={(e) => e.stopPropagation()}>
+            <h3>Move history</h3>
+            <ol className="movelist">
+              {history.length === 0 && <li className="muted">Nothing has happened yet.</li>}
+              {history.map((h) => (
+                <li key={h.n}>
+                  <span className="ml-n">{h.n}</span>
+                  <span className="ml-seat">{nameOfSeat(h.seat)}</span>
+                  <span className="ml-text">{h.text}</span>
+                </li>
+              ))}
+            </ol>
+            <button className="primary" onClick={() => setShowHistory(false)}>Close</button>
+          </div>
+        </div>
+      )}
+
+      {toast && (
+        <div className={`refused ${toast.tone}`} role="alert">
+          <span className="refused-mark">{toast.tone === 'bad' ? '✕' : 'i'}</span>{toast.text}
         </div>
       )}
 
@@ -513,21 +621,21 @@ interface Board {
   legal: Move[];
 }
 
-function read(matchId: string): Board {
-  const view = service.view(matchId, HUMAN);
-  return { matchId, view, legal: view.isYourTurn ? service.legal(matchId, HUMAN) : [] };
+function read(matchId: string, me: string): Board {
+  const view = service.view(matchId, me);
+  return { matchId, view, legal: view.isYourTurn ? service.legal(matchId, me) : [] };
 }
 
-function boot(def: GameDefinition, players: string[], fresh: boolean): Board {
+function boot(def: GameDefinition, players: string[] | Seat[], me: string, fresh: boolean): Board {
   if (!fresh) {
     const resume = resumableSession();
     if (resume && resume.gameId === def.meta.id && resume.seats === players.length) {
-      try { return read(resume.matchId); } catch { /* record went away; deal a new one */ }
+      try { return read(resume.matchId, me); } catch { /* record went away; deal a new one */ }
     }
   }
   const m = service.create(def, def.meta.id, players);
   rememberSession(m.matchId, def.meta.id, players.length);
-  return read(m.matchId);
+  return read(m.matchId, me);
 }
 
 function sortHand(hand: Card[], def: GameDefinition, mode: 'off' | 'rank' | 'suit'): Card[] {
