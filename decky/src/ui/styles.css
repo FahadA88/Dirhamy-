@@ -2875,3 +2875,157 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
 .felt .modal-box, .felt .modal-box .ms-row, .felt .modal-box .seat-name { color: var(--ink); }
 .felt .modal-box .ms-title { color: var(--oak); }
 .felt .modal-box .scores { color: var(--muted); }
+
+/* ============================================================
+   NAVIGATION — five candidates, all live
+   Switch with ?nav=rail | centre | dock | plate. The default is
+   the top bar the site already had.
+   ============================================================ */
+
+/* Marks and the settings label are rendered per style rather than hidden with CSS — see the
+   note in SiteNav. Nothing here needs to switch them off. */
+
+/* --- 1. top bar (today) --- */
+.nav-bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 8px; }
+
+/* --- 2. side rail --- */
+/* A fixed column down the left. The page moves over to make room, which is what makes it read
+   as an application rather than a website with a menu. */
+.nav-is-rail.app { max-width: none; padding-left: 116px; }
+.nav-is-rail main { max-width: 1080px; margin: 0 auto; }
+.nav-rail {
+  position: fixed; top: 0; left: 0; bottom: 0; width: 96px; z-index: 20;
+  /* `justify-content` has to be stated: the base `header` rule sets space-between, which in a
+     column pins the brand to the top and shoves the items to the floor. */
+  display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 6px;
+  padding: 18px 8px;
+  background: linear-gradient(180deg, var(--panel-hi), var(--panel));
+  border-right: 1px solid var(--panel-brd);
+  box-shadow: 2px 0 18px rgba(58,44,20,.06);
+}
+.nav-rail .brand { flex-direction: column; gap: 6px; margin-bottom: 14px; }
+.nav-rail h1 { font-size: 12px; letter-spacing: 1.4px; }
+.nav-rail .nv-items { display: flex; flex-direction: column; gap: 4px; width: 100%; flex: 1 1 auto; }
+.nav-rail .nv-items button {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  width: 100%; padding: 11px 4px; border-radius: 12px; cursor: pointer;
+  font: inherit; font-size: 11px; color: var(--muted);
+  background: transparent; border: 1px solid transparent;
+  transition: background 140ms, color 140ms;
+}
+.nav-rail .nv-items button .nv-mark { font-size: 19px; line-height: 1; }
+.nav-rail .nv-items button:hover { background: var(--oak-dim); color: var(--ink); }
+.nav-rail .nv-items button.on {
+  background: var(--ink); color: var(--bg1); font-weight: 650;
+}
+.nav-rail .nv-settings { margin-top: auto; }
+
+/* --- 3. centred masthead --- */
+/* The brand on its own line with the navigation set under it between two rules. It reads as the
+   head of a printed page, which is the world this site is in. */
+.nav-centre {
+  display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 12px;
+  padding: 8px 0 0; margin-bottom: 20px;
+}
+.nav-centre .brand { flex-direction: column; gap: 8px; }
+.nav-centre h1 { font-size: 30px; letter-spacing: 2px; }
+.nav-centre .nv-items {
+  display: flex; align-items: center; gap: 28px;
+  width: 100%; justify-content: center;
+  padding: 11px 0; border-top: 1px solid var(--panel-brd); border-bottom: 1px solid var(--panel-brd);
+}
+.nav-centre .nv-items button {
+  padding: 2px 0; cursor: pointer; font: inherit; font-size: 14px;
+  letter-spacing: .04em; text-transform: uppercase;
+  background: none; border: 0; color: var(--muted);
+  border-bottom: 2px solid transparent;
+  transition: color 140ms, border-color 140ms;
+}
+.nav-centre .nv-items button:hover { color: var(--ink); }
+.nav-centre .nv-items button.on { color: var(--ink); border-bottom-color: var(--oak); font-weight: 700; }
+.nav-centre .nv-settings { font-size: 17px !important; }
+
+/* --- 4. floating dock --- */
+/* The brand stays small at the top and the navigation floats over the page at the bottom,
+   where a thumb is. This is the one that reads as a game rather than a site. */
+.nav-is-dock.app { padding-bottom: 110px; }
+.nav-dock-head { display: flex; align-items: center; justify-content: flex-start; margin-bottom: 10px; }
+.nav-dock-head .logo3d { width: 34px; height: 34px; }
+.nav-dock-head .logo3d span { font-size: 17px; border-radius: 10px; }
+.nav-dock-head h1 { font-size: 18px; }
+.nav-dock {
+  position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); z-index: 30;
+  display: flex; gap: 4px; padding: 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--panel-solid) 88%, transparent);
+  border: 1px solid var(--panel-brd);
+  box-shadow: 0 14px 34px rgba(58,44,20,.24), 0 1px 0 rgba(255,255,255,.7) inset;
+  backdrop-filter: blur(12px);
+}
+.nav-dock button {
+  display: flex; align-items: center; gap: 8px;
+  padding: 11px 20px; border-radius: 999px; cursor: pointer;
+  font: inherit; font-size: 13.5px; font-weight: 600;
+  background: transparent; border: 0; color: var(--muted);
+  transition: background 160ms, color 160ms, transform 160ms;
+}
+.nav-dock button .nv-mark { font-size: 15px; line-height: 1; }
+.nav-dock button:hover { color: var(--ink); transform: translateY(-1px); }
+.nav-dock button.on { background: var(--ink); color: var(--bg1); }
+.nav-dock .nv-settings { padding: 11px 15px; }
+
+/* --- 5. oak plate --- */
+/* A board across the top with the name engraved into it and the tabs cut in beside it — the
+   brass plate on the door of a card room. */
+/* `display: block` for the same reason: as a flex header the board shrinks to its contents
+   instead of spanning the page. */
+.nav-plate { display: block; margin: -6px -16px 20px; }
+.np-board {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 14px 26px;
+  border-radius: 0 0 16px 16px;
+  background:
+    repeating-linear-gradient(92deg, rgba(0,0,0,.05) 0 2px, transparent 2px 7px),
+    linear-gradient(180deg, #8a6033 0%, #6d4a26 52%, #7d5730 100%);
+  box-shadow:
+    0 1px 0 rgba(255,255,255,.16) inset,
+    0 -2px 0 rgba(0,0,0,.28) inset,
+    0 10px 26px rgba(58,44,20,.28);
+}
+.nav-plate .logo3d span { background: #f3ead6; color: #4a3218; }
+.nav-plate h1 {
+  color: #f6ecd6; letter-spacing: 3px; font-size: 22px;
+  text-shadow: 0 1px 0 rgba(0,0,0,.45), 0 -1px 0 rgba(255,255,255,.18);
+}
+.nav-plate .nv-items { display: flex; gap: 8px; }
+.nav-plate .nv-items button {
+  padding: 9px 20px; border-radius: 8px; cursor: pointer;
+  font: inherit; font-size: 13.5px; font-weight: 600;
+  color: rgba(246,236,214,.72);
+  background: rgba(0,0,0,.16);
+  border: 1px solid rgba(0,0,0,.24);
+  box-shadow: 0 1px 0 rgba(255,255,255,.12) inset;
+  transition: background 150ms, color 150ms;
+}
+.nav-plate .nv-items button:hover { color: #fff; background: rgba(0,0,0,.26); }
+.nav-plate .nv-items button.on {
+  color: #3a2712; background: linear-gradient(180deg, #f0e2c2, #d9c69c);
+  border-color: rgba(0,0,0,.3);
+}
+
+@media (max-width: 760px) {
+  .nav-is-rail.app { padding-left: 16px; padding-bottom: 92px; }
+  .nav-rail {
+    top: auto; right: 0; bottom: 0; width: auto; height: auto;
+    flex-direction: row; justify-content: space-around;
+    border-right: none; border-top: 1px solid var(--panel-brd);
+  }
+  .nav-rail .brand { display: none; }
+  .nav-rail .nv-items { flex-direction: row; }
+  .nav-rail .nv-settings { margin-top: 0; }
+  .nav-centre h1 { font-size: 22px; }
+  .nav-centre .nv-items { gap: 18px; }
+  .nav-plate { margin: -6px -10px 16px; }
+  .np-board { padding: 12px 14px; }
+  .nav-plate h1 { font-size: 17px; letter-spacing: 1.6px; }
+}
