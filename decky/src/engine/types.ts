@@ -57,6 +57,14 @@ export interface GameDefinition {
   // Present iff this is a comparison game (War): flip the top card, higher rank wins both;
   // ties trigger a "war". No decisions — win by taking all the cards.
   war?: WarConfig;
+  // Present iff this is a claim/challenge game — see BluffConfig.
+  bluff?: BluffConfig;
+  // Present iff this is a reflex game — see ReflexConfig.
+  reflex?: ReflexConfig;
+  // Present iff this is a betting game — see PokerConfig.
+  poker?: PokerConfig;
+  // Present iff this is a trading game — see PitConfig.
+  pit?: PitConfig;
   // Present iff this is a single-player patience game: build the tableau down, the foundations
   // up, and win by clearing the deck. No opponents, no turns, no bot.
   solitaire?: SolitaireConfig;
@@ -70,6 +78,47 @@ export interface GameDefinition {
 export interface WarConfig {
   aceHigh: boolean;
   roundCap: number; // safety bound: after this many flips, most cards wins
+}
+
+// Present iff this is a claim/challenge game (Cheat, "I Doubt It"): play cards face down while
+// claiming a rank; any other player may call the claim a lie. Whoever is wrong takes the whole
+// center pile. First to empty their hand wins.
+export interface BluffConfig {
+  // Ranks a claim may name. Defaults to every rank in the deck if omitted.
+  claimableRanks?: Rank[];
+}
+
+// Present iff this is a reflex game (Slapjack, Snap): players flip one card at a time onto a
+// shared pile; whenever the top card's rank is in `slapRanks` (or, for `slapMatch`, the top two
+// cards share a rank), ANY player — not just whoever's turn it is — may slap to claim the pile.
+// Whoever's slap reaches the engine first while it is still valid wins it.
+export interface ReflexConfig {
+  slapRanks: Rank[];      // e.g. ["J"] for Slapjack; [] if only slapMatch applies
+  slapMatch?: boolean;    // Snap-style: slap when the top two cards match rank
+  // Safety valve, same idea as War's roundCap: reflex games are a random walk of who's holding
+  // what, and can occasionally run long. After this many flips, whoever holds the most cards
+  // wins outright rather than the match running unbounded.
+  flipCap?: number;
+}
+
+// Present iff this is a betting game (Poker-family): a single fixed deal, one betting round,
+// then a showdown. No streets, no draws, no side pots — a player who cannot cover the current
+// bet must fold. Documented simplifications, not oversights.
+export interface PokerConfig {
+  handSize: number;       // cards dealt to each player (5 = five-card showdown)
+  startingChips: number;
+  ante: number;            // every player pays this before the deal (0 = none)
+  smallBlind: number;      // 0 = no blinds, ante-only
+  bigBlind: number;
+  minRaise: number;        // smallest amount a raise must increase the bet by
+}
+
+// Present iff this is a trading game (Pit-style): no turn order at all. Any player may post an
+// open offer (give N cards of one suit, want N of another) at any time, and any OTHER player
+// holding the wanted commodity may accept it, executing the swap immediately. First to hold
+// `cornerSize` cards of a single suit wins — "corners the market".
+export interface PitConfig {
+  cornerSize: number;
 }
 
 export interface RummyConfig {
@@ -108,6 +157,12 @@ export interface TrickConfig {
   // Euchre-family rules. With `auction`, trump is not fixed by the definition — it is named
   // during a bidding round and lives on MatchState for the duration of the hand.
   auction?: AuctionConfig;
+  // A numeric contract auction (Bridge-style): players bid a level (1..7) and a strain (a suit,
+  // or "NT" for no-trump), each bid strictly outbidding the last, until three consecutive
+  // passes settle it. The winning bid's side becomes declarer; trump is the winning strain
+  // (or none, for NT); the target is 6 + level tricks. Mutually exclusive with `auction` — a
+  // game has one auction shape or the other.
+  numericAuction?: NumericAuctionConfig;
   bowers?: boolean;            // the trump jack, then the same-colour jack, outrank every trump
   goAlone?: boolean;           // the maker may play the hand without their partner
   euchreScoring?: boolean;     // makers 1 / all five 2 / alone-all-five 4 / set 2 to the defenders
@@ -155,6 +210,13 @@ export interface AuctionConfig {
   upcardZone: string;          // shared pile holding the kitty; its top card is turned up
   dealerDiscards: boolean;     // ordering it up makes the dealer take the upcard and discard one
   rounds: 1 | 2;
+}
+
+export type Strain = Suit | 'NT';
+export interface NumericAuctionConfig {
+  minLevel: number;   // 1
+  maxLevel: number;   // 7
+  strains: Strain[];  // bid order, weakest to strongest, e.g. ["C","D","H","S","NT"]
 }
 
 // A simultaneous pre-hand exchange (Hearts). Direction cycles per hand; 'hold' skips a hand.
@@ -400,6 +462,23 @@ export interface MatchState {
   faceUp: Record<string, boolean>;       // solitaire: which cards are turned face up
   redealsLeft: number;                   // solitaire: stock passes remaining (-1 = unlimited)
   moveCount: number;                     // solitaire: moves made, for scoring/stats
+  // bluff: the most recent claim, open to challenge until superseded by the next one.
+  pendingClaim: { player: string; count: number; claimedRank: string; cardIds: string[] } | null;
+  // reflex: who has been eliminated (hand empty), in elimination order — last remaining wins.
+  reflexOut: string[];
+  // poker: chip stacks, the pot, and betting-round bookkeeping.
+  chips: Record<string, number>;
+  pot: number;
+  currentBet: number;
+  committed: Record<string, number>;      // this betting round's contribution per player
+  folded: Record<string, boolean>;
+  actedThisRound: Record<string, boolean>; // has acted since the last bet/raise
+  pokerPhase: 'bet' | 'showdown';
+  // pit: open offers on the market. Any player may post or accept one at any time.
+  market: { id: number; player: string; give: Suit; count: number; want: Suit }[];
+  nextOfferId: number;
+  // numeric (Bridge-style) contract auction: the standing high bid, if any.
+  highBid: { player: string; level: number; strain: Strain } | null;
   ply: number;                           // moves resolved this hand, all families (rules read it)
   log: LogEntry[];
 }
@@ -421,6 +500,13 @@ export interface Move {
   alone?: boolean;        // euchre: name trump and play the hand without your partner
   from?: string;          // solitaire: source zone id
   to?: string;            // solitaire: destination zone id
+  claimedRank?: string;    // bluff: the rank being claimed
+  amount?: number;         // poker: bet/raise size
+  offerId?: number;        // pit: which open offer to accept/cancel
+  give?: string;           // pit: suit offered (as Suit)
+  want?: string;           // pit: suit wanted (as Suit)
+  level?: number;          // numeric auction: bid level 1..7
+  strain?: string;         // numeric auction: bid strain
 }
 
 // ---------- Redacted (per-player) view ----------
@@ -447,7 +533,8 @@ export interface RedactedState {
   scores: Record<string, number>;
   log: LogEntry[];
   // family-specific view
-  mode: 'shedding' | 'trick' | 'climb' | 'fish' | 'rummy' | 'war' | 'solitaire';
+  mode: 'shedding' | 'trick' | 'climb' | 'fish' | 'rummy' | 'war' | 'solitaire'
+    | 'bluff' | 'reflex' | 'poker' | 'pit';
   // solitaire
   tableau?: { id: string; cards: Card[]; faceDown: number }[];
   foundations?: { id: string; cards: Card[] }[];
@@ -494,4 +581,24 @@ export interface RedactedState {
   passCount: number;         // cards owed this pass
   passStaged: string[];      // this viewer's picks so far, for a multi-card pass
   brokenSuitPlayed?: boolean;
+  // bluff — the claimed rank is spoken aloud in real Cheat, so everyone sees it; only the
+  // actual cards under it stay hidden until a challenge reveals them.
+  centerCount?: number;               // cards face-down in the center pile right now
+  pendingClaim?: { player: string; count: number; claimedRank: string } | null;
+  // reflex
+  pileTop?: Card | null;
+  slapValid?: boolean;                // true iff a slap would currently succeed for THIS viewer
+  reflexOut?: string[];
+  // poker
+  chips?: Record<string, number>;
+  pot?: number;
+  currentBet?: number;
+  committed?: Record<string, number>;
+  folded?: Record<string, boolean>;
+  showdown?: { player: string; cards: Card[]; label: string }[]; // revealed only once the hand ends
+  // pit
+  market?: { id: number; player: string; give: Suit; count: number; want: Suit }[];
+  cornerSize?: number;
+  // numeric (Bridge-style) auction
+  highBid?: { player: string; level: number; strain: Strain } | null;
 }

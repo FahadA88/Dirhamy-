@@ -34,7 +34,12 @@ export function validate(def: GameDefinition): ValidationResult {
   const isRummy = !!def.rummy;
   const isWar = !!def.war;
   const isSolitaire = !!def.solitaire;
-  const isSpecial = isTrick || isClimb || isFish || isRummy || isWar || isSolitaire;
+  const isBluff = !!def.bluff;
+  const isReflex = !!def.reflex;
+  const isPoker = !!def.poker;
+  const isPit = !!def.pit;
+  const isSpecial = isTrick || isClimb || isFish || isRummy || isWar || isSolitaire
+    || isBluff || isReflex || isPoker || isPit;
 
   // --- players ---
   // Patience is played alone; every other family needs an opponent.

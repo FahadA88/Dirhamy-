@@ -40,6 +40,10 @@ const BY_FAMILY: Record<Knobs['family'], (keyof Knobs)[]> = {
   rummy: ['handSize', 'rummySetMin', 'rummyRunMin', 'rummyKnock', 'rummyKnockAt', 'rummyLayOff',
     'perRankPoints'],
   war: ['warRoundCap'],
+  bluff: [],
+  reflex: ['reflexSlapRanks', 'reflexSlapMatch'],
+  poker: ['pokerHandSize', 'pokerStartingChips', 'pokerAnte', 'pokerSmallBlind', 'pokerBigBlind', 'pokerMinRaise'],
+  pit: ['pitCornerSize'],
   solitaire: ['solColumns', 'solDeal', 'solFaceUp', 'solBuild', 'solMoveRun', 'solEmpty',
     'solFreeCells', 'solFoundations', 'solAutoRuns', 'solStock', 'solStockTurn', 'solRedeals',
     'solDecks'],
@@ -75,7 +79,7 @@ Return ONLY that JSON object. No prose around it, no markdown fence.
 
 # Families
 
-Every game is one of seven families. The family decides the shape of a turn, so pick it first.
+Every game is one of eleven families. The family decides the shape of a turn, so pick it first.
 
   - "shedding"  — play a card that matches the pile; first to empty their hand wins.
                   (Crazy Eights, Switch, Uno-likes)
@@ -89,6 +93,23 @@ Every game is one of seven families. The family decides the shape of a turn, so 
                   (Rummy, Gin)
   - "war"       — everyone flips, highest card takes the pile. No decisions.
   - "solitaire" — one player, a tableau, foundations.
+  - "bluff"      — play cards face down while claiming a rank; anyone may call it a lie.
+                  Whoever is wrong takes the pile. First to empty their hand wins.
+                  (Cheat, "I Doubt It") Every claim is a group of 1-4 cards that actually
+                  share their real rank in your hand — the LIE is only in what you call that
+                  rank, not in mixing unrelated cards together.
+  - "reflex"     — flip a card each turn onto a shared pile; whenever the top card (or, with
+                  reflexSlapMatch, the top two) matches, ANY player may slap to take the whole
+                  pile, not just whoever's turn it is. Last player holding cards wins.
+                  (Slapjack, Snap)
+  - "poker"      — a fixed deal, real chips, one round of betting (check/bet/call/raise/fold),
+                  then a showdown. No streets, no draw phase, no side pots — say so in "notes"
+                  if the description wants those; they are not available.
+  - "pit"        — no turn order at all. Any player may post an open offer to trade N cards of
+                  one suit for N of another; any OTHER player holding the wanted suit may
+                  accept it instantly. First to hold cornerSize cards of one suit wins.
+                  (Pit, commodities trading) Suits stand in for commodities — there is no way
+                  to define custom commodities beyond the four suits.
 
 # Knobs
 

@@ -55,6 +55,14 @@ export function Table({ def, seats = 3, plan }: {
   // this only holds them back on screen so they appear to arrive rather than to have been
   // there all along.
   const [dealing, setDealing] = useState(false);
+  // bluff: which of your own cards are staged for the next claim, and what rank you'll claim
+  // them as. Cleared on every submit and every fresh deal.
+  const [bluffSelected, setBluffSelected] = useState<string[]>([]);
+  const [bluffRank, setBluffRank] = useState<string | null>(null);
+  // pit: the offer you're composing. No engine state backs this — it's just the form.
+  const [pitGive, setPitGive] = useState<'C' | 'D' | 'H' | 'S'>('C');
+  const [pitWant, setPitWant] = useState<'C' | 'D' | 'H' | 'S'>('D');
+  const [pitCount, setPitCount] = useState(1);
 
   const { matchId, view } = board;
   const passAndPlay = localSeats.length > 1;
@@ -107,6 +115,10 @@ export function Table({ def, seats = 3, plan }: {
   const isRummy = view.mode === 'rummy';
   const isWar = view.mode === 'war';
   const isClimb = view.mode === 'climb';
+  const isBluff = view.mode === 'bluff';
+  const isReflex = view.mode === 'reflex';
+  const isPoker = view.mode === 'poker';
+  const isPit = view.mode === 'pit';
   // Groups of 2+ need a button — you can't express "these three cards" with one tap.
   const comboMoves = useMemo(
     () => myLegal.filter((m) => m.actionId === 'climbPlay' && (m.cards?.length ?? 1) > 1),
@@ -234,11 +246,35 @@ export function Table({ def, seats = 3, plan }: {
     if (move.actionId === 'playCard' || move.actionId === 'playToTrick' || move.actionId === 'climbPlay' || move.actionId === 'climbBomb') playSound('play', settings.sound);
     if (move.actionId === 'drawCard' || move.actionId === 'fishDraw') playSound('draw', settings.sound);
     if (move.actionId === 'ask') playSound('ui', settings.sound);
+    if (move.actionId === 'bluffClaim' || move.actionId === 'bluffChallenge') playSound('play', settings.sound);
+    if (move.actionId === 'reflexSlap') playSound('win', settings.sound);
+    if (move.actionId === 'reflexFlip') playSound('play', settings.sound);
     setToast(null);
     setSelected(null);
     setAskRank(null);
+    setBluffSelected([]);
+    setBluffRank(null);
     setBoard(read(matchId, me));
   }
+
+  // Bluff: clicking a card either starts a new group or, if it matches the real rank already
+  // staged, adds to it (up to four) — a second click on an already-staged card removes it.
+  // This is deliberately real-rank-only: the LIE lives entirely in the rank you claim next, not
+  // in which physical cards you hand over, which is also the only shape the engine will accept.
+  function toggleBluffCard(id: string) {
+    const card = view.hand.find((c) => c.id === id);
+    if (!card) return;
+    if (bluffSelected.includes(id)) { setBluffSelected(bluffSelected.filter((x) => x !== id)); return; }
+    const first = view.hand.find((c) => c.id === bluffSelected[0]);
+    if (bluffSelected.length > 0 && first && first.rank !== card.rank) { setBluffSelected([id]); return; }
+    if (bluffSelected.length >= 4) return;
+    setBluffSelected([...bluffSelected, id]);
+  }
+  const bluffClaimMove = useMemo(
+    () => myLegal.find((m) => m.actionId === 'bluffClaim' && m.claimedRank === bluffRank
+      && m.cards?.length === bluffSelected.length && m.cards?.every((id) => bluffSelected.includes(id))),
+    [myLegal, bluffRank, bluffSelected],
+  );
 
   // A toast is a nudge, not a state to live in.
   useEffect(() => {
@@ -503,7 +539,131 @@ export function Table({ def, seats = 3, plan }: {
           )}
           <button className="restart-btn" onClick={restart} title="Deal a fresh game">Restart</button>
         </div>
-        {isWar ? (
+        {isBluff ? (
+          <div className="bluff-controls">
+            <div className="bluff-info">
+              <span className="bluff-pile">Center pile · {view.centerCount ?? 0} card{(view.centerCount ?? 0) === 1 ? '' : 's'}</span>
+              {view.pendingClaim && (
+                <span className={`bluff-claim ${view.pendingClaim.player === me ? 'mine' : ''}`}>
+                  {nameOf(view.pendingClaim.player)} claim{view.pendingClaim.player === me ? '' : 's'} {view.pendingClaim.count}× {view.pendingClaim.claimedRank}
+                </span>
+              )}
+            </div>
+            {myLegal.some((m) => m.actionId === 'bluffChallenge') && (
+              <button className="primary bluff-challenge" onClick={() => submit({ actionId: 'bluffChallenge' })}>
+                🤨 Call bluff!
+              </button>
+            )}
+            {myLegal.some((m) => m.actionId === 'bluffClaim') && (
+              <>
+                <div className={`hand hl-${settings.highlight}`}>
+                  {hand.map((c) => (
+                    <button key={c.id}
+                      className={`card-btn ${bluffSelected.includes(c.id) ? 'selected' : 'playable'}`}
+                      onClick={() => toggleBluffCard(c.id)}
+                      title={bluffSelected.includes(c.id) ? 'Take this one back out' : 'Stage this card face down'}>
+                      <CardFace card={c} />
+                    </button>
+                  ))}
+                </div>
+                <div className="bluff-rankpicker">
+                  <span className="muted">Tap up to four of the same card, then claim them as whatever you like:</span>
+                  <div className="seg wrap">
+                    {def.deck.rankOrder.map((r) => (
+                      <button key={r} className={bluffRank === r ? 'on' : ''} onClick={() => setBluffRank(r)}>{r}</button>
+                    ))}
+                  </div>
+                  <button className="primary sm" disabled={!bluffClaimMove} onClick={() => bluffClaimMove && submit(bluffClaimMove)}>
+                    Play {bluffSelected.length || ''} face down
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        ) : isReflex ? (
+          <div className="reflex-controls">
+            <div className="reflex-pile">
+              {view.pileTop ? <div className="pile-card"><CardFace card={view.pileTop} /></div> : <div className="empty-hand">— empty —</div>}
+              <span className="muted">{view.zones.pile?.count ?? 0} on the pile</span>
+            </div>
+            <div className="reflex-actions">
+              {myLegal.some((m) => m.actionId === 'reflexSlap') && (
+                <button className="primary reflex-slap" onClick={() => submit({ actionId: 'reflexSlap' })}>✋ SLAP!</button>
+              )}
+              {myLegal.some((m) => m.actionId === 'reflexFlip') && (
+                <button className="ghost" onClick={() => submit({ actionId: 'reflexFlip' })}>Flip</button>
+              )}
+            </div>
+            <span className="muted">Your hand · {hand.length} card{hand.length === 1 ? '' : 's'}</span>
+          </div>
+        ) : isPoker ? (
+          <div className="poker-controls">
+            <div className="poker-info">
+              <span className="chip">Pot · {view.pot ?? 0}</span>
+              <span className="chip">Your chips · {view.chips?.[me] ?? 0}</span>
+              {(view.currentBet ?? 0) > (view.committed?.[me] ?? 0) && (
+                <span className="chip">To call · {(view.currentBet ?? 0) - (view.committed?.[me] ?? 0)}</span>
+              )}
+            </div>
+            <div className="hand hl-off poker-hand">
+              {hand.map((c) => (<div key={c.id} className="card-btn dim static"><CardFace card={c} /></div>))}
+            </div>
+            <div className="poker-actions">
+              {myLegal.filter((m) => m.actionId?.startsWith('poker')).map((m, i) => (
+                <button key={i} className={m.actionId === 'pokerFold' ? 'ghost danger' : 'primary'} onClick={() => submit(m)}>
+                  {m.actionId === 'pokerCheck' ? 'Check'
+                    : m.actionId === 'pokerCall' ? `Call ${(view.currentBet ?? 0) - (view.committed?.[me] ?? 0)}`
+                    : m.actionId === 'pokerFold' ? 'Fold'
+                    : `${m.actionId === 'pokerBet' ? 'Bet' : 'Raise to'} ${m.amount}`}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : isPit ? (
+          <div className="pit-controls">
+            <div className="pit-hand-summary">
+              {(['C', 'D', 'H', 'S'] as const).map((suit) => {
+                const count = hand.filter((c) => c.suit === suit).length;
+                return count > 0 ? <span key={suit} className="chip">{count}× {SUIT_SYMBOLS[suit]}</span> : null;
+              })}
+            </div>
+            <div className="pit-market">
+              {(view.market?.length ?? 0) === 0 && <span className="muted">No open offers.</span>}
+              {view.market?.map((o) => (
+                <div key={o.id} className={`pit-offer ${o.player === me ? 'mine' : ''}`}>
+                  <span>{nameOf(o.player)} offers {o.count}× {SUIT_SYMBOLS[o.give]} for {SUIT_SYMBOLS[o.want]}</span>
+                  {o.player === me
+                    ? myLegal.some((m) => m.actionId === 'pitCancel' && m.offerId === o.id) && (
+                        <button className="ghost sm" onClick={() => submit({ actionId: 'pitCancel', offerId: o.id })}>Cancel</button>
+                      )
+                    : myLegal.some((m) => m.actionId === 'pitAccept' && m.offerId === o.id) && (
+                        <button className="primary sm" onClick={() => submit({ actionId: 'pitAccept', offerId: o.id })}>Accept</button>
+                      )}
+                </div>
+              ))}
+            </div>
+            <div className="pit-offer-maker">
+              <span className="muted">Offer</span>
+              <select value={pitCount} onChange={(e) => setPitCount(+e.target.value)} aria-label="How many">
+                {[1, 2, 3].map((n) => <option key={n} value={n}>{n}</option>)}
+              </select>
+              <select value={pitGive} onChange={(e) => setPitGive(e.target.value as typeof pitGive)} aria-label="Give this suit">
+                {(['C', 'D', 'H', 'S'] as const).map((sut) => <option key={sut} value={sut}>{SUIT_SYMBOLS[sut]} {SUIT_NAMES[sut]}</option>)}
+              </select>
+              <span className="muted">for</span>
+              <select value={pitWant} onChange={(e) => setPitWant(e.target.value as typeof pitWant)} aria-label="Want this suit">
+                {(['C', 'D', 'H', 'S'] as const).map((sut) => <option key={sut} value={sut}>{SUIT_SYMBOLS[sut]} {SUIT_NAMES[sut]}</option>)}
+              </select>
+              <button
+                className="primary sm"
+                disabled={!myLegal.some((m) => m.actionId === 'pitOffer' && m.give === pitGive && m.want === pitWant && m.cards?.[0] === String(pitCount))}
+                onClick={() => submit({ actionId: 'pitOffer', give: pitGive, want: pitWant, cards: [String(pitCount)] })}
+              >
+                Offer
+              </button>
+            </div>
+          </div>
+        ) : isWar ? (
           <div className="war-controls">
             <span className="war-pile">Your pile · {myPile} cards</span>
             {canFlip && <button className="primary" onClick={() => submit({ actionId: 'warFlip' })}>⚔ Flip</button>}

@@ -263,6 +263,69 @@ export function chooseMove(
     return { move: best, botSeed };
   }
 
+  // Bluff: challenge sometimes (never deterministically always/never, or the same claim and
+  // the same response repeat forever), otherwise dump your largest real group under its own
+  // true rank — a bot that never lies still makes real progress and gives the AI simulator (and
+  // a human opponent) something honest to either catch or not bother challenging.
+  if (moves.some((m) => m.actionId === 'bluffClaim' || m.actionId === 'bluffChallenge')) {
+    const challenge = moves.find((m) => m.actionId === 'bluffChallenge');
+    const claims = moves.filter((m) => m.actionId === 'bluffClaim');
+    if (challenge && claims.length === 0) return { move: challenge, botSeed };
+    const r = nextRandom(botSeed);
+    if (challenge && r.value < 0.3) return { move: challenge, botSeed: r.state };
+    let best = claims[0];
+    for (const m of claims) {
+      const truthful = m.cards?.length && state.zones[`hand:${playerId}`]?.find((c) => c.id === m.cards![0])?.rank === m.claimedRank;
+      const bestTruthful = best.cards?.length && state.zones[`hand:${playerId}`]?.find((c) => c.id === best.cards![0])?.rank === best.claimedRank;
+      if ((m.cards?.length ?? 0) > (best.cards?.length ?? 0) || (truthful && !bestTruthful)) best = m;
+    }
+    return { move: best, botSeed: r.state };
+  }
+
+  // Reflex: a slap on offer is always the right move; otherwise the only choice is to flip.
+  if (moves.some((m) => m.actionId === 'reflexSlap' || m.actionId === 'reflexFlip')) {
+    const slap = moves.find((m) => m.actionId === 'reflexSlap');
+    return { move: slap ?? moves[0], botSeed };
+  }
+
+  // Poker: fold weak hands facing a real bet, otherwise check/call; raise occasionally with a
+  // strong-looking hand (a pair or better among your own cards is all a bot can see).
+  if (moves.some((m) => m.actionId?.startsWith('poker'))) {
+    const hand = state.zones[`hand:${playerId}`] || [];
+    const counts: Record<string, number> = {};
+    for (const c of hand) counts[c.rank] = (counts[c.rank] ?? 0) + 1;
+    const strong = Object.values(counts).some((n) => n >= 2);
+    const toCall = moves.some((m) => m.actionId === 'pokerCall');
+    const r = nextRandom(botSeed);
+    if (!toCall) {
+      const bet = moves.find((m) => m.actionId === 'pokerBet');
+      if (strong && bet && r.value < 0.5) return { move: bet, botSeed: r.state };
+      return { move: moves.find((m) => m.actionId === 'pokerCheck') ?? moves[0], botSeed: r.state };
+    }
+    if (!strong && r.value < 0.55) return { move: moves.find((m) => m.actionId === 'pokerFold') ?? moves[0], botSeed: r.state };
+    const raise = moves.find((m) => m.actionId === 'pokerRaise');
+    if (strong && raise && r.value < 0.3) return { move: raise, botSeed: r.state };
+    return { move: moves.find((m) => m.actionId === 'pokerCall') ?? moves.find((m) => m.actionId === 'pokerFold') ?? moves[0], botSeed: r.state };
+  }
+
+  // Pit: take a trade that's actually on the table before ever posting a new one — otherwise
+  // every player just keeps re-offering and the market grows forever without a single trade
+  // landing. Only post a fresh offer, in your scarcest suit, when nothing is acceptable and you
+  // don't already have too many of your own sitting open.
+  if (moves.some((m) => m.actionId === 'pitOffer' || m.actionId === 'pitAccept' || m.actionId === 'pitCancel')) {
+    const accepts = moves.filter((m) => m.actionId === 'pitAccept');
+    const r = nextRandom(botSeed);
+    if (accepts.length > 0) return { move: accepts[Math.floor(r.value * accepts.length)], botSeed: r.state };
+    const mine = state.market.filter((o) => o.player === playerId);
+    if (mine.length >= 2) {
+      const cancels = moves.filter((m) => m.actionId === 'pitCancel');
+      if (cancels.length > 0) return { move: cancels[Math.floor(r.value * cancels.length)], botSeed: r.state };
+    }
+    const offers = moves.filter((m) => m.actionId === 'pitOffer');
+    if (offers.length === 0) return { move: moves[0], botSeed };
+    return { move: offers[Math.floor(r.value * offers.length)], botSeed: r.state };
+  }
+
   // Simultaneous pass: give away the most dangerous card — the biggest penalty first, then
   // simply the highest rank.
   if (moves[0].actionId === 'choosePass') {

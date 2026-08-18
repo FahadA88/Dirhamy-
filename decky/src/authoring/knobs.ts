@@ -9,7 +9,8 @@ import { CURRENT_SCHEMA } from '../engine/migrate';
 export const RANKS_13: Rank[] = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
 
 export interface Knobs {
-  family: 'shedding' | 'trick' | 'climb' | 'fish' | 'rummy' | 'war' | 'solitaire';
+  family: 'shedding' | 'trick' | 'climb' | 'fish' | 'rummy' | 'war' | 'solitaire'
+    | 'bluff' | 'reflex' | 'poker' | 'pit';
   // Author-written conditional rules. Kept as drafts (ingredient ids + parameters) so the
   // builder can re-open them; compiled into definition.rules on every build.
   customRules: RuleDraft[];
@@ -49,6 +50,19 @@ export interface Knobs {
   rummyLayOff: boolean;     // spare cards may extend melds already on the table
   // war
   warRoundCap: number;
+  // bluff — no extra knobs; claims may name any rank in the deck.
+  // reflex
+  reflexSlapRanks: Rank[];
+  reflexSlapMatch: boolean;
+  // poker
+  pokerHandSize: number;
+  pokerStartingChips: number;
+  pokerAnte: number;
+  pokerSmallBlind: number;
+  pokerBigBlind: number;
+  pokerMinRaise: number;
+  // pit
+  pitCornerSize: number;
   // solitaire — the board is described, not drawn: these are the dials the engine reads.
   solColumns: number;
   solDeal: 'triangle' | 'even';
@@ -139,6 +153,15 @@ export const defaultKnobs: Knobs = {
   rummyKnockAt: 10,
   rummyLayOff: true,
   warRoundCap: 800,
+  reflexSlapRanks: ['J'],
+  reflexSlapMatch: false,
+  pokerHandSize: 5,
+  pokerStartingChips: 200,
+  pokerAnte: 0,
+  pokerSmallBlind: 5,
+  pokerBigBlind: 10,
+  pokerMinRaise: 10,
+  pitCornerSize: 7,
   solColumns: 7,
   solDeal: 'triangle',
   solFaceUp: 'top',
@@ -195,6 +218,10 @@ function buildFamilyDefinition(knobs: Knobs, id: string): GameDefinition {
   if (knobs.family === 'rummy') return buildRummyDefinition(knobs, id);
   if (knobs.family === 'war') return buildWarDefinition(knobs, id);
   if (knobs.family === 'solitaire') return buildSolitaireDefinition(knobs, id);
+  if (knobs.family === 'bluff') return buildBluffDefinition(knobs, id);
+  if (knobs.family === 'reflex') return buildReflexDefinition(knobs, id);
+  if (knobs.family === 'poker') return buildPokerDefinition(knobs, id);
+  if (knobs.family === 'pit') return buildPitDefinition(knobs, id);
   return buildSheddingDefinition(knobs, id);
 }
 
@@ -299,6 +326,102 @@ function buildWarDefinition(knobs: Knobs, id: string): GameDefinition {
     endConditions: [{ id: 'handEmpty', when: { zoneCount: { zone: 'hand', of: 'anyPlayer', eq: 0 } }, result: 'roundOver' }],
     scoring: { mode: 'lowestPoints', winner: 'highestTotal', cardPoints: {}, target: matchTarget(knobs) },
     war: { aceHigh: knobs.aceHigh, roundCap: clampInt(knobs.warRoundCap, 100, 5000) },
+  };
+}
+
+function buildBluffDefinition(knobs: Knobs, id: string): GameDefinition {
+  return {
+    schemaVersion: CURRENT_SCHEMA,
+    meta: {
+      id, name: knobs.name,
+      description: knobs.description || 'Play cards face down, claiming a rank. Anyone can call your bluff — whoever is wrong takes the whole pile. First to empty their hand wins.',
+      players: { min: clampInt(knobs.minPlayers, 2, 6), max: clampInt(knobs.maxPlayers, knobs.minPlayers, 6) },
+      family: 'bluff',
+    },
+    deck: { base: 'standard54', includeJokers: false, deckCount: 1, excludeRanks: knobs.excludeRanks, rankOrder: RANKS_13, tags: {} },
+    zones: [
+      { id: 'center', type: 'pile', ordered: true, faceDown: true, visibility: 'none', shared: true },
+      { id: 'hand', type: 'hand', ordered: false, faceDown: true, visibility: 'owner', perPlayer: true },
+    ],
+    setup: [{ op: 'shuffle', zone: 'center' }, { op: 'dealAll', from: 'center', to: 'hand' }],
+    turnFlow: { order: 'clockwise', startPlayer: 'first', actionsPerTurn: { min: 1, max: 1 } },
+    actions: [], triggers: [], endConditions: [],
+    scoring: { mode: 'lowestPoints', winner: 'highestTotal', cardPoints: {}, target: null },
+    bluff: {},
+  };
+}
+
+function buildReflexDefinition(knobs: Knobs, id: string): GameDefinition {
+  return {
+    schemaVersion: CURRENT_SCHEMA,
+    meta: {
+      id, name: knobs.name,
+      description: knobs.description || 'Flip a card each turn onto the shared pile. Whenever it matches, slap first to take the whole thing. Last player holding cards wins.',
+      players: { min: clampInt(knobs.minPlayers, 2, 6), max: clampInt(knobs.maxPlayers, knobs.minPlayers, 6) },
+      family: 'reflex',
+    },
+    deck: { base: 'standard54', includeJokers: false, deckCount: 1, excludeRanks: knobs.excludeRanks, rankOrder: RANKS_13, tags: {} },
+    zones: [
+      { id: 'draw', type: 'pile', ordered: true, faceDown: true, visibility: 'none', shared: true },
+      { id: 'pile', type: 'pile', ordered: true, faceDown: false, visibility: 'all', shared: true },
+      { id: 'hand', type: 'hand', ordered: true, faceDown: true, visibility: 'none', perPlayer: true },
+    ],
+    setup: [{ op: 'shuffle', zone: 'draw' }, { op: 'dealAll', from: 'draw', to: 'hand' }],
+    turnFlow: { order: 'clockwise', startPlayer: 'first', actionsPerTurn: { min: 1, max: 1 } },
+    actions: [], triggers: [], endConditions: [],
+    scoring: { mode: 'lowestPoints', winner: 'highestTotal', cardPoints: {}, target: null },
+    reflex: { slapRanks: knobs.reflexSlapRanks, slapMatch: knobs.reflexSlapMatch },
+  };
+}
+
+function buildPokerDefinition(knobs: Knobs, id: string): GameDefinition {
+  return {
+    schemaVersion: CURRENT_SCHEMA,
+    meta: {
+      id, name: knobs.name,
+      description: knobs.description || 'A fixed deal, one round of betting, then a showdown. Real chips, no side pots, no draw.',
+      players: { min: clampInt(knobs.minPlayers, 2, 8), max: clampInt(knobs.maxPlayers, knobs.minPlayers, 8) },
+      family: 'poker',
+    },
+    deck: { base: 'standard54', includeJokers: false, deckCount: 1, excludeRanks: knobs.excludeRanks, rankOrder: RANKS_13, tags: {} },
+    zones: [
+      { id: 'draw', type: 'pile', ordered: true, faceDown: true, visibility: 'none', shared: true },
+      { id: 'hand', type: 'hand', ordered: false, faceDown: true, visibility: 'owner', perPlayer: true },
+    ],
+    setup: [{ op: 'shuffle', zone: 'draw' }, { op: 'deal', from: 'draw', to: 'hand', countPerPlayer: clampInt(knobs.pokerHandSize, 3, 7) }],
+    turnFlow: { order: 'clockwise', startPlayer: 'first', actionsPerTurn: { min: 1, max: 1 } },
+    actions: [], triggers: [], endConditions: [],
+    scoring: { mode: 'lowestPoints', winner: 'highestTotal', cardPoints: {}, target: null },
+    poker: {
+      handSize: clampInt(knobs.pokerHandSize, 3, 7),
+      startingChips: Math.max(knobs.pokerBigBlind * 4, knobs.pokerStartingChips),
+      ante: Math.max(0, knobs.pokerAnte),
+      smallBlind: Math.max(0, knobs.pokerSmallBlind),
+      bigBlind: Math.max(0, knobs.pokerBigBlind),
+      minRaise: Math.max(1, knobs.pokerMinRaise),
+    },
+  };
+}
+
+function buildPitDefinition(knobs: Knobs, id: string): GameDefinition {
+  return {
+    schemaVersion: CURRENT_SCHEMA,
+    meta: {
+      id, name: knobs.name,
+      description: knobs.description || 'No turns. Post trades, accept anyone else\'s, first to corner a suit wins.',
+      players: { min: clampInt(knobs.minPlayers, 3, 8), max: clampInt(knobs.maxPlayers, knobs.minPlayers, 8) },
+      family: 'pit',
+    },
+    deck: { base: 'standard54', includeJokers: false, deckCount: 1, excludeRanks: knobs.excludeRanks, rankOrder: RANKS_13, tags: {} },
+    zones: [
+      { id: 'draw', type: 'pile', ordered: true, faceDown: true, visibility: 'none', shared: true },
+      { id: 'hand', type: 'hand', ordered: false, faceDown: true, visibility: 'owner', perPlayer: true },
+    ],
+    setup: [{ op: 'shuffle', zone: 'draw' }, { op: 'dealAll', from: 'draw', to: 'hand' }],
+    turnFlow: { order: 'clockwise', startPlayer: 'first', actionsPerTurn: { min: 1, max: 1 } },
+    actions: [], triggers: [], endConditions: [],
+    scoring: { mode: 'lowestPoints', winner: 'highestTotal', cardPoints: {}, target: null },
+    pit: { cornerSize: clampInt(knobs.pitCornerSize, 4, 13) },
   };
 }
 
@@ -525,7 +648,8 @@ export function knobsFromDefinition(def: GameDefinition): Knobs {
   const wildRanks = tagRanks('wild').filter((r) => !wildDrawRanks.includes(r));
 
   return {
-    family: def.solitaire ? 'solitaire' : def.war ? 'war' : def.rummy ? 'rummy' : def.fish ? 'fish' : def.climb ? 'climb' : def.trick ? 'trick' : 'shedding',
+    family: def.solitaire ? 'solitaire' : def.war ? 'war' : def.rummy ? 'rummy' : def.fish ? 'fish' : def.climb ? 'climb' : def.trick ? 'trick'
+      : def.bluff ? 'bluff' : def.reflex ? 'reflex' : def.poker ? 'poker' : def.pit ? 'pit' : 'shedding',
     // Compiled rules can't be turned back into the ingredients they were assembled from, so
     // importing a definition starts the rule list empty rather than pretending otherwise.
     customRules: [],
@@ -599,6 +723,15 @@ export function knobsFromDefinition(def: GameDefinition): Knobs {
     pointTarget: typeof def.scoring.target === 'number' ? def.scoring.target : 100,
     perRankPoints: perRank,
     jokerPoints: typeof cp.JOKER === 'number' ? (cp.JOKER as number) : 50,
+    reflexSlapRanks: def.reflex?.slapRanks ?? ['J'],
+    reflexSlapMatch: def.reflex?.slapMatch ?? false,
+    pokerHandSize: def.poker?.handSize ?? 5,
+    pokerStartingChips: def.poker?.startingChips ?? 200,
+    pokerAnte: def.poker?.ante ?? 0,
+    pokerSmallBlind: def.poker?.smallBlind ?? 5,
+    pokerBigBlind: def.poker?.bigBlind ?? 10,
+    pokerMinRaise: def.poker?.minRaise ?? 10,
+    pitCornerSize: def.pit?.cornerSize ?? 7,
   };
 }
 

@@ -173,6 +173,20 @@ export function explainGame(def: GameDefinition): string[] {
     if (def.rummy.knock) out.push('Melds stay hidden; end the hand by knocking.');
   } else if (def.war) {
     out.push('Both players flip. Higher card takes both. Ties mean war.');
+  } else if (def.bluff) {
+    out.push('Play 1-4 cards face down, claiming a rank — true or not. Anyone else may call it a lie.');
+    out.push('Whoever is wrong takes the whole center pile. First to empty their hand, unclaimed, wins.');
+  } else if (def.reflex) {
+    const ranks = def.reflex.slapRanks.join(', ') || 'nothing by rank';
+    out.push(`Flip a card each turn onto the shared pile. When the top card is a ${ranks}${def.reflex.slapMatch ? ', or the top two match,' : ''}, anyone may slap to take it.`);
+    out.push('Last player still holding cards wins.');
+  } else if (def.poker) {
+    out.push(`${def.poker.handSize} cards each. Check, bet, call, raise or fold in one round of betting, then a showdown.`);
+    if (def.poker.smallBlind || def.poker.bigBlind) out.push(`Blinds: ${def.poker.smallBlind}/${def.poker.bigBlind}.`);
+    out.push('No side pots — going short on chips means folding, not a partial call.');
+  } else if (def.pit) {
+    out.push('No turns. Offer to trade cards of one suit for another, or accept anyone else\'s open offer, at any time.');
+    out.push(`First to hold ${def.pit.cornerSize} of one suit corners the market and wins.`);
   } else {
     out.push('Play a card that matches the pile, or draw. First to empty their hand wins.');
   }

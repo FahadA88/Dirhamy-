@@ -94,6 +94,18 @@ export function createMatch(
     moveCount: 0,
     ply: 0,
     bonus: {},
+    pendingClaim: null,
+    reflexOut: [],
+    chips: def.poker ? Object.fromEntries(players.map((p) => [p, def.poker!.startingChips])) : {},
+    pot: 0,
+    currentBet: 0,
+    committed: {},
+    folded: {},
+    actedThisRound: {},
+    pokerPhase: 'bet',
+    market: [],
+    nextOfferId: 1,
+    highBid: null,
     log: [],
     matchScores: carry?.matchScores ?? Object.fromEntries(players.map((p) => [p, 0])),
     handScores: carry?.handScores ?? [],
@@ -214,6 +226,37 @@ export function createMatch(
     log(state, null, `${short(players[state.dealerIndex])} deals. ${up ? `${cardLabel(up)} is turned up.` : ''}`);
   } else if (def.trick && !state.passDirection && !state.bidding) {
     state.turnIndex = openingLeadSeat(state);
+  }
+  // Poker: antes and blinds are posted before the first decision, same as any real table —
+  // otherwise "bet" would just be the first player's own choice with nothing already at risk.
+  if (def.poker) {
+    const cfg = def.poker;
+    const n = players.length;
+    if (cfg.ante > 0) {
+      for (const p of players) {
+        const add = Math.min(cfg.ante, state.chips[p] ?? 0);
+        state.chips[p] = (state.chips[p] ?? 0) - add;
+        state.pot += add;
+      }
+    }
+    const postBlind = (idx: number, amount: number) => {
+      const p = players[idx];
+      const add = Math.min(amount, state.chips[p] ?? 0);
+      state.chips[p] = (state.chips[p] ?? 0) - add;
+      state.committed[p] = (state.committed[p] ?? 0) + add;
+      state.pot += add;
+    };
+    const sbIdx = 0;
+    const bbIdx = n > 1 ? 1 : 0;
+    if (n >= 2) {
+      postBlind(sbIdx, cfg.smallBlind);
+      postBlind(bbIdx, cfg.bigBlind);
+      state.currentBet = Math.max(...players.map((p) => state.committed[p] ?? 0));
+      // Heads-up, the button posts the small blind and acts first preflop. Three or more,
+      // action opens under the gun — the seat left of the big blind.
+      state.turnIndex = n === 2 ? sbIdx : 2 % n;
+      log(state, null, `${short(players[sbIdx])} posts the small blind (${cfg.smallBlind}). ${short(players[bbIdx])} posts the big blind (${cfg.bigBlind}).`);
+    }
   }
   fireRules(state, 'handStart', { playerId: state.players[state.turnIndex] });
   return state;
@@ -428,6 +471,10 @@ export function legalMoves(state: MatchState, playerId: string): Move[] {
   if (state.definition.fish) return fishLegalMoves(state, playerId);
   if (state.definition.rummy) return rummyLegalMoves(state, playerId);
   if (state.definition.war) return state.players[state.turnIndex] === playerId ? [{ actionId: 'warFlip' }] : [];
+  if (state.definition.bluff) return bluffLegalMoves(state, playerId);
+  if (state.definition.reflex) return reflexLegalMoves(state, playerId);
+  if (state.definition.poker) return pokerLegalMoves(state, playerId);
+  if (state.definition.pit) return pitLegalMoves(state, playerId);
 
   // Resolve a pending choice first (e.g. pick a suit after a wild).
   if (state.pendingChoice) {
@@ -476,6 +523,14 @@ function cloneState(state: MatchState): MatchState {
     passStaged: Object.fromEntries(Object.entries(state.passStaged).map(([k, v]) => [k, v.slice()])),
     climbBombDeclined: { ...state.climbBombDeclined },
     faceUp: { ...state.faceUp },
+    pendingClaim: state.pendingClaim ? { ...state.pendingClaim, cardIds: state.pendingClaim.cardIds.slice() } : null,
+    reflexOut: state.reflexOut.slice(),
+    chips: { ...state.chips },
+    committed: { ...state.committed },
+    folded: { ...state.folded },
+    actedThisRound: { ...state.actedThisRound },
+    market: state.market.map((o) => ({ ...o })),
+    highBid: state.highBid ? { ...state.highBid } : null,
     log: state.log.slice(),
   };
 }
@@ -693,6 +748,10 @@ export function applyMove(state: MatchState, playerId: string, move: Move): Matc
   if (def.fish) return afterFamilyMove(applyFishMove(s, playerId, move), playerId, handBefore);
   if (def.rummy) return afterFamilyMove(applyRummyMove(s, playerId, move), playerId, handBefore);
   if (def.war) return afterFamilyMove(applyWarMove(s, playerId, move), playerId, handBefore);
+  if (def.bluff) return afterFamilyMove(applyBluffMove(s, playerId, move), playerId, handBefore);
+  if (def.reflex) return afterFamilyMove(applyReflexMove(s, playerId, move), playerId, handBefore);
+  if (def.poker) return afterFamilyMove(applyPokerMove(s, playerId, move), playerId, handBefore);
+  if (def.pit) return afterFamilyMove(applyPitMove(s, playerId, move), playerId, handBefore);
 
   // Resolve a pending suit choice.
   if (move.actionId === 'resolveChoice') {
@@ -1004,11 +1063,24 @@ export function actingPlayers(state: MatchState): string[] {
   if (state.pendingChoice) return [state.pendingChoice.player];
   if (state.discarding) return [state.discarding];
   if (state.passDirection) return state.players.filter((p) => !(p in state.passChoices));
+  // Pit has no turn order at all — every player who still has legal moves is "acting" on
+  // every tick, the same way a simultaneous pass works.
+  if (state.definition.pit) return state.players.filter((p) => pitLegalMoves(state, p).length > 0);
   const current = state.players[state.turnIndex];
   if (state.definition.climb?.bombSize) {
     // A bomb can interrupt out of turn — anyone holding one is also "acting" right now.
     const bombers = state.players.filter((p) => p !== current && climbBombMoves(state, p).length > 0);
     if (bombers.length > 0) return [current, ...bombers];
+  }
+  if (state.definition.bluff && state.pendingClaim) {
+    // Anyone but the claimant may challenge right now, on top of whoever's turn it is.
+    const challengers = state.players.filter((p) => p !== state.pendingClaim!.player);
+    return [...new Set([current, ...challengers])];
+  }
+  if (state.definition.reflex) {
+    const flipper = reflexNextFlipper(state, state.turnIndex);
+    if (reflexSlapValid(state)) return [...new Set([flipper, ...reflexActive(state)].filter((p): p is string => !!p))];
+    return flipper ? [flipper] : [];
   }
   return [current];
 }
@@ -2452,6 +2524,476 @@ function endWarRound(s: MatchState): void {
   finalizeMatchProgress(s);
 }
 
+
+// ---------- bluff family (Cheat / "I Doubt It") ----------
+//
+// Every claim plays one same-actual-rank group from your hand — 1 to 4 cards — face down,
+// under a claimed rank you choose freely (which may or may not match). That claim stays open
+// to challenge, by anyone but you, until you make your NEXT claim; making a new claim without
+// challenging the last one lets it stand forever. A challenge reveals the disputed cards: if
+// the claim was true, the challenger takes the whole center pile; if it was a lie, the
+// claimant does. First to empty their hand wins.
+
+function bluffCenterZone(def: GameDefinition): string {
+  return def.zones.find((z) => z.shared && z.type === 'pile')!.id;
+}
+
+function bluffChallengeMoves(state: MatchState, playerId: string): Move[] {
+  if (!state.pendingClaim || state.pendingClaim.player === playerId) return [];
+  return [{ actionId: 'bluffChallenge' }];
+}
+
+function bluffClaimMoves(state: MatchState, playerId: string): Move[] {
+  const cfg = state.definition.bluff!;
+  const hand = state.zones[`hand:${playerId}`] || [];
+  if (hand.length === 0) return [];
+  const ranks = cfg.claimableRanks ?? state.definition.deck.rankOrder;
+  const moves: Move[] = [];
+  for (const size of [1, 2, 3, 4]) {
+    for (const g of climbGroups(hand, size)) {
+      for (const claimedRank of ranks) moves.push({ actionId: 'bluffClaim', cards: g.cards, claimedRank });
+    }
+  }
+  return moves;
+}
+
+function bluffLegalMoves(state: MatchState, playerId: string): Move[] {
+  const challenge = bluffChallengeMoves(state, playerId);
+  if (state.players[state.turnIndex] !== playerId) return challenge;
+  // On your own turn you may challenge the standing claim (if any) OR simply make your own —
+  // playing your own claim, without challenging, is exactly what lets the previous one stand.
+  return [...challenge, ...bluffClaimMoves(state, playerId)];
+}
+
+function applyBluffMove(s: MatchState, playerId: string, move: Move): MatchState {
+  const def = s.definition;
+  const center = bluffCenterZone(def);
+
+  if (move.actionId === 'bluffChallenge') {
+    if (bluffChallengeMoves(s, playerId).length === 0) return s;
+    const claim = s.pendingClaim!;
+    const pile = s.zones[center] || [];
+    const disputed = pile.filter((c) => claim.cardIds.includes(c.id));
+    const claimWasTrue = disputed.length === claim.count && disputed.every((c) => c.rank === claim.claimedRank);
+    const loser = claimWasTrue ? playerId : claim.player;
+    log(s, playerId, claimWasTrue
+      ? `${short(playerId)} called it — but ${short(claim.player)} was telling the truth about the ${claim.claimedRank}s. ${short(playerId)} takes the pile (${pile.length}).`
+      : `${short(playerId)} called it — ${short(claim.player)} was lying about the ${claim.claimedRank}s. ${short(claim.player)} takes the pile (${pile.length}).`);
+    const loserHand = s.zones[`hand:${loser}`] || (s.zones[`hand:${loser}`] = []);
+    loserHand.push(...pile);
+    s.zones[center] = [];
+    s.pendingClaim = null;
+    // Whoever just picked up the pile leads next — set directly, not via advanceAndCheck,
+    // which would step turnIndex one further and skip right past them.
+    s.turnIndex = s.players.indexOf(loser);
+    bluffCheckWin(s);
+    return s;
+  }
+
+  if (move.actionId !== 'bluffClaim' || s.players[s.turnIndex] !== playerId) return s;
+  const legal = bluffClaimMoves(s, playerId);
+  const chosen = legal.find((m) => m.actionId === 'bluffClaim'
+    && m.claimedRank === move.claimedRank
+    && m.cards?.length === move.cards?.length
+    && m.cards?.every((id) => move.cards?.includes(id)));
+  if (!chosen) return s;
+
+  const hand = s.zones[`hand:${playerId}`] || [];
+  const moved: Card[] = [];
+  for (const id of move.cards!) {
+    const i = hand.findIndex((c) => c.id === id);
+    if (i >= 0) moved.push(...hand.splice(i, 1));
+  }
+  s.zones[center] = [...(s.zones[center] || []), ...moved];
+  // Making this claim is what lets any PREVIOUS claim stand unchallenged forever — nothing
+  // extra to do for that; it simply stops being named anywhere once this one replaces it.
+  s.pendingClaim = { player: playerId, count: moved.length, claimedRank: move.claimedRank!, cardIds: moved.map((c) => c.id) };
+  log(s, playerId, `${short(playerId)} plays ${moved.length} card${moved.length === 1 ? '' : 's'} face down, claiming ${move.claimedRank}${moved.length > 1 ? 's' : ''}.`);
+  advanceAndCheck(s);
+  bluffCheckWin(s);
+  return s;
+}
+
+// A player wins the instant they hold zero cards AND no claim of theirs is still open to
+// challenge — which covers going out safely (the claim later gets superseded or survives a
+// challenge) as well as the ordinary case of being caught out by nobody at all. Checked after
+// every claim and every challenge resolves, so it fires at the first moment it becomes true
+// however it happens to become true.
+function bluffCheckWin(s: MatchState): boolean {
+  if (s.phase !== 'playing') return false;
+  const out = s.players.find((p) =>
+    (s.zones[`hand:${p}`] || []).length === 0 && s.pendingClaim?.player !== p);
+  if (!out) return false;
+  s.phase = 'roundOver';
+  s.winner = out;
+  for (const p of s.players) s.scores[p] = p === out ? 1 : 0;
+  log(s, null, `Game over — ${short(out)} is out of cards and in the clear.`);
+  finalizeMatchProgress(s);
+  return true;
+}
+
+// ---------- reflex family (Slapjack / Snap) ----------
+//
+// Whoever's turn it is flips their top card face-up onto the shared pile; turn then advances
+// normally, like a metronome. Separately, ANY player may slap whenever the top of the pile (or,
+// for `slapMatch`, the top two cards) satisfies the trigger — this is the same "several players
+// can act; the engine takes whichever move actually arrives" shape climb's bomb already uses,
+// just without a turn requirement on either side. A correct slap wins the whole pile into the
+// slapper's hand; there is no penalty for a slap offered when it would not have been valid,
+// because the engine never offers one — `legalMoves` only lists a slap while it is genuine.
+
+function reflexPileZone(def: GameDefinition): string {
+  return def.zones.find((z) => z.shared && z.visibility === 'all')!.id;
+}
+
+function reflexSlapValid(state: MatchState): boolean {
+  const cfg = state.definition.reflex!;
+  const pile = state.zones[reflexPileZone(state.definition)] || [];
+  const top = pile[pile.length - 1];
+  if (!top) return false;
+  if (cfg.slapRanks.includes(top.rank)) return true;
+  if (cfg.slapMatch && pile.length >= 2 && pile[pile.length - 2].rank === top.rank) return true;
+  return false;
+}
+
+// Still in the game: has not been eliminated. A player can reach zero cards in hand and stay
+// here — they can still win a slap and get the whole pile back — so this is deliberately not
+// the same set as "has cards to flip".
+function reflexActive(state: MatchState): string[] {
+  return state.players.filter((p) => !state.reflexOut.includes(p));
+}
+
+// Whose turn it is to FLIP, walking forward from turnIndex (which indexes the raw seat list,
+// the same convention climb's nextActiveIndex uses) and skipping active players who currently
+// hold no cards — they cannot flip, and simply waiting on them without ever moving past them
+// is a deadlock, not a turn. Returns null only when nobody at all can flip right now.
+function reflexNextFlipper(state: MatchState, from: number): string | null {
+  const n = state.players.length;
+  for (let step = 0; step < n; step++) {
+    const i = (from + step) % n;
+    const p = state.players[i];
+    if (state.reflexOut.includes(p)) continue;
+    if ((state.zones[`hand:${p}`] || []).length > 0) return p;
+  }
+  return null;
+}
+
+function reflexLegalMoves(state: MatchState, playerId: string): Move[] {
+  if (state.reflexOut.includes(playerId)) return [];
+  const moves: Move[] = [];
+  if (reflexSlapValid(state)) moves.push({ actionId: 'reflexSlap' });
+  if (reflexNextFlipper(state, state.turnIndex) === playerId) moves.push({ actionId: 'reflexFlip' });
+  return moves;
+}
+
+function applyReflexMove(s: MatchState, playerId: string, move: Move): MatchState {
+  const def = s.definition;
+  const pile = reflexPileZone(def);
+
+  if (move.actionId === 'reflexSlap') {
+    if (!reflexSlapValid(s) || s.reflexOut.includes(playerId)) return s;
+    const won = s.zones[pile] || [];
+    log(s, playerId, `${short(playerId)} slaps! Takes ${won.length} card${won.length === 1 ? '' : 's'}.`);
+    const hand = s.zones[`hand:${playerId}`] || (s.zones[`hand:${playerId}`] = []);
+    hand.unshift(...won);
+    s.zones[pile] = [];
+    reflexCheckEnd(s);
+    return s;
+  }
+
+  if (move.actionId !== 'reflexFlip' || reflexNextFlipper(s, s.turnIndex) !== playerId) return s;
+  const hand = s.zones[`hand:${playerId}`] || [];
+  const card = hand.shift();
+  if (!card) return s;
+  s.zones[pile] = [...(s.zones[pile] || []), card];
+  log(s, playerId, `${short(playerId)} flips ${cardLabel(card)}.`);
+  s.turnIndex = s.players.indexOf(playerId);
+  s.stallCount += 1; // doubles as the flip counter here, the same way War reuses it for its own cap
+
+  // Each flip can trigger at most one slap in reply, so total moves run to roughly double
+  // this — keep real headroom under the simulator's own 4000-move safety cap.
+  const cap = def.reflex!.flipCap ?? 1500;
+  if (s.stallCount >= cap) {
+    const winner = s.players.reduce((best, p) =>
+      (s.zones[`hand:${p}`] || []).length > (s.zones[`hand:${best}`] || []).length ? p : best, s.players[0]);
+    s.phase = 'roundOver';
+    s.winner = winner;
+    for (const p of s.players) s.scores[p] = p === winner ? 1 : 0;
+    log(s, null, `Game over — ${cap} flips in, ${short(winner)} is holding the most cards.`);
+    finalizeMatchProgress(s);
+    return s;
+  }
+
+  if (reflexCheckEnd(s)) return s;
+  const next = reflexNextFlipper(s, s.turnIndex + 1);
+  if (next) s.turnIndex = s.players.indexOf(next);
+  return s;
+}
+
+function reflexCheckEnd(s: MatchState): boolean {
+  // A player with zero cards and nothing left to slap for is out; re-check everyone now that
+  // the pile just changed hands (a slap) or might have just run dry (defensive; a flip never
+  // empties the pile on its own).
+  const pileEmpty = (s.zones[reflexPileZone(s.definition)] || []).length === 0;
+  if (pileEmpty) {
+    for (const p of s.players) {
+      if (!s.reflexOut.includes(p) && (s.zones[`hand:${p}`] || []).length === 0) {
+        s.reflexOut.push(p);
+        log(s, null, `${short(p)} is out of cards.`);
+      }
+    }
+  }
+  const remaining = reflexActive(s);
+  if (remaining.length > 1) return false;
+  s.phase = 'roundOver';
+  const winner = remaining[0] ?? s.players.reduce((best, p) =>
+    (s.zones[`hand:${p}`] || []).length > (s.zones[`hand:${best}`] || []).length ? p : best, s.players[0]);
+  s.winner = winner;
+  for (const p of s.players) s.scores[p] = p === winner ? 1 : 0;
+  log(s, null, `Game over — ${short(winner)} is the last one holding cards.`);
+  finalizeMatchProgress(s);
+  return true;
+}
+
+// ---------- poker family (single-round showdown, ante/blinds, no side pots) ----------
+//
+// A fixed deal, one betting round, then a showdown — deliberately not the full game. No
+// streets, no draw phase, no side pots: a player who cannot cover the current bet may only
+// fold. Real, working stakes (chips move, a pot is won and lost) rather than the "no wagering"
+// scoring-only showdown the classic template already shipped.
+
+function pokerActiveIds(s: MatchState): string[] {
+  return s.players.filter((p) => !s.folded[p]);
+}
+
+function pokerToCall(s: MatchState, playerId: string): number {
+  return Math.max(0, s.currentBet - (s.committed[playerId] ?? 0));
+}
+
+function pokerLegalMoves(state: MatchState, playerId: string): Move[] {
+  if (state.folded[playerId] || state.pokerPhase !== 'bet') return [];
+  if (state.players[state.turnIndex] !== playerId) return [];
+  const toCall = pokerToCall(state, playerId);
+  const stack = state.chips[playerId] ?? 0;
+  const moves: Move[] = [];
+  if (toCall === 0) moves.push({ actionId: 'pokerCheck' });
+  else if (stack >= toCall) moves.push({ actionId: 'pokerCall' });
+  if (stack > toCall) {
+    const cfg = state.definition.poker!;
+    const minTo = state.currentBet + cfg.minRaise;
+    if (stack >= minTo - (state.committed[playerId] ?? 0)) {
+      moves.push({ actionId: state.currentBet === 0 ? 'pokerBet' : 'pokerRaise', amount: minTo });
+      // A shove is always offered too, so an author-testing bot can go all-in without needing
+      // the exact minimum-raise increment.
+      if (stack + (state.committed[playerId] ?? 0) > minTo) {
+        moves.push({ actionId: state.currentBet === 0 ? 'pokerBet' : 'pokerRaise', amount: stack + (state.committed[playerId] ?? 0) });
+      }
+    }
+  }
+  moves.push({ actionId: 'pokerFold' });
+  return moves;
+}
+
+function pokerAdvance(s: MatchState): void {
+  const active = pokerActiveIds(s);
+  if (active.length <= 1) { pokerEndHand(s); return; }
+  const n = s.players.length;
+  let i = s.turnIndex;
+  for (let step = 0; step < n; step++) {
+    i = (i + 1) % n;
+    const p = s.players[i];
+    if (s.folded[p]) continue;
+    if (!s.actedThisRound[p] || (s.committed[p] ?? 0) < s.currentBet) { s.turnIndex = i; return; }
+  }
+  pokerShowdown(s);
+}
+
+function applyPokerMove(s: MatchState, playerId: string, move: Move): MatchState {
+  const legal = pokerLegalMoves(s, playerId);
+  const chosen = legal.find((m) => m.actionId === move.actionId
+    && (move.actionId !== 'pokerBet' && move.actionId !== 'pokerRaise' || m.amount === move.amount));
+  if (!chosen) return s;
+
+  const commit = (to: number) => {
+    const already = s.committed[playerId] ?? 0;
+    const add = Math.min(to, already + (s.chips[playerId] ?? 0)) - already;
+    s.chips[playerId] = (s.chips[playerId] ?? 0) - add;
+    s.committed[playerId] = already + add;
+    s.pot += add;
+  };
+
+  if (move.actionId === 'pokerFold') {
+    s.folded[playerId] = true;
+    log(s, playerId, `${short(playerId)} folds.`);
+  } else if (move.actionId === 'pokerCheck') {
+    s.actedThisRound[playerId] = true;
+    log(s, playerId, `${short(playerId)} checks.`);
+  } else if (move.actionId === 'pokerCall') {
+    commit(s.currentBet);
+    s.actedThisRound[playerId] = true;
+    log(s, playerId, `${short(playerId)} calls.`);
+  } else if (move.actionId === 'pokerBet' || move.actionId === 'pokerRaise') {
+    commit(move.amount!);
+    s.currentBet = Math.max(s.currentBet, s.committed[playerId] ?? 0);
+    // A new bet reopens the round for everyone else.
+    for (const p of s.players) s.actedThisRound[p] = false;
+    s.actedThisRound[playerId] = true;
+    log(s, playerId, `${short(playerId)} ${move.actionId === 'pokerBet' ? 'bets' : 'raises to'} ${s.currentBet}.`);
+  }
+
+  if (s.phase !== 'playing') return s;
+  pokerAdvance(s);
+  return s;
+}
+
+const HAND_CATEGORY = ['high', 'pair', 'twoPair', 'trips', 'straight', 'flush', 'fullHouse', 'quads', 'straightFlush'] as const;
+
+/** A simple, honest hand ranking — enough to settle a showdown, not a full 52-card evaluator. */
+function pokerHandStrength(def: GameDefinition, cards: Card[]): { score: number; label: string } {
+  const order = def.deck.rankOrder;
+  const ranks = cards.map((c) => order.indexOf(c.rank)).sort((a, b) => b - a);
+  const counts: Record<number, number> = {};
+  for (const r of ranks) counts[r] = (counts[r] ?? 0) + 1;
+  const groups = Object.entries(counts).map(([r, n]) => ({ r: Number(r), n }))
+    .sort((a, b) => b.n - a.n || b.r - a.r);
+  const isFlush = cards.length >= 5 && cards.every((c) => c.suit === cards[0].suit);
+  const uniq = [...new Set(ranks)].sort((a, b) => a - b);
+  let isStraight = false; let straightHigh = -1;
+  for (let i = 0; i + 4 < uniq.length + 1 && uniq.length >= 5; i++) {
+    if (uniq[i + 4] - uniq[i] === 4) { isStraight = true; straightHigh = uniq[i + 4]; }
+  }
+  let cat = 0; // index into HAND_CATEGORY
+  if (isStraight && isFlush) cat = 8;
+  else if (groups[0]?.n === 4) cat = 7;
+  else if (groups[0]?.n === 3 && groups[1]?.n >= 2) cat = 6;
+  else if (isFlush) cat = 5;
+  else if (isStraight) cat = 4;
+  else if (groups[0]?.n === 3) cat = 3;
+  else if (groups[0]?.n === 2 && groups[1]?.n === 2) cat = 2;
+  else if (groups[0]?.n === 2) cat = 1;
+  const tiebreak = cat === 4 || cat === 8 ? [straightHigh] : groups.map((g) => g.r).concat(ranks).slice(0, 5);
+  const score = cat * 1e10 + tiebreak.reduce((acc, v, i) => acc + v * Math.pow(15, 4 - i), 0);
+  return { score, label: HAND_CATEGORY[cat] };
+}
+
+function pokerShowdown(s: MatchState): void {
+  s.pokerPhase = 'showdown';
+  const active = pokerActiveIds(s);
+  let winner = active[0];
+  let best = -1;
+  for (const p of active) {
+    const { score } = pokerHandStrength(s.definition, s.zones[`hand:${p}`] || []);
+    if (score > best) { best = score; winner = p; }
+  }
+  pokerAwardPot(s, winner, active.length > 1);
+}
+
+function pokerAwardPot(s: MatchState, winner: string, wasShowdown: boolean): void {
+  s.chips[winner] = (s.chips[winner] ?? 0) + s.pot;
+  log(s, null, wasShowdown
+    ? `${short(winner)} wins the showdown and takes the pot (${s.pot}).`
+    : `Everyone else folded — ${short(winner)} takes the pot (${s.pot}).`);
+  pokerEndHand(s, winner);
+}
+
+function pokerEndHand(s: MatchState, forcedWinner?: string): void {
+  if (s.phase === 'roundOver') return;
+  if (forcedWinner === undefined) { pokerShowdown(s); return; }
+  s.phase = 'roundOver';
+  s.winner = forcedWinner;
+  for (const p of s.players) s.scores[p] = s.chips[p] ?? 0;
+  finalizeMatchProgress(s);
+}
+
+// ---------- pit family (open-market trading, no turn order) ----------
+//
+// Nobody waits their turn. Any player holding cards may post an offer — give N of one suit,
+// want N of another — and any OTHER player holding the wanted commodity may accept it, which
+// swaps the cards immediately. First to hold `cornerSize` cards of one suit "corners the
+// market" and wins. Every player is always in `actingPlayers()`, the same way a simultaneous
+// pass is: there is no turn to wait for.
+
+function pitLegalMoves(state: MatchState, playerId: string): Move[] {
+  if (state.phase !== 'playing') return [];
+  const hand = state.zones[`hand:${playerId}`] || [];
+  const bySuit: Record<string, number> = {};
+  for (const c of hand) bySuit[c.suit] = (bySuit[c.suit] ?? 0) + 1;
+  const moves: Move[] = [];
+  const suits: Suit[] = ['C', 'D', 'H', 'S'];
+  for (const give of suits) {
+    if ((bySuit[give] ?? 0) === 0) continue;
+    for (const want of suits) {
+      if (want === give) continue;
+      for (const count of [1, 2, 3]) {
+        if (count <= (bySuit[give] ?? 0)) moves.push({ actionId: 'pitOffer', give, want, cards: [String(count)] });
+      }
+    }
+  }
+  for (const offer of state.market) {
+    if (offer.player === playerId) { moves.push({ actionId: 'pitCancel', offerId: offer.id }); continue; }
+    if ((bySuit[offer.want] ?? 0) >= offer.count) moves.push({ actionId: 'pitAccept', offerId: offer.id });
+  }
+  return moves;
+}
+
+function applyPitMove(s: MatchState, playerId: string, move: Move): MatchState {
+  const hand = s.zones[`hand:${playerId}`] || (s.zones[`hand:${playerId}`] = []);
+
+  if (move.actionId === 'pitOffer') {
+    const count = Number(move.cards?.[0] ?? 0);
+    const give = move.give as Suit; const want = move.want as Suit;
+    const have = hand.filter((c) => c.suit === give).length;
+    if (!count || have < count || give === want) return s;
+    const id = s.nextOfferId++;
+    s.market.push({ id, player: playerId, give, count, want });
+    log(s, playerId, `${short(playerId)} offers ${count} ${suitWord(give)} for ${suitWord(want)}.`);
+    return s;
+  }
+
+  if (move.actionId === 'pitCancel') {
+    const before = s.market.length;
+    s.market = s.market.filter((o) => !(o.id === move.offerId && o.player === playerId));
+    if (s.market.length < before) log(s, playerId, `${short(playerId)} withdraws an offer.`);
+    return s;
+  }
+
+  if (move.actionId === 'pitAccept') {
+    const offer = s.market.find((o) => o.id === move.offerId);
+    if (!offer || offer.player === playerId) return s;
+    const mine = hand.filter((c) => c.suit === offer.want);
+    const theirHand = s.zones[`hand:${offer.player}`] || [];
+    const theirs = theirHand.filter((c) => c.suit === offer.give);
+    if (mine.length < offer.count || theirs.length < offer.count) { s.market = s.market.filter((o) => o.id !== offer.id); return s; }
+    const give = mine.slice(0, offer.count);
+    const get = theirs.slice(0, offer.count);
+    s.zones[`hand:${playerId}`] = hand.filter((c) => !give.includes(c)).concat(get);
+    s.zones[`hand:${offer.player}`] = theirHand.filter((c) => !get.includes(c)).concat(give);
+    s.market = s.market.filter((o) => o.id !== offer.id);
+    log(s, playerId, `${short(playerId)} trades ${offer.count} ${suitWord(offer.want)} with ${short(offer.player)} for ${suitWord(offer.give)}.`);
+    if (pitCheckWin(s)) return s;
+    return s;
+  }
+
+  return s;
+}
+
+function pitCheckWin(s: MatchState): boolean {
+  const cfg = s.definition.pit!;
+  for (const p of s.players) {
+    const bySuit: Record<string, number> = {};
+    for (const c of s.zones[`hand:${p}`] || []) bySuit[c.suit] = (bySuit[c.suit] ?? 0) + 1;
+    if (Object.values(bySuit).some((n) => n >= cfg.cornerSize)) {
+      s.phase = 'roundOver';
+      s.winner = p;
+      for (const q of s.players) s.scores[q] = q === p ? 1 : 0;
+      log(s, null, `Game over — ${short(p)} corners the market.`);
+      finalizeMatchProgress(s);
+      return true;
+    }
+  }
+  return false;
+}
+
 // ---------- redaction (hidden information) ----------
 
 export function redact(state: MatchState, viewer: string): RedactedState {
@@ -2508,11 +3050,20 @@ export function redact(state: MatchState, viewer: string): RedactedState {
         ? !(viewer in state.passChoices)
         : state.sittingOut === viewer
         ? false
+        // These four don't share the trick/climb/rummy notion of "whose turn" — each has its
+        // own legality (an open-market trade, a claim to challenge, a slap, a bet) — so ask the
+        // family directly rather than compare against `turnIndex`, which for reflex indexes the
+        // active-player subset, not the raw seat list, and would name the wrong seat outright.
+        : state.definition.bluff ? bluffLegalMoves(state, viewer).length > 0
+        : state.definition.reflex ? reflexLegalMoves(state, viewer).length > 0
+        : state.definition.poker ? pokerLegalMoves(state, viewer).length > 0
+        : state.definition.pit ? pitLegalMoves(state, viewer).length > 0
         : state.players[state.turnIndex] === viewer || climbBombMoves(state, viewer).length > 0),
     pendingChoice: state.pendingChoice,
     scores: { ...state.scores },
     log: state.log.slice(-40),
-    mode: state.definition.solitaire ? 'solitaire' : state.definition.trick ? 'trick' : state.definition.climb ? 'climb' : state.definition.fish ? 'fish' : state.definition.rummy ? 'rummy' : state.definition.war ? 'war' : 'shedding',
+    mode: state.definition.solitaire ? 'solitaire' : state.definition.trick ? 'trick' : state.definition.climb ? 'climb' : state.definition.fish ? 'fish' : state.definition.rummy ? 'rummy' : state.definition.war ? 'war'
+      : state.definition.bluff ? 'bluff' : state.definition.reflex ? 'reflex' : state.definition.poker ? 'poker' : state.definition.pit ? 'pit' : 'shedding',
     ...(state.definition.solitaire ? solitaireView(state) : {}),
     battle: state.definition.war ? (state.zones[state.definition.zones.find((z) => z.shared && z.visibility === 'all')!.id] || []).slice() : undefined,
     rummyPhase: state.definition.rummy ? state.rummyPhase : undefined,
@@ -2558,6 +3109,32 @@ export function redact(state: MatchState, viewer: string): RedactedState {
     passCount: state.passCount,
     passStaged: (state.passStaged[viewer] || []).slice(),
     brokenSuitPlayed: state.definition.trick?.brokenSuit ? state.brokenSuitPlayed : undefined,
+    // bluff
+    centerCount: state.definition.bluff ? (state.zones[bluffCenterZone(def)] || []).length : undefined,
+    pendingClaim: state.definition.bluff
+      ? (state.pendingClaim ? { player: state.pendingClaim.player, count: state.pendingClaim.count, claimedRank: state.pendingClaim.claimedRank } : null)
+      : undefined,
+    // reflex
+    pileTop: state.definition.reflex ? (topCard(state.zones[reflexPileZone(def)] || []) ?? null) : undefined,
+    slapValid: state.definition.reflex ? reflexSlapValid(state) : undefined,
+    reflexOut: state.definition.reflex ? state.reflexOut.slice() : undefined,
+    // poker
+    chips: state.definition.poker ? { ...state.chips } : undefined,
+    pot: state.definition.poker ? state.pot : undefined,
+    currentBet: state.definition.poker ? state.currentBet : undefined,
+    committed: state.definition.poker ? { ...state.committed } : undefined,
+    folded: state.definition.poker ? { ...state.folded } : undefined,
+    showdown: state.definition.poker && state.phase === 'roundOver'
+      ? state.players.filter((p) => !state.folded[p]).map((p) => {
+          const cards = state.zones[`hand:${p}`] || [];
+          return { player: p, cards: cards.slice(), label: pokerHandStrength(def, cards).label };
+        })
+      : undefined,
+    // pit
+    market: state.definition.pit ? state.market.map((o) => ({ ...o })) : undefined,
+    cornerSize: state.definition.pit ? state.definition.pit.cornerSize : undefined,
+    // numeric (Bridge-style) auction
+    highBid: state.definition.trick?.numericAuction ? state.highBid : undefined,
   };
 }
 

@@ -42,7 +42,7 @@ console.log('\nThe briefing is generated from the code, not typed out');
   ok('every condition id appears', ['always', 'suitIs', 'rankIs', 'handSize', 'holds'].every((id) => spec.includes(`"${id}"`)));
   ok('every effect id appears', ['addScore', 'announce', 'skipNext', 'reveal', 'endHand'].every((id) => spec.includes(`"${id}"`)));
   ok('every hook appears', ['cardPlayed', 'turnStart', 'trickWon', 'drawPileEmpty'].every((h) => spec.includes(`"${h}"`)));
-  ok('all seven families are described', ['shedding', 'trick', 'climb', 'fish', 'rummy', 'war', 'solitaire'].every((f) => spec.includes(`"${f}"`)));
+  ok('all eleven families are described', ['shedding', 'trick', 'climb', 'fish', 'rummy', 'war', 'solitaire', 'bluff', 'reflex', 'poker', 'pit'].every((f) => spec.includes(`"${f}"`)));
 }
 
 console.log('\nReading a reply');
