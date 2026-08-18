@@ -1,10 +1,18 @@
 import { createServer, IncomingMessage, ServerResponse } from 'node:http';
+import { readFile } from 'node:fs/promises';
+import { extname, join, normalize } from 'node:path';
 import { WebSocketServer, WebSocket } from 'ws';
 import { MatchService, Seat } from '../server/matchService';
 import { Request, Response, TableEvent } from './protocol';
 import { handle, mutates, eventFor } from './dispatch';
 import { GameDefinition } from '../engine/types';
 import { handleAuthor, canAuthor, AuthorRequest } from './authorEndpoint';
+
+const MIME: Record<string, string> = {
+  '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
+  '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.svg': 'image/svg+xml',
+  '.png': 'image/png', '.ico': 'image/x-icon', '.woff2': 'font/woff2', '.txt': 'text/plain',
+};
 
 // A real host.
 //
@@ -20,6 +28,12 @@ export interface HostOptions {
   port?: number;
   /** Games this host will deal. A table can only be opened for a definition the host knows. */
   catalog?: GameDefinition[];
+  /**
+   * A built frontend (`vite build`'s `dist/`) to serve alongside the API, so one process is a
+   * complete deployable site — no separate static host, no CORS, no endpoint to pin at build
+   * time. Omit to run API/WS only, as the test suite does.
+   */
+  staticDir?: string;
 }
 
 interface Table {
@@ -35,11 +49,13 @@ export class GameHost {
   private byMatch = new Map<string, Table>();
   private queue: string[] = [];                // invite codes waiting for a quick-play partner
   private catalog: GameDefinition[];
+  private staticDir?: string;
   private wss?: WebSocketServer;
   private http?: ReturnType<typeof createServer>;
 
   constructor(opts: HostOptions = {}) {
     this.catalog = opts.catalog ?? [];
+    this.staticDir = opts.staticDir;
   }
 
   // ----- table lifecycle -----
@@ -216,7 +232,29 @@ export class GameHost {
       });
       return;
     }
+    if (this.staticDir && (req.method === 'GET' || req.method === 'HEAD')) {
+      this.serveStatic(url.pathname, res);
+      return;
+    }
     json(404, { error: 'Not found.' });
+  }
+
+  /** Serves the built frontend. Any path without a file extension falls back to index.html —
+   * this is a single-page app with no server-side routes of its own. */
+  private serveStatic(pathname: string, res: ServerResponse): void {
+    const dir = this.staticDir!;
+    const safe = normalize(pathname).replace(/^(\.\.[/\\])+/, '');
+    const hasExt = extname(safe) !== '';
+    const target = join(dir, hasExt ? safe : 'index.html');
+    readFile(target).then((buf) => {
+      res.writeHead(200, { 'content-type': MIME[extname(target)] ?? 'application/octet-stream' });
+      res.end(buf);
+    }).catch(() => {
+      readFile(join(dir, 'index.html')).then((buf) => {
+        res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+        res.end(buf);
+      }).catch(() => { res.writeHead(404); res.end('Not found.'); });
+    });
   }
 }
 
