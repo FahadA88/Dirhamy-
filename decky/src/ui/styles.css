@@ -1563,12 +1563,9 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
   border: 1px solid rgba(214,175,92,0.35);
 }
 
-/* The primary action anywhere is brass. */
-button.primary {
-  background: var(--gold); color: #17140c; border: 0; font-weight: 800;
-}
-button.primary:hover { background: var(--gold-hi); }
-.tabs button.on { background: var(--panel-hi); color: var(--ink); }
+/* The Parlour palette painted every primary button brass, and its `:hover` outranked the plain
+   `button.primary` that replaced it — so the main action on every screen turned gold the moment
+   you pointed at it. Both are gone; the house button lives in one place now. */
 
 /* Names on the table read as names, not as terminal output. */
 .match-hand, .seat-name, .you-head > span:first-child { font-family: inherit; }
@@ -3113,7 +3110,14 @@ button.primary {
   transform: translateY(0);
   transition: transform 90ms cubic-bezier(.2,.9,.3,1.3), box-shadow 90ms, filter 140ms;
 }
-button.primary:hover { filter: brightness(1.08); }
+/* States have to restate the background. An earlier `button.primary:hover` sets one, and a
+   pseudo-class outranks the plain rule no matter how far down the sheet the plain rule is —
+   which is how the house button kept turning a different colour under the pointer. */
+button.primary:hover {
+  background: linear-gradient(180deg, #ff85bb 0%, var(--hot-hi) 52%, var(--hot) 100%);
+  border: 0;
+  filter: none;
+}
 button.primary:active {
   transform: translateY(var(--lip));
   box-shadow: 0 0 0 #a30f4f, 0 2px 8px rgba(255, 46, 136, .3), 0 1px 0 rgba(255,255,255,.3) inset;
@@ -3561,4 +3565,85 @@ header h1 {
   content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px;
   background: linear-gradient(90deg, transparent, rgba(255,255,255,.5), transparent);
   opacity: .5;
+}
+
+/* ============================================================
+   DESCRIBE IT
+   The box you type a game into, and the work being shown.
+   ============================================================ */
+
+.describe {
+  margin-bottom: 34px; padding: 24px 26px 22px;
+  border-radius: var(--r-lg);
+  background:
+    radial-gradient(120% 90% at 10% -10%, rgba(255,46,136,.16), transparent 60%),
+    radial-gradient(120% 90% at 90% 110%, rgba(31,227,255,.12), transparent 60%),
+    linear-gradient(180deg, var(--panel-hi), var(--panel));
+  border: 1px solid var(--panel-brd);
+  box-shadow: var(--shadow-panel), 0 1px 0 rgba(255,255,255,.10) inset;
+}
+.describe-head h2 { margin: 0 0 4px; font-size: 26px; }
+.describe-head p { margin: 0 0 16px; max-width: 62ch; }
+
+.describe-box {
+  width: 100%; padding: 14px 16px; border-radius: 12px;
+  font: inherit; font-size: 15px; line-height: 1.55; resize: vertical;
+  background: var(--input-bg); color: var(--ink);
+  border: 1px solid var(--panel-brd);
+}
+.describe-box:disabled { opacity: .6; }
+
+.describe-actions { display: flex; align-items: center; gap: 14px; margin-top: 14px; flex-wrap: wrap; }
+.describe-examples { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+.describe-examples .chip { font-size: 12px; cursor: pointer; }
+
+/* The work, one line per stage. */
+.describe-steps {
+  list-style: none; margin: 18px 0 0; padding: 14px 16px;
+  border-radius: 12px; background: rgba(0,0,0,.22);
+  border: 1px solid var(--panel-brd);
+  display: flex; flex-direction: column; gap: 7px;
+  font-size: 13.5px;
+}
+.describe-steps li { display: flex; align-items: center; gap: 10px; color: var(--muted); }
+.ds-mark { width: 16px; text-align: center; flex: 0 0 auto; }
+.ds-text { flex: 1 1 auto; }
+.describe-steps li.live { color: var(--ink); }
+.describe-steps li.live .ds-mark { animation: ds-pulse 1s ease-in-out infinite; color: var(--cyan); }
+@keyframes ds-pulse { 50% { opacity: .25; } }
+.ds-done { color: var(--lime) !important; }
+.ds-done .ds-mark { color: var(--lime); }
+.ds-failed { color: var(--red) !important; }
+.ds-failed .ds-mark { color: var(--red); }
+.ds-repairing .ds-mark { color: var(--amber); }
+.ds-attempt {
+  font-family: var(--mono); font-size: 10px; padding: 1px 7px; border-radius: 999px;
+  border: 1px solid var(--panel-brd); opacity: .7;
+}
+
+.describe-result {
+  margin-top: 18px; padding: 18px 20px; border-radius: 14px;
+  border: 1px solid var(--panel-brd); background: rgba(0,0,0,.2);
+}
+.describe-result h3 { margin: 0 0 4px; font-size: 22px; }
+.describe-result p { margin: 0 0 12px; }
+.describe-result.ok { border-color: rgba(77,255,160,.4); box-shadow: 0 0 30px rgba(77,255,160,.12); }
+.describe-result.bad { border-color: rgba(255,77,94,.45); }
+.dr-stats { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+.dr-stats span {
+  font-size: 12px; padding: 5px 11px; border-radius: 999px;
+  border: 1px solid var(--panel-brd); color: var(--muted);
+}
+.dr-stats b { color: var(--ink); font-family: var(--mono); }
+.dr-notes {
+  margin-bottom: 14px; padding: 11px 14px; border-radius: 10px;
+  background: rgba(255,197,49,.08); border: 1px solid rgba(255,197,49,.32);
+  font-size: 13px;
+}
+.dr-notes b { display: block; margin-bottom: 5px; color: var(--gold-hi); font-size: 12px; }
+.dr-notes ul { margin: 0; padding-left: 18px; color: var(--muted); }
+
+@media (max-width: 700px) {
+  .describe { padding: 18px 16px; }
+  .describe-head h2 { font-size: 21px; }
 }

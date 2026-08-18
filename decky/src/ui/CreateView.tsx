@@ -30,6 +30,7 @@ import { explainGame } from '../authoring/explain';
 import { publish, complexityOf, playtimeOf } from '../library/library';
 import { checkName, checkText } from '../social/safety';
 import { useSettings } from '../settings/SettingsContext';
+import { DescribeGame } from './DescribeGame';
 
 type RankArrayKey = 'wildRanks' | 'skipRanks' | 'reverseRanks' | 'drawRanks' | 'extraTurnRanks' | 'wildDrawRanks' | 'excludeRanks' | 'passRanks';
 
@@ -139,8 +140,13 @@ export function CreateView({ onPlay }: { onPlay?: (def: GameDefinition) => void 
 
       {step === 'start' && (
         <div className="startgrid">
+          <DescribeGame onBuilt={({ knobs: k, rules, report: rep }) => {
+            startFrom({ ...defaultKnobs, ...k, customRules: rules } as Knobs);
+            setReport(rep);
+            setStep('design');
+          }} />
           <div className="startgrid-head">
-            <h2>What are you making?</h2>
+            <h2>Or start from a shape</h2>
             <p className="muted">Every one of these is already playable. Pick the closest and change it.</p>
           </div>
           <div className="template-grid">

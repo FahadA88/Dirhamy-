@@ -11,7 +11,7 @@
     "validate": "tsx scripts/validate.ts",
     "mechanics": "tsx scripts/mechanics.ts",
     "phase1": "tsx scripts/phase1.ts",
-    "test": "tsx scripts/selftest.ts && tsx scripts/validate.ts && tsx scripts/mechanics.ts && tsx scripts/phase1.ts && tsx scripts/phase2.ts && tsx scripts/phase3.ts && tsx scripts/phase5.ts",
+    "test": "tsx scripts/selftest.ts && tsx scripts/validate.ts && tsx scripts/mechanics.ts && tsx scripts/phase1.ts && tsx scripts/phase2.ts && tsx scripts/phase3.ts && tsx scripts/phase5.ts && tsx scripts/author.ts",
     "typecheck": "tsc --noEmit",
     "smoke": "node scripts/browser/smoke.mjs",
     "verify:ui": "node scripts/browser/verify.mjs",
@@ -22,7 +22,8 @@
     "verify:mp": "node scripts/browser/multiplayer.mjs",
     "verify:shelf": "node scripts/browser/shelf.mjs",
     "phase5": "tsx scripts/phase5.ts",
-    "verify:all": "node scripts/browser/smoke.mjs && node scripts/browser/verify.mjs && node scripts/browser/builder.mjs && node scripts/browser/multiplayer.mjs && node scripts/browser/shelf.mjs"
+    "verify:all": "node scripts/browser/smoke.mjs && node scripts/browser/verify.mjs && node scripts/browser/builder.mjs && node scripts/browser/multiplayer.mjs && node scripts/browser/shelf.mjs",
+    "author": "tsx scripts/author.ts"
   },
   "dependencies": {
     "react": "^18.3.1",

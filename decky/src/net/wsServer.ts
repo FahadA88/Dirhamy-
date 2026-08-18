@@ -4,6 +4,7 @@ import { MatchService, Seat } from '../server/matchService';
 import { Request, Response, TableEvent } from './protocol';
 import { handle, mutates, eventFor } from './dispatch';
 import { GameDefinition } from '../engine/types';
+import { handleAuthor, canAuthor, AuthorRequest } from './authorEndpoint';
 
 // A real host.
 //
@@ -175,7 +176,18 @@ export class GameHost {
       res.end();
       return;
     }
-    if (url.pathname === '/health') { json(200, { ok: true, tables: this.tables.size }); return; }
+    if (url.pathname === '/health') { json(200, { ok: true, tables: this.tables.size, canAuthor: canAuthor() }); return; }
+
+    // The game writer. Served at /api/author as well as /author so a site behind a proxy that
+    // routes /api/* to the host does not need a rewrite rule.
+    if ((url.pathname === '/author' || url.pathname === '/api/author') && req.method === 'POST') {
+      body(req, (data) => {
+        handleAuthor(data as AuthorRequest).then((r) => {
+          json(r.status, r.error ? { error: r.error } : { text: r.text });
+        });
+      });
+      return;
+    }
     if (url.pathname === '/games') { json(200, this.catalog.map((g) => ({ id: g.meta.id, name: g.meta.name }))); return; }
 
     if (url.pathname === '/open' && req.method === 'POST') {
