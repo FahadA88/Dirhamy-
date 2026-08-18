@@ -31,7 +31,8 @@ host.listen(port).then((actual) => {
   console.log(`  quick play POST /quickplay  { gameId, name, seats }`);
   console.log(`  author     POST /api/author { system, user }`);
   console.log(`  live       ws://127.0.0.1:${actual}`);
-  console.log(`\n${catalog.length} games available. AI writer: ${process.env.ANTHROPIC_API_KEY ? 'configured' : 'NOT configured (set ANTHROPIC_API_KEY)'}.`);
+  const writerKey = process.env.GEMINI_API_KEY ? 'Gemini' : process.env.ANTHROPIC_API_KEY ? 'Anthropic' : null;
+  console.log(`\n${catalog.length} games available. AI writer: ${writerKey ? `configured (${writerKey})` : 'NOT configured (set GEMINI_API_KEY or ANTHROPIC_API_KEY)'}.`);
 });
 
 for (const sig of ['SIGINT', 'SIGTERM'] as const) {
