@@ -3,6 +3,7 @@ import { GameDefinition, Move, RedactedState } from '../engine/types';
 import { CardFace } from './Card';
 import { TableDressing, TableRail } from './TableDressing';
 import { DealMotion } from './DealMotion';
+import { Confetti } from './Confetti';
 import { useSettings } from '../settings/SettingsContext';
 import { playSound } from './sound';
 import { service } from '../server/local';
@@ -210,12 +211,15 @@ export function SolitaireTable({ def }: { def: GameDefinition }) {
 
       {view.phase === 'roundOver' && (
         <div className="modal">
-          <div className="modal-box">
-            <h3>{view.winner ? `🏆 Solved in ${view.moveCount} moves` : 'No moves left'}</h3>
+          {view.winner && <Confetti pieces={64} spread="rain" />}
+          <div className={`modal-box celebrate ${view.winner ? 'won' : ''}`}>
+            {view.winner && <span className="cb-crown" aria-hidden="true">★</span>}
+            <span className="cb-kicker">{view.winner ? `${view.moveCount} moves` : 'Stuck'}</span>
+            <h3>{view.winner ? 'Solved' : 'No moves left'}</h3>
             <p className="scores">
-              {view.winner
+              <span>{view.winner
                 ? 'Every card is home.'
-                : 'Blocked. Undo, or take a fresh deal.'}
+                : 'Blocked. Undo, or take a fresh deal.'}</span>
             </p>
             <div className="sol-end-actions">
               {!view.winner && <button className="ghost" onClick={undo} disabled={!canUndo}>Undo</button>}

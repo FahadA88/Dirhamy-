@@ -5,6 +5,7 @@ import { CardFace } from './Card';
 import { TableDressing, TableRail } from './TableDressing';
 import { DealMotion } from './DealMotion';
 import { ScorePad } from './ScorePad';
+import { Confetti } from './Confetti';
 import { useSettings } from '../settings/SettingsContext';
 import { BOT_SPEED_MS } from '../settings/settings';
 import { playSound } from './sound';
@@ -544,10 +545,14 @@ export function Table({ def, seats = 3, plan }: {
 
       {view.phase === 'roundOver' && !view.matchOver && (
         <div className="modal">
-          <div className="modal-box">
-            <h3>{view.winner === me ? '🎉 You win this hand!' : `${nameOf(view.winner || '')} wins this hand`}</h3>
+          {view.winner === me && <Confetti pieces={30} />}
+          <div className={`modal-box celebrate ${view.winner === me ? 'won' : ''}`}>
+            <span className="cb-kicker">Hand {view.handNumber}</span>
+            <h3>{view.winner === me ? 'You take it' : `${nameOf(view.winner || '')} takes it`}</h3>
             <p className="scores">
-              {Object.entries(view.scores).map(([p, s]) => (<span key={p}>{nameOf(p)}: +{s}&nbsp;&nbsp;</span>))}
+              {Object.entries(view.scores).map(([p, s]) => (
+                <span key={p} className={p === me ? 'mine' : ''}>{nameOf(p)} <b>+{s}</b></span>
+              ))}
             </p>
             <div className="match-scoreboard">
               <div className="ms-title">Race to {view.matchTarget}</div>
@@ -566,19 +571,32 @@ export function Table({ def, seats = 3, plan }: {
         </div>
       )}
 
-      {view.phase === 'roundOver' && view.matchOver && (
-        <div className="modal">
-          <div className="modal-box">
-            <h3>{view.matchWinner === me ? '🏆 You win the match!' : view.winner === me ? '🎉 You win!' : `${nameOf(view.matchWinner ?? view.winner ?? '')} wins${view.matchTarget != null ? ' the match' : ''}`}</h3>
-            <p className="scores">
-              {Object.entries(view.matchTarget != null ? (view.matchScores ?? view.scores) : view.scores).map(([p, s]) => (
-                <span key={p}>{nameOf(p)}: {s} pts&nbsp;&nbsp;</span>
-              ))}
-            </p>
-            <button className="primary" onClick={restart}>Play again</button>
+      {view.phase === 'roundOver' && view.matchOver && (() => {
+        const iWon = view.matchWinner === me || (view.matchWinner == null && view.winner === me);
+        const finals = Object.entries(view.matchTarget != null ? (view.matchScores ?? view.scores) : view.scores);
+        const lowWins = def.scoring.winner === 'lowestTotal';
+        const ranked = finals.slice().sort((a, b) => (lowWins ? a[1] - b[1] : b[1] - a[1]));
+        return (
+          <div className="modal">
+            {iWon && <Confetti pieces={64} spread="rain" />}
+            <div className={`modal-box celebrate final ${iWon ? 'won' : ''}`}>
+              <span className="cb-crown" aria-hidden="true">{iWon ? '★' : '☆'}</span>
+              <span className="cb-kicker">{view.matchTarget != null ? 'Match over' : 'Game over'}</span>
+              <h3>{iWon ? 'You win' : `${nameOf(view.matchWinner ?? view.winner ?? '')} wins`}</h3>
+              <ol className="podium">
+                {ranked.map(([p, sc], i) => (
+                  <li key={p} className={`${p === me ? 'mine' : ''} ${i === 0 ? 'first' : ''}`}>
+                    <span className="pd-rank">{i + 1}</span>
+                    <span className="pd-name">{nameOf(p)}</span>
+                    <b className="pd-score">{sc}</b>
+                  </li>
+                ))}
+              </ol>
+              <button className="primary" onClick={restart}>Play again</button>
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       </div>
       </div>

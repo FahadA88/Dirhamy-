@@ -3452,3 +3452,103 @@ header h1 {
    resolves to `start` for it — so every swatch sat at its content width in the middle of a
    111px column. Same family of bug as the row heights above: state it, don't infer it. */
 .swatches .swatch { justify-self: stretch; width: 100%; }
+
+/* ============================================================
+   WINNING
+   Confetti and a panel that behaves like a result screen rather
+   than an alert box.
+   ============================================================ */
+
+.confetti { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 1; }
+.cf {
+  position: absolute; top: -8%;
+  border-radius: 2px;
+  animation-name: cf-fall;
+  animation-timing-function: cubic-bezier(.28,.5,.5,1);
+  animation-fill-mode: both;
+  will-change: transform, opacity;
+}
+.cf.flat { border-radius: 50%; }
+@keyframes cf-fall {
+  0%   { opacity: 0; transform: translate3d(0, 0, 0) rotate(0deg) scale(.6); }
+  8%   { opacity: 1; }
+  80%  { opacity: 1; }
+  100% { opacity: 0; transform: translate3d(var(--drift), 118vh, 0) rotate(var(--spin)) scale(1); }
+}
+
+.modal-box.celebrate {
+  position: relative; z-index: 2;
+  text-align: center;
+  padding: 30px 34px 26px;
+  border-radius: 22px;
+  background:
+    radial-gradient(120% 90% at 50% -10%, rgba(255,46,136,.20), transparent 62%),
+    linear-gradient(180deg, var(--panel-hi), var(--panel));
+  border: 1px solid var(--panel-brd);
+  box-shadow: 0 2px 0 rgba(0,0,0,.4), 0 30px 80px rgba(4,0,26,.66), 0 1px 0 rgba(255,255,255,.10) inset;
+}
+.modal-box.celebrate.won {
+  border-color: rgba(255,197,49,.5);
+  box-shadow:
+    0 2px 0 rgba(0,0,0,.4),
+    0 0 60px rgba(255,197,49,.28),
+    0 30px 80px rgba(4,0,26,.66),
+    0 1px 0 rgba(255,255,255,.14) inset;
+}
+.cb-kicker {
+  display: block; font-family: var(--mono); font-size: 10px;
+  letter-spacing: 2.6px; text-transform: uppercase; color: var(--muted);
+  margin-bottom: 6px;
+}
+.modal-box.celebrate h3 {
+  margin: 0 0 14px; font-size: clamp(28px, 5vw, 42px); font-weight: 900; letter-spacing: -.03em;
+  background: linear-gradient(100deg, var(--gold-hi), var(--hot-hi) 58%, var(--cyan));
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+}
+.modal-box.celebrate.won h3 { filter: drop-shadow(0 0 22px rgba(255,197,49,.45)); }
+.cb-crown {
+  display: block; font-size: 40px; line-height: 1; margin-bottom: 4px;
+  color: var(--gold);
+  text-shadow: 0 0 26px rgba(255,197,49,.7);
+  animation: crown-in 620ms cubic-bezier(.2,1.4,.4,1) both;
+}
+@keyframes crown-in {
+  from { transform: scale(.2) rotate(-24deg); opacity: 0; }
+  to   { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+
+.modal-box.celebrate .scores {
+  display: flex; flex-wrap: wrap; gap: 8px; justify-content: center;
+  margin: 0 0 18px; font-size: 13px;
+}
+.modal-box.celebrate .scores span {
+  padding: 5px 12px; border-radius: 999px;
+  border: 1px solid var(--panel-brd); background: rgba(255,255,255,.04);
+  color: var(--muted);
+}
+.modal-box.celebrate .scores span.mine { border-color: var(--hot); color: var(--ink); }
+.modal-box.celebrate .scores b { color: var(--ink); font-family: var(--mono); }
+
+/* The final standings, as a list you read top to bottom. */
+.podium { list-style: none; margin: 0 0 20px; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.podium li {
+  display: flex; align-items: center; gap: 12px;
+  padding: 9px 14px; border-radius: 12px;
+  background: rgba(255,255,255,.035);
+  border: 1px solid var(--panel-brd);
+}
+.podium li.first {
+  background: linear-gradient(90deg, rgba(255,197,49,.18), rgba(255,197,49,.04));
+  border-color: rgba(255,197,49,.5);
+}
+.podium li.mine .pd-name { color: var(--ink); font-weight: 800; }
+.pd-rank {
+  width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center;
+  font-family: var(--mono); font-size: 11px; flex: 0 0 auto;
+  background: rgba(255,255,255,.08); color: var(--muted);
+}
+.podium li.first .pd-rank { background: var(--gold); color: #241700; font-weight: 800; }
+.pd-name { flex: 1 1 auto; text-align: left; color: var(--muted); }
+.pd-score { font-family: var(--mono); color: var(--ink); }
+
+.modal { background: rgba(6, 2, 22, .62); }
