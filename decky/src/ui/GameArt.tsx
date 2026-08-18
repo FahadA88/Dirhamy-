@@ -50,17 +50,20 @@ interface Scene {
 // Coordinates are percentages of the tile and rotations are degrees. A card is about 26% wide
 // and 38% tall, so a card at x: 50 fills the middle third.
 
+// Ten cloths, each one lit rather than dyed. A dark jewel tone reads as "old library"; the
+// point of a shelf is that you can pick a game out of it from across the room, so every one of
+// these has a light in it somewhere.
 const CLOTH = {
-  claret: 'linear-gradient(150deg, #3d1220 0%, #6b1d31 58%, #4a1524 100%)',
-  forest: 'linear-gradient(150deg, #0e2a1c 0%, #1c4d33 58%, #123a25 100%)',
-  midnight: 'linear-gradient(150deg, #101a33 0%, #1e2f57 58%, #16233f 100%)',
-  amber: 'linear-gradient(150deg, #3d2708 0%, #6d4713 58%, #4a3010 100%)',
-  plum: 'linear-gradient(150deg, #2a1236 0%, #4a2160 58%, #331642 100%)',
-  slate: 'linear-gradient(150deg, #1a1e22 0%, #333b42 58%, #23292f 100%)',
-  teal: 'linear-gradient(150deg, #06272b 0%, #0f4a50 58%, #0a343a 100%)',
-  rust: 'linear-gradient(150deg, #3a1408 0%, #6a2812 58%, #481a0c 100%)',
-  moss: 'linear-gradient(150deg, #1d2a10 0%, #3b5220 58%, #283715 100%)',
-  ink: 'linear-gradient(150deg, #14120e 0%, #2e2a22 58%, #1d1a15 100%)',
+  claret: 'radial-gradient(120% 100% at 22% 8%, #ff2e6a 0%, #a3123f 42%, #4c0a20 100%)',
+  forest: 'radial-gradient(120% 100% at 22% 8%, #21e08a 0%, #0f8a55 44%, #06341f 100%)',
+  midnight: 'radial-gradient(120% 100% at 22% 8%, #4d7bff 0%, #2740c4 42%, #0d123f 100%)',
+  amber: 'radial-gradient(120% 100% at 22% 8%, #ffc531 0%, #d1750d 44%, #4a2606 100%)',
+  plum: 'radial-gradient(120% 100% at 22% 8%, #c05cff 0%, #7a20c9 42%, #2d0a4c 100%)',
+  slate: 'radial-gradient(120% 100% at 22% 8%, #7d92a8 0%, #3d4c5e 44%, #141b24 100%)',
+  teal: 'radial-gradient(120% 100% at 22% 8%, #1fe3ff 0%, #0d8fae 44%, #04303d 100%)',
+  rust: 'radial-gradient(120% 100% at 22% 8%, #ff7a3d 0%, #c23d10 44%, #401206 100%)',
+  moss: 'radial-gradient(120% 100% at 22% 8%, #9ade3a 0%, #4d8a15 44%, #1c3208 100%)',
+  ink: 'radial-gradient(120% 100% at 22% 8%, #ff2e88 0%, #5b1e8a 46%, #140a2c 100%)',
 };
 
 /** Four cards thrown into the middle, the winner on top. What a trick looks like. */

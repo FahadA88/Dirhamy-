@@ -3361,7 +3361,8 @@ header h1 {
 
 /* --- the tiles get their colour back up --- */
 .gameart { border-bottom: 1px solid rgba(255,255,255,.10); }
-.ga-felt { filter: saturate(1.35) brightness(1.12); }
+/* The cloths are already lit; a filter on top of them only smears the gradient. */
+.ga-felt { filter: none; }
 .ga-vignette {
   background: radial-gradient(78% 78% at 50% 42%, transparent 40%, rgba(4,0,20,.5) 100%);
 }
@@ -3552,3 +3553,12 @@ header h1 {
 .pd-score { font-family: var(--mono); color: var(--ink); }
 
 .modal { background: rgba(6, 2, 22, .62); }
+
+/* The tile's own light spills onto the card body under it, so a shelf reads as a row of lit
+   objects rather than a row of dark rectangles with pictures in them. */
+.shelfcard .sc-body { position: relative; }
+.gameart::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.5), transparent);
+  opacity: .5;
+}
