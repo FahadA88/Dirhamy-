@@ -33,6 +33,23 @@ export function TableDressing({ felt, title }: { felt: TableFelt; title: string 
     );
   }
 
+  if (felt === 'neon') {
+    // The house table: a lit ring around the middle and the game's name burnt into the cloth
+    // above it, the way the sign outside spells it.
+    return (
+      <svg className="dressing nt" viewBox="0 0 1000 560" preserveAspectRatio="none" aria-hidden="true">
+        <defs>
+          <path id="neonArc" d="M 262 468 A 300 210 0 0 0 738 468" fill="none" />
+        </defs>
+        <ellipse className="nt-ring" cx="500" cy="290" rx="466" ry="250" />
+        <ellipse className="nt-ring faint" cx="500" cy="290" rx="440" ry="228" />
+        <text className="nt-name">
+          <textPath href="#neonArc" startOffset="50%" textAnchor="middle">{title.toUpperCase()}</textPath>
+        </text>
+      </svg>
+    );
+  }
+
   if (felt === 'parlour') {
     // Chalked onto the cloth: the table's own outline and a centre ring. Drawn in CSS so it
     // scales with the table instead of stretching with a viewBox.

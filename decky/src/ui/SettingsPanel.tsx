@@ -134,11 +134,11 @@ function body(id: SectionId, s: Settings, set: Setter): React.ReactNode {
 function LookSection({ s, set }: { s: Settings; set: Setter }) {
   return (
     <>
-      <Row label="Theme" hint="Sunlit Parlour by day, the same room with the lamp on by night." keywords="light dark mode night">
+      <Row label="Theme" hint="The room after midnight, or the same room with the lights on." keywords="light dark mode night">
         <Seg value={s.theme} onChange={(v) => set('theme', v as Settings['theme'])}
           options={[['light', 'Day'], ['dark', 'Evening'], ['system', 'Match device']]} />
       </Row>
-      <Row label="Accent" hint="The one saturated colour outside the cards." keywords="colour color highlight">
+      <Row label="Accent" hint="The light everything else takes its cue from." keywords="colour color highlight">
         <div className="swatches inline">
           {(Object.keys(ACCENTS) as AccentId[]).map((id) => (
             <button key={id} title={ACCENTS[id].name} aria-label={ACCENTS[id].name}

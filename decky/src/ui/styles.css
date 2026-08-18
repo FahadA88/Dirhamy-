@@ -1,105 +1,150 @@
+/* The display face, vendored rather than fetched from a third party at runtime. A webfont on
+   somebody else's host is a network dependency the game does not need: it flashes fallback type
+   on a slow connection and logs a failure everywhere that host is unreachable. One variable
+   file covers 400 through 900. */
+@font-face {
+  font-family: "Outfit";
+  font-style: normal;
+  font-weight: 400 900;
+  font-display: swap;
+  src: url("/fonts/outfit-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215,
+    U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "Outfit";
+  font-style: normal;
+  font-weight: 400 900;
+  font-display: swap;
+  src: url("/fonts/outfit-latin-ext.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304,
+    U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0,
+    U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
 /* ------------------------------------------------------------------
-   SUNLIT PARLOUR
-   A card room in daylight. Cream paper, waxed oak, ink. The only
-   saturated things on screen are the cards themselves and the felt
-   they sit on — everything else is paper and wood, so the game reads
-   as the subject and the interface reads as furniture.
+   NEON TABLE
+   A card room after midnight, lit by the sign outside. Deep indigo,
+   electric magenta and cyan, gold for anything you win. The cards
+   themselves stay honest white — a real deck under coloured light —
+   and everything you can press is a physical object with a lit face
+   and a solid edge under it.
+
+   The rule: nothing on this screen is flat, and nothing is beige.
    ------------------------------------------------------------------ */
 :root {
-  --bg0: #e9e1d1;          /* the room */
-  --bg1: #f2ece0;
-  --panel: #fffdf7;        /* paper on the table */
-  --panel-solid: #fffdf7;
-  --panel-hi: #ffffff;
-  --panel-brd: rgba(58, 44, 20, 0.13);
-  --panel-brd-hi: rgba(138, 107, 47, 0.55);
-  --ink: #241d10;
-  --muted: #6f6553;
-  --dim: #9a9080;
+  --bg0: #090518;          /* the room, past midnight */
+  --bg1: #120a2e;
+  --panel: #1b1040;        /* a lit surface */
+  --panel-solid: #1b1040;
+  --panel-hi: #261656;
+  --panel-brd: rgba(150, 110, 255, 0.26);
+  --panel-brd-hi: rgba(255, 46, 136, 0.75);
+  --ink: #f6f1ff;
+  --muted: #b3a4de;
+  --dim: #7d6dab;
 
-  /* Waxed oak, not startup green and not brass. One accent. */
-  --oak: #8a6b2f;
-  --oak-hi: #a8823c;
-  --oak-dim: rgba(138, 107, 47, 0.13);
-  --green: #2f7a52;
-  --green-d: #8a6b2f;      /* legacy alias — anything asking for "accent" gets oak */
-  --emerald: #3d9366;
-  --lime: #4bb07c;
-  --amber: #b07d1c;
-  --red: #b03030;
+  /* Five lights. Magenta leads, cyan answers, gold is for winning. */
+  --hot: #ff2e88;
+  --hot-hi: #ff6aa9;
+  --cyan: #1fe3ff;
+  --cyan-hi: #7ceeff;
+  --gold: #ffc531;
+  --gold-hi: #ffdd7a;
+  --gold-dim: rgba(255, 197, 49, 0.16);
+  --violet: #9b5cff;
+  --lime: #4dffa0;
+  --red: #ff4d5e;
+  --amber: #ffb020;
 
-  --card-bg: #fdfbf5;
-  --card-edge: #ded6c4;    /* the thickness you see on a card's side */
-  --card-red: #b8202c;
-  --card-black: #1a1a1c;
+  /* Older names, still asked for all over the sheet. Pointed at the new lights rather than
+     deleted, because an undefined custom property invalidates the whole declaration. */
+  --oak: var(--gold);
+  --oak-hi: var(--gold-hi);
+  --oak-dim: var(--gold-dim);
+  --green: var(--cyan);
+  --green-d: var(--hot);
+  --emerald: var(--violet);
 
-  --serif: Georgia, "Iowan Old Style", "Times New Roman", serif;
+  --card-bg: #fffdf8;
+  --card-edge: #cfc6b8;    /* the thickness you see on a card's side */
+  --card-red: #e0263c;
+  --card-black: #15161c;
+
+  --display: "Outfit", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --serif: var(--display);   /* the serif is gone; anything asking for it gets the display face */
   --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
-  --glow: rgba(138, 107, 47, 0.28);
-  --input-bg: #fffdf7;
+  --glow: rgba(255, 46, 136, 0.45);
+  --input-bg: #150c36;
   --cw: 76px; --ch: 108px; --bw: 56px; --bh: 80px;
-  --r-lg: 16px; --r-md: 11px; --r-pill: 999px;
-  --shadow-panel: 0 1px 2px rgba(58,44,20,.06), 0 10px 30px rgba(58,44,20,.10);
+  --r-lg: 18px; --r-md: 12px; --r-pill: 999px;
+  --shadow-panel: 0 2px 0 rgba(0,0,0,.35), 0 18px 44px rgba(4, 0, 20, .55);
 
-  /* The palette before this one called the accent "gold". Plenty of rules still ask for it by
-     that name, and an undefined custom property makes the whole declaration invalid — so the
-     old names are aliases onto oak rather than dead references. */
-  --gold: var(--oak);
-  --gold-hi: var(--oak-hi);
-  --gold-dim: var(--oak-dim);
+  /* The drop under a pressable object: its own solid edge, then the shadow it throws. */
+  --lip: 4px;
 }
 
-/* Evening in the same room. Same furniture, the lamp on. */
-:root[data-theme="dark"] {
-  --bg0: #14110c;
-  --bg1: #1c1811;
-  --panel: #221d15;
-  --panel-solid: #221d15;
-  --panel-hi: #2b251a;
-  --panel-brd: rgba(226, 210, 176, 0.11);
-  --panel-brd-hi: rgba(196, 158, 82, 0.5);
-  --ink: #f2ebda;
-  --muted: #a2977f;
-  --dim: #6f6553;
-  --oak: #c49e52;
-  --oak-hi: #dcb96e;
-  --oak-dim: rgba(196, 158, 82, 0.16);
-  --green-d: #c49e52;
-  --amber: #c49e52;
-  --card-edge: #b8ad95;
-  --input-bg: #1a160f;
-  --glow: rgba(196, 158, 82, 0.3);
-  --shadow-panel: 0 1px 2px rgba(0,0,0,.5), 0 12px 32px rgba(0,0,0,.4);
-}
-:root[data-theme="dark"] body {
-  background:
-    radial-gradient(1100px 700px at 50% -18%, rgba(196,158,82,.10) 0%, transparent 58%),
-    var(--bg0);
+/* Daylight. Still the same neon signage, just with the lights on and white walls — not paper,
+   not a magazine. Everything saturated stays saturated. */
+:root[data-theme="light"] {
+  --bg0: #eceaf8;
+  --bg1: #f6f4ff;
+  --panel: #ffffff;
+  --panel-solid: #ffffff;
+  --panel-hi: #ffffff;
+  --panel-brd: rgba(70, 40, 140, 0.16);
+  --panel-brd-hi: rgba(255, 46, 136, 0.6);
+  --ink: #180f34;
+  --muted: #6b5f92;
+  --dim: #9d93bd;
+  --hot: #e6006b;
+  --hot-hi: #ff3d8f;
+  --cyan: #0090b8;
+  --cyan-hi: #16b8e0;
+  --gold: #c98a00;
+  --gold-hi: #e6a70c;
+  --gold-dim: rgba(201, 138, 0, 0.14);
+  --violet: #7b3cf0;
+  --input-bg: #ffffff;
+  --glow: rgba(230, 0, 107, 0.3);
+  --shadow-panel: 0 2px 0 rgba(70,40,140,.10), 0 14px 34px rgba(70, 40, 140, .14);
 }
 
 * { box-sizing: border-box; }
 
 body {
   margin: 0;
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-family: var(--display);
+  font-weight: 500;
   color: var(--ink);
   min-height: 100vh;
-  /* Daylight from a high window, and the faint tooth of laid paper. */
+  /* Two signs in the dark and the haze between them. */
   background:
-    radial-gradient(1200px 800px at 50% -22%, rgba(255,255,255,.85) 0%, transparent 60%),
-    repeating-linear-gradient(0deg, rgba(58,44,20,.016) 0 1px, transparent 1px 3px),
+    radial-gradient(900px 620px at 12% -8%, rgba(255, 46, 136, .26) 0%, transparent 62%),
+    radial-gradient(820px 560px at 92% 4%, rgba(31, 227, 255, .20) 0%, transparent 60%),
+    radial-gradient(700px 700px at 50% 108%, rgba(155, 92, 255, .22) 0%, transparent 62%),
     var(--bg0);
+  background-attachment: fixed;
   overflow-x: hidden;
 }
-
-/* The room's voice: an old-style serif for names, sans for everything you operate. */
-h1, h2, h3, .display, .hero-body h2, .sc-main h3 {
-  font-family: var(--serif);
-  font-weight: 700;
-  letter-spacing: -0.015em;
-  line-height: 1.08;
+:root[data-theme="light"] body {
+  background:
+    radial-gradient(900px 620px at 12% -8%, rgba(255, 46, 136, .16) 0%, transparent 62%),
+    radial-gradient(820px 560px at 92% 4%, rgba(31, 200, 255, .16) 0%, transparent 60%),
+    radial-gradient(700px 700px at 50% 108%, rgba(155, 92, 255, .14) 0%, transparent 62%),
+    var(--bg0);
+  background-attachment: fixed;
 }
-h1 { letter-spacing: 0.01em; }
+
+/* The voice: heavy, tight, confident. Titles are objects, not labels. */
+h1, h2, h3, .display, .hero-body h2, .sc-main h3 {
+  font-family: var(--display);
+  font-weight: 800;
+  letter-spacing: -0.028em;
+  line-height: 1.04;
+}
+h1 { letter-spacing: 0.06em; font-weight: 900; }
 
 /* ---------------- 3D animated backdrop ---------------- */
 .backdrop { position: fixed; inset: 0; z-index: -1; overflow: hidden; perspective: 1000px; opacity: 0.35; }
@@ -3029,3 +3074,381 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
   .np-board { padding: 12px 14px; }
   .nav-plate h1 { font-size: 17px; letter-spacing: 1.6px; }
 }
+
+/* ============================================================
+   MAKE IT A GAME
+   Everything you can press is an object: a lit face, a solid
+   edge under it, and it goes down when you push it. Everything
+   that holds content glows at the rim. Nothing is flat and
+   nothing is beige.
+   ============================================================ */
+
+/* --- pressable things --- */
+button.primary,
+.hero-slide .hero-cta,
+.seeall,
+button.ghost,
+.chip,
+.kindtab,
+.tabs button.on,
+.nav-dock button.on {
+  font-family: var(--display);
+}
+
+/* The house button: a lit face over a solid edge that compresses under a press. */
+button.primary {
+  position: relative;
+  background: linear-gradient(180deg, var(--hot-hi) 0%, var(--hot) 52%, #d81c6f 100%);
+  color: #fff;
+  border: 0;
+  padding: 12px 24px;
+  border-radius: var(--r-pill);
+  font-weight: 800;
+  letter-spacing: .01em;
+  cursor: pointer;
+  box-shadow:
+    0 var(--lip) 0 #a30f4f,
+    0 calc(var(--lip) + 8px) 20px rgba(255, 46, 136, .38),
+    0 1px 0 rgba(255,255,255,.45) inset;
+  transform: translateY(0);
+  transition: transform 90ms cubic-bezier(.2,.9,.3,1.3), box-shadow 90ms, filter 140ms;
+}
+button.primary:hover { filter: brightness(1.08); }
+button.primary:active {
+  transform: translateY(var(--lip));
+  box-shadow: 0 0 0 #a30f4f, 0 2px 8px rgba(255, 46, 136, .3), 0 1px 0 rgba(255,255,255,.3) inset;
+}
+button.primary:disabled {
+  background: var(--panel-hi); color: var(--dim); box-shadow: 0 var(--lip) 0 rgba(0,0,0,.28);
+  filter: none; cursor: not-allowed;
+}
+
+/* The quiet button is the same object with the light off. */
+button.ghost {
+  background: linear-gradient(180deg, var(--panel-hi), var(--panel));
+  color: var(--ink);
+  border: 1px solid var(--panel-brd);
+  border-radius: var(--r-pill);
+  padding: 10px 18px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 3px 0 rgba(0,0,0,.30), 0 1px 0 rgba(255,255,255,.10) inset;
+  transition: transform 90ms cubic-bezier(.2,.9,.3,1.3), box-shadow 90ms, border-color 140ms, color 140ms;
+}
+button.ghost:hover { border-color: var(--hot); color: var(--hot-hi); }
+button.ghost:active { transform: translateY(3px); box-shadow: 0 0 0 rgba(0,0,0,.3), 0 1px 0 rgba(255,255,255,.08) inset; }
+button.ghost:disabled { opacity: .4; cursor: not-allowed; box-shadow: none; transform: none; }
+button.ghost.danger:hover { border-color: var(--red); color: var(--red); }
+
+/* --- surfaces --- */
+.glass, .panel {
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.045), rgba(255,255,255,0) 38%),
+    var(--panel);
+  border: 1px solid var(--panel-brd);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-panel), 0 1px 0 rgba(255,255,255,.09) inset;
+}
+
+/* --- chips and tabs: lit when on --- */
+.chip, .kindtab {
+  background: linear-gradient(180deg, var(--panel-hi), var(--panel));
+  border: 1px solid var(--panel-brd);
+  color: var(--muted);
+  font-weight: 600;
+  box-shadow: 0 2px 0 rgba(0,0,0,.28);
+}
+.chip:hover, .kindtab:hover { color: var(--ink); border-color: var(--violet); box-shadow: 0 2px 0 rgba(0,0,0,.28), 0 0 18px rgba(155,92,255,.32); }
+.chip.on, .kindtab.on {
+  color: #fff;
+  background: linear-gradient(180deg, var(--hot-hi), var(--hot));
+  border-color: transparent;
+  box-shadow: 0 2px 0 #a30f4f, 0 0 22px rgba(255,46,136,.5);
+}
+.kindtab.on .kt-count { border-color: rgba(255,255,255,.55); opacity: .9; }
+
+.tabs {
+  background: linear-gradient(180deg, var(--panel-hi), var(--panel));
+  border: 1px solid var(--panel-brd);
+  box-shadow: 0 2px 0 rgba(0,0,0,.3), 0 1px 0 rgba(255,255,255,.08) inset;
+}
+.tabs button { font-weight: 700; }
+.tabs button.on {
+  color: #fff;
+  background: linear-gradient(180deg, var(--hot-hi), var(--hot));
+  box-shadow: 0 0 20px rgba(255,46,136,.55);
+}
+
+/* --- inputs --- */
+input:not([type=range]):not([type=color]), textarea, select, .searchbox, .prefs-search, .pref-text {
+  background: var(--input-bg);
+  border: 1px solid var(--panel-brd);
+  color: var(--ink);
+  font-family: var(--display);
+}
+input:focus, textarea:focus, select:focus {
+  outline: none; border-color: var(--hot);
+  box-shadow: 0 0 0 3px rgba(255,46,136,.22);
+}
+::placeholder { color: var(--dim); }
+
+/* --- the brand, lit --- */
+.logo3d span {
+  background: linear-gradient(150deg, var(--hot) 0%, var(--violet) 100%);
+  color: #fff;
+  box-shadow: 0 0 26px rgba(255,46,136,.6), 0 4px 0 #6a1180, 0 1px 0 rgba(255,255,255,.4) inset;
+}
+header h1 {
+  background: linear-gradient(100deg, var(--gold-hi) 0%, var(--hot-hi) 46%, var(--cyan) 100%);
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 0 18px rgba(255,46,136,.35));
+  font-family: var(--display);
+}
+
+/* --- section headings get a lit rule beside them --- */
+.section-head h2, .shelf .section-head h2 {
+  display: inline-flex; align-items: center; gap: 12px;
+}
+.section-head h2::after {
+  content: ""; height: 3px; width: 46px; border-radius: 2px;
+  background: linear-gradient(90deg, var(--hot), transparent);
+}
+
+/* ============================================================
+   THE NEON TABLE
+   The house table: indigo cloth under the sign, seams lit from
+   underneath, a black rail with a magenta rim.
+   ============================================================ */
+.table-wrap:has(.table[data-felt="neon"]) {
+  --room-pad: 24px;
+  --room-bg:
+    radial-gradient(80% 100% at 50% 0%, rgba(255,46,136,.16), transparent 62%),
+    radial-gradient(70% 90% at 50% 100%, rgba(31,227,255,.12), transparent 62%),
+    #0a0620;
+}
+.table[data-felt="neon"], .felt-swatch[data-felt="neon"], .pp-stage[data-felt="neon"] {
+  --rail-w: 18px; --rail-r: 30px; --felt-r: 20px; --felt-pad: 30px;
+  --rail-bg:
+    linear-gradient(180deg, #2a1a52 0%, #170d33 48%, #241548 100%);
+  --rail-shadow:
+    inset 0 1px 0 rgba(255,255,255,.14),
+    inset 0 0 0 1px rgba(255,46,136,.30),
+    0 0 46px rgba(255,46,136,.28),
+    0 26px 70px rgba(0,0,0,.62);
+  --felt-bg:
+    radial-gradient(72% 92% at 50% 30%, #2c1f6b 0%, #1a1147 46%, #0f0a2e 100%);
+  --felt-shadow:
+    inset 0 0 100px rgba(0,0,0,.62),
+    inset 0 0 0 1px rgba(31,227,255,.22),
+    inset 0 0 34px rgba(155,92,255,.22);
+  --t-ink: #f2ecff; --t-muted: rgba(206,193,245,.62); --t-key: var(--cyan);
+  --t-line: rgba(155,92,255,.30); --t-panel: rgba(0,0,0,.34);
+  --t-seat: rgba(31,227,255,.09); --t-seat-line: rgba(31,227,255,.42);
+}
+/* The seam under the rail, lit. */
+.table[data-felt="neon"] .felt::before {
+  content: ""; position: absolute; inset: -1px; border-radius: var(--felt-r);
+  pointer-events: none; z-index: 2;
+  box-shadow: 0 0 24px rgba(31,227,255,.28) inset;
+}
+.nt-ring { fill: none; stroke: rgba(31,227,255,.34); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+.nt-ring.faint { stroke: rgba(255,46,136,.20); }
+
+.nt-name {
+  fill: rgba(255,46,136,.34);
+  font-family: var(--display); font-weight: 800; font-size: 40px; letter-spacing: 9px;
+}
+
+/* ============================================================
+   ENERGY
+   The hero, the shelf and the tiles, turned up.
+   ============================================================ */
+
+/* --- the hero is a lit sign, not a green board --- */
+.hero {
+  background:
+    radial-gradient(700px 340px at 88% 20%, rgba(31,227,255,.34), transparent 66%),
+    radial-gradient(620px 420px at 6% 96%, rgba(255,197,49,.22), transparent 62%),
+    linear-gradient(128deg, #ff2e88 0%, #a12bd6 42%, #4b2ae0 72%, #1b1a8f 100%);
+  border: 1px solid rgba(255,255,255,.16);
+  box-shadow:
+    0 1px 0 rgba(255,255,255,.24) inset,
+    0 0 60px rgba(255,46,136,.28),
+    0 26px 70px rgba(6,0,26,.6);
+}
+/* A slow sweep of light across it, the way a sign flickers over. */
+.hero::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(102deg, transparent 32%, rgba(255,255,255,.16) 48%, transparent 62%);
+  transform: translateX(-60%);
+  animation: sheen 7s ease-in-out infinite;
+}
+@keyframes sheen { 0%, 62% { transform: translateX(-60%); } 88%, 100% { transform: translateX(60%); } }
+
+.hero .hero-kicker {
+  color: #fff; opacity: .92;
+  text-shadow: 0 0 14px rgba(255,255,255,.5);
+}
+.hero-body h2 { color: #fff; text-shadow: 0 2px 24px rgba(0,0,0,.4); font-weight: 900; }
+.hero-blurb { color: rgba(255,255,255,.82); }
+.hero .sc-kind { border-color: rgba(255,255,255,.4); color: #fff; }
+.hero .sc-rating { color: var(--gold-hi); }
+
+/* Winning colour on the one button that starts a game. */
+.hero-slide .hero-cta {
+  background: linear-gradient(180deg, #ffe08a 0%, var(--gold) 54%, #e0a300 100%);
+  color: #241700;
+  font-weight: 900;
+  box-shadow:
+    0 var(--lip) 0 #a97600,
+    0 calc(var(--lip) + 10px) 24px rgba(255,197,49,.44),
+    0 1px 0 rgba(255,255,255,.6) inset;
+  transition: transform 90ms cubic-bezier(.2,.9,.3,1.3), box-shadow 90ms, filter 140ms;
+}
+.hero-slide .hero-cta:hover { transform: translateY(-1px); filter: brightness(1.06); }
+.hero-slide .hero-cta:active {
+  transform: translateY(var(--lip));
+  box-shadow: 0 0 0 #a97600, 0 2px 8px rgba(255,197,49,.3), 0 1px 0 rgba(255,255,255,.4) inset;
+}
+.hero-more {
+  background: rgba(255,255,255,.14); border-color: rgba(255,255,255,.34); color: #fff;
+  font-weight: 700;
+}
+.hero-more:hover { background: rgba(255,255,255,.24); border-color: #fff; }
+
+.car-arrow {
+  background: rgba(20,10,48,.72); border-color: rgba(255,46,136,.42); color: #fff;
+}
+.car-arrow:hover { background: var(--hot); border-color: var(--hot); box-shadow: 0 0 24px rgba(255,46,136,.6); }
+.car-dot { border-color: rgba(255,255,255,.34); }
+.car-dot.on { background: var(--hot); border-color: var(--hot); box-shadow: 0 0 14px rgba(255,46,136,.8); }
+
+/* --- shelf cards lift and light up --- */
+.shelfcard {
+  background: linear-gradient(180deg, var(--panel-hi), var(--panel));
+  border: 1px solid var(--panel-brd);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  box-shadow: 0 3px 0 rgba(0,0,0,.34), 0 14px 30px rgba(4,0,20,.4);
+  transition: transform 220ms cubic-bezier(.2,.9,.3,1.2), box-shadow 220ms, border-color 220ms;
+}
+.shelfcard:hover {
+  transform: translateY(-6px);
+  border-color: var(--hot);
+  box-shadow: 0 3px 0 rgba(0,0,0,.34), 0 0 34px rgba(255,46,136,.34), 0 22px 46px rgba(4,0,20,.55);
+}
+.shelfcard .sc-main h3 { font-weight: 800; letter-spacing: -.02em; }
+.sc-kind {
+  border-color: rgba(155,92,255,.5); color: var(--violet);
+  background: rgba(155,92,255,.10); opacity: 1;
+}
+.sc-rating { color: var(--gold); }
+.pick-badge {
+  background: linear-gradient(180deg, var(--gold-hi), var(--gold));
+  color: #241700; box-shadow: 0 0 18px rgba(255,197,49,.6);
+}
+/* The play button on a tile is the loudest thing on it. */
+.sc-play {
+  background: linear-gradient(180deg, var(--hot-hi), var(--hot)) !important;
+  color: #fff !important; border: 0 !important;
+  box-shadow: 0 0 20px rgba(255,46,136,.55);
+  opacity: 0; transform: scale(.8);
+  transition: opacity 180ms, transform 220ms cubic-bezier(.2,.9,.3,1.4);
+}
+.shelfcard:hover .sc-play, .sc-play:focus-visible { opacity: 1; transform: scale(1); }
+.star.on { color: var(--hot); text-shadow: 0 0 14px rgba(255,46,136,.7); }
+
+/* --- the tiles get their colour back up --- */
+.gameart { border-bottom: 1px solid rgba(255,255,255,.10); }
+.ga-felt { filter: saturate(1.35) brightness(1.12); }
+.ga-vignette {
+  background: radial-gradient(78% 78% at 50% 42%, transparent 40%, rgba(4,0,20,.5) 100%);
+}
+.ga-mark { color: rgba(255,255,255,.18); }
+
+/* --- the seeall button --- */
+.seeall {
+  background: linear-gradient(180deg, var(--panel-hi), var(--panel));
+  border: 1px solid var(--panel-brd);
+  color: var(--ink);
+  font-weight: 800;
+  box-shadow: 0 3px 0 rgba(0,0,0,.32);
+}
+.seeall:hover {
+  border-color: var(--cyan); color: var(--cyan-hi);
+  box-shadow: 0 3px 0 rgba(0,0,0,.32), 0 0 28px rgba(31,227,255,.3);
+  transform: translateY(-2px);
+}
+.seeall:active { transform: translateY(3px); box-shadow: 0 0 0 rgba(0,0,0,.3); }
+
+@media (prefers-reduced-motion: reduce) {
+  .hero::after { animation: none; }
+}
+:root[data-motion="reduced"] .hero::after { animation: none; }
+
+/* Everything inside `.gameart` is absolutely positioned, so the box has no intrinsic width. In
+   a shelf card it fills the cell and that never shows; as a flex item in the hero it collapses
+   to nothing. Where it is not being stretched by a parent, it has to be told its size. */
+.hero-art .gameart {
+  width: 268px; height: 176px; border-radius: 16px; overflow: hidden;
+  border: 1px solid rgba(255,255,255,.22);
+  transform: rotate(-7deg) scale(1.02);
+  box-shadow: 0 24px 50px rgba(4,0,26,.5), 0 0 0 1px rgba(255,255,255,.1) inset;
+}
+.hero-art { margin-right: 46px; }
+
+/* --- the deck stays honest under coloured light --- */
+/* A playing card is white. The interface can glow; the thing you are reading cannot, or the
+   pips go to mush against a magenta haze. */
+.card.face {
+  background: linear-gradient(168deg, #ffffff 0%, #fdfcf8 46%, #f4f1e8 100%);
+  border-color: rgba(0,0,0,.18);
+}
+.card.face::after, .card.back::after { opacity: .55; }
+
+/* The legal-move light is cyan: it has to be the one colour on screen that is not the
+   interface's own magenta, or "you may play this" reads as "this is a button". */
+.hand.hl-glow .card-btn.playable .card.face {
+  box-shadow:
+    0 0 0 2px var(--cyan),
+    0 0 22px rgba(31,227,255,.55),
+    0 8px 22px rgba(4,0,26,.5);
+}
+.hand.hl-outline .card-btn.playable .card.face { box-shadow: 0 0 0 2px var(--cyan); }
+.hand.hl-off .card-btn.playable .card.face { box-shadow: 0 8px 20px rgba(4,0,26,.45); }
+
+/* The game's name is printed low on the cloth, under the seats rather than through them. */
+.nt-name { font-size: 34px; letter-spacing: 12px; fill: rgba(255,46,136,.22); }
+
+/* Cloth text has to survive a dark cloth. */
+.table[data-felt="neon"] { --t-muted: rgba(214,203,250,.74); }
+
+/* The log is a lit panel like everything else. */
+.log { border-color: var(--panel-brd); }
+.log-row { color: var(--muted); }
+
+/* --- a cloth swatch is a small table, seen from above --- */
+/* The old `.felt-swatch` rule draws a rail of its own, and the picker's `.fs-rail` draws a
+   second one inside it, so the cloth ended up a sliver in the middle of two frames. In the
+   picker the outer element is a plain box and `.fs-rail` is the only rail. */
+.swatches.tables .felt-swatch {
+  display: block; width: 100%; height: auto;
+  padding: 0; background: none; box-shadow: none; overflow: visible;
+}
+.swatches.tables .fs-rail {
+  display: block; width: 100%;
+  padding: clamp(3px, calc(var(--rail-w, 8px) * 0.45), 8px);
+  border-radius: clamp(5px, calc(var(--rail-r, 10px) * 0.5), 16px);
+}
+.swatches.tables .fs-felt {
+  height: 44px;
+  border-radius: clamp(3px, calc(var(--felt-r, 6px) * 0.5), 12px);
+}
+.swatches.tables { grid-auto-rows: 96px; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); }
+.swatches.tables .swatch { padding: 6px 4px; gap: 6px; }
+
+/* A `<button>` is not stretched by its grid cell the way a div is — `justify-self: normal`
+   resolves to `start` for it — so every swatch sat at its content width in the middle of a
+   111px column. Same family of bug as the row heights above: state it, don't infer it. */
+.swatches .swatch { justify-self: stretch; width: 100%; }

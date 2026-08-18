@@ -13,7 +13,7 @@ export type CardBack =
 // Four table builds, each with its own rail, felt, markings and lighting.
 /** The thirteen tables that survived the cut. */
 export type TableFelt =
-  | 'mahogany' | 'vegas' | 'midnight' | 'parlour' | 'concrete' | 'darkglass'
+  | 'neon' | 'mahogany' | 'vegas' | 'midnight' | 'parlour' | 'concrete' | 'darkglass'
   | 'papermat' | 'velvet' | 'marble' | 'zinc' | 'litedges' | 'chalkboard' | 'studio';
 export type CardSize = 's' | 'm' | 'l';
 /**
@@ -74,11 +74,11 @@ export interface Settings {
 }
 
 export const defaultSettings: Settings = {
-  // Sunlit Parlour is the house look: cream paper, oak, ink. Dark is a choice, not the default.
-  theme: 'light',
+  // Neon Table is the house look, and a card room after midnight is dark. Daylight is a choice.
+  theme: 'dark',
   accent: 'emerald',
   cardBack: 'monogram',
-  tableFelt: 'parlour',
+  tableFelt: 'neon',
   cardFace: 'classic',
   customBack: null,
   cardSize: 'm',
@@ -118,6 +118,7 @@ export const ACCENTS: Record<AccentId, AccentPreset> = {
 export interface FeltPreset { name: string; blurb: string }
 
 export const FELTS: Record<TableFelt, FeltPreset> = {
+  neon:       { name: 'Neon',       blurb: 'Indigo cloth under a magenta sign, seams lit from beneath.' },
   parlour:    { name: 'Parlour',    blurb: 'Pale cloth in an oak frame. Quiet, domestic, daylight.' },
   mahogany:   { name: 'Mahogany',   blurb: 'Padded leather rail, polished wood, chrome drink wells.' },
   vegas:      { name: 'Vegas',      blurb: 'Bright baize with the betting line printed across it.' },
