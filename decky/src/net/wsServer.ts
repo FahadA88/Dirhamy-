@@ -50,6 +50,12 @@ export class GameHost {
   private queue: string[] = [];                // invite codes waiting for a quick-play partner
   private catalog: GameDefinition[];
   private staticDir?: string;
+  /**
+   * Block and mute lists, kept against an opaque code so somebody can carry them between their
+   * own devices. In memory: this is a convenience, and losing it costs somebody a re-block, not
+   * a game. A deployment that wants it durable swaps this Map for a table.
+   */
+  private safety = new Map<string, { blocked: string[]; muted: string[] }>();
   private wss?: WebSocketServer;
   private http?: ReturnType<typeof createServer>;
 
@@ -206,6 +212,27 @@ export class GameHost {
         handleAuthor(data as AuthorRequest).then((r) => {
           json(r.status, r.error ? { error: r.error } : { text: r.text });
         });
+      });
+      return;
+    }
+    // Carrying a safety list between devices. The code is the credential; see safety.ts.
+    if (url.pathname === '/safety' && req.method === 'GET') {
+      const code = (url.searchParams.get('code') ?? '').trim().toUpperCase();
+      if (code.length < 8) { json(400, { error: 'A sync code is required.' }); return; }
+      json(200, { lists: this.safety.get(code) ?? { blocked: [], muted: [] } });
+      return;
+    }
+    if (url.pathname === '/safety' && req.method === 'POST') {
+      body(req, (data) => {
+        const { code, lists } = data as { code?: string; lists?: { blocked?: string[]; muted?: string[] } };
+        const key = (code ?? '').trim().toUpperCase();
+        if (key.length < 8) { json(400, { error: 'A sync code is required.' }); return; }
+        // Bounded on the way in — this is a list of names somebody blocked, not a store.
+        const clean = (xs: unknown): string[] => Array.isArray(xs)
+          ? xs.filter((x): x is string => typeof x === 'string' && x.length <= 60).slice(0, 500)
+          : [];
+        this.safety.set(key, { blocked: clean(lists?.blocked), muted: clean(lists?.muted) });
+        json(200, { ok: true });
       });
       return;
     }

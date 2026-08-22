@@ -140,6 +140,10 @@ function panelsFor(def: GameDefinition): Panel[] {
     }];
   }
 
+  // A set game's cards are not playing cards, so its example cannot be drawn with them. The
+  // rules panel shows the board itself instead, which is a better teacher anyway.
+  if (def.set) return [];
+
   if (def.solitaire) {
     return [
       {

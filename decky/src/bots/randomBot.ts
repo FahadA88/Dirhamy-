@@ -53,6 +53,19 @@ export function chooseMove(
     return { move: { actionId: 'resolveChoice', choice: best }, botSeed };
   }
 
+  // Spotting a set. The engine only ever offers valid ones, so the bot's only real decision is
+  // how fast it sees them — and a bot that always calls instantly is not an opponent, it is a
+  // wall. Easy hesitates far more often than sharp does.
+  if (moves[0]?.actionId === 'callSet') {
+    const r = nextRandom(botSeed);
+    botSeed = r.state;
+    // Even at its sharpest it misses sometimes, so a person gets a chance to see one first.
+    const miss = mode === 'random' ? 0.85 : 0.45;
+    if (r.value < miss) return { move: { actionId: 'setPass' }, botSeed };
+    const pick = nextRandom(botSeed);
+    return { move: moves[Math.floor(pick.value * moves.length)], botSeed: pick.state };
+  }
+
   // A contract auction: bid what the hand can actually carry, and stop.
   //
   // The count is deliberately crude — high cards plus length — because the point is that the

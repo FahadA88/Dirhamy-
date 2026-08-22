@@ -75,6 +75,76 @@ export function toggleMute(name: string): boolean {
   return !on;
 }
 
+// ---------- carrying a block list to another device ----------
+//
+// There are no accounts here, so there is nothing to hang a synced list off. Rather than invent
+// a login for a list of names, this uses a code: a long random string generated on this device,
+// which the host stores a safety list against. Type the same code on another device and you get
+// the same list.
+//
+// Be clear about what that means — the code IS the credential. Anyone who has it can read and
+// change that list. It is deliberately long, and the data is a list of display names you have
+// blocked rather than anything private, but it is a shared secret and it is named like one.
+
+const SYNC = 'decky.synccode.v1';
+
+export interface SafetyLists { blocked: string[]; muted: string[] }
+
+/** This device's code, made on first use. */
+export function syncCode(): string {
+  try {
+    const found = localStorage.getItem(SYNC);
+    if (found) return found;
+    const bytes = new Uint8Array(12);
+    crypto.getRandomValues(bytes);
+    const code = [...bytes].map((b) => b.toString(36).padStart(2, '0')).join('').slice(0, 20).toUpperCase();
+    localStorage.setItem(SYNC, code);
+    return code;
+  } catch {
+    return '';
+  }
+}
+
+/** Point this device at somebody else's code — that is, at your own list on another device. */
+export function useSyncCode(code: string): void {
+  try { localStorage.setItem(SYNC, code.trim().toUpperCase()); } catch { /* ignore */ }
+}
+
+/** Send this device's lists up. Silent on failure: syncing is a convenience, not a requirement. */
+export async function pushSafety(base: string): Promise<boolean> {
+  const code = syncCode();
+  if (!code || !base) return false;
+  try {
+    const res = await fetch(`${base}/safety`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ code, lists: { blocked: blocked(), muted: muted() } }),
+    });
+    return res.ok;
+  } catch { return false; }
+}
+
+/**
+ * Pull the stored lists and merge them in. A merge rather than a replace, because the two sides
+ * are both things somebody meant: blocking on a phone and then syncing should not un-block
+ * anybody you blocked on a laptop.
+ */
+export async function pullSafety(base: string): Promise<boolean> {
+  const code = syncCode();
+  if (!code || !base) return false;
+  try {
+    const res = await fetch(`${base}/safety?code=${encodeURIComponent(code)}`);
+    if (!res.ok) return false;
+    const body = await res.json() as { lists?: SafetyLists };
+    if (!body.lists) return false;
+    const mergeB = [...new Set([...blocked(), ...(body.lists.blocked ?? [])])];
+    const mergeM = [...new Set([...muted(), ...(body.lists.muted ?? [])])];
+    write(BLOCKED, mergeB);
+    write(MUTED, mergeM);
+    return true;
+  } catch { return false; }
+}
+
 // ---------- name screening ----------
 
 // Deliberately short and deliberately about the two things a filter can actually decide:

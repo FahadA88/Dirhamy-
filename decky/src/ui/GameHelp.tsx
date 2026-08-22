@@ -58,6 +58,12 @@ const FAMILY_HOW: Record<string, string[]> = {
     'Anyone holding what you asked for can accept.',
     'Corner a whole suit to win.',
   ],
+  set: [
+    'Twelve cards are face up. There are no turns — everyone looks at once.',
+    'Find three where each property is all the same or all different.',
+    'All red, or one of each colour — never two of one and one of another.',
+    'Call it first and it is yours; call wrongly and it costs you.',
+  ],
   solitaire: [
     'Build the columns downward and the foundations upward.',
     'Tap a card to pick it up, then tap where it should go.',

@@ -161,6 +161,19 @@ export function createMatch(
     return state;
   }
 
+  // A set game has no hands to deal. It has one shared board and a deck behind it, so it builds
+  // its own zones the way solitaire does rather than being described one at a time.
+  if (def.set) {
+    const { result, rngState } = seededShuffle(buildDeck(def), state.rngState);
+    state.rngState = rngState;
+    state.zones['set:deck'] = result;
+    state.zones['set:board'] = [];
+    for (const p of players) state.scores[p] = 0;
+    refillSetBoard(state);
+    log(state, null, `${def.meta.name} — ${state.zones['set:board'].length} cards face up.`);
+    return state;
+  }
+
   // Initialize zones.
   for (const z of def.zones) {
     if (z.perPlayer) {
@@ -486,6 +499,7 @@ export function legalMoves(state: MatchState, playerId: string): Move[] {
   if (state.definition.reflex) return reflexLegalMoves(state, playerId);
   if (state.definition.poker) return pokerLegalMoves(state, playerId);
   if (state.definition.pit) return pitLegalMoves(state, playerId);
+  if (state.definition.set) return setLegalMoves(state);
 
   // Resolve a pending choice first (e.g. pick a suit after a wild).
   if (state.pendingChoice) {
@@ -763,6 +777,7 @@ export function applyMove(state: MatchState, playerId: string, move: Move): Matc
   if (def.reflex) return afterFamilyMove(applyReflexMove(s, playerId, move), playerId, handBefore);
   if (def.poker) return afterFamilyMove(applyPokerMove(s, playerId, move), playerId, handBefore);
   if (def.pit) return afterFamilyMove(applyPitMove(s, playerId, move), playerId, handBefore);
+  if (def.set) return afterFamilyMove(applySetMove(s, playerId, move), playerId, handBefore);
 
   // Resolve a pending suit choice.
   if (move.actionId === 'resolveChoice') {
@@ -1077,6 +1092,8 @@ export function actingPlayers(state: MatchState): string[] {
   // Pit has no turn order at all — every player who still has legal moves is "acting" on
   // every tick, the same way a simultaneous pass works.
   if (state.definition.pit) return state.players.filter((p) => pitLegalMoves(state, p).length > 0);
+  // Nobody's turn: everyone is looking at the same board, and whoever calls first gets it.
+  if (state.definition.set) return setLegalMoves(state).length > 0 ? state.players.slice() : [];
   const current = state.players[state.turnIndex];
   if (state.definition.climb?.bombSize) {
     // A bomb can interrupt out of turn — anyone holding one is also "acting" right now.
@@ -3150,6 +3167,113 @@ function pitCheckWin(s: MatchState): boolean {
   return false;
 }
 
+// ---------- the set family (spotting combinations on a shared board) ----------
+//
+// The odd one out. No turns, no hands, no pile: a board of cards is face up and everyone is
+// looking at the same thing, so "whose go is it" has no meaning. Whoever names a valid
+// combination first gets it, and the board is refilled.
+//
+// Validity is one rule applied to every property: the chosen cards must be all-the-same or
+// all-different in each. That is why the deck had to be built from properties — with ranks and
+// suits there is nothing to be all-different about.
+
+const setZones = { board: 'set:board', deck: 'set:deck' };
+
+/** All-same or all-different, for every property. The whole game. */
+export function isValidSet(cards: Card[]): boolean {
+  if (cards.length < 3) return false;
+  const names = Object.keys(cards[0].attrs ?? {});
+  if (names.length === 0) return false;
+  for (const name of names) {
+    const seen = new Set(cards.map((c) => c.attrs?.[name]));
+    if (seen.size !== 1 && seen.size !== cards.length) return false;
+  }
+  return true;
+}
+
+/** Every combination of the given size that is valid. Used to know when the board is dead. */
+function findSets(board: Card[], size: number): Card[][] {
+  const out: Card[][] = [];
+  const walk = (start: number, picked: Card[]) => {
+    if (picked.length === size) {
+      if (isValidSet(picked)) out.push(picked.slice());
+      return;
+    }
+    for (let i = start; i < board.length; i++) walk(i + 1, [...picked, board[i]]);
+  };
+  walk(0, []);
+  return out;
+}
+
+function setLegalMoves(state: MatchState): Move[] {
+  if (state.phase !== 'playing') return [];
+  const cfg = state.definition.set!;
+  const board = state.zones[setZones.board] ?? [];
+  // Everybody may call at any moment, so every valid combination on the board is a legal move
+  // for every player. This is what makes the family turn-free rather than simultaneous-turn.
+  const moves: Move[] = findSets(board, cfg.size).map((cards) => ({
+    actionId: 'callSet',
+    cards: cards.map((c) => c.id),
+  }));
+  if (moves.length > 0) moves.push({ actionId: 'setPass' });
+  return moves;
+}
+
+/** Top the board back up to its size, as far as the deck allows. */
+function refillSetBoard(s: MatchState): void {
+  const cfg = s.definition.set!;
+  const board = s.zones[setZones.board] ?? (s.zones[setZones.board] = []);
+  const deck = s.zones[setZones.deck] ?? (s.zones[setZones.deck] = []);
+  while (board.length < cfg.boardSize && deck.length > 0) board.push(deck.pop()!);
+
+  // A board with nothing on it is a stuck game, so deal more until there is something to find.
+  // With the deck empty and no combination left, the game is over — which is how a real one ends.
+  while (findSets(board, cfg.size).length === 0 && deck.length > 0) {
+    for (let i = 0; i < cfg.size && deck.length > 0; i++) board.push(deck.pop()!);
+  }
+}
+
+function applySetMove(s: MatchState, playerId: string, move: Move): MatchState {
+  // A player who cannot see one yet says so. Nothing changes — it exists so a bot that has not
+  // spotted anything has something legal to do rather than being forced to call at random.
+  if (move.actionId === 'setPass') return s;
+  if (move.actionId !== 'callSet' || !move.cards) return s;
+  const cfg = s.definition.set!;
+  const board = s.zones[setZones.board] ?? [];
+  const picked = move.cards.map((id) => board.find((c) => c.id === id)).filter((c): c is Card => !!c);
+  if (picked.length !== cfg.size) return s;
+
+  if (!isValidSet(picked)) {
+    // Calling wrongly costs something, or there would be no reason not to call constantly.
+    s.scores[playerId] = (s.scores[playerId] ?? 0) - cfg.penalty;
+    log(s, playerId, `${short(playerId)} called a set that was not one (-${cfg.penalty}).`);
+    return s;
+  }
+
+  s.zones[setZones.board] = board.filter((c) => !move.cards!.includes(c.id));
+  s.scores[playerId] = (s.scores[playerId] ?? 0) + cfg.score;
+  log(s, playerId, `${short(playerId)} spots a set (+${cfg.score}).`);
+  refillSetBoard(s);
+  setCheckEnd(s);
+  return s;
+}
+
+/** Over when nothing is left to find and there is nothing left to deal. */
+function setCheckEnd(s: MatchState): boolean {
+  if (s.phase !== 'playing') return false;
+  const cfg = s.definition.set!;
+  const board = s.zones[setZones.board] ?? [];
+  const deck = s.zones[setZones.deck] ?? [];
+  if (deck.length > 0 || findSets(board, cfg.size).length > 0) return false;
+  s.phase = 'roundOver';
+  let best = s.players[0];
+  for (const p of s.players) if ((s.scores[p] ?? 0) > (s.scores[best] ?? 0)) best = p;
+  s.winner = best;
+  log(s, null, `No sets left — ${short(best)} wins with ${s.scores[best] ?? 0}.`);
+  finalizeMatchProgress(s);
+  return true;
+}
+
 // ---------- redaction (hidden information) ----------
 
 export function redact(state: MatchState, viewer: string): RedactedState {
@@ -3219,7 +3343,7 @@ export function redact(state: MatchState, viewer: string): RedactedState {
     scores: { ...state.scores },
     log: state.log.slice(-40),
     mode: state.definition.solitaire ? 'solitaire' : state.definition.trick ? 'trick' : state.definition.climb ? 'climb' : state.definition.fish ? 'fish' : state.definition.rummy ? 'rummy' : state.definition.war ? 'war'
-      : state.definition.bluff ? 'bluff' : state.definition.reflex ? 'reflex' : state.definition.poker ? 'poker' : state.definition.pit ? 'pit' : 'shedding',
+      : state.definition.bluff ? 'bluff' : state.definition.reflex ? 'reflex' : state.definition.poker ? 'poker' : state.definition.pit ? 'pit' : state.definition.set ? 'set' : 'shedding',
     ...(state.definition.solitaire ? solitaireView(state) : {}),
     battle: state.definition.war ? (state.zones[state.definition.zones.find((z) => z.shared && z.visibility === 'all')!.id] || []).slice() : undefined,
     rummyPhase: state.definition.rummy ? state.rummyPhase : undefined,
@@ -3295,6 +3419,11 @@ export function redact(state: MatchState, viewer: string): RedactedState {
     // pit
     market: state.definition.pit ? state.market.map((o) => ({ ...o })) : undefined,
     cornerSize: state.definition.pit ? state.definition.pit.cornerSize : undefined,
+    // set: the board is face up to everyone by definition, so there is nothing to hide. The
+    // deck count is public too — knowing how much is left is part of the game, not a leak.
+    setBoard: state.definition.set ? (state.zones['set:board'] ?? []).map((c) => ({ ...c })) : undefined,
+    setDeckLeft: state.definition.set ? (state.zones['set:deck'] ?? []).length : undefined,
+    setSize: state.definition.set ? state.definition.set.size : undefined,
     // numeric (Bridge-style) auction
     highBid: state.definition.trick?.numericAuction ? state.highBid : undefined,
   };

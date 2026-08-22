@@ -4213,3 +4213,65 @@ header h1 {
 .ip-seats { font-size: 12px; }
 .ip-turn { font-size: 11px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); }
 .ip-turn.on { color: var(--hot, #ff2e88); }
+
+/* ---- whose board ---- */
+.gd-sub { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.seg.sm.board-scope button { padding: 4px 10px; font-size: 11px; }
+
+/* ---- carrying a block list between devices ---- */
+.sync { display: flex; flex-direction: column; gap: 8px; inline-size: 100%; }
+.sync-code {
+  font-family: var(--mono); font-size: 15px; letter-spacing: 0.16em;
+  padding: 9px 12px; border-radius: var(--r-md);
+  border: 1px solid var(--panel-brd); background: var(--panel-hi);
+  color: var(--gold, #d6af5c); overflow-wrap: anywhere;
+}
+.sync-actions, .sync-entry { display: flex; gap: 8px; }
+.sync-entry .pref-text { flex: 1; font-family: var(--mono); letter-spacing: 0.08em; }
+.sync-status { margin: 0; font-size: 12px; }
+
+/* ============================================================================
+   A DECK THAT IS NOT A DECK
+   Trio's board. Twelve cards face up, no hand, no turn — so the layout is a
+   grid everybody reads at once rather than a fan belonging to one person.
+   ========================================================================= */
+
+.set-controls { display: flex; flex-direction: column; align-items: center; gap: 12px; inline-size: 100%; }
+.set-info { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+.set-info .chip.mine { border-color: var(--gold, #d6af5c); color: var(--gold, #d6af5c); }
+
+.set-board {
+  display: grid; gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(84px, 108px));
+  justify-content: center;
+  inline-size: 100%; max-inline-size: 700px;
+}
+.set-card {
+  padding: 0; cursor: pointer;
+  border: 2px solid transparent; border-radius: 12px;
+  background: none;
+  transition: transform 0.12s ease, border-color 0.12s ease;
+}
+.set-card:hover { transform: translateY(-3px); }
+.set-card.on { border-color: var(--gold, #d6af5c); transform: translateY(-5px); }
+.set-card:focus-visible { outline: 3px solid var(--cyan, #46d5ff); outline-offset: 2px; }
+
+.attrcard {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 5px; padding: 12px 8px;
+  aspect-ratio: 5 / 7;
+  border-radius: 10px;
+  background: var(--card-bg, #fdfcf7);
+  box-shadow: 0 1px 0 var(--card-edge), 0 4px 12px rgba(0,0,0,0.3);
+}
+.ac-shape { display: block; inline-size: 62%; }
+.ac-shape svg { display: block; inline-size: 100%; block-size: auto; }
+
+@media (prefers-reduced-motion: reduce) {
+  .set-card:hover, .set-card.on { transform: none; }
+}
+[data-motion="reduced"] .set-card:hover, [data-motion="reduced"] .set-card.on { transform: none; }
+
+@media (hover: none), (pointer: coarse) {
+  .set-board { grid-template-columns: repeat(auto-fit, minmax(76px, 1fr)); }
+}

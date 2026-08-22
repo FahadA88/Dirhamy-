@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { GameDefinition } from '../engine/types';
 import {
   Collection, Filters, KINDS, PublishedGame, SortKey,
-  allGames, averageRating, collections, complexityOf, creator, featuredSet, fork,
+  allGames, averageRating, collections, complexityOf, creator, featuredSet, follows, fork,
   isFavourite, isFollowing, kindLabel, kindOf, myReview, playtimeOf, review, reviewsFor,
   searchLibrary, toggleFavourite, toggleFollow, unpublish,
 } from '../library/library';
@@ -406,7 +406,10 @@ function GameDetail({ game, me, onBack, onPlay, onSetup, onOnline, onChanged, on
   const [note, setNote] = useState('');
   const [textError, setTextError] = useState<string | null>(null);
   const reviews = reviewsFor(game.id).filter((r) => !isMuted(r.author));
-  const board = leaderboard(game.id).slice(0, 5);
+  // Everyone, or only the people you follow (plus yourself — a board you are not on is odd).
+  const [boardScope, setBoardScope] = useState<'all' | 'friends'>('all');
+  const friendNames = useMemo(() => [...follows(), me], [me]);
+  const board = leaderboard(game.id, boardScope === 'friends' ? friendNames : undefined).slice(0, 5);
   const fav = isFavourite(game.id);
   const rating = averageRating(game.stats);
 
@@ -537,9 +540,21 @@ function GameDetail({ game, me, onBack, onPlay, onSetup, onOnline, onChanged, on
           </div>
           {textError && <div className="issue error">{textError}</div>}
 
-          {board.length > 0 && (
+          {(board.length > 0 || boardScope === 'friends') && (
             <>
-              <h3 className="gd-sub">Leaderboard</h3>
+              <h3 className="gd-sub">
+                Leaderboard
+                {/* Only worth offering once there is somebody to compare against. */}
+                {follows().length > 0 && (
+                  <span className="seg sm board-scope">
+                    <button className={boardScope === 'all' ? 'on' : ''} onClick={() => setBoardScope('all')}>Everyone</button>
+                    <button className={boardScope === 'friends' ? 'on' : ''} onClick={() => setBoardScope('friends')}>Following</button>
+                  </span>
+                )}
+              </h3>
+              {board.length === 0 && (
+                <p className="muted">Nobody you follow has finished this one yet.</p>
+              )}
               <ol className="leaderboard">
                 {board.map((row, i) => (
                   <li key={row.name}>

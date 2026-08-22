@@ -38,20 +38,23 @@ export function validate(def: GameDefinition): ValidationResult {
   const isReflex = !!def.reflex;
   const isPoker = !!def.poker;
   const isPit = !!def.pit;
+  const isSet = !!def.set;
   const isSpecial = isTrick || isClimb || isFish || isRummy || isWar || isSolitaire
-    || isBluff || isReflex || isPoker || isPit;
+    || isBluff || isReflex || isPoker || isPit || isSet;
 
   // --- players ---
-  // Patience is played alone; every other family needs an opponent.
-  if (!isSolitaire && def.meta.players.min < 2) err('players.min', 'A game needs at least 2 players.');
+  // Patience is played alone, and spotting sets on a shared board works just as well solo, so
+  // neither is required to seat an opponent. Everything else is.
+  if (!isSolitaire && !isSet && def.meta.players.min < 2) err('players.min', 'A game needs at least 2 players.');
   if (def.meta.players.max < def.meta.players.min) {
     err('players.range', 'Max players is below min players.');
   }
 
   // --- zones: engine expectations ---
-  // Solitaire's board — columns, foundations, cells, stock — is synthesised from its config,
-  // so it declares no zones of its own and these requirements do not apply.
-  if (!isSolitaire) {
+  // Solitaire's board — columns, foundations, cells, stock — is synthesised from its config, and
+  // a set game's board and deck likewise. Neither declares zones of its own, so a missing hand
+  // or draw pile is the correct shape rather than a mistake.
+  if (!isSolitaire && !isSet) {
     const sharedPile = def.zones.find((z) => z.shared && z.type === 'pile');
     if (!sharedPile) err('zones.deck', 'Need a shared pile to hold the deck (e.g. a "draw" pile).');
     const handZone = def.zones.find((z) => z.type === 'hand' && z.perPlayer);

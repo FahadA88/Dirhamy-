@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Card, GameDefinition, Move, RedactedState } from '../engine/types';
 import { SUIT_SYMBOLS } from '../engine/deck';
 import { CardFace } from './Card';
+import { AttrCard, describeAttrs } from './AttrCard';
 import { TableDressing, TableRail } from './TableDressing';
 import { DealMotion } from './DealMotion';
 import { ScorePad } from './ScorePad';
@@ -124,6 +125,8 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
   const [cursor, setCursor] = useState<number | null>(null);
   // Replay: how far through the recorded moves we are looking, or null for "live".
   const [replayAt, setReplayAt] = useState<number | null>(null);
+  // set: which board cards are picked so far. Cleared the moment a call is made either way.
+  const [setPicked, setSetPicked] = useState<string[]>([]);
 
   const { matchId, view } = board;
   const passAndPlay = localSeats.length > 1;
@@ -192,6 +195,7 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
   const isReflex = view.mode === 'reflex';
   const isPoker = view.mode === 'poker';
   const isPit = view.mode === 'pit';
+  const isSet = view.mode === 'set';
   // Groups of 2+ need a button — you can't express "these three cards" with one tap.
   const comboMoves = useMemo(
     () => myLegal.filter((m) => m.actionId === 'climbPlay' && (m.cards?.length ?? 1) > 1),
@@ -460,6 +464,7 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
     setAskRank(null);
     setBluffSelected([]);
     setBluffRank(null);
+    setSetPicked([]);
     setUndoable(true);
     setBoard(clientRef.current.read(me));
   }
@@ -530,13 +535,15 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
       <TableRail felt={settings.tableFelt} />
       <div className={`felt ${dealing ? 'dealing' : ''}`}>
       <TableDressing felt={settings.tableFelt} title={def.meta.name} />
-      <DealMotion
+      {/* Nothing is dealt to anybody in a set game — the cards go face up on a shared board —
+          so a deal animation would be showing something that does not happen. */}
+      {!isSet && <DealMotion
         seats={view.players.length}
         aim={['.opponents .seat', '.hand']}
         round={`${matchId}:${view.handNumber}`}
         onStart={() => setDealing(true)}
         onDone={() => setDealing(false)}
-      />
+      />}
       <div className="felt-content">
       {view.matchTarget != null && (
         <ScorePad view={view} me={me} nameOf={nameOf}
@@ -732,6 +739,10 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
             </div>
           </div>
         </div>
+      ) : isSet ? (
+        /* Everything is on the board below. There is no draw pile and no discard, so drawing
+           two empty ones would be furniture for a game that does not have them. */
+        null
       ) : (
         <div className="center">
           <div className="pile">
@@ -747,7 +758,9 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
 
       <div className={`you ${view.isYourTurn ? 'your-turn' : ''}`}>
         <div className="you-head">
-          <span>{settings.playerName === 'You' ? 'Your hand' : `${settings.playerName}’s hand`}{view.mode === 'trick' && (view.tricksWon?.[me] ?? 0) > 0 ? ` · ${view.tricksWon?.[me]} won` : ''}{view.mode === 'trick' && view.bids?.[me] !== undefined ? ` · bid ${view.bids[HUMAN]}` : ''}{isFish ? ` · ${view.booksWon?.[me] ?? 0} books` : ''}{teamOf(me) ? ` · ${teamOf(me)}` : ''}</span>
+          <span>{isSet
+            ? 'The board'
+            : settings.playerName === 'You' ? 'Your hand' : `${settings.playerName}’s hand`}{view.mode === 'trick' && (view.tricksWon?.[me] ?? 0) > 0 ? ` · ${view.tricksWon?.[me]} won` : ''}{view.mode === 'trick' && view.bids?.[me] !== undefined ? ` · bid ${view.bids[HUMAN]}` : ''}{isFish ? ` · ${view.booksWon?.[me] ?? 0} books` : ''}{teamOf(me) ? ` · ${teamOf(me)}` : ''}</span>
           {view.needsPassChoice && (
             <span className="turn-badge">
               {view.passCount > 1
@@ -757,7 +770,9 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
           )}
           {isInterrupt && <span className="bomb-badge">💣 Bomb?</span>}
           {discardMoves.length > 0 && <span className="turn-badge">Discard one</span>}
-          {!view.passDirection && view.isYourTurn && !suitPickerOpen && !isInterrupt && <span className="turn-badge">Your turn</span>}
+          {/* "Your turn" is meaningless where there are no turns — everybody is always in. */}
+          {!view.passDirection && view.isYourTurn && !suitPickerOpen && !isInterrupt && !isSet && <span className="turn-badge">Your turn</span>}
+          {isSet && view.isYourTurn && <span className="turn-badge">Find a set</span>}
           {!view.needsPassChoice && view.passDirection && <span className="waiting-badge">Waiting on {view.passWaitingOn}…</span>}
           {canDraw && <button className="draw-btn" onClick={() => submit({ actionId: 'drawCard' })}>Draw</button>}
           {canPass && <button className="draw-btn" onClick={() => submit({ actionId: 'climbPass' })}>Pass</button>}
@@ -809,7 +824,53 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
           )}
           <button className="restart-btn" onClick={restart} title="Deal a fresh game">Restart</button>
         </div>
-        {isBluff ? (
+        {isSet ? (
+          /*
+            No hand and no turn: one board everybody can see. Picking the right number of cards
+            submits the call immediately — hesitating to press a button is the opposite of the
+            game, which is about being first.
+          */
+          <div className="set-controls">
+            <div className="set-info">
+              <span className="chip">{view.setDeckLeft ?? 0} left in the deck</span>
+              <span className="chip">Pick {view.setSize ?? 3}</span>
+              {Object.entries(view.scores).map(([p, sc]) => (
+                <span key={p} className={`chip ${p === me ? 'mine' : ''}`}>{nameOf(p)} {sc}</span>
+              ))}
+            </div>
+            <div className="set-board" role="group" aria-label="The board">
+              {(view.setBoard ?? []).map((c) => {
+                const on = setPicked.includes(c.id);
+                return (
+                  <button
+                    key={c.id}
+                    className={`set-card ${on ? 'on' : ''}`}
+                    aria-pressed={on}
+                    aria-label={describeAttrs(c.attrs ?? {})}
+                    onClick={() => {
+                      const next = on ? setPicked.filter((x) => x !== c.id) : [...setPicked, c.id];
+                      const want = view.setSize ?? 3;
+                      if (next.length === want) {
+                        // Submit as soon as the third is picked, right or wrong.
+                        const move = myLegal.find((m) => m.actionId === 'callSet'
+                          && m.cards?.length === want && m.cards.every((id) => next.includes(id)));
+                        submit(move ?? { actionId: 'callSet', cards: next });
+                        setSetPicked([]);
+                      } else {
+                        setSetPicked(next);
+                      }
+                    }}
+                  >
+                    <AttrCard card={c} />
+                  </button>
+                );
+              })}
+            </div>
+            {setPicked.length > 0 && (
+              <button className="ghost sm" onClick={() => setSetPicked([])}>Clear pick</button>
+            )}
+          </div>
+        ) : isBluff ? (
           <div className="bluff-controls">
             <div className="bluff-info">
               <span className="bluff-pile">Center pile · {view.centerCount ?? 0} card{(view.centerCount ?? 0) === 1 ? '' : 's'}</span>

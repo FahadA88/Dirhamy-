@@ -4,6 +4,24 @@ const SUITS: Suit[] = ['C', 'D', 'H', 'S'];
 const RANKS: Rank[] = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
 
 export function buildDeck(def: GameDefinition): Card[] {
+  // A deck built from properties rather than ranks and suits: every combination, once each.
+  // The synthetic rank and suit exist so the rest of the engine — sorting, logging, redaction —
+  // keeps working without a second card type running through all of it.
+  if (def.deck.base === 'attributes') {
+    const attrs = def.deck.attributes ?? [];
+    if (attrs.length === 0) return [];
+    let combos: Record<string, string>[] = [{}];
+    for (const a of attrs) {
+      combos = combos.flatMap((c) => a.values.map((v) => ({ ...c, [a.name]: v })));
+    }
+    return combos.map((attrs2, i) => ({
+      id: `A${i}`,
+      rank: String(i + 1) as Card['rank'],
+      suit: 'JOKER' as Card['suit'],
+      attrs: attrs2,
+    }));
+  }
+
   const copies = Math.max(1, def.deck.deckCount ?? 1);
   const excluded = new Set(def.deck.excludeRanks ?? []);
   const cards: Card[] = [];

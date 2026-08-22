@@ -10,6 +10,15 @@ export interface Card {
   id: string;      // stable unique id, e.g. "H8" or "JOKER1"
   rank: Rank;
   suit: Suit;
+  /**
+   * For decks that are not a pack of playing cards.
+   *
+   * A Set card is not a rank and a suit — it is four independent properties, and the game is
+   * about the relationships between them. Rather than pretend otherwise, such a card carries its
+   * real properties here, and keeps a synthetic rank and suit so that everything already written
+   * against Card still works rather than needing a second card type threaded through the engine.
+   */
+  attrs?: Record<string, string>;
 }
 
 // ---------- Game definition (the schema) ----------
@@ -24,7 +33,14 @@ export interface GameDefinition {
     family: string;
   };
   deck: {
-    base: 'standard54';
+    /**
+     * 'standard54' is a pack of cards. 'attributes' builds every combination of the properties
+     * listed below instead — three colours times three shapes times three counts is
+     * twenty-seven cards, and no two are alike.
+     */
+    base: 'standard54' | 'attributes';
+    /** Required for base 'attributes'. Order matters only for display. */
+    attributes?: { name: string; values: string[] }[];
     includeJokers: boolean;
     deckCount?: number;        // how many copies of the deck are shuffled together (default 1)
     excludeRanks?: Rank[];     // ranks removed from the deck entirely (short-deck games)
@@ -65,6 +81,7 @@ export interface GameDefinition {
   poker?: PokerConfig;
   // Present iff this is a trading game — see PitConfig.
   pit?: PitConfig;
+  set?: SetConfig;
   // Present iff this is a single-player patience game: build the tableau down, the foundations
   // up, and win by clearing the deck. No opponents, no turns, no bot.
   solitaire?: SolitaireConfig;
@@ -244,6 +261,26 @@ export interface NumericAuctionConfig {
   slamBonus?: number;
   /** How many consecutive passes end the auction once somebody has bid. Usually all but one. */
   passesToClose?: number;
+}
+
+/**
+ * Spotting sets on a shared board.
+ *
+ * The odd one out among the families: there are no turns, no hands, and no cards played to a
+ * pile. A board of cards is face up, everyone is looking at the same thing, and the game is
+ * whether you can see a valid combination before anybody else. A combination is valid when, for
+ * every property, the chosen cards are either all the same or all different — which is the whole
+ * rule, and the reason the deck has to be built from properties rather than ranks and suits.
+ */
+export interface SetConfig {
+  /** Cards in a valid combination. Three, in the game everyone knows. */
+  size: number;
+  /** How many are face up at once. */
+  boardSize: number;
+  /** Points for spotting one. */
+  score: number;
+  /** Points lost for calling a combination that is not one. Discourages guessing. */
+  penalty: number;
 }
 
 // A simultaneous pre-hand exchange (Hearts). Direction cycles per hand; 'hold' skips a hand.
@@ -561,7 +598,7 @@ export interface RedactedState {
   log: LogEntry[];
   // family-specific view
   mode: 'shedding' | 'trick' | 'climb' | 'fish' | 'rummy' | 'war' | 'solitaire'
-    | 'bluff' | 'reflex' | 'poker' | 'pit';
+    | 'bluff' | 'reflex' | 'poker' | 'pit' | 'set';
   // solitaire
   tableau?: { id: string; cards: Card[]; faceDown: number }[];
   foundations?: { id: string; cards: Card[] }[];
@@ -626,6 +663,10 @@ export interface RedactedState {
   // pit
   market?: { id: number; player: string; give: Suit; count: number; want: Suit }[];
   cornerSize?: number;
+  /** set: the face-up board, and what is left behind it. Both public by design. */
+  setBoard?: Card[];
+  setDeckLeft?: number;
+  setSize?: number;
   // numeric (Bridge-style) auction
   highBid?: { player: string; level: number; strain: Strain } | null;
   /** True while a contract auction is still running. */

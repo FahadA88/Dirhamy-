@@ -2,6 +2,8 @@ import { createContext, useContext, useMemo, useState } from 'react';
 import { useSettings } from '../settings/SettingsContext';
 import { useDismissable } from './useEscape';
 import { resetFirstRun } from './FirstRun';
+import { pullSafety, pushSafety, syncCode, useSyncCode } from '../social/safety';
+import { hostInfo } from '../net/host';
 import {
   ACCENTS, AVATARS, AccentId, BACKS, CardBack, CardFace, CustomBack, CustomFelt, FACES, FELTS,
   MAX_BACK_IMAGE, Settings, TableFelt, THEME_PACKS,
@@ -420,6 +422,14 @@ function AccessSection({ s, set }: { s: Settings; set: Setter }) {
         <Seg value={s.motion} onChange={(v) => set('motion', v as Settings['motion'])}
           options={[['system', 'Match device'], ['full', 'Full'], ['reduced', 'Reduced']]} />
       </Row>
+      <Row
+        label="Carry your block list to another device"
+        hint="Type this code on your other device to bring your blocks and mutes with you. Anyone who has the code can read and change that list, so treat it like a password."
+        keywords="sync block mute safety devices code transfer"
+        wide
+      >
+        <SyncCode />
+      </Row>
       <Row label="Show the introduction again" hint="The three cards you saw the first time." keywords="intro tutorial onboarding help first run again">
         <button className="ghost sm" onClick={() => { resetFirstRun(); location.reload(); }}>Show it</button>
       </Row>
@@ -427,6 +437,45 @@ function AccessSection({ s, set }: { s: Settings; set: Setter }) {
         <Toggle on={s.speak} onChange={(v) => set('speak', v)} label="Read the table aloud" />
       </Row>
     </>
+  );
+}
+
+/**
+ * The sync code, and somewhere to type a different one.
+ *
+ * Deliberately not automatic. Syncing a block list is a thing somebody chooses to do, and doing
+ * it silently in the background would mean a list leaving this device without being asked.
+ */
+function SyncCode() {
+  const [code, setCode] = useState(() => syncCode());
+  const [entry, setEntry] = useState('');
+  const [status, setStatus] = useState<string | null>(null);
+
+  async function run(fn: (base: string) => Promise<boolean>, okText: string) {
+    setStatus('Working…');
+    const host = await hostInfo();
+    if (!host.up) { setStatus('No host is running, so there is nowhere to sync to.'); return; }
+    setStatus(await fn(host.base) ? okText : 'That did not work.');
+  }
+
+  return (
+    <div className="sync">
+      <div className="sync-code" aria-label={`Your sync code is ${code.split('').join(' ')}`}>{code}</div>
+      <div className="sync-actions">
+        <button className="ghost sm" onClick={() => void run(pushSafety, 'Sent.')}>Upload mine</button>
+        <button className="ghost sm" onClick={() => void run(pullSafety, 'Merged in.')}>Fetch</button>
+      </div>
+      <div className="sync-entry">
+        <input className="pref-text" placeholder="Use another device's code" value={entry}
+          aria-label="Another device's sync code"
+          onChange={(e) => setEntry(e.target.value.toUpperCase())} />
+        <button className="ghost sm" disabled={entry.trim().length < 8}
+          onClick={() => { useSyncCode(entry); setCode(entry.trim().toUpperCase()); setEntry(''); setStatus('Code changed. Fetch to pull that list in.'); }}>
+          Use it
+        </button>
+      </div>
+      {status && <p className="muted sync-status" role="status">{status}</p>}
+    </div>
   );
 }
 

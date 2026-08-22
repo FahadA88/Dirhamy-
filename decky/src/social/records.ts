@@ -58,7 +58,7 @@ export function allResults(gameId?: string): Result[] {
  * Sorted by win rate rather than raw wins, with a games-played tiebreak — otherwise whoever sat
  * down most often tops every board, which tells you nothing.
  */
-export function leaderboard(gameId?: string): Standing[] {
+export function leaderboard(gameId?: string, only?: string[]): Standing[] {
   const rows = new Map<string, Standing>();
   for (const r of allResults(gameId)) {
     r.standings.forEach((s, i) => {
@@ -71,6 +71,7 @@ export function leaderboard(gameId?: string): Standing[] {
     });
   }
   return [...rows.values()]
+    .filter((s) => !only || only.includes(s.name))
     .map((s) => ({ ...s, winRate: s.played > 0 ? s.won / s.played : 0 }))
     .sort((a, b) => b.winRate - a.winRate || b.played - a.played);
 }

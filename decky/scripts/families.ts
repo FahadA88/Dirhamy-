@@ -1,4 +1,5 @@
-// The four newest primitives — claim/challenge, reflex, betting, open trading — proved the
+// The newest primitives — claim/challenge, reflex, betting, open trading, contract auctions and
+// attribute decks — proved the
 // same way every other family is: a deterministic scenario for the rule itself, then the bot
 // simulator across a spread of seat counts to show the whole game actually finishes and can
 // actually be won. See src/engine/types.ts for the honest limitations each config comment
@@ -9,7 +10,9 @@ import { slapjack } from '../src/games/slapjack';
 import { showdownPoker } from '../src/games/showdownPoker';
 import { pit } from '../src/games/pit';
 import { contractWhist } from '../src/games/contract';
-import { createMatch, applyMove, legalMoves, actingPlayers, redact } from '../src/engine/engine';
+import { trio } from '../src/games/trio';
+import { createMatch, applyMove, legalMoves, actingPlayers, isValidSet, redact } from '../src/engine/engine';
+import { buildDeck } from '../src/engine/deck';
 import { simulate } from '../src/engine/simulator';
 import { validate } from '../src/engine/validator';
 import { Card, MatchState } from '../src/engine/types';
@@ -173,6 +176,45 @@ section('Contract auction — a hand nobody wants is thrown in');
   check('and nobody scored', P.every((p) => s.scores[p] === 0));
 }
 
+// ---------- Set: a deck that is not a deck, and a board with no turns ----------
+section('Attribute deck — every combination once, and one rule about all of them (Trio)');
+{
+  const deck = buildDeck(trio);
+  check('three properties of three values makes twenty-seven cards', deck.length === 27, deck.length);
+  check('and no two are alike', new Set(deck.map((c) => JSON.stringify(c.attrs))).size === 27);
+
+  const card = (colour: string, shape: string, count: string) =>
+    ({ id: `${colour}${shape}${count}`, rank: '2' as never, suit: 'JOKER' as never, attrs: { colour, shape, count } });
+
+  check('all the same is a set',
+    isValidSet([card('red', 'oval', '1'), card('red', 'oval', '2'), card('red', 'oval', '3')]));
+  check('all different is a set',
+    isValidSet([card('red', 'oval', '1'), card('green', 'diamond', '2'), card('violet', 'squiggle', '3')]));
+  check('two of one and one of another is not',
+    !isValidSet([card('red', 'oval', '1'), card('red', 'oval', '2'), card('green', 'oval', '3')]));
+
+  const P = ['A', 'B'];
+  let s: MatchState = createMatch(trio, P, 5);
+  check('a board is dealt face up', (s.zones['set:board'] || []).length === 12);
+  check('there is always something to find', legalMoves(s, 'A').some((m) => m.actionId === 'callSet'));
+  check('nobody is waiting for a turn', actingPlayers(s).length === P.length);
+
+  const call = legalMoves(s, 'B').find((m) => m.actionId === 'callSet')!;
+  s = applyMove(s, 'B', call);
+  check('spotting one scores it', s.scores.B === 1);
+  check('and the board is topped back up', (s.zones['set:board'] || []).length >= 12
+    || (s.zones['set:deck'] || []).length === 0);
+
+  // A wrong call costs something, or there would be no reason not to guess constantly.
+  const board = s.zones['set:board'] || [];
+  const bad = [board[0], board[1], board[2]];
+  if (!isValidSet(bad)) {
+    const before = s.scores.A ?? 0;
+    s = applyMove(s, 'A', { actionId: 'callSet', cards: bad.map((c) => c.id) });
+    check('a wrong call is penalised', (s.scores.A ?? 0) === before - 1);
+  }
+}
+
 // ---------- termination and reachability, the same gate every author-built game passes ----------
 section('Every new family terminates, and is winnable, at the seat counts it ships with');
 for (const [name, def, seats] of [
@@ -181,6 +223,7 @@ for (const [name, def, seats] of [
   ['Showdown Poker', showdownPoker, [2, 4, 8]],
   ['Pit', pit, [3, 4, 6]],
   ['Contract Whist', contractWhist, [3, 4]],
+  ['Trio', trio, [1, 2, 4]],
 ] as const) {
   check(`${name} validates clean`, validate(def).ok, validate(def).issues);
   for (const n of seats) {
