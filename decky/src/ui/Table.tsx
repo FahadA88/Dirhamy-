@@ -54,7 +54,7 @@ function highlightOf(view: RedactedState, me: string): { key: string; label: str
   return null;
 }
 
-export function Table({ def, seats = 3, plan, practice = false, client: injected, mySeat }: {
+export function Table({ def, seats = 3, plan, practice = false, client: injected, mySeat, resumeMatchId }: {
   def: GameDefinition;
   seats?: number;
   /** Who is sitting where. Omitted means the classic single human against bots. */
@@ -70,6 +70,8 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
    * table cannot work out which one is yours by looking.
    */
   mySeat?: string;
+  /** Resume this exact match rather than whichever was most recent. */
+  resumeMatchId?: string;
   /**
    * A game for trying things out. Nothing is recorded, the undo window never closes, and a
    * hint is always on offer — so somebody can learn a game without it counting against them.
@@ -96,7 +98,7 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
   const [history, setHistory] = useState<MoveRecord[]>([]);
   // The referee, and the last position it gave us. A local table makes its own client; an
   // online one is handed one already connected to the table it joined.
-  const clientRef = useRef<TableClient>(injected ?? bootLocal(def, players, false));
+  const clientRef = useRef<TableClient>(injected ?? bootLocal(def, players, false, resumeMatchId));
   const [board, setBoard] = useState<Board>(() => clientRef.current.read(localSeats[0] ?? HUMAN));
   // One toast, two tones: a refusal is a red ✕, a status note is not.
   const [toast, setToast] = useState<{ text: string; tone: 'bad' | 'info' } | null>(null);
@@ -135,7 +137,7 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
     // from this side — the host owns it — so this only ever replaces a local one.
     if (clientRef.current.remote) return;
     if (fresh) clientRef.current.end();
-    clientRef.current = bootLocal(def, players, fresh);
+    clientRef.current = bootLocal(def, players, fresh);   // a fresh deal, never a resume
     setBoard(clientRef.current.read(localSeats[0] ?? HUMAN));
     setMe(localSeats[0] ?? HUMAN);
   }
@@ -153,8 +155,8 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
 
   // The pointer is only worth keeping while there is something to come back to.
   useEffect(() => {
-    if (view.phase !== 'playing') forgetSession();
-  }, [view.phase]);
+    if (view.phase !== 'playing') forgetSession(matchId);
+  }, [view.phase, matchId]);
 
   function restart() { deal(true); }
 
@@ -1164,7 +1166,17 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
  * Start (or pick up) a table refereed in this tab. Resuming is tried first so closing a tab
  * mid-game is not the same as abandoning it.
  */
-function bootLocal(def: GameDefinition, players: string[] | Seat[], fresh: boolean): TableClient {
+function bootLocal(
+  def: GameDefinition, players: string[] | Seat[], fresh: boolean, resumeMatchId?: string,
+): TableClient {
+  // Asked for a specific table — the one picked off the list of games in progress.
+  if (!fresh && resumeMatchId) {
+    try {
+      service.summaryOf(resumeMatchId);
+      rememberSession(resumeMatchId, def.meta.id, players.length);
+      return new LocalTableClient(resumeMatchId, service);
+    } catch { /* gone; fall through to the usual path */ }
+  }
   if (!fresh) {
     const resume = resumableSession();
     if (resume && resume.gameId === def.meta.id && resume.seats === players.length) {

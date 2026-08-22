@@ -17,15 +17,33 @@ export interface SessionPointer {
   savedAt: number;
 }
 
-export function rememberSession(matchId: string, gameId: string, seats: number): void {
-  try {
-    const p: SessionPointer = { matchId, gameId, seats, savedAt: Date.now() };
-    localStorage.setItem(SESSION, JSON.stringify(p));
-  } catch { /* ignore */ }
+// More than one game at a time.
+//
+// A single pointer meant starting a second game silently abandoned the first, which is the wrong
+// answer for a card game: people leave a hand half-played and come back to it. This keeps a list,
+// newest first, and the single-pointer functions above it still work — they operate on the head
+// of the list, so nothing that already used them had to change.
+const OPEN = 'decky.opengames.v1';
+const MAX_OPEN = 12;
+
+function readOpen(): SessionPointer[] {
+  try { return JSON.parse(localStorage.getItem(OPEN) || '[]') as SessionPointer[]; } catch { return []; }
 }
 
-export function forgetSession(): void {
+function writeOpen(ps: SessionPointer[]): void {
+  try { localStorage.setItem(OPEN, JSON.stringify(ps.slice(0, MAX_OPEN))); } catch { /* quota */ }
+}
+
+export function rememberSession(matchId: string, gameId: string, seats: number): void {
+  const p: SessionPointer = { matchId, gameId, seats, savedAt: Date.now() };
+  try { localStorage.setItem(SESSION, JSON.stringify(p)); } catch { /* ignore */ }
+  // Move it to the front rather than adding a duplicate.
+  writeOpen([p, ...readOpen().filter((x) => x.matchId !== matchId)]);
+}
+
+export function forgetSession(matchId?: string): void {
   try { localStorage.removeItem(SESSION); } catch { /* ignore */ }
+  if (matchId) writeOpen(readOpen().filter((p) => p.matchId !== matchId));
 }
 
 /** The remembered match, but only if the service can still find it and it is still in play. */
@@ -40,4 +58,29 @@ export function resumableSession(): SessionPointer | null {
   } catch {
     return null;
   }
+}
+
+export interface OpenGame extends SessionPointer {
+  /** True when this table is waiting on a seat this device plays. */
+  yourTurn: boolean;
+}
+
+/**
+ * Every game still in play, newest first, each marked with whether it is waiting on you.
+ * Entries the service can no longer find are dropped as they are read, so a cleared store or an
+ * ended match never leaves a dead row on the screen.
+ */
+export function openGames(): OpenGame[] {
+  const kept: SessionPointer[] = [];
+  const out: OpenGame[] = [];
+  for (const p of readOpen()) {
+    try {
+      const summary = service.summaryOf(p.matchId);
+      if (summary.phase !== 'playing') continue;
+      kept.push(p);
+      out.push({ ...p, yourTurn: summary.waitingOn.includes('P1') });
+    } catch { /* the record is gone; drop it */ }
+  }
+  if (kept.length !== readOpen().length) writeOpen(kept);
+  return out;
 }
