@@ -1,6 +1,7 @@
 import { explainGame } from '../authoring/explain';
 import { GameDefinition } from '../engine/types';
 import { useDismissable } from './useEscape';
+import { GameDiagram } from './GameDiagram';
 
 const FAMILY_HOW: Record<string, string[]> = {
   'shedding-matching': [
@@ -34,6 +35,29 @@ const FAMILY_HOW: Record<string, string[]> = {
     'The higher card takes both.',
     'A tie means war — cards face down, then flip again.',
   ],
+  bluff: [
+    'Play cards face down and say what rank they are.',
+    'You do not have to be telling the truth.',
+    'Anyone may call it — whoever is wrong takes the whole pile.',
+    'First to get rid of every card wins.',
+  ],
+  reflex: [
+    'Cards turn over one at a time onto a shared pile.',
+    'When the trigger card appears, slap the pile.',
+    'The first hand down takes every card on it.',
+    'Run out of cards and you are out — unless you win a slap.',
+  ],
+  poker: [
+    'Blinds are posted, then everyone is dealt a hand.',
+    'Check, bet, call, raise or fold.',
+    'Everyone still in shows their hand; the best one takes the pot.',
+  ],
+  pit: [
+    'There are no turns — everybody trades at once.',
+    'Offer a number of cards of one suit for another suit.',
+    'Anyone holding what you asked for can accept.',
+    'Corner a whole suit to win.',
+  ],
   solitaire: [
     'Build the columns downward and the foundations upward.',
     'Tap a card to pick it up, then tap where it should go.',
@@ -57,6 +81,9 @@ export function GameHelp({ def, onClose }: { def: GameDefinition; onClose: () =>
         aria-label={`How to play ${def.meta.name}`} onClick={(e) => e.stopPropagation()}>
         <h3>{def.meta.name}</h3>
         <p className="help-desc">{def.meta.description}</p>
+
+        {/* Shown before the prose, because a worked example is the part people actually read. */}
+        <GameDiagram def={def} />
 
         <div className="help-head">In short</div>
         <ul className="help-list">
