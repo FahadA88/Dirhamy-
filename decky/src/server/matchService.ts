@@ -533,7 +533,9 @@ function normaliseSeats(players: string[] | Seat[]): Seat[] {
       id,
       name: i === 0 ? 'You' : `Bot ${i + 1}`,
       kind: i === 0 ? 'local' : 'bot',
-      difficulty: 'smart' as const,
+      // Left unset so botStep()'s own seat-difficulty-or-caller's-setting fallback actually
+      // applies: a hardcoded value here would silently override whatever the player picked in
+      // Settings for every quick-play match, since a seat's own difficulty always wins there.
     }));
   }
   return (players as Seat[]).map((s) => ({ ...s }));
@@ -563,6 +565,11 @@ function sameMove(a: Move, b: Move): boolean {
   if (a.rank !== b.rank) return false;
   if (a.from !== b.from || a.to !== b.to) return false;
   if (!!a.alone !== !!b.alone) return false;
+  if (a.claimedRank !== b.claimedRank) return false;
+  if (a.amount !== b.amount) return false;
+  if (a.offerId !== b.offerId) return false;
+  if (a.give !== b.give || a.want !== b.want) return false;
+  if (a.level !== b.level || a.strain !== b.strain) return false;
   const ac = a.cards ?? [], bc = b.cards ?? [];
   if (ac.length !== bc.length) return false;
   return ac.every((x, i) => x === bc[i]);
