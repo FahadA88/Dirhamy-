@@ -2,7 +2,7 @@
 // set of KNOBS; buildDefinition() compiles those knobs into a full GameDefinition the engine
 // can run. This is what the visual editor edits and what the AI co-pilot writes to.
 
-import { Effect, GameDefinition, Predicate, Rank, Suit } from '../engine/types';
+import { Effect, GameDefinition, Predicate, Rank, Strain, Suit } from '../engine/types';
 import { RuleDraft, compileRules } from './ruleKit';
 import { CURRENT_SCHEMA } from '../engine/migrate';
 
@@ -30,6 +30,14 @@ export interface Knobs {
   heartsValue: number;       // penalty per heart (penalty scoring)
   queenSpadesValue: number;  // penalty for the Queen of Spades (penalty scoring)
   trumpAuction: boolean;     // trump is named per hand rather than fixed by the definition
+  /**
+   * A Bridge-style contract auction: bid a level and a suit together, each bid beating the last,
+   * and the winner has promised that many tricks. Mutually exclusive with trumpAuction — a hand
+   * has one auction or the other.
+   */
+  contractAuction: boolean;
+  contractMaxLevel: number;  // how high the bidding may go
+  contractBook: number;      // tricks the level sits on top of (Bridge's six; 0 for a short deal)
   bowers: boolean;           // trump jack, then the same-colour jack, top the trump suit
   goAlone: boolean;          // the maker may cut their partner out of the hand
   shootTheMoon: boolean;     // sweeping every penalty point scores you 0 and everyone else the pot
@@ -137,6 +145,9 @@ export const defaultKnobs: Knobs = {
   heartsValue: 1,
   queenSpadesValue: 13,
   trumpAuction: false,
+  contractAuction: false,
+  contractMaxLevel: 7,
+  contractBook: 0,
   bowers: false,
   goAlone: false,
   shootTheMoon: false,
@@ -519,7 +530,19 @@ function buildTrickDefinition(knobs: Knobs, id: string): GameDefinition {
       bidding: knobs.trickBidding || undefined,
       partnerships: knobs.trickPartnerships || undefined,
       // Euchre: trump is auctioned per hand instead of fixed.
-      auction: knobs.trumpAuction ? { upcardZone: 'kitty', dealerDiscards: true, rounds: 2 as const } : undefined,
+      auction: knobs.trumpAuction && !knobs.contractAuction
+        ? { upcardZone: 'kitty', dealerDiscards: true, rounds: 2 as const } : undefined,
+      // A contract auction replaces the trump auction rather than stacking on it.
+      numericAuction: knobs.contractAuction ? {
+        minLevel: 1,
+        maxLevel: Math.max(1, Math.min(7, knobs.contractMaxLevel)),
+        strains: ['C', 'D', 'H', 'S', 'NT'] as const as Strain[],
+        book: Math.max(0, knobs.contractBook),
+        trickValue: 10,
+        overtrickValue: 3,
+        undertrickValue: 12,
+        slamBonus: 30,
+      } : undefined,
       bowers: knobs.trumpAuction && knobs.bowers ? true : undefined,
       goAlone: knobs.trumpAuction && knobs.goAlone && knobs.trickPartnerships ? true : undefined,
       euchreScoring: knobs.trumpAuction && knobs.trickPartnerships ? true : undefined,
@@ -664,6 +687,9 @@ export function knobsFromDefinition(def: GameDefinition): Knobs {
     heartsValue: (def.trick?.penaltyPoints?.H as number) ?? 1,
     queenSpadesValue: (def.trick?.penaltyPoints?.SQ as number) ?? 13,
     trumpAuction: !!def.trick?.auction,
+    contractAuction: !!def.trick?.numericAuction,
+    contractMaxLevel: def.trick?.numericAuction?.maxLevel ?? 7,
+    contractBook: def.trick?.numericAuction?.book ?? 0,
     bowers: !!def.trick?.bowers,
     goAlone: !!def.trick?.goAlone,
     shootTheMoon: !!def.trick?.shootTheMoon,

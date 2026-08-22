@@ -1,6 +1,7 @@
 import { createContext, useContext, useMemo, useState } from 'react';
 import { useSettings } from '../settings/SettingsContext';
 import { useDismissable } from './useEscape';
+import { resetFirstRun } from './FirstRun';
 import {
   ACCENTS, AVATARS, AccentId, BACKS, CardBack, CardFace, CustomBack, CustomFelt, FACES, FELTS,
   MAX_BACK_IMAGE, Settings, TableFelt, THEME_PACKS,
@@ -418,6 +419,9 @@ function AccessSection({ s, set }: { s: Settings; set: Setter }) {
       <Row label="Animation" hint="The same control as in Motion & sound — here because it is the one people look for." keywords="motion reduce vestibular system">
         <Seg value={s.motion} onChange={(v) => set('motion', v as Settings['motion'])}
           options={[['system', 'Match device'], ['full', 'Full'], ['reduced', 'Reduced']]} />
+      </Row>
+      <Row label="Show the introduction again" hint="The three cards you saw the first time." keywords="intro tutorial onboarding help first run again">
+        <button className="ghost sm" onClick={() => { resetFirstRun(); location.reload(); }}>Show it</button>
       </Row>
       <Row label="Read the table aloud" hint="Speaks each move and your hand through the browser's own voice. Separate from a screen reader, which is always supported." keywords="speech speak voice audio blind narrate tts">
         <Toggle on={s.speak} onChange={(v) => set('speak', v)} label="Read the table aloud" />

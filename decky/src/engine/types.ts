@@ -213,10 +213,37 @@ export interface AuctionConfig {
 }
 
 export type Strain = Suit | 'NT';
+/**
+ * A contract auction, as in Bridge.
+ *
+ * The distinguishing feature is that a bid is a NUMBER and a SUIT together, and every bid must
+ * beat the last one — first on level, then on strain. That makes the auction a real negotiation
+ * rather than a single choice, and it makes the result a contract: a promise about how many
+ * tricks the winning side will take, which the hand is then scored against.
+ *
+ * Deliberately not the whole of Bridge. There are no doubles, no vulnerability, no rubber, and
+ * no dummy — the declarer plays their own cards. What is here is the auction itself and being
+ * scored on whether you kept your word.
+ */
 export interface NumericAuctionConfig {
   minLevel: number;   // 1
   maxLevel: number;   // 7
   strains: Strain[];  // bid order, weakest to strongest, e.g. ["C","D","H","S","NT"]
+  /**
+   * Tricks the contract is worth on top of the level. Bridge's "book" of six: a 3♠ contract
+   * promises 3 + 6 = 9 tricks.
+   */
+  book: number;
+  /** Points per trick bid when the contract is made. */
+  trickValue: number;
+  /** Points per trick over the contract. */
+  overtrickValue: number;
+  /** Points the other side takes per trick the contract falls short by. */
+  undertrickValue: number;
+  /** A bonus for bidding and making the top level. 0 for none. */
+  slamBonus?: number;
+  /** How many consecutive passes end the auction once somebody has bid. Usually all but one. */
+  passesToClose?: number;
 }
 
 // A simultaneous pre-hand exchange (Hearts). Direction cycles per hand; 'hold' skips a hand.
@@ -601,4 +628,8 @@ export interface RedactedState {
   cornerSize?: number;
   // numeric (Bridge-style) auction
   highBid?: { player: string; level: number; strain: Strain } | null;
+  /** True while a contract auction is still running. */
+  contractAuction?: boolean;
+  /** How many tricks the standing contract promises, once there is one. */
+  contractTricks?: number;
 }

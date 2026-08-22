@@ -4088,3 +4088,54 @@ header h1 {
   margin: 8px 0 0; font-size: 12px; color: var(--muted);
 }
 .gd-written em { font-style: italic; opacity: 0.85; }
+
+/* ---- the contract auction ---- */
+.contract-panel { max-inline-size: 380px; }
+.bid-line { margin: 4px 0 12px; font-size: 13px; }
+.contract-grid { display: flex; flex-direction: column; gap: 4px; max-block-size: 260px; overflow-y: auto; }
+.contract-row { display: flex; align-items: center; gap: 4px; }
+.cr-level {
+  inline-size: 20px; text-align: center;
+  font-family: var(--mono); font-size: 13px; color: var(--muted);
+}
+.cr-bid {
+  inline-size: 38px; block-size: 34px;
+  display: grid; place-items: center;
+  font-size: 16px; line-height: 1;
+  border: 1px solid var(--panel-brd); border-radius: 8px;
+  background: var(--panel-hi); color: var(--ink); cursor: pointer;
+}
+.cr-bid:hover { border-color: var(--gold, #d6af5c); }
+.cr-bid.s-H, .cr-bid.s-D { color: var(--card-red, #d33); }
+.cr-bid.s-NT { font-size: 12px; font-weight: 700; letter-spacing: 0.02em; }
+@media (hover: none), (pointer: coarse) {
+  .cr-bid { inline-size: 44px; block-size: 44px; }
+}
+
+/* ---- stepping back through a match ---- */
+.replay-bar { display: flex; align-items: center; gap: 8px; margin-block-end: 12px; }
+.replay-bar input[type="range"] { flex: 1; min-inline-size: 120px; }
+.replay-count {
+  font-family: var(--mono); font-size: 12px; color: var(--muted);
+  font-variant-numeric: tabular-nums; min-inline-size: 74px; text-align: end;
+}
+/* Moves past the scrubber are dimmed rather than hidden, so the shape of the whole match stays
+   visible while you look at one point in it. */
+.movelist li.ahead { opacity: 0.32; }
+.movelist li.at {
+  background: color-mix(in srgb, var(--gold, #d6af5c) 14%, transparent);
+  border-radius: 6px;
+}
+
+/* ---- the introduction ---- */
+.modal-box.intro { max-inline-size: 460px; text-align: center; }
+.intro-mark { font-size: 40px; line-height: 1; display: block; margin-block-end: 10px; }
+.modal-box.intro h3 { margin: 0 0 10px; font-family: var(--display); font-size: 21px; }
+.modal-box.intro p { margin: 0 auto; max-inline-size: 44ch; font-size: 14px; line-height: 1.55; color: var(--muted); }
+.intro-dots { display: flex; justify-content: center; gap: 7px; margin: 20px 0 16px; }
+.intro-dot {
+  inline-size: 9px; block-size: 9px; padding: 0; border-radius: 50%;
+  border: 1px solid var(--panel-brd-hi); background: none; cursor: pointer;
+}
+.intro-dot.on { background: var(--gold, #d6af5c); border-color: var(--gold, #d6af5c); }
+.intro-actions { display: flex; justify-content: center; gap: 10px; }

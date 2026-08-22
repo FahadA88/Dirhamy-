@@ -8,6 +8,7 @@ import { bluff } from '../src/games/bluff';
 import { slapjack } from '../src/games/slapjack';
 import { showdownPoker } from '../src/games/showdownPoker';
 import { pit } from '../src/games/pit';
+import { contractWhist } from '../src/games/contract';
 import { createMatch, applyMove, legalMoves, actingPlayers, redact } from '../src/engine/engine';
 import { simulate } from '../src/engine/simulator';
 import { validate } from '../src/engine/validator';
@@ -131,6 +132,47 @@ section('Pit — the market has no turn order (Pit)');
   check('and the offer is gone', s.market.length === 0);
 }
 
+// ---------- Contract auction: a bid must beat the last, and a promise is scored ----------
+section('Contract auction — bids escalate, and the contract is scored (Contract Whist)');
+{
+  const P = ['A', 'B', 'C'];
+  let s: MatchState = createMatch(contractWhist, P, 3);
+  check('the auction opens', s.auctionRound > 0 && s.highBid === null);
+
+  const opener = s.players[s.turnIndex];
+  const bids = legalMoves(s, opener).filter((m) => m.actionId === 'contractBid');
+  check('a level and a strain are offered together', bids.length > 0 && bids[0].level != null && bids[0].strain != null);
+  check('every level is on offer at the start', new Set(bids.map((m) => m.level)).size === 7);
+
+  s = applyMove(s, opener, { actionId: 'contractBid', level: 3, strain: 'H' });
+  check('the bid stands', s.highBid?.level === 3 && s.highBid?.strain === 'H');
+
+  const next = s.players[s.turnIndex];
+  const after = legalMoves(s, next).filter((m) => m.actionId === 'contractBid');
+  check('a weaker bid is no longer offered',
+    !after.some((m) => (m.level ?? 0) < 3 || ((m.level === 3) && ['C', 'D'].includes(String(m.strain)))));
+  check('3 spades still beats 3 hearts', after.some((m) => m.level === 3 && m.strain === 'S'));
+  check('4 clubs beats it too', after.some((m) => m.level === 4 && m.strain === 'C'));
+
+  // Everyone else passes: the auction closes and the strain becomes trump.
+  s = applyMove(s, s.players[s.turnIndex], { actionId: 'passBid' });
+  s = applyMove(s, s.players[s.turnIndex], { actionId: 'passBid' });
+  check('the auction closed', s.auctionRound === 0);
+  check('the winning strain became trump', s.trumpSuit === 'H');
+  check('the declarer is the high bidder', s.maker === opener);
+  check('the lead is to the declarer\u2019s left',
+    s.players[s.turnIndex] === s.players[(s.players.indexOf(opener) + 1) % 3]);
+}
+
+section('Contract auction — a hand nobody wants is thrown in');
+{
+  const P = ['A', 'B', 'C'];
+  let s: MatchState = createMatch(contractWhist, P, 11);
+  for (let i = 0; i < 3; i++) s = applyMove(s, s.players[s.turnIndex], { actionId: 'passBid' });
+  check('passed out', s.phase === 'roundOver');
+  check('and nobody scored', P.every((p) => s.scores[p] === 0));
+}
+
 // ---------- termination and reachability, the same gate every author-built game passes ----------
 section('Every new family terminates, and is winnable, at the seat counts it ships with');
 for (const [name, def, seats] of [
@@ -138,6 +180,7 @@ for (const [name, def, seats] of [
   ['Slapjack', slapjack, [2, 4, 6]],
   ['Showdown Poker', showdownPoker, [2, 4, 8]],
   ['Pit', pit, [3, 4, 6]],
+  ['Contract Whist', contractWhist, [3, 4]],
 ] as const) {
   check(`${name} validates clean`, validate(def).ok, validate(def).issues);
   for (const n of seats) {

@@ -34,6 +34,7 @@ const BY_FAMILY: Record<Knobs['family'], (keyof Knobs)[]> = {
   trick: ['handSize', 'trump', 'mustFollowSuit', 'aceHigh', 'trickScoreBy', 'trickBidding',
     'trickPartnerships', 'bustEnabled', 'bustScore', 'heartsValue', 'queenSpadesValue',
     'trumpAuction', 'bowers', 'goAlone', 'shootTheMoon', 'brokenSuitLead', 'forceOpeningLead',
+    'contractAuction', 'contractMaxLevel', 'contractBook',
     'handPassCount'],
   climb: ['handSize', 'climbTwosHigh', 'climbCombos', 'climbBombSize', 'direction'],
   fish: ['handSize', 'bookSize'],
@@ -85,6 +86,10 @@ Every game is one of eleven families. The family decides the shape of a turn, so
                   (Crazy Eights, Switch, Uno-likes)
   - "trick"     — everyone plays one card, highest takes the trick.
                   (Hearts, Spades, Euchre, Whist)
+                  Set contractAuction for a Bridge-style auction: each bid is a level AND a
+                  suit and must beat the last, and the winner has promised that many tricks.
+                  contractBook is what the level sits on top of — six in Bridge, 0 on a short
+                  deal where the level itself is the promise.
   - "climb"     — each play must beat the last or you pass; first out wins.
                   (President, Big Two)
   - "fish"      — ask another player for a rank, collect sets.

@@ -18,9 +18,10 @@ import { bluff } from './bluff';
 import { slapjack } from './slapjack';
 import { showdownPoker } from './showdownPoker';
 import { pit } from './pit';
+import { contractWhist } from './contract';
 
 // The classics library. Each entry is a hand-authored game, expressed purely as data.
-export const catalog: GameDefinition[] = [crazyEights, switchGame, spadesLite, hearts, euchre, president, goFish, rummy, ginRummy, war, tradeWinds, undertow, klondike, freecell, spider, bluff, slapjack, showdownPoker, pit];
+export const catalog: GameDefinition[] = [crazyEights, switchGame, spadesLite, hearts, euchre, president, goFish, rummy, ginRummy, war, tradeWinds, undertow, klondike, freecell, spider, bluff, slapjack, showdownPoker, pit, contractWhist];
 
 export function getGame(id: string): GameDefinition | undefined {
   return catalog.find((g) => g.meta.id === id);

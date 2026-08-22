@@ -120,6 +120,8 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
   const [secsLeft, setSecsLeft] = useState<number | null>(null);
   // Which card the keyboard is on. Null means the keyboard is not driving the hand.
   const [cursor, setCursor] = useState<number | null>(null);
+  // Replay: how far through the recorded moves we are looking, or null for "live".
+  const [replayAt, setReplayAt] = useState<number | null>(null);
 
   const { matchId, view } = board;
   const passAndPlay = localSeats.length > 1;
@@ -562,7 +564,48 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
         })}
       </div>
 
-      {view.mode === 'trick' && (view.auctionRound ?? 0) > 0 ? (
+      {view.contractAuction ? (
+        /*
+          A contract auction. Every bid must beat the last, so the grid only shows what is still
+          available — the levels that are gone simply are not there, which is easier to read than
+          a wall of disabled buttons.
+        */
+        <div className="center bid-area">
+          <div className="bid-panel contract-panel">
+            <span className="bid-kicker">The auction</span>
+            <p className="bid-line">
+              {view.highBid
+                ? <>Standing bid <b>{view.highBid.level}{view.highBid.strain === 'NT' ? 'NT' : SUIT_SYMBOLS[view.highBid.strain]}</b> by {nameOf(view.highBid.player)}</>
+                : 'Nobody has bid yet.'}
+            </p>
+            {view.isYourTurn ? (
+              <>
+                <div className="contract-grid">
+                  {Array.from(new Set(myLegal.filter((m) => m.actionId === 'contractBid').map((m) => m.level!)))
+                    .sort((a, b) => a - b)
+                    .map((level) => (
+                      <div key={level} className="contract-row">
+                        <span className="cr-level">{level}</span>
+                        {myLegal
+                          .filter((m) => m.actionId === 'contractBid' && m.level === level)
+                          .map((m) => (
+                            <button key={`${level}-${m.strain}`} className={`cr-bid s-${m.strain}`}
+                              aria-label={`Bid ${level} ${m.strain === 'NT' ? 'no trump' : SUIT_NAMES[m.strain as string] ?? m.strain}`}
+                              onClick={() => submit(m)}>
+                              {m.strain === 'NT' ? 'NT' : SUIT_SYMBOLS[m.strain as string]}
+                            </button>
+                          ))}
+                      </div>
+                    ))}
+                </div>
+                <button className="ghost" onClick={() => submit({ actionId: 'passBid' })}>Pass</button>
+              </>
+            ) : (
+              <p className="muted">Waiting for the next bid…</p>
+            )}
+          </div>
+        </div>
+      ) : view.mode === 'trick' && (view.auctionRound ?? 0) > 0 ? (
         <div className="center bid-area">
           {view.upcard && (
             <div className="pile">
@@ -1047,17 +1090,44 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
         <div className="modal" onClick={() => setShowHistory(false)}>
           <div className="modal-box wide" ref={historyRef} role="dialog" aria-modal="true" aria-label="Move history" onClick={(e) => e.stopPropagation()}>
             <h3>Move history</h3>
+            {/*
+              Every move is already recorded, so stepping back through them costs nothing but a
+              scrubber. This walks the record rather than re-simulating: it shows what was done
+              and when, which is what somebody wants when they ask "how did that happen".
+            */}
+            {history.length > 0 && (
+              <div className="replay-bar">
+                <button className="ghost sm" aria-label="Step back"
+                  disabled={replayAt !== null && replayAt <= 0}
+                  onClick={() => setReplayAt((n) => Math.max(0, (n ?? history.length) - 1))}>◀</button>
+                <input
+                  type="range" min={0} max={history.length}
+                  value={replayAt ?? history.length}
+                  aria-label="Step through the match"
+                  onChange={(e) => setReplayAt(+e.target.value)}
+                />
+                <button className="ghost sm" aria-label="Step forward"
+                  disabled={replayAt === null || replayAt >= history.length}
+                  onClick={() => setReplayAt((n) => Math.min(history.length, (n ?? 0) + 1))}>▶</button>
+                <span className="replay-count">
+                  {replayAt === null ? `${history.length} moves` : `${replayAt} / ${history.length}`}
+                </span>
+                {replayAt !== null && (
+                  <button className="ghost sm" onClick={() => setReplayAt(null)}>Live</button>
+                )}
+              </div>
+            )}
             <ol className="movelist">
               {history.length === 0 && <li className="muted">Nothing has happened yet.</li>}
               {history.map((h) => (
-                <li key={h.n}>
+                <li key={h.n} className={replayAt !== null && h.n > replayAt ? 'ahead' : replayAt === h.n ? 'at' : ''}>
                   <span className="ml-n">{h.n}</span>
                   <span className="ml-seat">{nameOfSeat(h.seat)}</span>
                   <span className="ml-text">{h.text}</span>
                 </li>
               ))}
             </ol>
-            <button className="primary" onClick={() => setShowHistory(false)}>Close</button>
+            <button className="primary" onClick={() => { setShowHistory(false); setReplayAt(null); }}>Close</button>
           </div>
         </div>
       )}

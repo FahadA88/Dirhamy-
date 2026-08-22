@@ -53,6 +53,36 @@ export function chooseMove(
     return { move: { actionId: 'resolveChoice', choice: best }, botSeed };
   }
 
+  // A contract auction: bid what the hand can actually carry, and stop.
+  //
+  // The count is deliberately crude — high cards plus length — because the point is that the
+  // bot bids more with a better hand and passes with a bad one, which is what makes an auction
+  // a negotiation rather than noise. It will not bid past its own estimate, so auctions close.
+  if (moves.some((m) => m.actionId === 'contractBid')) {
+    if (mode === 'random') { const r = nextRandom(botSeed); return { move: moves[Math.floor(r.value * moves.length)], botSeed: r.state }; }
+    const hand = state.zones[`hand:${playerId}`] || [];
+    const points = hand.reduce((a, c) => a + (c.rank === 'A' ? 4 : c.rank === 'K' ? 3 : c.rank === 'Q' ? 2 : c.rank === 'J' ? 1 : 0), 0);
+    const bySuit: Record<string, number> = { C: 0, D: 0, H: 0, S: 0 };
+    for (const c of hand) if (c.suit in bySuit) bySuit[c.suit]++;
+    const best = (Object.keys(bySuit) as string[]).sort((a, b) => bySuit[b] - bySuit[a])[0];
+    // Roughly: a third of a trick per high-card point, plus anything past a third of the hand
+    // in one suit. Scaled to the hand actually dealt rather than to a thirteen-card one.
+    const longAt = Math.max(3, Math.ceil(hand.length / 3));
+    const canTake = Math.floor(points / 3) + Math.max(0, bySuit[best] - longAt);
+    // The book comes from the definition, not from Bridge: a short deal may have none, in which
+    // case the level IS the promise. Assuming six here made every bot pass on every hand.
+    const book = state.definition.trick?.numericAuction?.book ?? 0;
+    const wantLevel = canTake - book;
+    const pass = moves.find((m) => m.actionId === 'passBid')!;
+    if (wantLevel < 1) return { move: pass, botSeed };
+    // The strongest bid at or below what the hand is worth, preferring the long suit.
+    const affordable = moves.filter((m) => m.actionId === 'contractBid' && (m.level ?? 9) <= wantLevel);
+    if (affordable.length === 0) return { move: pass, botSeed };
+    const inBest = affordable.filter((m) => m.strain === best);
+    const pick = (inBest.length ? inBest : affordable).slice(-1)[0];
+    return { move: pick, botSeed };
+  }
+
   // Euchre auction: take a suit only when the hand is genuinely strong in it. Count the two
   // bowers, then trump aces/kings; go alone on a near-lock.
   if (moves.some((m) => m.actionId === 'orderUp' || m.actionId === 'nameTrump' || m.actionId === 'passBid')) {

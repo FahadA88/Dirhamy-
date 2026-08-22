@@ -5,6 +5,7 @@ import { ProfileView } from './ProfileView';
 import { Backdrop } from './Backdrop';
 import { SettingsPanel } from './SettingsPanel';
 import { SiteNav, navStyle } from './SiteNav';
+import { FirstRun } from './FirstRun';
 
 type View = 'play' | 'create' | 'profile';
 
@@ -23,6 +24,7 @@ export function App() {
           : <ProfileView />}
       </main>
       <SettingsPanel open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <FirstRun />
     </div>
   );
 }

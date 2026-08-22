@@ -9,8 +9,9 @@
 //   redact(state, playerId)         -> RedactedState
 
 import {
-  ActionDef, Card, CustomRule, Effect, GameDefinition, MatchState, Move, PlayerRef, Predicate,
-  RedactedState, RedactedZone, RuleHook, RuleValue, ScoringDef, Suit, TrickConfig, ZoneDef,
+  ActionDef, Card, CustomRule, Effect, GameDefinition, MatchState, Move, NumericAuctionConfig,
+  PlayerRef, Predicate, RedactedState, RedactedZone, RuleHook, RuleValue, ScoringDef, Strain,
+  Suit, TrickConfig, ZoneDef,
 } from './types';
 import { buildDeck, cardColor, cardTags } from './deck';
 import { seededShuffle } from './rng';
@@ -217,7 +218,17 @@ export function createMatch(
   log(state, null, `${def.meta.name} started with ${players.length} players.`);
   // A pre-hand exchange happens before anyone plays; otherwise open at the designated lead.
   if (def.handPass) startHandPass(state);
-  if (def.trick?.auction) {
+  if (def.trick?.numericAuction) {
+    // The deal rotates, and the auction opens to the dealer's left. auctionRound doubles as
+    // "an auction is running" — there are no rounds in a contract auction, it simply continues
+    // until the passes close it.
+    state.dealerIndex = ((carry?.handNumber ?? 1) - 1) % players.length;
+    state.auctionRound = 1;
+    state.auctionPasses = 0;
+    state.highBid = null;
+    state.turnIndex = (state.dealerIndex + 1) % players.length;
+    log(state, null, `${short(players[state.dealerIndex])} deals. The auction is open.`);
+  } else if (def.trick?.auction) {
     // The deal rotates each hand, and bidding opens to the dealer's left.
     state.dealerIndex = ((carry?.handNumber ?? 1) - 1) % players.length;
     state.auctionRound = 1;
@@ -1154,9 +1165,13 @@ export function nextHand(state: MatchState, seed: number): MatchState {
 
 // ---------- trick-taking family ----------
 
-// Trump is normally fixed by the definition, but an auction game names it per hand.
+// Trump is normally fixed by the definition, but an auction game names it per hand. Both kinds
+// of auction count: a contract auction sets it from the winning strain, and no-trump leaves it
+// unset on purpose, which is exactly 'none'.
 function trumpOf(s: MatchState): Suit | 'none' {
-  return s.definition.trick!.auction ? (s.trumpSuit ?? 'none') : s.definition.trick!.trump;
+  const cfg = s.definition.trick!;
+  if (cfg.auction || cfg.numericAuction) return s.trumpSuit ?? 'none';
+  return cfg.trump;
 }
 
 const SAME_COLOUR: Record<string, string> = { C: 'S', S: 'C', H: 'D', D: 'H' };
@@ -1194,6 +1209,11 @@ function trickLegalMoves(state: MatchState, playerId: string): Move[] {
   if (state.sittingOut === playerId) return [];   // partner is out while the maker plays alone
   if (state.players[state.turnIndex] !== playerId) return [];
   const def = state.definition;
+
+  // A contract auction: bid a level and a strain, or pass. Every bid must beat the last.
+  if (state.auctionRound > 0 && cfgEarly.numericAuction) {
+    return contractBidMoves(state);
+  }
 
   // Trump auction: take the turned-up suit (round 1) or name one (round 2), or pass.
   if (state.auctionRound > 0 && cfgEarly.auction) {
@@ -1263,6 +1283,11 @@ function penaltyOf(cfg: TrickConfig, card: Card): number {
 }
 
 function applyTrickMove(s: MatchState, playerId: string, move: Move): MatchState {
+  // A contract auction settles who plays and what they promised before a card is played.
+  if (s.auctionRound > 0 && s.definition.trick?.numericAuction) {
+    return applyContractBid(s, playerId, move);
+  }
+
   // Trump auction and the dealer's discard.
   if (s.discarding || s.auctionRound > 0) {
     const auctionMoves = trickLegalMoves(s, playerId);
@@ -1442,6 +1467,130 @@ function resolveTrick(s: MatchState, trickZoneId: string): void {
   if (activeSeats(s).every((p) => (s.zones[`hand:${p}`] || []).length === 0)) endTrickRound(s);
 }
 
+// ---------- the contract auction (Bridge-style) ----------
+//
+// What makes this different from every other auction the engine already has is that a bid is
+// two things at once — a number and a strain — and it has to beat the last one on both, level
+// first. That turns the auction into a negotiation, and it turns the result into a promise:
+// the winning side has said how many tricks they will take, and the hand is scored on whether
+// they were right rather than on how many they happened to win.
+//
+// Deliberately not the whole of Bridge: no doubles, no vulnerability, no rubber, and no dummy.
+// The declarer plays their own cards.
+
+/** A bid's place in the order. Higher is stronger; strains are ranked by their config order. */
+function bidRank(cfg: NumericAuctionConfig, level: number, strain: Strain): number {
+  const i = cfg.strains.indexOf(strain);
+  return level * 100 + (i < 0 ? 0 : i);
+}
+
+function contractBidMoves(state: MatchState): Move[] {
+  const cfg = state.definition.trick!.numericAuction!;
+  const moves: Move[] = [];
+  const floor = state.highBid ? bidRank(cfg, state.highBid.level, state.highBid.strain) : -1;
+  for (let level = cfg.minLevel; level <= cfg.maxLevel; level++) {
+    for (const strain of cfg.strains) {
+      if (bidRank(cfg, level, strain) > floor) {
+        moves.push({ actionId: 'contractBid', level, strain });
+      }
+    }
+  }
+  // Passing is always allowed. A hand where everybody passes is thrown in, which is a real
+  // outcome in the game rather than a deadlock to be prevented.
+  moves.push({ actionId: 'passBid' });
+  return moves;
+}
+
+function applyContractBid(s: MatchState, playerId: string, move: Move): MatchState {
+  const cfg = s.definition.trick!.numericAuction!;
+  const legal = contractBidMoves(s);
+  const ok = legal.some((m) => m.actionId === move.actionId
+    && m.level === move.level && m.strain === move.strain);
+  if (!ok) return s;
+
+  const n = s.players.length;
+  const closeAfter = cfg.passesToClose ?? (n - 1);
+
+  if (move.actionId === 'passBid') {
+    s.auctionPasses += 1;
+    log(s, playerId, `${short(playerId)} passes.`);
+    // Everybody passed with nothing on the table: the hand is thrown in.
+    if (!s.highBid && s.auctionPasses >= n) {
+      log(s, null, 'Passed out — no contract. The hand is thrown in.');
+      s.auctionRound = 0;
+      s.phase = 'roundOver';
+      for (const p of s.players) s.scores[p] = 0;
+      s.winner = s.players[0];
+      finalizeMatchProgress(s);
+      return s;
+    }
+    if (s.highBid && s.auctionPasses >= closeAfter) return settleContract(s);
+  } else {
+    s.highBid = { player: playerId, level: move.level!, strain: move.strain as Strain };
+    s.auctionPasses = 0;
+    log(s, playerId, `${short(playerId)} bids ${move.level}${strainLabel(move.strain as Strain)}.`);
+  }
+
+  s.turnIndex = ((s.turnIndex + s.direction) % n + n) % n;
+  return s;
+}
+
+function strainLabel(strain: Strain): string {
+  return strain === 'NT' ? 'NT' : (SUIT_GLYPH[strain] ?? strain);
+}
+
+const SUIT_GLYPH: Record<string, string> = { C: '\u2663', D: '\u2666', H: '\u2665', S: '\u2660' };
+
+/** The auction is over: the high bid becomes the contract, and its strain becomes trump. */
+function settleContract(s: MatchState): MatchState {
+  const bid = s.highBid!;
+  s.auctionRound = 0;
+  s.auctionPasses = 0;
+  // No-trump is exactly that: the suit stays null and the engine's ordinary high-card-of-the-
+  // led-suit rule decides every trick.
+  s.trumpSuit = bid.strain === 'NT' ? null : (bid.strain as Suit);
+  s.maker = bid.player;
+  const need = bid.level + s.definition.trick!.numericAuction!.book;
+  log(s, null, `${short(bid.player)} plays ${bid.level}${strainLabel(bid.strain)} — ${need} tricks to make it.`);
+  // The lead is to the declarer's left, as it is in the real game.
+  s.turnIndex = (s.players.indexOf(bid.player) + 1) % s.players.length;
+  return s;
+}
+
+/**
+ * Score a contract. The declaring side is paid for what it promised and for anything extra;
+ * falling short pays the other side instead. Partnerships share a contract, as they share a
+ * hand — which is why this reads teams rather than players.
+ */
+function scoreContract(s: MatchState): void {
+  const cfg = s.definition.trick!.numericAuction!;
+  const bid = s.highBid;
+  const teams = trickTeams(s);
+  if (!bid) {
+    for (const p of s.players) s.scores[p] = 0;
+    s.winner = s.players[0];
+    return;
+  }
+  const declaring = teams.find((t) => t.includes(bid.player)) ?? [bid.player];
+  const defending = teams.filter((t) => t !== declaring).flat();
+  const need = bid.level + cfg.book;
+  const took = declaring.reduce((a, p) => a + (s.tricksWon[p] ?? 0), 0);
+
+  let declarerPts = 0;
+  let defenderPts = 0;
+  if (took >= need) {
+    declarerPts = bid.level * cfg.trickValue + (took - need) * cfg.overtrickValue;
+    if (cfg.slamBonus && bid.level === cfg.maxLevel) declarerPts += cfg.slamBonus;
+    log(s, null, `${short(bid.player)} made ${bid.level}${strainLabel(bid.strain)} with ${took} tricks — ${declarerPts}.`);
+  } else {
+    defenderPts = (need - took) * cfg.undertrickValue;
+    log(s, null, `${short(bid.player)} went down ${need - took} — defenders take ${defenderPts}.`);
+  }
+  for (const p of declaring) s.scores[p] = declarerPts;
+  for (const p of defending) s.scores[p] = defenderPts;
+  s.winner = declarerPts >= defenderPts ? declaring[0] : (defending[0] ?? declaring[0]);
+}
+
 export function trickTeams(s: MatchState): string[][] {
   if (s.definition.trick?.partnerships && s.players.length === 4) {
     return [[s.players[0], s.players[2]], [s.players[1], s.players[3]]];
@@ -1452,6 +1601,13 @@ export function trickTeams(s: MatchState): string[][] {
 function endTrickRound(s: MatchState): void {
   const cfg = s.definition.trick!;
   s.phase = 'roundOver';
+
+  // A contract was promised; score against it rather than against tricks alone.
+  if (cfg.numericAuction) {
+    scoreContract(s);
+    finalizeMatchProgress(s);
+    return;
+  }
 
   // Euchre: only the making team can score by making it; setting them is worth more.
   if (cfg.euchreScoring) {
@@ -3090,6 +3246,12 @@ export function redact(state: MatchState, viewer: string): RedactedState {
     teams: state.definition.trick?.partnerships ? trickTeams(state) : undefined,
     trumpSuit: state.definition.trick ? trumpOf(state) : undefined,
     auctionRound: state.definition.trick?.auction ? state.auctionRound : undefined,
+    // The auction is public by definition — bids are spoken aloud. The contract that comes out
+    // of it is the single most important fact at the table, so everyone sees it.
+    contractAuction: state.definition.trick?.numericAuction ? state.auctionRound > 0 : undefined,
+    contractTricks: state.definition.trick?.numericAuction && state.highBid
+      ? state.highBid.level + state.definition.trick.numericAuction.book
+      : undefined,
     upcard: state.definition.trick?.auction
       ? topCard(state.zones[state.definition.trick.auction.upcardZone] || []) ?? null : undefined,
     maker: state.definition.trick?.auction ? state.maker : undefined,
