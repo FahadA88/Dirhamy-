@@ -53,6 +53,8 @@ export function CreateView({ onPlay }: { onPlay?: (def: GameDefinition) => void 
   const [seats, setSeats] = useState(3);
   const [tags, setTags] = useState('');
   const [published, setPublished] = useState<{ id: string; name: string } | null>(null);
+  // Where this game came from. Set when the writer produced it, so publishing can say so.
+  const [writtenFrom, setWrittenFrom] = useState<string | null>(null);
   const [publishError, setPublishError] = useState<string | null>(null);
   const [knobs, setKnobs] = useState<Knobs>({ ...defaultKnobs });
   const [override, setOverride] = useState<GameDefinition | null>(null);
@@ -93,6 +95,8 @@ export function CreateView({ onPlay }: { onPlay?: (def: GameDefinition) => void 
       knobs,
       author: settings.playerName || 'You',
       tags: tags.split(',').map((t) => t.trim()).filter(Boolean),
+      aiWritten: !!writtenFrom,
+      prompt: writtenFrom ?? undefined,
     });
     setPublished({ id: g.id, name: g.definition.meta.name });
   }
@@ -140,9 +144,10 @@ export function CreateView({ onPlay }: { onPlay?: (def: GameDefinition) => void 
 
       {step === 'start' && (
         <div className="startgrid">
-          <DescribeGame onBuilt={({ knobs: k, rules, report: rep }) => {
+          <DescribeGame onBuilt={({ knobs: k, rules, report: rep, prompt }) => {
             startFrom({ ...defaultKnobs, ...k, customRules: rules } as Knobs);
             setReport(rep);
+            setWrittenFrom(prompt);
             setStep('design');
           }} />
           <div className="startgrid-head">

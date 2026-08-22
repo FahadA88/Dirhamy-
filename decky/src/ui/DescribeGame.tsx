@@ -4,6 +4,9 @@ import { RuleDraft } from '../authoring/ruleKit';
 import { AuthorResult, AuthorStep, authorGame } from '../authoring/author';
 import { defaultProvider } from '../authoring/provider';
 import { SimReport } from '../engine/simulator';
+import { Draft, allDrafts, forgetDraft, saveDraft } from '../authoring/drafts';
+import { hostInfo, HostInfo } from '../net/host';
+import { useEffect } from 'react';
 
 // Describe a game; get a game.
 //
@@ -22,24 +25,47 @@ const EXAMPLES = [
 ];
 
 export function DescribeGame({ onBuilt }: {
-  onBuilt: (r: { knobs: Partial<Knobs>; rules: RuleDraft[]; report: SimReport; notes: string[] }) => void;
+  onBuilt: (r: {
+    knobs: Partial<Knobs>; rules: RuleDraft[]; report: SimReport; notes: string[];
+    /** What was typed to produce it, so publishing can say where the game came from. */
+    prompt: string;
+  }) => void;
 }) {
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
   const [steps, setSteps] = useState<AuthorStep[]>([]);
   const [result, setResult] = useState<AuthorResult | null>(null);
+  const [drafts, setDrafts] = useState<Draft[]>(() => allDrafts());
+  const [showDrafts, setShowDrafts] = useState(false);
+  // Which writer this host actually has, and which of its models to use.
+  const [host, setHost] = useState<HostInfo | null>(null);
+  const [model, setModel] = useState<string>('');
+
+  useEffect(() => { void hostInfo().then(setHost); }, []);
 
   async function go() {
     if (!text.trim() || busy) return;
     setBusy(true);
     setResult(null);
     setSteps([]);
-    const r = await authorGame(text, defaultProvider(), (s) => setSteps((prev) => [...prev, s]));
+    const r = await authorGame(text, defaultProvider(model || undefined), (s) => setSteps((prev) => [...prev, s]));
     setResult(r);
     setBusy(false);
+    // Kept whether it worked or not. A description that nearly worked is the most useful thing
+    // you have, and it used to disappear the moment you typed over it.
+    saveDraft({
+      description: text,
+      ok: r.ok,
+      name: r.definition?.meta.name,
+      knobs: r.knobs,
+      rules: r.rules,
+      report: r.report,
+      notes: r.notes,
+      error: r.error,
+    });
+    setDrafts(allDrafts());
   }
 
-  const latest = steps[steps.length - 1];
 
   return (
     <section className="describe">
@@ -64,6 +90,20 @@ export function DescribeGame({ onBuilt }: {
         <button className="primary" onClick={go} disabled={busy || !text.trim()}>
           {busy ? 'Building…' : 'Build it'}
         </button>
+        {/* Only shown when there is a real choice to make. A host with one model, or none,
+            should not be asked about it. */}
+        {host && host.authorModels.length > 1 && (
+          <label className="model-pick">
+            <span className="muted">{host.authorProvider}</span>
+            <select value={model || host.authorModels[0].id} disabled={busy}
+              aria-label="Which model writes the game"
+              onChange={(e) => setModel(e.target.value)}>
+              {host.authorModels.map((m) => (
+                <option key={m.id} value={m.id} title={m.blurb}>{m.name}</option>
+              ))}
+            </select>
+          </label>
+        )}
         {!busy && !result && (
           <span className="muted">Or pick a starting point below and build it by hand.</span>
         )}
@@ -110,7 +150,8 @@ export function DescribeGame({ onBuilt }: {
           <button
             className="primary"
             onClick={() => onBuilt({
-              knobs: result.knobs!, rules: result.rules ?? [], report: result.report!, notes: result.notes,
+              knobs: result.knobs!, rules: result.rules ?? [], report: result.report!,
+              notes: result.notes, prompt: text,
             })}
           >
             Open it in the editor →
@@ -122,13 +163,84 @@ export function DescribeGame({ onBuilt }: {
         <div className="describe-result bad">
           <h3>It could not build that</h3>
           <p>{result.error}</p>
-          <p className="muted">
-            {latest?.stage === 'failed' && result.error?.includes('configured')
-              ? 'Build it by hand below instead — everything still works without a writer.'
-              : 'Try describing the turn more concretely: what you play, and what ends the game.'}
-          </p>
+          <Advice result={result} />
+          {/* The pipeline already records every stage of every attempt. Showing them is the
+              difference between "it did not work" and knowing which part did not. */}
+          {result.steps.length > 0 && (
+            <details className="dr-detail">
+              <summary>What it tried</summary>
+              <ol className="describe-steps">
+                {result.steps.map((s, i) => (
+                  <li key={i} className={`ds-${s.stage}`}>
+                    <span className="ds-mark" aria-hidden="true">{s.stage === 'failed' ? '✕' : '•'}</span>
+                    <span className="ds-text">{s.detail}</span>
+                    {s.attempt > 1 && <span className="ds-attempt">try {s.attempt}</span>}
+                  </li>
+                ))}
+              </ol>
+            </details>
+          )}
+        </div>
+      )}
+
+      {drafts.length > 0 && !busy && (
+        <div className="drafts">
+          <button className="ghost sm" aria-expanded={showDrafts} onClick={() => setShowDrafts((v) => !v)}>
+            {showDrafts ? 'Hide' : `Earlier attempts (${drafts.length})`}
+          </button>
+          {showDrafts && (
+            <ul className="draft-list">
+              {drafts.map((d) => (
+                <li key={d.id} className={d.ok ? 'ok' : 'bad'}>
+                  <span className="dl-mark" aria-hidden="true">{d.ok ? '✓' : '✕'}</span>
+                  <div className="dl-body">
+                    <b>{d.ok ? (d.name ?? 'Built') : 'Did not build'}</b>
+                    <span className="dl-desc">{d.description}</span>
+                  </div>
+                  <div className="dl-actions">
+                    <button className="ghost sm" onClick={() => setText(d.description)}>Edit</button>
+                    {d.ok && d.knobs && d.report && (
+                      <button className="primary sm" onClick={() => onBuilt({
+                        knobs: d.knobs!, rules: d.rules ?? [], report: d.report!,
+                        notes: d.notes ?? [], prompt: d.description,
+                      })}>Open</button>
+                    )}
+                    <button className="ghost sm" aria-label="Forget this attempt"
+                      onClick={() => { forgetDraft(d.id); setDrafts(allDrafts()); }}>✕</button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       )}
     </section>
   );
+}
+
+/**
+ * Say what to do about it, based on where it actually failed rather than one generic sentence
+ * for every kind of failure. The stage the pipeline stopped at is the useful signal: a game
+ * that would not terminate is a different problem from a description nobody could parse.
+ */
+function Advice({ result }: { result: AuthorResult }) {
+  const err = result.error ?? '';
+  const stopped = [...result.steps].reverse().find((s) => s.stage === 'failed')
+    ?? result.steps[result.steps.length - 1];
+
+  let advice: string;
+  if (err.includes('configured') || err.includes('No game writer')) {
+    advice = 'Build it by hand below instead — everything else works without a writer.';
+  } else if (stopped?.stage === 'playtesting' || err.includes('playtest') || err.includes('terminate')) {
+    advice = 'The rules it wrote never finished a game. Say how the game ends — somebody runs '
+      + 'out of cards, or the deck does, or somebody reaches a score.';
+  } else if (stopped?.stage === 'checking' || err.includes('validate') || err.includes('unknown')) {
+    advice = 'It asked for something the engine does not have. Try describing the same idea with '
+      + 'ordinary card actions: play, draw, pass, take a trick.';
+  } else if (stopped?.stage === 'parsing') {
+    advice = 'The reply came back malformed. That is usually worth simply trying again.';
+  } else {
+    advice = 'Try describing the turn more concretely: what you play, and what ends the game.';
+  }
+  return <p className="muted">{advice}</p>;
 }

@@ -356,6 +356,7 @@ function ShelfCard({ game, onOpen, onPlay, onChanged }: {
           <Meta game={game} />
         </div>
         {game.staffPick && <span className="pick-badge" title="Staff pick">★</span>}
+        {game.aiWritten && <span className="ai-badge" title="Written from a description">✎</span>}
       </button>
       <button className={`star ${fav ? 'on' : ''}`} aria-pressed={fav}
         aria-label={fav ? 'Remove from favourites' : 'Add to favourites'}
@@ -435,6 +436,15 @@ function GameDetail({ game, me, onBack, onPlay, onSetup, onOnline, onChanged, on
                 by <button className="linkish" onClick={() => onProfile(game.author)}>{game.author}</button>
                 {game.forkedFrom && <span className="muted"> · remixed from {game.forkedFrom}</span>}
               </p>
+              {/* Where the game came from, in its own words. A player is entitled to know a
+                  game was written from a sentence rather than assembled by hand. */}
+              {game.aiWritten && (
+                <p className="gd-written">
+                  <span className="ai-badge" aria-hidden="true">✎</span>
+                  Written from a description
+                  {game.prompt && <em>“{game.prompt}”</em>}
+                </p>
+              )}
             </div>
             <button className={`star big ${fav ? 'on' : ''}`} aria-pressed={fav}
               aria-label={fav ? 'Remove from favourites' : 'Add to favourites'}

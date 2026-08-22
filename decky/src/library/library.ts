@@ -28,6 +28,14 @@ export interface PublishedGame {
   /** Shipped with the app. Can be played, favourited, rated and forked; cannot be deleted. */
   builtIn?: boolean;
   staffPick?: boolean;
+  /**
+   * Written by the game writer from a description, rather than assembled in the editor. Worth
+   * recording honestly: it is how somebody finds out what the writer is capable of, and it is
+   * information a player is entitled to before they play.
+   */
+  aiWritten?: boolean;
+  /** The sentence that produced it, when it was written from one. */
+  prompt?: string;
 }
 
 export interface GameStats {
@@ -123,6 +131,8 @@ export interface PublishInput {
   forkedFrom?: string;
   /** Publishing over an existing id updates it in place and bumps the version. */
   id?: string;
+  aiWritten?: boolean;
+  prompt?: string;
 }
 
 export function publish(input: PublishInput): PublishedGame {
@@ -147,6 +157,9 @@ export function publish(input: PublishInput): PublishedGame {
     tags: dedupe([...(input.tags ?? []), definition.meta.family]),
     forkedFrom: input.forkedFrom ?? existing?.forkedFrom,
     stats: existing?.stats ?? { plays: 0, favourites: 0, ratingSum: 0, ratingCount: 0 },
+    // Provenance survives a re-publish: editing a written game does not make it hand-made.
+    aiWritten: input.aiWritten ?? existing?.aiWritten,
+    prompt: input.prompt ?? existing?.prompt,
   };
 
   const next = existing ? games.map((g) => (g.id === id ? game : g)) : [...games, game];
@@ -307,6 +320,11 @@ export function collections(games: PublishedGame[]): Collection[] {
       id: 'staff', title: 'Staff picks',
       blurb: 'A good place to start.',
       games: games.filter((g) => g.staffPick),
+    },
+    {
+      id: 'written', title: 'Written from a description',
+      blurb: 'Games the writer built from a sentence. Every one was playtested before it appeared.',
+      games: games.filter((g) => g.aiWritten).slice(0, 8),
     },
     {
       id: 'favourites', title: 'Your favourites',

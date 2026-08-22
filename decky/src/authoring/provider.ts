@@ -14,7 +14,7 @@ export const NO_MODEL =
   + 'or build your game with the editor instead.';
 
 /** The default: ask whatever host is serving the tables. */
-export function httpAuthorProvider(endpoint: string): AuthorProvider {
+export function httpAuthorProvider(endpoint: string, model?: string): AuthorProvider {
   return {
     name: 'host',
     async complete({ system, user }) {
@@ -23,7 +23,8 @@ export function httpAuthorProvider(endpoint: string): AuthorProvider {
         res = await fetch(endpoint, {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ system, user }),
+          // The model is a request, not an instruction — the host only honours one it offers.
+          body: JSON.stringify({ system, user, model }),
         });
       } catch {
         throw new Error(NO_MODEL);
@@ -51,9 +52,9 @@ export const unavailableProvider: AuthorProvider = {
  * Which provider the app should use. An endpoint can be pinned at build time for a deployment
  * that has one; otherwise we try the host we are served from and let it 404 into a clear message.
  */
-export function defaultProvider(): AuthorProvider {
+export function defaultProvider(model?: string): AuthorProvider {
   const pinned = (import.meta as { env?: Record<string, string> }).env?.VITE_AUTHOR_ENDPOINT;
-  if (pinned) return httpAuthorProvider(pinned);
+  if (pinned) return httpAuthorProvider(pinned, model);
   if (typeof window === 'undefined') return unavailableProvider;
-  return httpAuthorProvider('/api/author');
+  return httpAuthorProvider('/api/author', model);
 }

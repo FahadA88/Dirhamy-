@@ -12,12 +12,41 @@
 const GEMINI_MODEL = process.env.DECKY_AUTHOR_MODEL ?? 'gemini-2.0-flash';
 const ANTHROPIC_MODEL = process.env.DECKY_AUTHOR_MODEL ?? 'claude-sonnet-5';
 
-export interface AuthorRequest { system?: unknown; user?: unknown }
+export interface AuthorRequest { system?: unknown; user?: unknown; model?: unknown }
 export interface AuthorReply { text?: string; error?: string; status: number }
 
 /** True when this host can write games at all. Lets the UI say so before you type. */
 export function canAuthor(): boolean {
   return !!process.env.GEMINI_API_KEY || !!process.env.ANTHROPIC_API_KEY;
+}
+
+/**
+ * Which models this host will actually use, so the interface can offer a real choice rather
+ * than a list of names it hopes work. The key never leaves this process — only the fact that
+ * one exists, and what it can drive.
+ */
+export function authorModels(): { provider: string; models: { id: string; name: string; blurb: string }[] } {
+  if (process.env.GEMINI_API_KEY) {
+    return {
+      provider: 'Gemini',
+      models: [
+        { id: 'gemini-2.0-flash', name: 'Flash', blurb: 'Quick, and free on Google\u2019s own tier.' },
+        { id: 'gemini-2.5-flash', name: 'Flash 2.5', blurb: 'Newer, a little slower, follows a long brief better.' },
+        { id: 'gemini-2.5-pro', name: 'Pro', blurb: 'Slowest and best at unusual rules.' },
+      ],
+    };
+  }
+  if (process.env.ANTHROPIC_API_KEY) {
+    return {
+      provider: 'Anthropic',
+      models: [
+        { id: 'claude-haiku-4-5-20251001', name: 'Haiku', blurb: 'Fast and cheap.' },
+        { id: 'claude-sonnet-5', name: 'Sonnet', blurb: 'The balanced one.' },
+        { id: 'claude-opus-5', name: 'Opus', blurb: 'Best at rules nobody has written down before.' },
+      ],
+    };
+  }
+  return { provider: '', models: [] };
 }
 
 export async function handleAuthor(payload: AuthorRequest): Promise<AuthorReply> {
@@ -28,13 +57,19 @@ export async function handleAuthor(payload: AuthorRequest): Promise<AuthorReply>
   // free model, not describing a card game.
   if (user.length > 8000) return { status: 413, error: 'That description is too long.' };
 
-  if (process.env.GEMINI_API_KEY) return callGemini(process.env.GEMINI_API_KEY, system, user);
-  if (process.env.ANTHROPIC_API_KEY) return callAnthropic(process.env.ANTHROPIC_API_KEY, system, user);
+  // A caller may name a model, but only one this host has offered. Anything else falls back to
+  // the default rather than being passed through to the provider — the browser does not get to
+  // pick what this key is spent on.
+  const offered = authorModels().models.map((m) => m.id);
+  const asked = typeof payload.model === 'string' && offered.includes(payload.model) ? payload.model : null;
+
+  if (process.env.GEMINI_API_KEY) return callGemini(process.env.GEMINI_API_KEY, system, user, asked);
+  if (process.env.ANTHROPIC_API_KEY) return callAnthropic(process.env.ANTHROPIC_API_KEY, system, user, asked);
   return { status: 501, error: 'This host has no GEMINI_API_KEY or ANTHROPIC_API_KEY, so it cannot write games.' };
 }
 
-async function callGemini(key: string, system: string, user: string): Promise<AuthorReply> {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${key}`;
+async function callGemini(key: string, system: string, user: string, model: string | null): Promise<AuthorReply> {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model ?? GEMINI_MODEL}:generateContent?key=${key}`;
   try {
     const res = await fetch(url, {
       method: 'POST',
@@ -60,7 +95,7 @@ async function callGemini(key: string, system: string, user: string): Promise<Au
   }
 }
 
-async function callAnthropic(key: string, system: string, user: string): Promise<AuthorReply> {
+async function callAnthropic(key: string, system: string, user: string, model: string | null): Promise<AuthorReply> {
   try {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -70,7 +105,7 @@ async function callAnthropic(key: string, system: string, user: string): Promise
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: ANTHROPIC_MODEL,
+        model: model ?? ANTHROPIC_MODEL,
         max_tokens: 4096,
         // The schema briefing is identical on every request and long, so caching it turns the
         // repair loop from three full-price calls into one.

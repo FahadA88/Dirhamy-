@@ -6,7 +6,7 @@ import { MatchService, Seat } from '../server/matchService';
 import { Request, Response, TableEvent } from './protocol';
 import { handle, mutates, eventFor } from './dispatch';
 import { GameDefinition } from '../engine/types';
-import { handleAuthor, canAuthor, AuthorRequest } from './authorEndpoint';
+import { handleAuthor, canAuthor, authorModels, AuthorRequest } from './authorEndpoint';
 
 const MIME: Record<string, string> = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
@@ -192,7 +192,12 @@ export class GameHost {
       res.end();
       return;
     }
-    if (url.pathname === '/health') { json(200, { ok: true, tables: this.tables.size, canAuthor: canAuthor() }); return; }
+    if (url.pathname === '/health') {
+      // The models are named here, not the key. The interface can then offer a real choice
+      // instead of a list it hopes the host understands.
+      json(200, { ok: true, tables: this.tables.size, canAuthor: canAuthor(), author: authorModels() });
+      return;
+    }
 
     // The game writer. Served at /api/author as well as /author so a site behind a proxy that
     // routes /api/* to the host does not need a rewrite rule.

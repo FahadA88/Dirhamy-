@@ -13,6 +13,9 @@ export interface HostInfo {
   up: boolean;
   /** Whether that host can write games, so the Create view can say so honestly. */
   canAuthor: boolean;
+  /** Which provider is behind the writer, and which models it will actually run. */
+  authorProvider: string;
+  authorModels: { id: string; name: string; blurb: string }[];
 }
 
 function baseUrl(): string {
@@ -36,7 +39,7 @@ let cached: Promise<HostInfo> | null = null;
 export function hostInfo(): Promise<HostInfo> {
   if (cached) return cached;
   const base = baseUrl();
-  const fallback: HostInfo = { base, ws: socketUrl(base), up: false, canAuthor: false };
+  const fallback: HostInfo = { base, ws: socketUrl(base), up: false, canAuthor: false, authorProvider: '', authorModels: [] };
   cached = (async () => {
     if (!base) return fallback;
     try {
@@ -45,8 +48,15 @@ export function hostInfo(): Promise<HostInfo> {
       const res = await fetch(`${base}/health`, { signal: controller.signal });
       clearTimeout(timer);
       if (!res.ok) return fallback;
-      const body = await res.json() as { ok?: boolean; canAuthor?: boolean };
-      return { base, ws: socketUrl(base), up: !!body.ok, canAuthor: !!body.canAuthor };
+      const body = await res.json() as {
+        ok?: boolean; canAuthor?: boolean;
+        author?: { provider?: string; models?: { id: string; name: string; blurb: string }[] };
+      };
+      return {
+        base, ws: socketUrl(base), up: !!body.ok, canAuthor: !!body.canAuthor,
+        authorProvider: body.author?.provider ?? '',
+        authorModels: body.author?.models ?? [],
+      };
     } catch {
       // No host, a static deployment, or an offline tab. All the same answer.
       return fallback;
