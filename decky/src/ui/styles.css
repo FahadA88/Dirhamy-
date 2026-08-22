@@ -3847,3 +3847,135 @@ header h1 {
   .hand .card-btn { margin-inline-start: -14px; }
   .hand .card-btn:first-child { margin-inline-start: 0; }
 }
+
+/* ============================================================================
+   YOUR RECORD
+   The profile page. Everything on it is derived from stored results, so the
+   job of this section is to make a pile of finished games legible: big
+   numbers first, then the detail, then the long tail.
+   ========================================================================= */
+
+.profile { display: flex; flex-direction: column; gap: 18px; }
+
+/*
+   A bare `header` rule up the sheet sets justify-content: space-between, which threw the name
+   to the far side of the page. Stated explicitly here rather than loosening the global rule,
+   which the site header still wants.
+*/
+.profile-head {
+  display: flex; align-items: center; gap: 16px;
+  justify-content: flex-start; text-align: start;
+  margin-block-end: 0;
+}
+.profile-head h2 { margin: 0; font-family: var(--display); font-size: 26px; }
+.profile-head p { margin: 2px 0 0; font-size: 13px; }
+.profile-avatar {
+  inline-size: 62px; block-size: 62px;
+  display: grid; place-items: center;
+  font-size: 30px; line-height: 1;
+  border-radius: 18px;
+  border: 1px solid var(--panel-brd);
+  background: var(--panel-hi);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--you, var(--emerald)) 26%, transparent);
+}
+
+.profile-tabs { align-self: flex-start; }
+.profile-note { margin: 0; font-size: 13px; }
+.profile-panel { padding: 16px 18px; }
+.profile-panel h4 {
+  margin: 0 0 12px; font-size: 12px; letter-spacing: 0.09em;
+  text-transform: uppercase; color: var(--muted);
+}
+
+/* ---- the four numbers that matter ---- */
+.stat-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; }
+.stat {
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 14px 16px; border-radius: var(--r-md);
+  border: 1px solid var(--panel-brd); background: var(--panel);
+}
+.stat-value {
+  font-family: var(--display); font-size: 30px; line-height: 1.05;
+  font-variant-numeric: tabular-nums;
+}
+.stat-label { font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.stat-hint { font-style: normal; font-size: 11px; }
+
+/* ---- best of ---- */
+.highlight-list, .recent-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.highlight-list li, .recent-list li {
+  display: flex; align-items: baseline; gap: 10px;
+  padding: 8px 0; border-block-end: 1px solid var(--panel-brd);
+}
+.highlight-list li:last-child, .recent-list li:last-child { border-block-end: none; }
+.hl-label { flex: 1; font-size: 13px; }
+.hl-value { font-family: var(--display); font-size: 19px; font-variant-numeric: tabular-nums; color: var(--gold, #d6af5c); }
+.highlight-list em, .recent-list .muted { font-style: normal; font-size: 12px; }
+
+.recent-list .rl-mark { inline-size: 14px; color: var(--muted); }
+.recent-list li.won .rl-mark { color: var(--gold, #d6af5c); }
+.rl-name { flex: 1; font-size: 13px; }
+.rl-seats, .rl-when { font-size: 12px; }
+
+/* ---- the record, game by game ---- */
+.record-table { inline-size: 100%; border-collapse: collapse; font-size: 13px; }
+.record-table th, .record-table td { padding: 9px 8px; text-align: end; }
+.record-table th[scope="row"], .record-table thead th:first-child { text-align: start; font-weight: 500; }
+.record-table thead th {
+  font-size: 11px; letter-spacing: 0.07em; text-transform: uppercase;
+  color: var(--muted); border-block-end: 1px solid var(--panel-brd);
+}
+.record-table td { font-variant-numeric: tabular-nums; }
+.record-table tbody tr { border-block-end: 1px solid var(--panel-brd); }
+.record-table tbody tr:last-child { border-block-end: none; }
+
+/* ---- badges ---- */
+.badge-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; }
+.badge {
+  display: flex; flex-direction: column; gap: 6px;
+  padding: 16px; border-radius: var(--r-md);
+  border: 1px solid var(--panel-brd); background: var(--panel);
+  /* An unearned badge is dimmed rather than hidden: knowing what is possible is the point. */
+  opacity: 0.62;
+}
+.badge.earned {
+  opacity: 1;
+  border-color: color-mix(in srgb, var(--gold, #d6af5c) 55%, var(--panel-brd));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--gold, #d6af5c) 22%, transparent);
+}
+.badge h4 { margin: 0; font-size: 15px; font-family: var(--display); }
+.badge p { margin: 0; font-size: 12px; }
+.badge-mark { font-size: 24px; line-height: 1; }
+.badge.earned .badge-mark { filter: drop-shadow(0 0 8px color-mix(in srgb, var(--gold, #d6af5c) 60%, transparent)); }
+.badge-bar {
+  block-size: 5px; border-radius: 999px; overflow: hidden;
+  background: var(--panel-hi); margin-block-start: 4px;
+}
+.badge-bar > span {
+  display: block; block-size: 100%; border-radius: inherit;
+  background: linear-gradient(90deg, var(--emerald), var(--gold, #d6af5c));
+}
+.badge-detail { font-style: normal; font-size: 11px; color: var(--muted); }
+
+/* ---- an empty record ---- */
+.empty-state { text-align: center; padding: 46px 20px; }
+.empty-state .es-mark { font-size: 42px; margin: 0 0 6px; opacity: 0.5; }
+.empty-state h3 { margin: 0 0 6px; font-family: var(--display); }
+.empty-state p { margin: 0; font-size: 13px; }
+
+/* ---- practising ---- */
+.practice-toggle {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 12px 14px; margin-block-start: 12px;
+  border: 1px solid var(--panel-brd); border-radius: var(--r-md);
+  background: var(--panel-hi); cursor: pointer;
+}
+.practice-toggle input { margin-block-start: 3px; inline-size: 17px; block-size: 17px; cursor: pointer; }
+.practice-toggle b { display: block; font-size: 13px; font-weight: 600; }
+.practice-toggle em { display: block; font-style: normal; font-size: 12px; color: var(--muted); }
+
+.practice-badge {
+  padding: 3px 10px; border-radius: var(--r-pill);
+  border: 1px solid var(--gold, #d6af5c); color: var(--gold, #d6af5c);
+  font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase;
+}

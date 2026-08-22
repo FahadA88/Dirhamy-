@@ -21,6 +21,8 @@ export function PlayView() {
   const [helpFor, setHelpFor] = useState<GameDefinition | null>(null);
   const [plan, setPlan] = useState<Seat[] | null>(null);
   const [setupFor, setSetupFor] = useState<GameDefinition | null>(null);
+  // A practice game is played but never counted. Chosen at the table, cleared when you leave it.
+  const [practice, setPractice] = useState(false);
 
   // Offer to pick up an unfinished game rather than silently dropping it.
   useEffect(() => {
@@ -37,7 +39,10 @@ export function PlayView() {
         defaultSeats={Math.min(Math.max(settings.defaultSeats, setupFor.meta.players.min), setupFor.meta.players.max)}
         defaultName={settings.playerName}
         onCancel={() => setSetupFor(null)}
-        onStart={(seatPlan) => { setPlan(seatPlan); setSeats(seatPlan.length); setGame(setupFor); setSetupFor(null); }}
+        onStart={(seatPlan, isPractice) => {
+          setPlan(seatPlan); setSeats(seatPlan.length); setPractice(isPractice);
+          setGame(setupFor); setSetupFor(null);
+        }}
       />
     );
   }
@@ -46,8 +51,9 @@ export function PlayView() {
     return (
       <div>
         <div className="crumbs">
-          <button className="ghost" onClick={() => { setGame(null); setPlan(null); }}>← All games</button>
+          <button className="ghost" onClick={() => { setGame(null); setPlan(null); setPractice(false); }}>← All games</button>
           <span className="crumb-title">{game.meta.name}</span>
+          {practice && <span className="practice-badge" title="Nothing here is recorded">Practice</span>}
           <button className="ghost sm" onClick={() => setHelpFor(game)}>Rules</button>
           {!game.solitaire && !plan && (
             <div className="seat-control">
@@ -63,7 +69,7 @@ export function PlayView() {
         <ErrorBoundary label={game.meta.name}>
           {game.solitaire
             ? <SolitaireTable def={game} />
-            : <Table def={game} seats={seats} plan={plan ?? undefined} />}
+            : <Table def={game} seats={seats} plan={plan ?? undefined} practice={practice} />}
         </ErrorBoundary>
         {helpFor && <GameHelp def={helpFor} onClose={() => setHelpFor(null)} />}
       </div>
@@ -88,6 +94,7 @@ export function PlayView() {
         onPlay={(def) => {
           recordPlay(def.meta.id);
           setPlan(null);
+          setPractice(false);
           setSeats(Math.min(Math.max(settings.defaultSeats, def.meta.players.min), def.meta.players.max));
           setGame(def);
         }}

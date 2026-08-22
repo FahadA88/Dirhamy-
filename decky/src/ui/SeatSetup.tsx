@@ -24,13 +24,15 @@ export function SeatSetup({ def, defaultSeats, defaultName, onStart, onCancel }:
   def: GameDefinition;
   defaultSeats: number;
   defaultName: string;
-  onStart: (seats: Seat[]) => void;
+  onStart: (seats: Seat[], practice: boolean) => void;
   onCancel: () => void;
 }) {
   const min = def.meta.players.min;
   const max = def.meta.players.max;
   const [count, setCount] = useState(Math.min(Math.max(defaultSeats, min), max));
   const [seats, setSeats] = useState<Seat[]>(() => initial(Math.min(Math.max(defaultSeats, min), max), defaultName));
+  // Practice is a table you can learn at: it is not recorded and a move can always be taken back.
+  const [practice, setPractice] = useState(false);
 
   function resize(n: number) {
     setCount(n);
@@ -95,6 +97,14 @@ export function SeatSetup({ def, defaultSeats, defaultName, onStart, onCancel }:
           ))}
         </ol>
 
+        <label className="practice-toggle">
+          <input type="checkbox" checked={practice} onChange={(e) => setPractice(e.target.checked)} />
+          <span>
+            <b>Practice</b>
+            <em>Nothing is recorded, and you can always take a move back.</em>
+          </span>
+        </label>
+
         <p className="muted seat-note">
           {humans === 0
             ? 'Every seat is a bot — you will be watching, not playing.'
@@ -105,7 +115,7 @@ export function SeatSetup({ def, defaultSeats, defaultName, onStart, onCancel }:
 
         <div className="step-actions">
           <button className="ghost" onClick={onCancel}>Cancel</button>
-          <button className="primary" onClick={() => onStart(seats)}>Deal →</button>
+          <button className="primary" onClick={() => onStart(seats, practice)}>Deal →</button>
         </div>
       </div>
     </div>
@@ -122,6 +132,6 @@ function initial(n: number, you: string): Seat[] {
     id: `P${i + 1}`,
     name: defaultNameFor(i === 0 ? 'local' : 'bot', i, you),
     kind: (i === 0 ? 'local' : 'bot') as Seat['kind'],
-    difficulty: 'smart' as const,
+    difficulty: 'normal' as const,
   }));
 }

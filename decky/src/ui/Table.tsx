@@ -26,11 +26,43 @@ const SUIT_ORDER: Record<string, number> = { S: 0, H: 1, C: 2, D: 3, JOKER: 4 };
 const SUIT_NAMES: Record<string, string> = { C: 'Clubs', D: 'Diamonds', H: 'Hearts', S: 'Spades' };
 const SHAPE_NAME: Record<number, string> = { 1: 'single', 2: 'pair', 3: 'triple', 4: 'four', 5: 'five' };
 
-export function Table({ def, seats = 3, plan }: {
+/**
+ * The one number worth remembering from a finished game, chosen per family because "best" means
+ * something different in each. Returns null for families where no single number stands out —
+ * a made-up statistic is worse than none.
+ */
+function highlightOf(view: RedactedState, me: string): { key: string; label: string; value: number } | null {
+  if (view.mode === 'poker') {
+    const chips = view.chips?.[me];
+    if (typeof chips === 'number') return { key: 'poker-chips', label: 'Biggest stack', value: chips };
+  }
+  if (view.mode === 'reflex') {
+    const n = view.players.find((p) => p.id === me)?.handCount ?? 0;
+    if (n > 0) return { key: 'reflex-cards', label: 'Most cards taken', value: n };
+  }
+  if (view.mode === 'trick') {
+    const t = view.tricksWon?.[me];
+    if (typeof t === 'number' && t > 0) return { key: 'tricks', label: 'Most tricks in a hand', value: t };
+  }
+  if (view.mode === 'fish') {
+    const b = view.booksWon?.[me];
+    if (typeof b === 'number' && b > 0) return { key: 'books', label: 'Most books', value: b };
+  }
+  const score = view.matchScores?.[me] ?? view.scores?.[me];
+  if (typeof score === 'number' && score > 0) return { key: 'score', label: 'Best score', value: score };
+  return null;
+}
+
+export function Table({ def, seats = 3, plan, practice = false }: {
   def: GameDefinition;
   seats?: number;
   /** Who is sitting where. Omitted means the classic single human against bots. */
   plan?: Seat[];
+  /**
+   * A game for trying things out. Nothing is recorded, the undo window never closes, and a
+   * hint is always on offer — so somebody can learn a game without it counting against them.
+   */
+  practice?: boolean;
 }) {
   const { settings } = useSettings();
   const players = useMemo(
@@ -224,15 +256,17 @@ export function Table({ def, seats = 3, plan }: {
   // Only offered where it is honest: a table of bots, with the window still open. Against a
   // person the takeback above is the right instrument, because they have already seen it.
   const soloTable = !plan || plan.every((s) => s.kind !== 'remote');
-  const canQuickUndo = undoable && soloTable && settings.undoGraceMs > 0 && view.phase === 'playing';
+  const canQuickUndo = undoable && soloTable && view.phase === 'playing'
+    && (practice || settings.undoGraceMs > 0);
 
   // The window closes on its own. Restarting the timer on every move means the clock always
   // measures from the most recent one.
   useEffect(() => {
-    if (!undoable || settings.undoGraceMs <= 0) return;
+    // In practice the window never shuts — taking a move back is the point of practising.
+    if (!undoable || practice || settings.undoGraceMs <= 0) return;
     const t = setTimeout(() => setUndoable(false), settings.undoGraceMs);
     return () => clearTimeout(t);
-  }, [undoable, settings.undoGraceMs]);
+  }, [undoable, practice, settings.undoGraceMs]);
 
   function quickUndo() {
     const res = service.quickUndo(matchId, me);
@@ -342,6 +376,8 @@ export function Table({ def, seats = 3, plan }: {
         seats: view.players.length,
         standings,
         youWon: !!winner && localSeats.includes(winner),
+        highlight: highlightOf(view, me),
+        practice,
       });
     }
     prevPhase.current = view.phase;

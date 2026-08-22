@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { PlayView } from './PlayView';
 import { CreateView } from './CreateView';
+import { ProfileView } from './ProfileView';
 import { Backdrop } from './Backdrop';
 import { SettingsPanel } from './SettingsPanel';
 import { SiteNav, navStyle } from './SiteNav';
 
-type View = 'play' | 'create';
+type View = 'play' | 'create' | 'profile';
 
 export function App() {
   const [view, setView] = useState<View>('play');
@@ -17,7 +18,9 @@ export function App() {
       <Backdrop />
       <SiteNav style={nav} view={view} onView={setView} onSettings={() => setSettingsOpen(true)} />
       <main>
-        {view === 'play' ? <PlayView /> : <CreateView />}
+        {view === 'play' ? <PlayView />
+          : view === 'create' ? <CreateView />
+          : <ProfileView />}
       </main>
       <SettingsPanel open={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </div>

@@ -1,0 +1,204 @@
+import { useMemo, useState } from 'react';
+import { useSettings } from '../settings/SettingsContext';
+import { catalog } from '../games/catalog';
+import {
+  Badge, allResults, badges, currentStreak, highlights, leaderboard, mySummary,
+} from '../social/records';
+
+// Your record.
+//
+// Everything on this page is derived from the results already on the device — nothing here is
+// tracked separately, so a badge is correct for games played long before the badge existed and
+// there is only one story about what somebody did. The summary functions had been sitting in
+// records.ts with no reader for a while; this is that reader.
+
+type Tab = 'overview' | 'games' | 'badges';
+
+export function ProfileView() {
+  const { settings } = useSettings();
+  const [tab, setTab] = useState<Tab>('overview');
+
+  const summary = useMemo(() => mySummary(), []);
+  const results = useMemo(() => allResults(), []);
+  const earned = useMemo(() => badges(catalog.length), []);
+  const bests = useMemo(() => highlights(), []);
+
+  // Per-game record, most-played first. Only games actually finished appear — a list of
+  // nineteen zeroes is not a record of anything.
+  const perGame = useMemo(() => {
+    const rows = new Map<string, { id: string; name: string; played: number; won: number; streak: number }>();
+    for (const r of results) {
+      const cur = rows.get(r.gameId) ?? { id: r.gameId, name: r.gameName, played: 0, won: 0, streak: 0 };
+      cur.played += 1;
+      if (r.youWon) cur.won += 1;
+      rows.set(r.gameId, cur);
+    }
+    for (const row of rows.values()) row.streak = currentStreak(row.id);
+    return [...rows.values()].sort((a, b) => b.played - a.played);
+  }, [results]);
+
+  const pct = (n: number) => `${Math.round(n * 100)}%`;
+
+  if (summary.played === 0) {
+    return (
+      <section className="profile">
+        <ProfileHead name={settings.playerName} avatar={settings.avatar} summary={summary} />
+        <div className="empty-state">
+          <p className="es-mark" aria-hidden="true">🂠</p>
+          <h3>Nothing here yet</h3>
+          <p className="muted">Finish a game and it starts keeping score. Practice games do not count.</p>
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section className="profile">
+      <ProfileHead name={settings.playerName} avatar={settings.avatar} summary={summary} />
+
+      <div className="seg profile-tabs" role="tablist" aria-label="Your record">
+        {([['overview', 'Overview'], ['games', 'By game'], ['badges', 'Badges']] as [Tab, string][]).map(([id, label]) => (
+          <button key={id} role="tab" aria-selected={tab === id} className={tab === id ? 'on' : ''}
+            onClick={() => setTab(id)}>{label}</button>
+        ))}
+      </div>
+
+      {tab === 'overview' && (
+        <>
+          <div className="stat-row">
+            <Stat label="Played" value={String(summary.played)} />
+            <Stat label="Won" value={String(summary.won)} />
+            <Stat label="Win rate" value={pct(summary.winRate)} />
+            <Stat label="Streak" value={String(summary.streak)} hint={summary.streak > 0 ? 'in a row' : 'no run yet'} />
+          </div>
+
+          {summary.favouriteGame && (
+            <p className="muted profile-note">
+              Most played: <b>{summary.favouriteGame}</b>.
+            </p>
+          )}
+
+          {bests.length > 0 && (
+            <section className="panel glass profile-panel">
+              <h4>Best of</h4>
+              <ul className="highlight-list">
+                {bests.map((h) => (
+                  <li key={h.key}>
+                    <span className="hl-label">{h.label}</span>
+                    <b className="hl-value">{h.value}</b>
+                    <em className="muted">{h.gameName}</em>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
+          <section className="panel glass profile-panel">
+            <h4>Recent games</h4>
+            <ol className="recent-list">
+              {results.slice(0, 8).map((r, i) => (
+                <li key={`${r.at}-${i}`} className={r.youWon ? 'won' : ''}>
+                  <span className="rl-mark" aria-hidden="true">{r.youWon ? '★' : '·'}</span>
+                  <span className="rl-name">{r.gameName}</span>
+                  <span className="rl-seats muted">{r.seats} seats</span>
+                  <span className="rl-when muted">{ago(r.at)}</span>
+                </li>
+              ))}
+            </ol>
+          </section>
+        </>
+      )}
+
+      {tab === 'games' && (
+        <section className="panel glass profile-panel">
+          <table className="record-table">
+            <caption className="sr-only">Your record in each game</caption>
+            <thead>
+              <tr><th scope="col">Game</th><th scope="col">Played</th><th scope="col">Won</th><th scope="col">Rate</th></tr>
+            </thead>
+            <tbody>
+              {perGame.map((g) => (
+                <tr key={g.id}>
+                  <th scope="row">{g.name}</th>
+                  <td>{g.played}</td>
+                  <td>{g.won}</td>
+                  <td>{pct(g.played ? g.won / g.played : 0)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      )}
+
+      {tab === 'badges' && (
+        <div className="badge-grid">
+          {earned.map((b) => <BadgeCard key={b.id} badge={b} />)}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function ProfileHead({ name, avatar, summary }: {
+  name: string; avatar: string; summary: { played: number; won: number };
+}) {
+  return (
+    <header className="profile-head">
+      <span className="profile-avatar" aria-hidden="true">{avatar}</span>
+      <div>
+        <h2>{name}</h2>
+        <p className="muted">
+          {summary.played === 0
+            ? 'No games finished yet'
+            : `${summary.won} of ${summary.played} games won`}
+        </p>
+      </div>
+    </header>
+  );
+}
+
+function Stat({ label, value, hint }: { label: string; value: string; hint?: string }) {
+  return (
+    <div className="stat">
+      <b className="stat-value">{value}</b>
+      <span className="stat-label">{label}</span>
+      {hint && <em className="stat-hint muted">{hint}</em>}
+    </div>
+  );
+}
+
+function BadgeCard({ badge }: { badge: Badge }) {
+  const done = badge.progress >= 1;
+  return (
+    <article className={`badge ${done ? 'earned' : ''}`}>
+      <span className="badge-mark" aria-hidden="true">{badge.mark}</span>
+      <h4>{badge.name}</h4>
+      <p className="muted">{badge.blurb}</p>
+      <div
+        className="badge-bar"
+        role="progressbar"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={Math.round(badge.progress * 100)}
+        aria-label={`${badge.name}: ${badge.detail}`}
+      >
+        <span style={{ inlineSize: `${Math.round(badge.progress * 100)}%` }} />
+      </div>
+      <em className="badge-detail">{done ? 'Earned' : badge.detail}</em>
+    </article>
+  );
+}
+
+/** Rough, friendly ages. Nobody wants a timestamp on a game they played this morning. */
+function ago(at: number): string {
+  const mins = Math.max(0, Math.round((Date.now() - at) / 60000));
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.round(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.round(hrs / 24);
+  return days === 1 ? 'yesterday' : `${days}d ago`;
+}
+
+// Kept so the module owns its own leaderboard access rather than the view importing it twice.
+export { leaderboard };

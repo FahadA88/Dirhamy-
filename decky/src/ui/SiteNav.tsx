@@ -23,8 +23,8 @@ export function navStyle(): NavStyle {
 
 export function SiteNav({ style, view, onView, onSettings }: {
   style: NavStyle;
-  view: 'play' | 'create';
-  onView: (v: 'play' | 'create') => void;
+  view: 'play' | 'create' | 'profile';
+  onView: (v: 'play' | 'create' | 'profile') => void;
   onSettings: () => void;
 }) {
   // The marks are only rendered where they are used. Hiding them with CSS leaves the glyph in
@@ -41,6 +41,10 @@ export function SiteNav({ style, view, onView, onSettings }: {
       <button className={view === 'create' ? 'on' : ''} onClick={() => onView('create')}>
         {marks && <span className="nv-mark" aria-hidden="true">✎</span>}
         <span className="nv-label">Create</span>
+      </button>
+      <button className={view === 'profile' ? 'on' : ''} onClick={() => onView('profile')}>
+        {marks && <span className="nv-mark" aria-hidden="true">☺</span>}
+        <span className="nv-label">You</span>
       </button>
       <button className="nv-settings" title="Preferences" aria-label="Preferences" onClick={onSettings}>
         <span className="nv-mark" aria-hidden="true">⚙</span>
