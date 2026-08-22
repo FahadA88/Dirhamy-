@@ -2,7 +2,8 @@ import { createContext, useContext, useMemo, useState } from 'react';
 import { useSettings } from '../settings/SettingsContext';
 import { useDismissable } from './useEscape';
 import {
-  ACCENTS, AccentId, BACKS, CardBack, CardFace, CustomBack, FACES, FELTS, Settings, TableFelt,
+  ACCENTS, AVATARS, AccentId, BACKS, CardBack, CardFace, CustomBack, CustomFelt, FACES, FELTS,
+  MAX_BACK_IMAGE, Settings, TableFelt, THEME_PACKS,
 } from '../settings/settings';
 
 // Preferences.
@@ -18,7 +19,17 @@ import {
 // label-then-control on one line, so the eye runs down a single column of controls instead of
 // hunting for them.
 
-const DEFAULT_CUSTOM_BACK: CustomBack = { pattern: 'lattice', ink: '#d6af5c', ground: '#123b28', emblem: '♠' };
+const DEFAULT_CUSTOM_BACK: CustomBack = { pattern: 'lattice', ink: '#d6af5c', ground: '#123b28', emblem: '♠', image: null };
+
+/** A green cloth in a dark rail — a plain table to start from before you change it. */
+const DEFAULT_FELT: CustomFelt = { cloth: '#1c6b46', rail: '#241a12' };
+
+/** Saved settings only ever held 'smart' or 'random'; the picker now offers three tiers. */
+function tierOfDiff(d: Settings['botDiff']): 'easy' | 'normal' | 'hard' {
+  if (d === 'random' || d === 'easy') return 'easy';
+  if (d === 'normal') return 'normal';
+  return 'hard';
+}
 
 const PATTERNS: [CustomBack['pattern'], string][] = [
   ['lattice', 'Lattice'], ['stripe', 'Stripe'], ['dots', 'Dots'],
@@ -26,12 +37,13 @@ const PATTERNS: [CustomBack['pattern'], string][] = [
 ];
 const EMBLEMS = ['', '♠', '♥', '♦', '♣', '★', '✦', '❖', '⚜'];
 
-type SectionId = 'look' | 'table' | 'cards' | 'play' | 'opponents' | 'motion' | 'access';
+type SectionId = 'look' | 'table' | 'cards' | 'you' | 'play' | 'opponents' | 'motion' | 'access';
 
 const SECTIONS: { id: SectionId; label: string; mark: string; blurb: string }[] = [
   { id: 'look', label: 'Appearance', mark: '◐', blurb: 'Light or dark, and the accent through the site.' },
   { id: 'table', label: 'The table', mark: '▤', blurb: 'What you play on.' },
   { id: 'cards', label: 'Cards', mark: '🂠', blurb: 'Faces, backs, and one you draw yourself.' },
+  { id: 'you', label: 'You', mark: '☺', blurb: 'Your name, face and colour at the table.' },
   { id: 'play', label: 'Playing', mark: '▶', blurb: 'How the table behaves while you play.' },
   { id: 'opponents', label: 'Opponents', mark: '☻', blurb: 'Who you play against and how fast.' },
   { id: 'motion', label: 'Motion & sound', mark: '♪', blurb: 'Animation, background, audio.' },
@@ -124,6 +136,7 @@ function body(id: SectionId, s: Settings, set: Setter): React.ReactNode {
     case 'look': return <LookSection s={s} set={set} />;
     case 'table': return <TableSection s={s} set={set} />;
     case 'cards': return <CardsSection s={s} set={set} />;
+    case 'you': return <YouSection s={s} set={set} />;
     case 'play': return <PlaySection s={s} set={set} />;
     case 'opponents': return <OpponentsSection s={s} set={set} />;
     case 'motion': return <MotionSection s={s} set={set} />;
@@ -132,8 +145,29 @@ function body(id: SectionId, s: Settings, set: Setter): React.ReactNode {
 }
 
 function LookSection({ s, set }: { s: Settings; set: Setter }) {
+  // A pack writes four settings at once. Whichever one matches all four is shown as current;
+  // change any of them afterwards and no pack is highlighted, which is the honest answer.
+  const activePack = THEME_PACKS.find((p) => p.accent === s.accent && p.tableFelt === s.tableFelt
+    && p.cardBack === s.cardBack && p.cardFace === s.cardFace);
   return (
     <>
+      <Row label="A whole look" hint="Sets the accent, cloth, back and face together. Everything stays editable afterwards." keywords="theme pack preset season look style bundle" wide>
+        <div className="swatches packs">
+          {THEME_PACKS.map((p) => (
+            <button key={p.id} className={`swatch wide ${activePack?.id === p.id ? 'on' : ''}`}
+              title={p.blurb} aria-pressed={activePack?.id === p.id}
+              onClick={() => {
+                set('accent', p.accent); set('tableFelt', p.tableFelt);
+                set('cardBack', p.cardBack); set('cardFace', p.cardFace);
+              }}>
+              <span className="pack-swatch" data-felt={p.tableFelt}>
+                <span className="pk-dot" style={{ background: ACCENTS[p.accent].emerald }} />
+              </span>
+              <em>{p.name}</em>
+            </button>
+          ))}
+        </div>
+      </Row>
       <Row label="Theme" hint="The room after midnight, or the same room with the lights on." keywords="light dark mode night">
         <Seg value={s.theme} onChange={(v) => set('theme', v as Settings['theme'])}
           options={[['light', 'Day'], ['dark', 'Evening'], ['system', 'Match device']]} />
@@ -161,19 +195,36 @@ function LookSection({ s, set }: { s: Settings; set: Setter }) {
 }
 
 function TableSection({ s, set }: { s: Settings; set: Setter }) {
+  const felt = s.customFelt ?? DEFAULT_FELT;
   return (
-    <Row label="Cloth" hint={FELTS[s.tableFelt].blurb} keywords="felt table green baize surface" wide>
-      <div className="swatches tables">
-        {(Object.keys(FELTS) as TableFelt[]).map((t) => (
-          <button key={t} className={`swatch wide ${s.tableFelt === t ? 'on' : ''}`}
-            title={FELTS[t].blurb} aria-pressed={s.tableFelt === t}
-            onClick={() => set('tableFelt', t)}>
-            <span className="felt-swatch" data-felt={t}><span className="fs-rail"><span className="fs-felt" /></span></span>
-            <em>{FELTS[t].name}</em>
-          </button>
-        ))}
-      </div>
-    </Row>
+    <>
+      <Row label="Cloth" hint={FELTS[s.tableFelt].blurb} keywords="felt table green baize surface" wide>
+        <div className="swatches tables">
+          {(Object.keys(FELTS) as TableFelt[]).map((t) => (
+            <button key={t} className={`swatch wide ${s.tableFelt === t ? 'on' : ''}`}
+              title={FELTS[t].blurb} aria-pressed={s.tableFelt === t}
+              onClick={() => {
+                set('tableFelt', t);
+                if (t === 'custom' && !s.customFelt) set('customFelt', DEFAULT_FELT);
+              }}>
+              <span className="felt-swatch" data-felt={t}><span className="fs-rail"><span className="fs-felt" /></span></span>
+              <em>{FELTS[t].name}</em>
+            </button>
+          ))}
+        </div>
+      </Row>
+      {/* Only asked once you have said you want your own — no point crowding the panel otherwise. */}
+      {s.tableFelt === 'custom' && (
+        <Row label="Your cloth" hint="The colour of the felt and the rail around it." keywords="custom felt colour color cloth rail mine" indent>
+          <div className="cust-colours">
+            <label><span>Cloth</span><input type="color" value={felt.cloth}
+              onChange={(e) => set('customFelt', { ...felt, cloth: e.target.value })} /></label>
+            <label><span>Rail</span><input type="color" value={felt.rail}
+              onChange={(e) => set('customFelt', { ...felt, rail: e.target.value })} /></label>
+          </div>
+        </Row>
+      )}
+    </>
   );
 }
 
@@ -231,13 +282,41 @@ function CardsSection({ s, set }: { s: Settings; set: Setter }) {
   );
 }
 
-function PlaySection({ s, set }: { s: Settings; set: Setter }) {
+/** Who you are at the table. Name, face and colour, kept together and away from the rules. */
+function YouSection({ s, set }: { s: Settings; set: Setter }) {
   return (
     <>
       <Row label="Your name" keywords="player name you">
         <input className="pref-text" value={s.playerName} maxLength={16}
           onChange={(e) => set('playerName', e.target.value || 'You')} />
       </Row>
+      <Row label="Your face" hint="Shown beside your name at the table." keywords="avatar icon emoji face picture you" wide>
+        <div className="swatches avatars">
+          {AVATARS.map((g) => (
+            <button key={g} className={`swatch glyph ${s.avatar === g ? 'on' : ''}`}
+              aria-label={`Avatar ${g}`} aria-pressed={s.avatar === g}
+              onClick={() => set('avatar', g)}>{g}</button>
+          ))}
+        </div>
+      </Row>
+      <Row label="Your colour" hint="Tints what belongs to you at the table." keywords="colour color seat you player">
+        <div className="swatches inline">
+          {(Object.keys(ACCENTS) as AccentId[]).map((id) => (
+            <button key={id} title={ACCENTS[id].name} aria-label={ACCENTS[id].name}
+              aria-pressed={s.playerColor === id}
+              className={`swatch dot ${s.playerColor === id ? 'on' : ''}`}
+              style={{ background: `linear-gradient(135deg, ${ACCENTS[id].emerald}, ${ACCENTS[id].green})` }}
+              onClick={() => set('playerColor', id)} />
+          ))}
+        </div>
+      </Row>
+    </>
+  );
+}
+
+function PlaySection({ s, set }: { s: Settings; set: Setter }) {
+  return (
+    <>
       <Row label="Show legal moves" hint="How a card you are allowed to play is marked." keywords="highlight glow outline hint legal">
         <Seg value={s.highlight} onChange={(v) => set('highlight', v as Settings['highlight'])}
           options={[['glow', 'Glow'], ['outline', 'Outline'], ['lift', 'Lift'], ['off', 'Off']]} />
@@ -256,6 +335,14 @@ function PlaySection({ s, set }: { s: Settings; set: Setter }) {
           <b>{s.defaultSeats}</b>
         </div>
       </Row>
+      <Row label="Undo a misclick" hint="A few seconds to take a move back before the table moves on. Solo play only — online, the others have already seen it." keywords="undo takeback mistake misclick grace">
+        <Seg value={String(s.undoGraceMs)} onChange={(v) => set('undoGraceMs', +v)}
+          options={[['0', 'Off'], ['3000', '3s'], ['6000', '6s'], ['10000', '10s']]} />
+      </Row>
+      <Row label="Turn clock" hint="A countdown on every turn. Running out plays a legal move for you rather than forfeiting." keywords="timer clock countdown speed chess blitz">
+        <Seg value={String(s.turnSeconds)} onChange={(v) => set('turnSeconds', +v)}
+          options={[['0', 'Off'], ['15', '15s'], ['30', '30s'], ['60', '60s']]} />
+      </Row>
     </>
   );
 }
@@ -271,9 +358,9 @@ function OpponentsSection({ s, set }: { s: Settings; set: Setter }) {
         <Seg value={s.botSpeed} onChange={(v) => set('botSpeed', v as Settings['botSpeed'])}
           options={[['slow', 'Slow'], ['normal', 'Normal'], ['fast', 'Fast'], ['instant', 'Instant']]} />
       </Row>
-      <Row label="How well they play" hint="Smart bots follow the rules of thumb a decent player would." keywords="bot bots difficulty hard easy smart random opponents">
-        <Seg value={s.botDiff} onChange={(v) => set('botDiff', v as Settings['botDiff'])}
-          options={[['random', 'Easy'], ['smart', 'Smart']]} />
+      <Row label="How well they play" hint="Easy throws cards away. Normal plays well but slips. Sharp always takes its best line." keywords="bot bots difficulty hard easy normal smart random opponents tier">
+        <Seg value={tierOfDiff(s.botDiff)} onChange={(v) => set('botDiff', v as Settings['botDiff'])}
+          options={[['easy', 'Easy'], ['normal', 'Normal'], ['hard', 'Sharp']]} />
       </Row>
     </>
   );
@@ -282,9 +369,13 @@ function OpponentsSection({ s, set }: { s: Settings; set: Setter }) {
 function MotionSection({ s, set }: { s: Settings; set: Setter }) {
   return (
     <>
-      <Row label="Animation" hint="Reduced keeps the game and drops the flourishes, including the deal." keywords="motion animation reduce deal shuffle">
+      <Row label="Animation" hint="Match device follows your system's reduce-motion setting. Reduced keeps the game and drops the flourishes, including the deal." keywords="motion animation reduce deal shuffle system vestibular">
         <Seg value={s.motion} onChange={(v) => set('motion', v as Settings['motion'])}
-          options={[['full', 'Full'], ['reduced', 'Reduced']]} />
+          options={[['system', 'Match device'], ['full', 'Full'], ['reduced', 'Reduced']]} />
+      </Row>
+      <Row label="Animation speed" hint="How quickly cards deal and flip. Nothing to do with how fast the bots think." keywords="speed fast slow deal flip animation pace" indent>
+        <Seg value={s.animSpeed} onChange={(v) => set('animSpeed', v as Settings['animSpeed'])}
+          options={[['relaxed', 'Relaxed'], ['normal', 'Normal'], ['brisk', 'Brisk']]} />
       </Row>
       <Row label="Sound" hint="Short tones on play, draw and win. Nothing else." keywords="audio sound mute volume">
         <Toggle on={s.sound} onChange={(v) => set('sound', v)} label="Sound" />
@@ -324,9 +415,12 @@ function AccessSection({ s, set }: { s: Settings; set: Setter }) {
           onChange={(v) => set('cardFace', (v === 'off' ? 'classic' : v) as CardFace)}
           options={[['off', 'Off'], ['letters', 'Letters'], ['shapes', 'Shapes']]} />
       </Row>
-      <Row label="Animation" hint="The same control as in Motion & sound — here because it is the one people look for." keywords="motion reduce vestibular">
+      <Row label="Animation" hint="The same control as in Motion & sound — here because it is the one people look for." keywords="motion reduce vestibular system">
         <Seg value={s.motion} onChange={(v) => set('motion', v as Settings['motion'])}
-          options={[['full', 'Full'], ['reduced', 'Reduced']]} />
+          options={[['system', 'Match device'], ['full', 'Full'], ['reduced', 'Reduced']]} />
+      </Row>
+      <Row label="Read the table aloud" hint="Speaks each move and your hand through the browser's own voice. Separate from a screen reader, which is always supported." keywords="speech speak voice audio blind narrate tts">
+        <Toggle on={s.speak} onChange={(v) => set('speak', v)} label="Read the table aloud" />
       </Row>
     </>
   );
@@ -373,8 +467,12 @@ function BackDesigner({ value, onChange }: { value: CustomBack; onChange: (v: Cu
     <div className="designer">
       <div className="dz-preview">
         <span className="sw-back big mine" data-cbpattern={value.pattern}
-          style={{ ['--cb-ink' as string]: value.ink, ['--cb-ground' as string]: value.ground }}>
-          {value.emblem}
+          style={{
+            ['--cb-ink' as string]: value.ink,
+            ['--cb-ground' as string]: value.ground,
+            ['--cb-image' as string]: value.image ? `url("${value.image}")` : 'none',
+          }}>
+          {value.image ? '' : value.emblem}
         </span>
       </div>
       <div className="dz-controls">
@@ -398,9 +496,46 @@ function BackDesigner({ value, onChange }: { value: CustomBack; onChange: (v: Cu
             ))}
           </div>
         </div>
+        <div className="field"><span>Picture</span>
+          <div className="dz-image">
+            <label className="ghost sm file-btn">
+              {value.image ? 'Replace' : 'Upload'}
+              <input type="file" accept="image/*" onChange={(e) => readBackImage(e, patch)} />
+            </label>
+            {value.image && (
+              <button className="ghost sm" onClick={() => patch({ image: null })}>Remove</button>
+            )}
+            <em className="muted">A picture covers the pattern.</em>
+          </div>
+        </div>
       </div>
     </div>
   );
+}
+
+/**
+ * Reads a chosen picture into the setting as a data URI. Everything here rides in localStorage
+ * next to the rest of the preferences, so an oversized file is refused rather than silently
+ * blowing the whole store away.
+ */
+function readBackImage(
+  e: React.ChangeEvent<HTMLInputElement>,
+  patch: (p: Partial<CustomBack>) => void,
+): void {
+  const file = e.target.files?.[0];
+  e.target.value = '';           // so choosing the same file twice still fires
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    const data = typeof reader.result === 'string' ? reader.result : '';
+    if (!data) return;
+    if (data.length > MAX_BACK_IMAGE) {
+      alert('That picture is too big to keep. Try one under about 300 KB.');
+      return;
+    }
+    patch({ image: data });
+  };
+  reader.readAsDataURL(file);
 }
 
 // ---------- rows and controls ----------

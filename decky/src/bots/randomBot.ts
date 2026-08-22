@@ -8,12 +8,38 @@ import { nextRandom } from '../engine/rng';
 
 const HIGH = new Set(['K', 'Q', 'J', '10']);
 
+/**
+ * How hard a bot tries. Underneath there are only two players — the heuristic one and the
+ * coin-flipping one — and a tier is how often you get each. That is a real difference in
+ * strength rather than a label: an easy bot genuinely throws away good cards.
+ *
+ * 'smart' and 'random' are the original two names, kept because saved settings and the seat
+ * editor still speak them.
+ */
+export type BotMode = 'easy' | 'normal' | 'hard' | 'smart' | 'random';
+
+/** Chance a tier plays a random legal move instead of its best one. */
+const SLIP: Record<BotMode, number> = {
+  easy: 1, normal: 0.22, hard: 0, smart: 0, random: 1,
+};
+
 export function chooseMove(
   state: MatchState,
   playerId: string,
   botSeed: number,
-  mode: 'smart' | 'random' = 'smart',
+  tier: BotMode = 'smart',
 ): { move: Move; botSeed: number } {
+  // Resolve the tier into the two modes the rest of this file understands. The draw comes from
+  // the bot seed, so a given seed still replays exactly — difficulty does not break determinism.
+  let mode: 'smart' | 'random' = 'smart';
+  const slip = SLIP[tier] ?? 0;
+  if (slip >= 1) mode = 'random';
+  else if (slip > 0) {
+    const r = nextRandom(botSeed);
+    botSeed = r.state;
+    if (r.value < slip) mode = 'random';
+  }
+
   const moves = legalMoves(state, playerId);
   if (moves.length === 0) return { move: { actionId: 'drawCard' }, botSeed };
 

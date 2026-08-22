@@ -5,7 +5,7 @@ import { pinDefinition, definitionFingerprint, migrate } from '../engine/migrate
 import {
   FairCommit, FairReveal, commitTo, deriveSeed, newClientSeed, newServerSeed,
 } from '../engine/fairness';
-import { chooseMove } from '../bots/randomBot';
+import { chooseMove, BotMode } from '../bots/randomBot';
 import { chooseSolitaireMove, positionKey } from '../bots/solitaireBot';
 
 // ---------------------------------------------------------------------------
@@ -37,7 +37,7 @@ export interface Seat {
   id: string;                 // the player id the engine knows, e.g. 'P1'
   name: string;               // what people see
   kind: 'local' | 'remote' | 'bot';
-  difficulty?: 'smart' | 'random';   // bots only
+  difficulty?: BotMode;              // bots only
   connected?: boolean;        // remote seats: are they here right now
   lastSeen?: number;
 }
@@ -398,7 +398,7 @@ export class MatchService {
    * table from inside the boundary — the client never receives a bot's hand in order to move it,
    * which is the other half of not leaking hidden information.
    */
-  botStep(matchId: string, humanSeats?: string[], difficulty: 'smart' | 'random' = 'smart'):
+  botStep(matchId: string, humanSeats?: string[], difficulty: BotMode = 'smart'):
     { moved: boolean; seat?: string; view: RedactedState } {
     const rec = this.require(matchId);
     // The seat table is the authority on who is a bot; the humanSeats argument stays supported
@@ -424,6 +424,38 @@ export class MatchService {
     this.recordMove(rec, seat, picked, before);
     this.store.set(matchId, rec);
     return { moved: true, seat, view: redact(rec.state, viewer) };
+  }
+
+  /**
+   * Take back your own last move, along with whatever the bots did in reply.
+   *
+   * This is not the takeback above, which asks the rest of the table and needs their consent.
+   * This is the misclick window: it exists only while nobody else could have seen the position,
+   * so it is refused outright once a human opponent is seated. The caller decides how long the
+   * window stays open; the referee decides whether it may be used at all.
+   */
+  quickUndo(matchId: string, playerId: string): MoveResult {
+    const rec = this.require(matchId);
+    this.requireSeat(rec, playerId);
+    if (rec.seats.some((s) => s.kind === 'remote')) {
+      return {
+        ok: false,
+        reason: 'Somebody else is at this table — ask for a takeback instead.',
+        view: redact(rec.state, playerId),
+      };
+    }
+    // Walk back past the bots' replies, stopping at the position where it was your turn again.
+    let popped = false;
+    while (rec.history.length > 0) {
+      rec.state = rec.history.pop()!;
+      popped = true;
+      if (rec.state.phase === 'playing' && actingPlayers(rec.state).includes(playerId)) break;
+    }
+    if (!popped) {
+      return { ok: false, reason: 'Nothing to take back.', view: redact(rec.state, playerId) };
+    }
+    this.store.set(matchId, rec);
+    return { ok: true, view: redact(rec.state, playerId) };
   }
 
   /** Whether anyone is still owed a move — lets the client know to keep ticking bots. */

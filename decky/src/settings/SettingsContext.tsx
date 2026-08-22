@@ -24,6 +24,15 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     return () => mq.removeEventListener('change', onChange);
   }, [settings]);
 
+  // Same for motion: somebody who turns on "reduce motion" mid-session gets it immediately.
+  useEffect(() => {
+    if (settings.motion !== 'system') return;
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const onChange = () => applySettings(settings);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, [settings]);
+
   const value = useMemo<Ctx>(() => ({
     settings,
     set: (key, val) => setSettings((s) => ({ ...s, [key]: val })),

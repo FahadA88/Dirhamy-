@@ -13,6 +13,13 @@ const KINDS: { value: Seat['kind']; label: string; blurb: string }[] = [
   { value: 'bot', label: 'Bot', blurb: 'Plays itself' },
 ];
 
+/** Old saved seats say 'smart' or 'random'; the picker speaks in tiers. Translate both ways. */
+function tierOf(d: Seat['difficulty']): 'easy' | 'normal' | 'hard' {
+  if (d === 'random' || d === 'easy') return 'easy';
+  if (d === 'normal') return 'normal';
+  return 'hard';
+}
+
 export function SeatSetup({ def, defaultSeats, defaultName, onStart, onCancel }: {
   def: GameDefinition;
   defaultSeats: number;
@@ -74,8 +81,14 @@ export function SeatSetup({ def, defaultSeats, defaultName, onStart, onCancel }:
               </div>
               {s.kind === 'bot' && (
                 <div className="seg">
-                  <button className={s.difficulty === 'random' ? 'on' : ''} onClick={() => patch(i, { difficulty: 'random' })}>Easy</button>
-                  <button className={s.difficulty !== 'random' ? 'on' : ''} onClick={() => patch(i, { difficulty: 'smart' })}>Sharp</button>
+                  {([['easy', 'Easy'], ['normal', 'Normal'], ['hard', 'Sharp']] as const).map(([val, label]) => (
+                    <button
+                      key={val}
+                      className={tierOf(s.difficulty) === val ? 'on' : ''}
+                      aria-pressed={tierOf(s.difficulty) === val}
+                      onClick={() => patch(i, { difficulty: val })}
+                    >{label}</button>
+                  ))}
                 </div>
               )}
             </li>

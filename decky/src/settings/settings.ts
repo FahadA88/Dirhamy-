@@ -14,7 +14,8 @@ export type CardBack =
 /** The thirteen tables that survived the cut. */
 export type TableFelt =
   | 'neon' | 'mahogany' | 'vegas' | 'midnight' | 'parlour' | 'concrete' | 'darkglass'
-  | 'papermat' | 'velvet' | 'marble' | 'zinc' | 'litedges' | 'chalkboard' | 'studio';
+  | 'papermat' | 'velvet' | 'marble' | 'zinc' | 'litedges' | 'chalkboard' | 'studio'
+  | 'custom';
 export type CardSize = 's' | 'm' | 'l';
 /**
  * How a card face is drawn. The first is the traditional deck; the rest exist because a deck
@@ -33,12 +34,40 @@ export interface CustomBack {
   ink: string;      // the pattern colour
   ground: string;   // the card colour
   emblem: string;   // one glyph in the middle, or '' for none
+  /**
+   * A picture the player uploaded, as a data URI, covering the whole back. When set it wins over
+   * the pattern. Kept small on the way in — see MAX_BACK_IMAGE — because this rides in
+   * localStorage alongside everything else.
+   */
+  image?: string | null;
 }
+
+/** Roughly 400 KB of data URI. Big enough for a real picture, small enough not to eat the quota. */
+export const MAX_BACK_IMAGE = 400_000;
 export type Surface = 'soft' | 'glass' | 'plain';
 export type Highlight = 'glow' | 'outline' | 'lift' | 'off';
 export type SortMode = 'off' | 'rank' | 'suit';
 export type BotSpeed = 'slow' | 'normal' | 'fast' | 'instant';
-export type BotDiff = 'smart' | 'random';
+/**
+ * How hard the opponents try. `random` is kept because old saved settings hold it and because a
+ * genuinely random table is useful for testing; the three tiers are what a person picks.
+ */
+export type BotDiff = 'easy' | 'normal' | 'hard' | 'smart' | 'random';
+/** How fast cards deal and flip, independent of how fast the bots think. */
+export type AnimSpeed = 'relaxed' | 'normal' | 'brisk';
+/**
+ * Motion follows the operating system by default. Somebody who has asked their whole machine for
+ * less movement should not have to ask this app separately — but they can still override it.
+ */
+export type MotionMode = 'system' | 'full' | 'reduced';
+
+/** A felt somebody mixed themselves, applied when tableFelt is 'custom'. */
+export interface CustomFelt {
+  /** The cloth colour. */
+  cloth: string;
+  /** The rail around it. */
+  rail: string;
+}
 
 export interface Settings {
   // appearance
@@ -58,10 +87,18 @@ export interface Settings {
   orbs: boolean;
   grid: boolean;
   floaties: boolean;
-  motion: 'full' | 'reduced';
+  motion: MotionMode;
+  /** How quickly cards deal and flip. Separate from motion, which is on/off. */
+  animSpeed: AnimSpeed;
   density: 'comfortable' | 'compact';
+  /** A felt the player mixed, applied when tableFelt is 'custom'. */
+  customFelt: CustomFelt | null;
   // gameplay / UX
   playerName: string;
+  /** One glyph shown beside your name at the table and on your profile. */
+  avatar: string;
+  /** Your seat colour. One of the accent presets, so it always sits in the palette. */
+  playerColor: AccentId;
   botLabels: boolean;
   defaultSeats: number;
   botSpeed: BotSpeed;
@@ -71,6 +108,12 @@ export interface Settings {
   confirmPlays: boolean;
   showLog: boolean;
   sound: boolean;
+  /** Read the table out loud through the browser's own voice. Off unless asked for. */
+  speak: boolean;
+  /** A few seconds to take back a misclick before the table moves on. 0 turns it off. */
+  undoGraceMs: number;
+  /** Optional clock. 0 is no clock at all, which is the default. */
+  turnSeconds: number;
 }
 
 export const defaultSettings: Settings = {
@@ -89,19 +132,59 @@ export const defaultSettings: Settings = {
   orbs: true,
   grid: true,
   floaties: true,
-  motion: 'full',
+  // Follow the machine. Somebody who asked their OS for less movement has already answered this.
+  motion: 'system',
+  animSpeed: 'normal',
   density: 'comfortable',
+  customFelt: null,
   playerName: 'You',
+  avatar: '🂡',
+  playerColor: 'emerald',
   botLabels: true,
   defaultSeats: 3,
   botSpeed: 'normal',
-  botDiff: 'smart',
+  botDiff: 'normal',
   highlight: 'glow',
   sort: 'off',
   confirmPlays: false,
   showLog: true,
   sound: false,
+  speak: false,
+  // Long enough to catch a misclick, short enough that nobody waits on it.
+  undoGraceMs: 3000,
+  turnSeconds: 0,
 };
+
+/** The glyphs offered as an avatar. Fixed set, so nothing needs screening. */
+export const AVATARS = ['🂡', '♠', '♥', '♦', '♣', '🎩', '🦊', '🐙', '🌙', '⭐', '🔥', '🎲', '🍀', '👑', '🤖', '🎯'];
+
+/** How long a deal or flip takes, as a multiplier on the stylesheet's own timings. */
+export const ANIM_SCALE: Record<AnimSpeed, number> = { relaxed: 1.6, normal: 1, brisk: 0.45 };
+
+/**
+ * A whole look in one click — accent, felt, back and face chosen to go together. Picking one
+ * writes the four settings; they stay individually editable afterwards.
+ */
+export interface ThemePack {
+  id: string;
+  name: string;
+  blurb: string;
+  accent: AccentId;
+  tableFelt: TableFelt;
+  cardBack: CardBack;
+  cardFace: CardFace;
+}
+
+export const THEME_PACKS: ThemePack[] = [
+  { id: 'neon', name: 'Neon Table', blurb: 'The house look — a card room after midnight.', accent: 'emerald', tableFelt: 'neon', cardBack: 'monogram', cardFace: 'classic' },
+  { id: 'parlour', name: 'Sunlit Parlour', blurb: 'Afternoon light on a quiet table.', accent: 'amber', tableFelt: 'parlour', cardBack: 'ivory', cardFace: 'typographic' },
+  { id: 'midnight', name: 'Midnight Blue', blurb: 'Deep and cool, easy on the eyes.', accent: 'ocean', tableFelt: 'midnight', cardBack: 'neongrid', cardFace: 'big-index' },
+  { id: 'autumn', name: 'Autumn Study', blurb: 'Mahogany, brass and old paper.', accent: 'amber', tableFelt: 'mahogany', cardBack: 'kraft', cardFace: 'woodcut' },
+  { id: 'frost', name: 'Winter Frost', blurb: 'Cold marble and pale ink.', accent: 'teal', tableFelt: 'marble', cardBack: 'linen', cardFace: 'minimal' },
+  { id: 'spring', name: 'Spring Green', blurb: 'Fresh felt, bright cards.', accent: 'emerald', tableFelt: 'velvet', cardBack: 'lattice', cardFace: 'four-color' },
+  { id: 'noir', name: 'Chalk & Noir', blurb: 'Blackboard green, chalk-white pips.', accent: 'slate', tableFelt: 'chalkboard', cardBack: 'halftone', cardFace: 'mono' },
+  { id: 'vegas', name: 'Vegas Red', blurb: 'Loud, warm and unmistakable.', accent: 'rose', tableFelt: 'vegas', cardBack: 'sunburst', cardFace: 'deco' },
+];
 
 export interface AccentPreset { name: string; green: string; greenD: string; emerald: string; lime: string; }
 
@@ -132,6 +215,7 @@ export const FELTS: Record<TableFelt, FeltPreset> = {
   litedges:   { name: 'Lit Edges',  blurb: 'Black surface, glowing seams.' },
   chalkboard: { name: 'Chalkboard', blurb: 'Matte slate with chalk seat markings.' },
   studio:     { name: 'Studio',     blurb: 'Pure white, one soft shadow. Cards as a product shot.' },
+  custom:     { name: 'Yours',      blurb: 'Your own cloth and rail.' },
 };
 
 export interface BackPreset { name: string }
@@ -213,6 +297,17 @@ export function saveSettings(s: Settings): void {
   try { localStorage.setItem(KEY, JSON.stringify(s)); } catch { /* ignore */ }
 }
 
+/** What 'system' actually means right now. Safe to call before the DOM has a preference. */
+export function prefersReducedMotion(): boolean {
+  try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch { return false; }
+}
+
+/** Turns the three-way setting into the two-way answer the app and the stylesheet use. */
+export function resolveMotion(mode: MotionMode): 'full' | 'reduced' {
+  if (mode === 'system') return prefersReducedMotion() ? 'reduced' : 'full';
+  return mode;
+}
+
 // Push settings into the DOM: CSS custom properties + data-* attributes the stylesheet keys off.
 export function applySettings(s: Settings): void {
   const root = document.documentElement;
@@ -232,7 +327,10 @@ export function applySettings(s: Settings): void {
     ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
     : s.theme;
   root.setAttribute('data-theme', theme);
-  root.setAttribute('data-motion', s.motion);
+  // 'system' asks the machine. The stylesheet already honours the media query on its own, but
+  // the app reads data-motion in JS too, so it has to resolve to a real answer here.
+  root.setAttribute('data-motion', resolveMotion(s.motion));
+  root.style.setProperty('--anim-scale', String(ANIM_SCALE[s.animSpeed]));
   root.setAttribute('data-density', s.density);
   root.setAttribute('data-surface', s.surface);
   root.setAttribute('data-face', s.cardFace);
@@ -242,7 +340,18 @@ export function applySettings(s: Settings): void {
     root.style.setProperty('--cb-ink', cb.ink);
     root.style.setProperty('--cb-ground', cb.ground);
     root.setAttribute('data-cbpattern', cb.pattern);
+    // An uploaded picture covers the whole back and wins over the pattern.
+    root.style.setProperty('--cb-image', cb.image ? `url("${cb.image}")` : 'none');
+  } else {
+    root.style.setProperty('--cb-image', 'none');
   }
+  const cf = s.customFelt;
+  if (cf) {
+    root.style.setProperty('--cf-cloth', cf.cloth);
+    root.style.setProperty('--cf-rail', cf.rail);
+  }
+  // Your seat colour, so a table can tint what belongs to you.
+  root.style.setProperty('--you', ACCENTS[s.playerColor]?.emerald ?? ACCENTS.emerald.emerald);
   root.setAttribute('data-text', s.textSize);
   root.setAttribute('data-legible', s.legibleText ? 'on' : 'off');
   root.style.setProperty('--text-scale', String(TEXT_SCALE[s.textSize]));

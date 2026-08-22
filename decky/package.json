@@ -23,10 +23,11 @@
     "verify:shelf": "node scripts/browser/shelf.mjs",
     "phase5": "tsx scripts/phase5.ts",
     "verify:families": "node scripts/browser/families.mjs",
-    "verify:all": "node scripts/browser/smoke.mjs && node scripts/browser/verify.mjs && node scripts/browser/builder.mjs && node scripts/browser/multiplayer.mjs && node scripts/browser/shelf.mjs && node scripts/browser/families.mjs",
+    "verify:all": "node scripts/browser/smoke.mjs && node scripts/browser/verify.mjs && node scripts/browser/builder.mjs && node scripts/browser/multiplayer.mjs && node scripts/browser/shelf.mjs && node scripts/browser/families.mjs && node scripts/browser/qol.mjs",
     "author": "tsx scripts/author.ts",
     "families": "tsx scripts/families.ts",
-    "start": "npm run build && npm run host"
+    "start": "npm run build && npm run host",
+    "verify:qol": "node scripts/browser/qol.mjs"
   },
   "dependencies": {
     "react": "^18.3.1",

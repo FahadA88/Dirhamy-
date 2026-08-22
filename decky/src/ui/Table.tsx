@@ -9,6 +9,9 @@ import { Confetti } from './Confetti';
 import { useSettings } from '../settings/SettingsContext';
 import { BOT_SPEED_MS } from '../settings/settings';
 import { playSound } from './sound';
+import { speak, stopSpeaking, spokenCard } from './speech';
+import { useTurnAlert } from './useTurnAlert';
+import { useDismissable } from './useEscape';
 import { service, rememberSession, forgetSession, resumableSession } from '../server/local';
 import { Seat, MoveRecord } from '../server/matchService';
 import { recordResult } from '../social/records';
@@ -63,6 +66,12 @@ export function Table({ def, seats = 3, plan }: {
   const [pitGive, setPitGive] = useState<'C' | 'D' | 'H' | 'S'>('C');
   const [pitWant, setPitWant] = useState<'C' | 'D' | 'H' | 'S'>('D');
   const [pitCount, setPitCount] = useState(1);
+  // The misclick window: set on every move you make, cleared when it lapses or is used.
+  const [undoable, setUndoable] = useState(false);
+  // Seconds left on the clock, or null when there is no clock.
+  const [secsLeft, setSecsLeft] = useState<number | null>(null);
+  // Which card the keyboard is on. Null means the keyboard is not driving the hand.
+  const [cursor, setCursor] = useState<number | null>(null);
 
   const { matchId, view } = board;
   const passAndPlay = localSeats.length > 1;
@@ -95,6 +104,15 @@ export function Table({ def, seats = 3, plan }: {
   }, [view.phase]);
 
   function restart() { deal(true); }
+
+  /**
+   * Play the same table again. The seat plan is a prop, so re-dealing keeps every seat, name
+   * and bot tier exactly as they were — which is the whole point of the button.
+   */
+  function rematch() {
+    setUndoable(false);
+    deal(true);
+  }
   const isFish = view.mode === 'fish';
   // Climbing moves carry a card group rather than a single cardId; a one-card group is still
   // a plain tap-to-play, so fold those in alongside the normal cardId moves.
@@ -201,6 +219,111 @@ export function Table({ def, seats = 3, plan }: {
 
   useEffect(() => { setHint(null); }, [board]);
 
+  // ---------- taking back a misclick ----------
+
+  // Only offered where it is honest: a table of bots, with the window still open. Against a
+  // person the takeback above is the right instrument, because they have already seen it.
+  const soloTable = !plan || plan.every((s) => s.kind !== 'remote');
+  const canQuickUndo = undoable && soloTable && settings.undoGraceMs > 0 && view.phase === 'playing';
+
+  // The window closes on its own. Restarting the timer on every move means the clock always
+  // measures from the most recent one.
+  useEffect(() => {
+    if (!undoable || settings.undoGraceMs <= 0) return;
+    const t = setTimeout(() => setUndoable(false), settings.undoGraceMs);
+    return () => clearTimeout(t);
+  }, [undoable, settings.undoGraceMs]);
+
+  function quickUndo() {
+    const res = service.quickUndo(matchId, me);
+    setUndoable(false);
+    if (!res.ok) { setToast({ text: res.reason ?? 'Nothing to take back.', tone: 'bad' }); return; }
+    playSound('ui', settings.sound);
+    setSelected(null);
+    setAskRank(null);
+    setBluffSelected([]);
+    setBluffRank(null);
+    setBoard(read(matchId, me));
+    setToast({ text: 'Taken back.', tone: 'info' });
+  }
+
+  // ---------- the clock ----------
+
+  // Counts only while you are actually owed a move. Running out plays a legal move rather than
+  // forfeiting the hand — a clock should hurry somebody along, not decide the game.
+  useEffect(() => {
+    if (settings.turnSeconds <= 0 || view.phase !== 'playing' || !view.isYourTurn) {
+      setSecsLeft(null);
+      return;
+    }
+    setSecsLeft(settings.turnSeconds);
+    const tick = setInterval(() => {
+      setSecsLeft((n) => {
+        if (n === null) return null;
+        if (n > 1) return n - 1;
+        // Out of time: take the advisor's move, or the first legal one.
+        const m = service.hint(matchId, me) ?? board.legal[0];
+        if (m) {
+          service.submit(matchId, me, m);
+          setBoard(read(matchId, me));
+          setToast({ text: 'Out of time — a move was played for you.', tone: 'info' });
+        }
+        return null;
+      });
+    }, 1000);
+    return () => clearInterval(tick);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [board, settings.turnSeconds, view.phase, view.isYourTurn, matchId, me]);
+
+  // ---------- saying what happened ----------
+
+  const lastLine = view.log[view.log.length - 1]?.text ?? '';
+
+  // Read the table aloud, when asked. The screen-reader region below is separate and always on.
+  useEffect(() => {
+    speak(lastLine, settings.speak);
+  }, [lastLine, settings.speak]);
+
+  useEffect(() => { if (!settings.speak) stopSpeaking(); }, [settings.speak]);
+  useEffect(() => () => stopSpeaking(), []);
+
+  // Mark the tab when somebody is waiting on you and looking somewhere else.
+  useTurnAlert(view.phase === 'playing' && !!view.isYourTurn);
+
+
+  // ---------- playing without a mouse ----------
+  //
+  // Cards are already real buttons, so tabbing reaches them. What was missing is the part that
+  // makes a hand feel like a hand: arrows to run along it, Enter to play, and a cursor that
+  // remembers where it was. The roving tabindex keeps the hand a single tab stop rather than
+  // fifty-two, which is the difference between usable and exhausting.
+  function handKeys(e: React.KeyboardEvent, ids: string[], play: (id: string) => void) {
+    if (ids.length === 0) return;
+    const at = cursor === null ? -1 : Math.min(cursor, ids.length - 1);
+    const go = (i: number) => {
+      e.preventDefault();
+      const next = (i + ids.length) % ids.length;
+      setCursor(next);
+      // Move real focus too, so a screen reader announces the card the cursor lands on.
+      const el = document.querySelector<HTMLElement>(`[data-cardkey="${CSS.escape(ids[next])}"]`);
+      el?.focus();
+    };
+    if (e.key === 'ArrowRight') go(at + 1);
+    else if (e.key === 'ArrowLeft') go(at <= 0 ? ids.length - 1 : at - 1);
+    else if (e.key === 'Home') go(0);
+    else if (e.key === 'End') go(ids.length - 1);
+    else if (e.key === 'Enter' || e.key === ' ') {
+      if (at >= 0) { e.preventDefault(); play(ids[at]); }
+    }
+  }
+
+  /** What a card should be called out loud, plus why it cannot be played if it cannot. */
+  function cardLabel(c: Card, playable: boolean, extra?: string): string {
+    const name = spokenCard(c.rank, c.suit);
+    if (extra) return `${name}, ${extra}`;
+    return playable ? name : `${name}, not playable`;
+  }
+
   // Win sound, and the result that feeds the leaderboards.
   const prevPhase = useRef(view.phase);
   useEffect(() => {
@@ -254,6 +377,7 @@ export function Table({ def, seats = 3, plan }: {
     setAskRank(null);
     setBluffSelected([]);
     setBluffRank(null);
+    setUndoable(true);
     setBoard(read(matchId, me));
   }
 
@@ -295,6 +419,16 @@ export function Table({ def, seats = 3, plan }: {
   const top = view.zones.discard?.cards[0];
   const activeSuit = view.vars.activeSuit;
   const suitPickerOpen = !!view.pendingChoice && view.pendingChoice.player === me;
+  // ---------- overlays ----------
+  //
+  // Every overlay traps focus, so a keyboard cannot wander behind it. Only the history panel
+  // takes Escape: the others are asking for a decision the game cannot continue without, and
+  // dismissing them would leave somebody looking at a table that will not move.
+  const historyRef = useDismissable(showHistory, () => setShowHistory(false));
+  const suitRef = useDismissable(suitPickerOpen, () => { /* a suit must be chosen */ });
+  const roundRef = useDismissable(view.phase === 'roundOver' && !view.matchOver, () => { /* pick next hand */ });
+  const handoffRef = useDismissable(!!handoff, () => { /* the device has to change hands */ });
+
   const nameOf = (id: string) => {
     const seat = plan?.find((s) => s.id === id);
     if (seat) return seat.id === me ? `${seat.name} (you)` : seat.name;
@@ -532,7 +666,19 @@ export function Table({ def, seats = 3, plan }: {
             </button>
           ))}
           {isRummy && view.rummyPhase === 'play' && view.isYourTurn && <span className="rummy-hint">discard</span>}
+          {/* The clock, only when there is one. Turns urgent in the last five seconds. */}
+          {secsLeft !== null && (
+            <span className={`turn-clock ${secsLeft <= 5 ? 'urgent' : ''}`} role="timer" aria-live="off">
+              {secsLeft}s
+            </span>
+          )}
           {view.isYourTurn && <button className="restart-btn" onClick={showHint} title="Suggest a move">Hint</button>}
+          {/* Taking back a misclick. Sits next to Hint because that is where the eye already is. */}
+          {canQuickUndo && (
+            <button className="restart-btn undo-btn" onClick={quickUndo} title="Take back the move you just made">
+              ↶ Undo
+            </button>
+          )}
           <button className="restart-btn" onClick={openHistory} title="Every move so far">History</button>
           {view.phase === 'playing' && !takeback && (
             <button className="restart-btn" onClick={askTakeback} title="Ask the table to take your last move back">Take back</button>
@@ -556,10 +702,20 @@ export function Table({ def, seats = 3, plan }: {
             )}
             {myLegal.some((m) => m.actionId === 'bluffClaim') && (
               <>
-                <div className={`hand hl-${settings.highlight}`}>
-                  {hand.map((c) => (
+                <div
+                  className={`hand hl-${settings.highlight}`}
+                  role="group"
+                  aria-label={`Your hand, ${hand.length} card${hand.length === 1 ? '' : 's'}`}
+                  onKeyDown={(e) => handKeys(e, hand.map((c) => c.id), toggleBluffCard)}
+                >
+                  {hand.map((c, i) => (
                     <button key={c.id}
+                      data-cardkey={c.id}
+                      tabIndex={(cursor === null ? i === 0 : i === Math.min(cursor, hand.length - 1)) ? 0 : -1}
+                      aria-pressed={bluffSelected.includes(c.id)}
+                      aria-label={cardLabel(c, true, bluffSelected.includes(c.id) ? 'staged face down' : undefined)}
                       className={`card-btn ${bluffSelected.includes(c.id) ? 'selected' : 'playable'}`}
+                      onFocus={() => setCursor(i)}
                       onClick={() => toggleBluffCard(c.id)}
                       title={bluffSelected.includes(c.id) ? 'Take this one back out' : 'Stage this card face down'}>
                       <CardFace card={c} />
@@ -605,8 +761,12 @@ export function Table({ def, seats = 3, plan }: {
                 <span className="chip">To call · {(view.currentBet ?? 0) - (view.committed?.[me] ?? 0)}</span>
               )}
             </div>
-            <div className="hand hl-off poker-hand">
-              {hand.map((c) => (<div key={c.id} className="card-btn dim static"><CardFace card={c} /></div>))}
+            <div className="hand hl-off poker-hand" role="group" aria-label={`Your hand, ${hand.length} cards`}>
+              {hand.map((c) => (
+                <div key={c.id} className="card-btn dim static" role="img" aria-label={spokenCard(c.rank, c.suit)}>
+                  <CardFace card={c} />
+                </div>
+              ))}
             </div>
             <div className="poker-actions">
               {myLegal.filter((m) => m.actionId?.startsWith('poker')).map((m, i) => (
@@ -669,15 +829,28 @@ export function Table({ def, seats = 3, plan }: {
             {canFlip && <button className="primary" onClick={() => submit({ actionId: 'warFlip' })}>⚔ Flip</button>}
           </div>
         ) : (
-        <div className={`hand hl-${settings.highlight}`}>
+        <div
+          className={`hand hl-${settings.highlight}`}
+          role="group"
+          aria-label={`Your hand, ${hand.length} card${hand.length === 1 ? '' : 's'}`}
+          onKeyDown={(e) => handKeys(e, hand.filter((c) => playableCardIds.has(c.id)).map((c) => c.id), clickCard)}
+        >
           {hand.map((c) => {
             const playable = playableCardIds.has(c.id);
             const staged = view.passStaged.includes(c.id);
+            const playableIds = hand.filter((x) => playableCardIds.has(x.id)).map((x) => x.id);
+            const idx = playableIds.indexOf(c.id);
+            // One tab stop for the whole hand; the arrows move within it.
+            const isCursor = playable && (cursor === null ? idx === 0 : idx === Math.min(cursor, playableIds.length - 1));
             return (
               <button
                 key={c.id}
+                data-cardkey={c.id}
+                tabIndex={playable ? (isCursor ? 0 : -1) : -1}
+                aria-label={cardLabel(c, playable, staged ? 'picked to pass' : undefined)}
                 className={`card-btn ${playable ? 'playable' : 'dim'} ${staged ? 'staged' : ''} ${hint === c.id ? 'hinted' : ''} ${(isFish ? c.rank === askRank : selected === c.id) ? 'selected' : ''}`}
                 disabled={!playable}
+                onFocus={() => { if (idx >= 0) setCursor(idx); }}
                 onClick={() => clickCard(c.id)}
                 title={staged ? 'Picked to pass' : playable ? (isFish ? 'Pick this rank to ask for' : view.needsPassChoice ? 'Give this card away' : settings.confirmPlays && selected !== c.id ? 'Click to select' : 'Play this card') : 'Not a legal move right now'}
               >
@@ -692,7 +865,7 @@ export function Table({ def, seats = 3, plan }: {
 
       {suitPickerOpen && (
         <div className="modal">
-          <div className="modal-box" role="dialog" aria-modal="true" aria-label="Choose a suit">
+          <div className="modal-box" ref={suitRef} role="dialog" aria-modal="true" aria-label="Choose a suit">
             <h3>Wild card — choose a suit</h3>
             <div className="suit-choices">
               {(['C', 'D', 'H', 'S'] as const).map((s) => (
@@ -706,7 +879,7 @@ export function Table({ def, seats = 3, plan }: {
       {view.phase === 'roundOver' && !view.matchOver && (
         <div className="modal">
           {view.winner === me && <Confetti pieces={30} />}
-          <div className={`modal-box celebrate ${view.winner === me ? 'won' : ''}`}>
+          <div className={`modal-box celebrate ${view.winner === me ? 'won' : ''}`} ref={roundRef} role="dialog" aria-modal="true">
             <span className="cb-kicker">Hand {view.handNumber}</span>
             <h3>{view.winner === me ? 'You take it' : `${nameOf(view.winner || '')} takes it`}</h3>
             <p className="scores">
@@ -752,7 +925,11 @@ export function Table({ def, seats = 3, plan }: {
                   </li>
                 ))}
               </ol>
-              <button className="primary" onClick={restart}>Play again</button>
+              <div className="final-actions">
+                <button className="primary" onClick={rematch}>
+                  {plan ? 'Rematch — same table' : 'Play again'}
+                </button>
+              </div>
             </div>
           </div>
         );
@@ -764,7 +941,7 @@ export function Table({ def, seats = 3, plan }: {
 
       {handoff && (
         <div className="modal handoff">
-          <div className="modal-box">
+          <div className="modal-box" ref={handoffRef} role="dialog" aria-modal="true">
             <div className="handoff-mark">🃏</div>
             <h3>Pass the device to {nameOfSeat(handoff)}</h3>
             <p className="scores">Everyone else, look away.</p>
@@ -789,7 +966,7 @@ export function Table({ def, seats = 3, plan }: {
 
       {showHistory && (
         <div className="modal" onClick={() => setShowHistory(false)}>
-          <div className="modal-box wide" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-box wide" ref={historyRef} role="dialog" aria-modal="true" aria-label="Move history" onClick={(e) => e.stopPropagation()}>
             <h3>Move history</h3>
             <ol className="movelist">
               {history.length === 0 && <li className="muted">Nothing has happened yet.</li>}
@@ -812,8 +989,16 @@ export function Table({ def, seats = 3, plan }: {
         </div>
       )}
 
+      {/*
+        The one place the table speaks to a screen reader. It carries what just happened and
+        whose turn it is now, in that order, because the second is the part somebody is waiting
+        to hear. Kept to one sentence: this fires on every board change, and a paragraph each
+        time is unusable.
+      */}
       <div className="sr-only" role="status" aria-live="polite">
-        {view.log.length > 0 ? view.log[view.log.length - 1].text : ''}
+        {view.phase === 'playing'
+          ? `${lastLine}${lastLine ? ' ' : ''}${view.isYourTurn ? 'Your turn.' : ''}`
+          : lastLine}
       </div>
 
       {settings.showLog && (
