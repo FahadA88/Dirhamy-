@@ -10,6 +10,8 @@ import { SeatSetup } from './SeatSetup';
 import { GameDefinition } from '../engine/types';
 import { useSettings } from '../settings/SettingsContext';
 import { BrowseView } from './BrowseView';
+import { OnlineTable, OnlineSession } from './OnlineTable';
+import { hostInfo } from '../net/host';
 import { recordPlay } from '../library/library';
 
 // Discover + play the classics library (and, once wired, published community games).
@@ -23,6 +25,14 @@ export function PlayView() {
   const [setupFor, setSetupFor] = useState<GameDefinition | null>(null);
   // A practice game is played but never counted. Chosen at the table, cleared when you leave it.
   const [practice, setPractice] = useState(false);
+  // Playing with other people: which game is being set up, and the live session once joined.
+  const [onlineFor, setOnlineFor] = useState<GameDefinition | null>(null);
+  const [session, setSession] = useState<OnlineSession | null>(null);
+  // Whether a host is even running. Until we know, the online button stays hidden rather than
+  // appearing and then failing.
+  const [hostUp, setHostUp] = useState(false);
+
+  useEffect(() => { void hostInfo().then((h) => setHostUp(h.up)); }, []);
 
   // Offer to pick up an unfinished game rather than silently dropping it.
   useEffect(() => {
@@ -31,6 +41,16 @@ export function PlayView() {
     const def = catalog.find((g) => g.meta.id === saved.gameId);
     if (def) setResumable({ gameId: saved.gameId, name: def.meta.name });
   }, []);
+
+  if (onlineFor && !session) {
+    return (
+      <OnlineTable
+        def={onlineFor}
+        onCancel={() => setOnlineFor(null)}
+        onStart={(s) => { setSession(s); setGame(onlineFor); setOnlineFor(null); }}
+      />
+    );
+  }
 
   if (setupFor) {
     return (
@@ -51,11 +71,19 @@ export function PlayView() {
     return (
       <div>
         <div className="crumbs">
-          <button className="ghost" onClick={() => { setGame(null); setPlan(null); setPractice(false); }}>← All games</button>
+          <button className="ghost" onClick={() => {
+            session?.client.end();
+            setSession(null); setGame(null); setPlan(null); setPractice(false);
+          }}>← All games</button>
           <span className="crumb-title">{game.meta.name}</span>
           {practice && <span className="practice-badge" title="Nothing here is recorded">Practice</span>}
+          {session && (
+            <span className="table-code" title="Anyone with this code can join">
+              Table <b>{session.code}</b>
+            </span>
+          )}
           <button className="ghost sm" onClick={() => setHelpFor(game)}>Rules</button>
-          {!game.solitaire && !plan && (
+          {!game.solitaire && !plan && !session && (
             <div className="seat-control">
               <span>Seats</span>
               {[2, 3, 4, 5, 6].map((n) => (
@@ -69,7 +97,14 @@ export function PlayView() {
         <ErrorBoundary label={game.meta.name}>
           {game.solitaire
             ? <SolitaireTable def={game} />
-            : <Table def={game} seats={seats} plan={plan ?? undefined} practice={practice} />}
+            : <Table
+                def={game}
+                seats={session ? session.seats.length : seats}
+                plan={session ? session.seats : (plan ?? undefined)}
+                practice={practice}
+                client={session?.client}
+                mySeat={session?.seat}
+              />}
         </ErrorBoundary>
         {helpFor && <GameHelp def={helpFor} onClose={() => setHelpFor(null)} />}
       </div>
@@ -99,6 +134,7 @@ export function PlayView() {
           setGame(def);
         }}
         onSetup={(def) => { recordPlay(def.meta.id); setSetupFor(def); }}
+        onOnline={hostUp ? (def) => { recordPlay(def.meta.id); setOnlineFor(def); } : undefined}
       />
     </div>
   );

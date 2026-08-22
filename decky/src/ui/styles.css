@@ -3979,3 +3979,58 @@ header h1 {
   border: 1px solid var(--gold, #d6af5c); color: var(--gold, #d6af5c);
   font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase;
 }
+
+/* ============================================================================
+   PLAYING WITH PEOPLE
+   The way in to the host that has existed since phase 3 and had no door.
+   Three ways to reach a table, an invite code big enough to read out loud,
+   and an honest empty state when no host is running.
+   ========================================================================= */
+
+.online-setup .panel { padding: 20px; }
+
+.online-choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+.online-card {
+  display: flex; flex-direction: column; gap: 10px; align-items: flex-start;
+  padding: 16px; border-radius: var(--r-md);
+  border: 1px solid var(--panel-brd); background: var(--panel);
+}
+.online-card h4 { margin: 0; font-family: var(--display); font-size: 16px; }
+.online-card p { margin: 0; font-size: 12px; }
+.online-card .primary { margin-block-start: auto; }
+.online-card .field { inline-size: 100%; }
+
+/* The code gets read down a phone line, so it is spaced like a code and not like a word. */
+.invite-code { display: flex; gap: 8px; margin: 12px 0; }
+.invite-code span {
+  inline-size: 46px; block-size: 58px;
+  display: grid; place-items: center;
+  font-family: var(--mono); font-size: 27px; font-weight: 700;
+  color: var(--gold, #d6af5c);
+  border: 1px solid var(--panel-brd); border-radius: var(--r-md);
+  background: var(--panel-hi);
+}
+.invite-actions { display: flex; gap: 8px; }
+.online-wait { display: flex; flex-direction: column; align-items: flex-start; }
+.online-wait p { margin: 10px 0 0; font-size: 12px; }
+
+.code-input {
+  font-family: var(--mono); font-size: 20px; letter-spacing: 0.22em;
+  text-transform: uppercase; text-align: center; inline-size: 100%;
+}
+
+.online-none { text-align: center; padding: 30px 16px; }
+.online-none .on-mark { font-size: 34px; margin: 0 0 6px; opacity: 0.5; }
+.online-none h3 { margin: 0 0 8px; font-family: var(--display); }
+.online-none p { margin: 0 auto; max-inline-size: 46ch; font-size: 13px; }
+
+.online-error { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+.online-error p { margin: 0; font-size: 13px; }
+
+/* The code stays visible at the table, so a latecomer can still be let in. */
+.table-code {
+  padding: 3px 10px; border-radius: var(--r-pill);
+  border: 1px solid var(--panel-brd); background: var(--panel-hi);
+  font-size: 11px; letter-spacing: 0.05em; color: var(--muted);
+}
+.table-code b { font-family: var(--mono); color: var(--gold, #d6af5c); letter-spacing: 0.12em; }

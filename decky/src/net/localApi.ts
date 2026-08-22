@@ -63,6 +63,15 @@ export class LocalApi implements MatchApi {
   async declineTakeback(matchId: string): Promise<void> {
     expectKind(this.send({ kind: 'declineTakeback', matchId }), 'ack');
   }
+  async hint(matchId: string, seat: string): Promise<Move | null> {
+    return expectKind(this.send({ kind: 'hint', matchId, seat }), 'hint').move;
+  }
+  async pendingTakeback(matchId: string): Promise<TakebackRequest | null> {
+    return expectKind(this.send({ kind: 'pendingTakeback', matchId }), 'takeback').pending;
+  }
+  async quickUndo(matchId: string, seat: string) {
+    return expectKind(this.send({ kind: 'quickUndo', matchId, seat }), 'submit').result;
+  }
 
   subscribe(matchId: string, listener: (e: TableEvent) => void): () => void {
     const set = this.listeners.get(matchId) ?? new Set();

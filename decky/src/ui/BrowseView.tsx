@@ -36,9 +36,11 @@ const SORTS: { key: SortKey; label: string }[] = [
   { key: 'name', label: 'A–Z' },
 ];
 
-export function BrowseView({ onPlay, onSetup, onRemix }: {
+export function BrowseView({ onPlay, onSetup, onOnline, onRemix }: {
   onPlay: (def: GameDefinition) => void;
   onSetup: (def: GameDefinition) => void;
+  /** Play this one with other people. Absent when no host is running. */
+  onOnline?: (def: GameDefinition) => void;
   onRemix?: (game: PublishedGame) => void;
 }) {
   const { settings } = useSettings();
@@ -77,6 +79,7 @@ export function BrowseView({ onPlay, onSetup, onRemix }: {
           onBack={() => setDetail(null)}
           onPlay={() => { onPlay(game.definition); }}
           onSetup={() => { onSetup(game.definition); }}
+          onOnline={onOnline ? () => { onOnline(game.definition); } : undefined}
           onChanged={refresh}
           onProfile={(a) => { setDetail(null); setProfile(a); }}
           onRemix={onRemix}
@@ -382,12 +385,13 @@ function Meta({ game }: { game: PublishedGame }) {
 
 // ---------- detail ----------
 
-function GameDetail({ game, me, onBack, onPlay, onSetup, onChanged, onProfile, onRemix }: {
+function GameDetail({ game, me, onBack, onPlay, onSetup, onOnline, onChanged, onProfile, onRemix }: {
   game: PublishedGame;
   me: string;
   onBack: () => void;
   onPlay: () => void;
   onSetup: () => void;
+  onOnline?: () => void;
   onChanged: () => void;
   onProfile: (author: string) => void;
   onRemix?: (g: PublishedGame) => void;
@@ -447,6 +451,9 @@ function GameDetail({ game, me, onBack, onPlay, onSetup, onChanged, onProfile, o
           <div className="gd-actions">
             <button className="primary" onClick={onPlay}>Play solo</button>
             {!game.definition.solitaire && <button className="ghost" onClick={onSetup}>Set up a table</button>}
+            {!game.definition.solitaire && onOnline && (
+              <button className="ghost" onClick={onOnline}>Play with people</button>
+            )}
             {onRemix && (
               <button className="ghost" onClick={() => { const f = fork(game.id, me); onChanged(); if (f) onRemix(f); }}>
                 Remix it

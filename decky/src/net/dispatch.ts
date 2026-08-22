@@ -33,6 +33,11 @@ export function handle(service: MatchService, req: Request): Response {
         return { ok: true, kind: 'takeback', pending: r.pending, applied: r.applied };
       }
       case 'declineTakeback': service.declineTakeback(req.matchId); return { ok: true, kind: 'ack' };
+      case 'hint': return { ok: true, kind: 'hint', move: service.hint(req.matchId, req.seat) };
+      case 'pendingTakeback':
+        return { ok: true, kind: 'takeback', pending: service.pendingTakeback(req.matchId) };
+      case 'quickUndo':
+        return { ok: true, kind: 'submit', result: service.quickUndo(req.matchId, req.seat) };
       default: return { ok: false, error: 'Unknown request.' };
     }
   } catch (e) {
@@ -46,7 +51,7 @@ export function handle(service: MatchService, req: Request): Response {
 /** Which requests change the table, and therefore need pushing to everyone watching. */
 export function mutates(req: Request): boolean {
   return req.kind === 'submit' || req.kind === 'botStep' || req.kind === 'nextHand'
-    || req.kind === 'agreeTakeback' || req.kind === 'setSeat';
+    || req.kind === 'agreeTakeback' || req.kind === 'setSeat' || req.kind === 'quickUndo';
 }
 
 export function eventFor(service: MatchService, req: Request): TableEvent {

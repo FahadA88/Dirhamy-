@@ -13,6 +13,7 @@ import { speak, stopSpeaking, spokenCard } from './speech';
 import { useTurnAlert } from './useTurnAlert';
 import { useDismissable } from './useEscape';
 import { service, rememberSession, forgetSession, resumableSession } from '../server/local';
+import { Board, LocalTableClient, TableClient } from '../net/tableClient';
 import { Seat, MoveRecord } from '../server/matchService';
 import { recordResult } from '../social/records';
 
@@ -53,11 +54,22 @@ function highlightOf(view: RedactedState, me: string): { key: string; label: str
   return null;
 }
 
-export function Table({ def, seats = 3, plan, practice = false }: {
+export function Table({ def, seats = 3, plan, practice = false, client: injected, mySeat }: {
   def: GameDefinition;
   seats?: number;
   /** Who is sitting where. Omitted means the classic single human against bots. */
   plan?: Seat[];
+  /**
+   * The referee. Omitted means the one in this tab, which is the ordinary case. An online table
+   * passes a client whose referee is across a socket — the table cannot tell the difference,
+   * which is the whole point of the boundary.
+   */
+  client?: TableClient;
+  /**
+   * Which seat is this browser. Only meaningful online, where every seat is 'remote' and the
+   * table cannot work out which one is yours by looking.
+   */
+  mySeat?: string;
   /**
    * A game for trying things out. Nothing is recorded, the undo window never closes, and a
    * hint is always on offer — so somebody can learn a game without it counting against them.
@@ -73,15 +85,19 @@ export function Table({ def, seats = 3, plan, practice = false }: {
   // pass-and-play it follows whoever is owed a move, behind a hand-off screen so the next
   // player doesn't see the last one's cards.
   const localSeats = useMemo(
-    () => (plan ? plan.filter((s) => s.kind === 'local').map((s) => s.id) : [HUMAN]),
-    [plan],
+    // Online, exactly one seat belongs to this browser and it is named rather than inferred.
+    () => (mySeat ? [mySeat] : plan ? plan.filter((s) => s.kind === 'local').map((s) => s.id) : [HUMAN]),
+    [plan, mySeat],
   );
   const [me, setMe] = useState(localSeats[0] ?? HUMAN);
   const [handoff, setHandoff] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState(false);
   const [hint, setHint] = useState<string | null>(null);
   const [history, setHistory] = useState<MoveRecord[]>([]);
-  const [board, setBoard] = useState<Board>(() => boot(def, players, localSeats[0] ?? HUMAN, false));
+  // The referee, and the last position it gave us. A local table makes its own client; an
+  // online one is handed one already connected to the table it joined.
+  const clientRef = useRef<TableClient>(injected ?? bootLocal(def, players, false));
+  const [board, setBoard] = useState<Board>(() => clientRef.current.read(localSeats[0] ?? HUMAN));
   // One toast, two tones: a refusal is a red ✕, a status note is not.
   const [toast, setToast] = useState<{ text: string; tone: 'bad' | 'info' } | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
@@ -113,9 +129,12 @@ export function Table({ def, seats = 3, plan, practice = false }: {
     setSelected(null);
     setAskRank(null);
     setToast(null);
-    // Don't leave the abandoned match sitting in the store.
-    if (fresh) { try { service.end(matchId); } catch { /* already gone */ } }
-    setBoard(boot(def, players, localSeats[0] ?? HUMAN, fresh));
+    // Don't leave the abandoned match sitting in the store. An online table is never re-dealt
+    // from this side — the host owns it — so this only ever replaces a local one.
+    if (clientRef.current.remote) return;
+    if (fresh) clientRef.current.end();
+    clientRef.current = bootLocal(def, players, fresh);
+    setBoard(clientRef.current.read(localSeats[0] ?? HUMAN));
     setMe(localSeats[0] ?? HUMAN);
   }
 
@@ -198,11 +217,13 @@ export function Table({ def, seats = 3, plan, practice = false }: {
   // one per tick cascades through all of them.
   useEffect(() => {
     if (view.phase !== 'playing') return;
-    const waiting = service.pending(matchId).some((p) => !localSeats.includes(p));
+    // Online, the host runs the bots. A guest stepping them would be a second referee.
+    if (clientRef.current.remote) return;
+    const waiting = clientRef.current.pending().some((p) => !localSeats.includes(p));
     if (!waiting) return;
     const timer = setTimeout(() => {
-      const r = service.botStep(matchId, localSeats, settings.botDiff);
-      if (r.moved) setBoard(read(matchId, me));
+      const r = clientRef.current.botStep(localSeats, settings.botDiff);
+      if (r.moved) setBoard(clientRef.current.read(me));
     }, BOT_SPEED_MS[settings.botSpeed]);
     return () => clearTimeout(timer);
   }, [board, matchId, me, localSeats, view.phase, settings.botSpeed, settings.botDiff]);
@@ -211,7 +232,7 @@ export function Table({ def, seats = 3, plan, practice = false }: {
   // rather than swapping the cards under the person still looking at them.
   useEffect(() => {
     if (!passAndPlay || view.phase !== 'playing' || handoff) return;
-    const waiting = service.pending(matchId).filter((p) => localSeats.includes(p));
+    const waiting = clientRef.current.pending().filter((p) => localSeats.includes(p));
     if (waiting.length === 0 || waiting.includes(me)) return;
     setHandoff(waiting[0]);
   }, [board, passAndPlay, view.phase, handoff, matchId, me, localSeats]);
@@ -221,32 +242,32 @@ export function Table({ def, seats = 3, plan, practice = false }: {
     setSelected(null);
     setAskRank(null);
     setMe(seat);
-    setBoard(read(matchId, seat));
+    setBoard(clientRef.current.read(seat));
   }
 
   // A beginner hint asks the service what it would do. It is the same advisor the bots use, so
   // it can only suggest something this player is actually allowed to play.
   function showHint() {
-    const m = service.hint(matchId, me);
+    const m = clientRef.current.hint(me);
     if (!m) { setToast({ text: 'No legal move to suggest right now.', tone: 'info' }); return; }
     setHint(m.cardId ?? m.cards?.[0] ?? null);
     setToast({ text: m.cardId || m.cards?.length ? 'Try the glowing card.' : `Try "${m.actionId}".`, tone: 'info' });
   }
 
   function openHistory() {
-    setHistory(service.history(matchId));
+    setHistory(clientRef.current.history());
     setShowHistory(true);
   }
 
   function askTakeback() {
-    const req = service.requestTakeback(matchId, me);
-    setBoard(read(matchId, me));
+    const req = clientRef.current.requestTakeback(me);
+    setBoard(clientRef.current.read(me));
     setToast(req
       ? { text: `Asked the table to take that back — waiting on ${req.needed.length}.`, tone: 'info' }
       : { text: 'Move taken back.', tone: 'info' });
   }
 
-  const takeback = view.phase === 'playing' ? service.pendingTakeback(matchId) : null;
+  const takeback = view.phase === 'playing' ? clientRef.current.pendingTakeback() : null;
   const nameOfSeat = (id: string) => plan?.find((s) => s.id === id)?.name ?? id;
 
   useEffect(() => { setHint(null); }, [board]);
@@ -269,7 +290,7 @@ export function Table({ def, seats = 3, plan, practice = false }: {
   }, [undoable, practice, settings.undoGraceMs]);
 
   function quickUndo() {
-    const res = service.quickUndo(matchId, me);
+    const res = clientRef.current.quickUndo(me);
     setUndoable(false);
     if (!res.ok) { setToast({ text: res.reason ?? 'Nothing to take back.', tone: 'bad' }); return; }
     playSound('ui', settings.sound);
@@ -277,7 +298,7 @@ export function Table({ def, seats = 3, plan, practice = false }: {
     setAskRank(null);
     setBluffSelected([]);
     setBluffRank(null);
-    setBoard(read(matchId, me));
+    setBoard(clientRef.current.read(me));
     setToast({ text: 'Taken back.', tone: 'info' });
   }
 
@@ -296,10 +317,10 @@ export function Table({ def, seats = 3, plan, practice = false }: {
         if (n === null) return null;
         if (n > 1) return n - 1;
         // Out of time: take the advisor's move, or the first legal one.
-        const m = service.hint(matchId, me) ?? board.legal[0];
+        const m = clientRef.current.hint(me) ?? board.legal[0];
         if (m) {
-          service.submit(matchId, me, m);
-          setBoard(read(matchId, me));
+          clientRef.current.submit(me, m);
+          setBoard(clientRef.current.read(me));
           setToast({ text: 'Out of time — a move was played for you.', tone: 'info' });
         }
         return null;
@@ -323,6 +344,28 @@ export function Table({ def, seats = 3, plan, practice = false }: {
 
   // Mark the tab when somebody is waiting on you and looking somewhere else.
   useTurnAlert(view.phase === 'playing' && !!view.isYourTurn);
+
+  // An online table changes because somebody else moved, not because we did. The client tells
+  // us the cached position moved; we re-read it for our own seat and render.
+  useEffect(() => {
+    const c = clientRef.current;
+    return c.onChange(() => {
+      setBoard(c.read(me));
+      // A refusal from a networked referee lands after we have already told the player their
+      // move went through. Surface it when it arrives rather than letting it disappear.
+      const late = (c as { lastRefusal?: string | null }).lastRefusal;
+      if (late) {
+        setToast({ text: late, tone: 'bad' });
+        (c as { lastRefusal?: string | null }).lastRefusal = null;
+      }
+    });
+  }, [me]);
+
+  // Closing the tab on an online table should hang up, not leave a socket open.
+  useEffect(() => {
+    const c = clientRef.current;
+    return () => { if (c.remote) c.end(); };
+  }, []);
 
 
   // ---------- playing without a mouse ----------
@@ -386,15 +429,15 @@ export function Table({ def, seats = 3, plan, practice = false }: {
   function playNextHand() {
     // Guarded because the button can be hit twice before the modal unmounts; the second call
     // finds the hand already dealt and would otherwise throw out of an event handler.
-    try { service.nextHand(matchId); } catch { /* already dealt */ }
-    setBoard(read(matchId, me));
+    try { clientRef.current.nextHand(); } catch { /* already dealt */ }
+    setBoard(clientRef.current.read(me));
     setSelected(null);
     setAskRank(null);
     setToast(null);
   }
 
   function submit(move: Move) {
-    const res = service.submit(matchId, me, move);
+    const res = clientRef.current.submit(me, move);
     if (!res.ok) {
       // The rules said no. Say why, instead of letting the tap disappear.
       setToast({ text: res.reason ?? 'That move is not legal here.', tone: 'bad' });
@@ -414,7 +457,7 @@ export function Table({ def, seats = 3, plan, practice = false }: {
     setBluffSelected([]);
     setBluffRank(null);
     setUndoable(true);
-    setBoard(read(matchId, me));
+    setBoard(clientRef.current.read(me));
   }
 
   // Bluff: clicking a card either starts a new group or, if it matches the real rank already
@@ -992,8 +1035,8 @@ export function Table({ def, seats = 3, plan, practice = false }: {
         <div className="takeback-bar" role="alert">
           <span>{nameOfSeat(takeback.by)} wants to take their last move back.</span>
           <div className="tb-actions">
-            <button className="ghost sm" onClick={() => { service.declineTakeback(matchId); setBoard(read(matchId, me)); }}>No</button>
-            <button className="primary sm" onClick={() => { service.agreeTakeback(matchId, me); setBoard(read(matchId, me)); }}>
+            <button className="ghost sm" onClick={() => { clientRef.current.declineTakeback(); setBoard(clientRef.current.read(me)); }}>No</button>
+            <button className="primary sm" onClick={() => { clientRef.current.agreeTakeback(me); setBoard(clientRef.current.read(me)); }}>
               Allow it ({takeback.agreed.length}/{takeback.needed.length})
             </button>
           </div>
@@ -1047,29 +1090,24 @@ export function Table({ def, seats = 3, plan, practice = false }: {
   );
 }
 
-// Everything the component knows about the match: an id, the board as this player may see it,
-// and what the service says this player may do. Nothing hidden, nothing authoritative.
-interface Board {
-  matchId: string;
-  view: RedactedState;
-  legal: Move[];
-}
-
-function read(matchId: string, me: string): Board {
-  const view = service.view(matchId, me);
-  return { matchId, view, legal: view.isYourTurn ? service.legal(matchId, me) : [] };
-}
-
-function boot(def: GameDefinition, players: string[] | Seat[], me: string, fresh: boolean): Board {
+/**
+ * Start (or pick up) a table refereed in this tab. Resuming is tried first so closing a tab
+ * mid-game is not the same as abandoning it.
+ */
+function bootLocal(def: GameDefinition, players: string[] | Seat[], fresh: boolean): TableClient {
   if (!fresh) {
     const resume = resumableSession();
     if (resume && resume.gameId === def.meta.id && resume.seats === players.length) {
-      try { return read(resume.matchId, me); } catch { /* record went away; deal a new one */ }
+      // Only accept the saved pointer if the match record is really still there.
+      try {
+        service.summaryOf(resume.matchId);
+        return new LocalTableClient(resume.matchId, service);
+      } catch { /* record went away; deal a new one */ }
     }
   }
   const m = service.create(def, def.meta.id, players);
   rememberSession(m.matchId, def.meta.id, players.length);
-  return read(m.matchId, me);
+  return new LocalTableClient(m.matchId, service);
 }
 
 function sortHand(hand: Card[], def: GameDefinition, mode: 'off' | 'rank' | 'suit'): Card[] {
