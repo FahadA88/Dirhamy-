@@ -21,6 +21,7 @@ const ok = (label, cond, extra) => {
 await p.goto(base, { waitUntil: 'networkidle' });
 await p.evaluate(() => {
   localStorage.clear();
+    localStorage.setItem('decky.seenintro.v1', '1');
   // Bots at full speed, so a 14-tick playtest actually reaches the player several times.
   localStorage.setItem('decky.settings.v1', JSON.stringify({ botSpeed: 'instant' }));
 });

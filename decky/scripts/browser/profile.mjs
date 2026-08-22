@@ -10,7 +10,7 @@ const ok = (l, c) => { console.log(`  ${c ? 'PASS' : 'FAIL'}  ${l}`); if (!c) fa
 
 // A fresh device has no record at all — that path has to hold up on its own.
 await p.goto(base, { waitUntil: 'networkidle' });
-await p.evaluate(() => { localStorage.clear(); localStorage.setItem('decky.settings.v1', JSON.stringify({ botSpeed: 'instant' })); });
+await p.evaluate(() => { localStorage.clear(); localStorage.setItem('decky.seenintro.v1', '1'); localStorage.setItem('decky.settings.v1', JSON.stringify({ botSpeed: 'instant' })); });
 await p.goto(base, { waitUntil: 'networkidle' });
 
 console.log('\nAn empty record');

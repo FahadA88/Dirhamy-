@@ -23,7 +23,7 @@ await p.goto(base, { waitUntil: 'networkidle' });
 // 'instant' bot speed (40ms) races the human for interrupt windows (bluff challenges, slaps) —
 // bots often grab the button out from under Playwright between its stability check and the click.
 // Use 'normal' so there's a real window to act, same as a human would get.
-await p.evaluate(() => { localStorage.clear(); localStorage.setItem('decky.settings.v1', JSON.stringify({ botSpeed: 'normal', motion: 'reduced' })); });
+await p.evaluate(() => { localStorage.clear(); localStorage.setItem('decky.seenintro.v1', '1'); localStorage.setItem('decky.settings.v1', JSON.stringify({ botSpeed: 'normal', motion: 'reduced' })); });
 
 // Interrupt windows (challenge/slap) can vanish between locating and clicking, since a bot may
 // win the race first. Treat that as fine, not a failure — it's the documented "first move wins" design.

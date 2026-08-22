@@ -13,7 +13,7 @@ let failed = false;
 const ok = (l, c, x) => { console.log(`  ${c ? 'PASS' : 'FAIL'}  ${l}${c ? '' : '  ' + (x ?? '')}`); if (!c) failed = true; };
 
 await p.goto(base, { waitUntil: 'networkidle' });
-await p.evaluate(() => localStorage.clear());
+await p.evaluate(() => { localStorage.clear(); localStorage.setItem('decky.seenintro.v1', '1'); });
 await p.goto(base, { waitUntil: 'networkidle' });
 
 console.log('\nThe front page is curated, not a dump');

@@ -17,6 +17,10 @@ const ok = (l, c) => { console.log(`  ${c ? 'PASS' : 'FAIL'}  ${l}`); if (!c) fa
 
 console.log('\nThe app declares itself installable');
 await p.goto(base, { waitUntil: 'networkidle' });
+// A fresh context is a first-time visitor, and a first-time visitor gets the introduction over
+// the shelf. This suite is about installing and playing offline, so it starts past it.
+await p.evaluate(() => localStorage.setItem('decky.seenintro.v1', '1'));
+await p.reload({ waitUntil: 'networkidle' });
 ok('a manifest is linked', (await p.locator('link[rel="manifest"]').count()) === 1);
 ok('a theme colour is set', (await p.locator('meta[name="theme-color"]').count()) === 1);
 ok('an icon is linked', (await p.locator('link[rel="icon"]').count()) === 1);

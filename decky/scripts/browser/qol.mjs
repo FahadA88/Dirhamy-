@@ -9,7 +9,7 @@ let failed = false;
 const ok = (l, c) => { console.log(`  ${c ? 'PASS' : 'FAIL'}  ${l}`); if (!c) failed = true; };
 
 await p.goto(base, { waitUntil: 'networkidle' });
-await p.evaluate(() => { localStorage.clear(); localStorage.setItem('decky.settings.v1', JSON.stringify({ botSpeed:'instant', undoGraceMs:10000, turnSeconds:0 })); });
+await p.evaluate(() => { localStorage.clear(); localStorage.setItem('decky.seenintro.v1', '1'); localStorage.setItem('decky.settings.v1', JSON.stringify({ botSpeed:'instant', undoGraceMs:10000, turnSeconds:0 })); });
 await p.goto(base, { waitUntil: 'networkidle' });
 await p.locator('.searchbox').fill('Crazy Eights'); await p.waitForTimeout(350);
 await p.locator('.shelf-grid .shelfcard').filter({ has: p.locator('.sc-main h3', { hasText: /^Crazy Eights$/ }) }).first().locator('.sc-play').click({ force:true });

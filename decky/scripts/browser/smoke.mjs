@@ -17,13 +17,20 @@ await page.goto(base, { waitUntil: 'networkidle' });
 await page.evaluate(() => {
   const raw = JSON.parse(localStorage.getItem('decky.settings.v1') || '{}');
   localStorage.setItem('decky.settings.v1', JSON.stringify({ ...raw, botSpeed: 'instant' }));
+  // A fresh profile meets the introduction, which sits over the shelf. This suite is about the
+  // games, so it starts as a returning player would.
+  localStorage.setItem('decky.seenintro.v1', '1');
 });
 await page.reload({ waitUntil: 'networkidle' });
 
 // The front page shows curated shelves; "Browse all" is the full grid.
 await page.locator('.chip', { hasText: 'Browse all' }).click();
 await page.waitForSelector('.shelf-grid');
-const names = await page.$$eval('.shelf-grid .sc-main h3', (els) => els.map((e) => e.textContent.trim()));
+let names = await page.$$eval('.shelf-grid .sc-main h3', (els) => els.map((e) => e.textContent.trim()));
+// `only=A,B` runs just those games. The whole shelf takes several minutes now, and being able
+// to re-check the two you just changed is worth one line.
+const only = (process.argv.find((a) => a.startsWith('only=')) ?? '').slice(5);
+if (only) names = names.filter((n) => only.split(',').includes(n));
 const report = [];
 for (const name of names) {
   errors.length = 0;

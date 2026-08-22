@@ -21,6 +21,7 @@ async function page(name) {
   await p.goto(base, { waitUntil: 'networkidle' });
   await p.evaluate((n) => {
     localStorage.clear();
+    localStorage.setItem('decky.seenintro.v1', '1');
     localStorage.setItem('decky.settings.v1', JSON.stringify({ botSpeed: 'instant', playerName: n }));
   }, name);
   await p.goto(base, { waitUntil: 'networkidle' });
