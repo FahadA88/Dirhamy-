@@ -885,40 +885,46 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
                 🤨 Call bluff!
               </button>
             )}
-            {myLegal.some((m) => m.actionId === 'bluffClaim') && (
-              <>
+            {/* Your own cards stay visible even off your claim turn — you still need them to
+                decide whether to call the current claim. */}
+            {hand.length > 0 && (() => {
+              const myClaimTurn = myLegal.some((m) => m.actionId === 'bluffClaim');
+              return (
                 <div
                   className={`hand hl-${settings.highlight}`}
                   role="group"
                   aria-label={`Your hand, ${hand.length} card${hand.length === 1 ? '' : 's'}`}
-                  onKeyDown={(e) => handKeys(e, hand.map((c) => c.id), toggleBluffCard)}
+                  onKeyDown={myClaimTurn ? (e) => handKeys(e, hand.map((c) => c.id), toggleBluffCard) : undefined}
                 >
                   {hand.map((c, i) => (
                     <button key={c.id}
                       data-cardkey={c.id}
-                      tabIndex={(cursor === null ? i === 0 : i === Math.min(cursor, hand.length - 1)) ? 0 : -1}
-                      aria-pressed={bluffSelected.includes(c.id)}
-                      aria-label={cardLabel(c, true, bluffSelected.includes(c.id) ? 'staged face down' : undefined)}
-                      className={`card-btn ${bluffSelected.includes(c.id) ? 'selected' : 'playable'}`}
-                      onFocus={() => setCursor(i)}
-                      onClick={() => toggleBluffCard(c.id)}
-                      title={bluffSelected.includes(c.id) ? 'Take this one back out' : 'Stage this card face down'}>
+                      tabIndex={myClaimTurn ? ((cursor === null ? i === 0 : i === Math.min(cursor, hand.length - 1)) ? 0 : -1) : -1}
+                      aria-pressed={myClaimTurn ? bluffSelected.includes(c.id) : undefined}
+                      aria-label={cardLabel(c, myClaimTurn, myClaimTurn && bluffSelected.includes(c.id) ? 'staged face down' : undefined)}
+                      className={`card-btn ${!myClaimTurn ? 'dim' : bluffSelected.includes(c.id) ? 'selected' : 'playable'}`}
+                      disabled={!myClaimTurn}
+                      onFocus={myClaimTurn ? () => setCursor(i) : undefined}
+                      onClick={myClaimTurn ? () => toggleBluffCard(c.id) : undefined}
+                      title={!myClaimTurn ? undefined : bluffSelected.includes(c.id) ? 'Take this one back out' : 'Stage this card face down'}>
                       <CardFace card={c} />
                     </button>
                   ))}
                 </div>
-                <div className="bluff-rankpicker">
-                  <span className="muted">Tap up to four of the same card, then claim them as whatever you like:</span>
-                  <div className="seg wrap">
-                    {def.deck.rankOrder.map((r) => (
-                      <button key={r} className={bluffRank === r ? 'on' : ''} onClick={() => setBluffRank(r)}>{r}</button>
-                    ))}
-                  </div>
-                  <button className="primary sm" disabled={!bluffClaimMove} onClick={() => bluffClaimMove && submit(bluffClaimMove)}>
-                    Play {bluffSelected.length || ''} face down
-                  </button>
+              );
+            })()}
+            {myLegal.some((m) => m.actionId === 'bluffClaim') && (
+              <div className="bluff-rankpicker">
+                <span className="muted">Tap up to four of the same card, then claim them as whatever you like:</span>
+                <div className="seg wrap">
+                  {def.deck.rankOrder.map((r) => (
+                    <button key={r} className={bluffRank === r ? 'on' : ''} onClick={() => setBluffRank(r)}>{r}</button>
+                  ))}
                 </div>
-              </>
+                <button className="primary sm" disabled={!bluffClaimMove} onClick={() => bluffClaimMove && submit(bluffClaimMove)}>
+                  Play {bluffSelected.length || ''} face down
+                </button>
+              </div>
             )}
           </div>
         ) : isReflex ? (
@@ -1255,7 +1261,16 @@ function bootLocal(
 
 function sortHand(hand: Card[], def: GameDefinition, mode: 'off' | 'rank' | 'suit'): Card[] {
   if (mode === 'off') return hand;
-  const rankIdx = (r: string) => { const i = def.deck.rankOrder.indexOf(r as never); return i < 0 ? 99 : i; };
+  // Rank strength isn't always the deck's raw listing order: climbing games (President,
+  // Undertow) define their own low→high order, and trick games with aceHigh treat the ace as
+  // the top card rather than wherever it falls in the deck listing.
+  const order = def.climb?.order ?? def.deck.rankOrder;
+  const aceHigh = !!def.trick?.aceHigh;
+  const rankIdx = (r: string) => {
+    if (aceHigh && r === 'A') return 1000;
+    const i = order.indexOf(r as never);
+    return i < 0 ? 99 : i;
+  };
   const copy = hand.slice();
   if (mode === 'rank') copy.sort((a, b) => rankIdx(a.rank) - rankIdx(b.rank) || SUIT_ORDER[a.suit] - SUIT_ORDER[b.suit]);
   else copy.sort((a, b) => SUIT_ORDER[a.suit] - SUIT_ORDER[b.suit] || rankIdx(a.rank) - rankIdx(b.rank));
