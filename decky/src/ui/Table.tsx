@@ -1018,8 +1018,15 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
                     <button key={r} className={bluffRank === r ? 'on' : ''} onClick={() => setBluffRank(r)}>{r}</button>
                   ))}
                 </div>
-                <button className="primary sm" disabled={!bluffClaimMove} onClick={() => bluffClaimMove && submit(bluffClaimMove)}>
-                  Play {bluffSelected.length || ''} face down
+                {/* A disabled button that says "Play 2 face down" tells you nothing about why
+                    it will not, and a claim needs both halves: cards from your hand, and the
+                    rank you are claiming they are. It says which half is missing. */}
+                <button className="primary bluff-go" disabled={!bluffClaimMove}
+                  onClick={() => bluffClaimMove && submit(bluffClaimMove)}>
+                  {bluffSelected.length === 0 ? 'Pick cards to play'
+                    : !bluffRank ? 'Now claim a rank'
+                    : bluffClaimMove ? `Play ${bluffSelected.length} as ${bluffRank}${bluffSelected.length === 1 ? '' : 's'}`
+                    : `You cannot claim ${bluffSelected.length} as ${bluffRank}s`}
                 </button>
               </div>
             )}

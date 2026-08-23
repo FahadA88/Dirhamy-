@@ -4510,3 +4510,37 @@ header h1 {
 
 /* The shelves each had a line written for them that was never shown. */
 .shelf-blurb { margin: 0; color: var(--muted); font-size: 13px; }
+
+/* A hand that always fits the table.
+   The overlap used to be a flat -30% of a card, which is right for the five to thirteen cards
+   most games deal and badly wrong beyond it: Bluff hands out seventeen at three players, and
+   the row ran past both edges of the felt and under the seats on either side. The advance per
+   card is now whichever is smaller — the natural overlap, or the share of the row each card
+   can have — so a small hand looks exactly as it did and a large one closes up instead of
+   escaping. The percentage resolves against the row, so this follows the table as it resizes. */
+@media (min-width: 900px) {
+  .hand .card-btn {
+    margin-left: calc(
+      min(var(--cw) * 0.70, (100% - var(--cw)) / max(var(--n) - 1, 1)) - var(--cw)
+    );
+  }
+  .hand .card-btn:first-child { margin-left: 0; }
+}
+
+/* The claim button is the whole point of a Bluff turn, so it reads as one even before it can
+   be pressed — dark-on-dark and disabled, it looked like decoration on the felt. */
+.bluff-go {
+  width: 100%; margin-top: 4px; padding: 11px 16px; font-size: 15px; font-weight: 700;
+}
+/* Matches `button.primary:disabled` above for specificity, or that rule's 0.4 opacity and
+   panel background win on the tie and the label greys back into the cloth. */
+button.bluff-go:disabled {
+  opacity: 1;
+  /* Opaque enough to sit ON the cloth: at 7% white the felt's printed name showed straight
+     through the middle of the label. */
+  background: #171233;
+  color: var(--t-ink, #fff);
+  border: 1px dashed rgba(255, 255, 255, .3);
+  box-shadow: none;
+  cursor: default;
+}
