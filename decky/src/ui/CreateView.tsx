@@ -5,20 +5,7 @@ import {
 import { offlineTranslator, ProposedChange, Question, TranslateResult } from '../authoring/copilot';
 import { validate } from '../engine/validator';
 import { simulate, SimReport } from '../engine/simulator';
-import { crazyEights } from '../games/crazyEights';
-import { switchGame } from '../games/switch';
-import { spadesLite } from '../games/spades';
-import { president } from '../games/president';
-import { goFish } from '../games/goFish';
-import { rummy } from '../games/rummy';
-import { war } from '../games/war';
-import { hearts } from '../games/hearts';
-import { euchre } from '../games/euchre';
-import { ginRummy } from '../games/ginRummy';
-import { undertow } from '../games/undertow';
-import { klondike } from '../games/klondike';
-import { freecell } from '../games/freecell';
-import { spider } from '../games/spider';
+import { catalog } from '../games/catalog';
 import { GameDefinition, Rank, Suit } from '../engine/types';
 import { Table } from './Table';
 import { SolitaireTable } from './SolitaireTable';
@@ -160,7 +147,7 @@ export function CreateView({ onPlay }: { onPlay?: (def: GameDefinition) => void 
                 <span className="tc-name">{t.name}</span>
                 <span className="tc-tag">{t.tagline}</span>
                 <span className="tc-meta">{t.shape}</span>
-                <span className="tc-players">{t.players} players</span>
+                <span className="tc-players">{t.players} player{t.players === '1' ? '' : 's'}</span>
               </button>
             ))}
           </div>
@@ -169,20 +156,14 @@ export function CreateView({ onPlay }: { onPlay?: (def: GameDefinition) => void 
             <p className="muted">Opens the finished game in the editor, ready to be pulled apart.</p>
           </div>
           <div className="starters">
-            <button className="chip" onClick={() => startFromTemplate(knobsFromDefinition(crazyEights))}>Crazy Eights</button>
-            <button className="chip" onClick={() => startFromTemplate(knobsFromDefinition(switchGame))}>Switch</button>
-            <button className="chip" onClick={() => startFromTemplate(knobsFromDefinition(spadesLite))}>Spades</button>
-            <button className="chip" onClick={() => startFromTemplate(knobsFromDefinition(president))}>President</button>
-            <button className="chip" onClick={() => startFromTemplate(knobsFromDefinition(goFish))}>Go Fish</button>
-            <button className="chip" onClick={() => startFromTemplate(knobsFromDefinition(rummy))}>Rummy</button>
-            <button className="chip" onClick={() => startFromTemplate(knobsFromDefinition(war))}>War</button>
-            <button className="chip" onClick={() => startFromTemplate(knobsFromDefinition(hearts))}>Hearts</button>
-            <button className="chip" onClick={() => startFromTemplate(knobsFromDefinition(euchre))}>Euchre</button>
-            <button className="chip" onClick={() => startFromTemplate(knobsFromDefinition(ginRummy))}>Gin Rummy</button>
-            <button className="chip" onClick={() => startFromTemplate(knobsFromDefinition(undertow))}>Undertow</button>
-            <button className="chip" onClick={() => startFromTemplate(knobsFromDefinition(klondike))}>Solitaire</button>
-            <button className="chip" onClick={() => startFromTemplate(knobsFromDefinition(freecell))}>FreeCell</button>
-            <button className="chip" onClick={() => startFromTemplate(knobsFromDefinition(spider))}>Spider</button>
+            {/* Derived from the catalogue, not listed by hand: the hand-written list had
+                drifted to fourteen of the twenty-one games, so the newest ones could not be
+                opened in the editor at all. Every one of these round-trips through the knobs
+                and still validates. */}
+            {catalog.map((g) => (
+              <button key={g.meta.id} className="chip"
+                onClick={() => startFromTemplate(knobsFromDefinition(g))}>{g.meta.name}</button>
+            ))}
           </div>
         </div>
       )}

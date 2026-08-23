@@ -3146,7 +3146,7 @@ function applyPitMove(s: MatchState, playerId: string, move: Move): MatchState {
     if (!count || have < count || give === want) return s;
     const id = s.nextOfferId++;
     s.market.push({ id, player: playerId, give, count, want });
-    log(s, playerId, `${short(playerId)} offers ${count} ${suitWord(give)} for ${suitWord(want)}.`);
+    log(s, playerId, `${short(playerId)} offers ${suitCount(count, give)} for ${suitWord(want)}.`);
     return s;
   }
 
@@ -3169,7 +3169,7 @@ function applyPitMove(s: MatchState, playerId: string, move: Move): MatchState {
     s.zones[`hand:${playerId}`] = hand.filter((c) => !give.includes(c)).concat(get);
     s.zones[`hand:${offer.player}`] = theirHand.filter((c) => !get.includes(c)).concat(give);
     s.market = s.market.filter((o) => o.id !== offer.id);
-    log(s, playerId, `${short(playerId)} trades ${offer.count} ${suitWord(offer.want)} with ${short(offer.player)} for ${suitWord(offer.give)}.`);
+    log(s, playerId, `${short(playerId)} trades ${suitCount(offer.count, offer.want)} with ${short(offer.player)} for ${suitWord(offer.give)}.`);
     if (pitCheckWin(s)) return s;
     return s;
   }
@@ -3468,6 +3468,12 @@ function short(id: string): string {
 
 function suitWord(s: string): string {
   return { C: 'Clubs', D: 'Diamonds', H: 'Hearts', S: 'Spades' }[s] || s;
+}
+
+/** "1 Diamond", "3 Diamonds" — a suit name is plural, and a count of one has to agree. */
+function suitCount(n: number, s: string): string {
+  const plural = suitWord(s);
+  return `${n} ${n === 1 ? plural.replace(/s$/, '') : plural}`;
 }
 
 function suitName(s: string): string {
