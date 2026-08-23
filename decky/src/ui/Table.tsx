@@ -136,6 +136,12 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
     setSelected(null);
     setAskRank(null);
     setToast(null);
+    // Card ids are deterministic per rank+suit, so a fresh shuffle can easily redeal the same id
+    // into the same seat — leaving a stale staged/picked id here would make it render as already
+    // selected in a hand nobody has touched yet.
+    setBluffSelected([]);
+    setBluffRank(null);
+    setSetPicked([]);
     // Don't leave the abandoned match sitting in the store. An online table is never re-dealt
     // from this side — the host owns it — so this only ever replaces a local one.
     if (clientRef.current.remote) return;
@@ -739,9 +745,11 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
             </div>
           </div>
         </div>
-      ) : isSet ? (
-        /* Everything is on the board below. There is no draw pile and no discard, so drawing
-           two empty ones would be furniture for a game that does not have them. */
+      ) : isSet || isBluff || isReflex || isPoker || isPit ? (
+        /* Each of these has its own dedicated center-area UI rendered below (Bluff's center-pile
+           count, Reflex's slap pile, Poker's pot, Pit's market) — none has a real draw/discard
+           zone, so falling through to the generic piles here would just be furniture on top of
+           the real thing, or (Set) furniture for a game that has neither at all. */
         null
       ) : (
         <div className="center">
@@ -760,7 +768,7 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
         <div className="you-head">
           <span>{isSet
             ? 'The board'
-            : settings.playerName === 'You' ? 'Your hand' : `${settings.playerName}’s hand`}{view.mode === 'trick' && (view.tricksWon?.[me] ?? 0) > 0 ? ` · ${view.tricksWon?.[me]} won` : ''}{view.mode === 'trick' && view.bids?.[me] !== undefined ? ` · bid ${view.bids[HUMAN]}` : ''}{isFish ? ` · ${view.booksWon?.[me] ?? 0} books` : ''}{teamOf(me) ? ` · ${teamOf(me)}` : ''}</span>
+            : settings.playerName === 'You' ? 'Your hand' : `${settings.playerName}’s hand`}{view.mode === 'trick' && (view.tricksWon?.[me] ?? 0) > 0 ? ` · ${view.tricksWon?.[me]} won` : ''}{view.mode === 'trick' && view.bids?.[me] !== undefined ? ` · bid ${view.bids[me]}` : ''}{isFish ? ` · ${view.booksWon?.[me] ?? 0} books` : ''}{teamOf(me) ? ` · ${teamOf(me)}` : ''}</span>
           {view.needsPassChoice && (
             <span className="turn-badge">
               {view.passCount > 1
