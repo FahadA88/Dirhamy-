@@ -907,6 +907,7 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
                   {hand.map((c, i) => (
                     <button key={c.id}
                       data-cardkey={c.id}
+                      style={{ '--i': i, '--n': hand.length } as React.CSSProperties}
                       tabIndex={myClaimTurn ? ((cursor === null ? i === 0 : i === Math.min(cursor, hand.length - 1)) ? 0 : -1) : -1}
                       aria-pressed={myClaimTurn ? bluffSelected.includes(c.id) : undefined}
                       aria-label={cardLabel(c, myClaimTurn, myClaimTurn && bluffSelected.includes(c.id) ? 'staged face down' : undefined)}
@@ -961,8 +962,9 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
               )}
             </div>
             <div className="hand hl-off poker-hand" role="group" aria-label={`Your hand, ${hand.length} cards`}>
-              {hand.map((c) => (
-                <div key={c.id} className="card-btn dim static" role="img" aria-label={spokenCard(c.rank, c.suit)}>
+              {hand.map((c, i) => (
+                <div key={c.id} className="card-btn dim static" role="img" aria-label={spokenCard(c.rank, c.suit)}
+                  style={{ '--i': i, '--n': hand.length } as React.CSSProperties}>
                   <CardFace card={c} />
                 </div>
               ))}
@@ -1034,7 +1036,7 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
           aria-label={`Your hand, ${hand.length} card${hand.length === 1 ? '' : 's'}`}
           onKeyDown={(e) => handKeys(e, hand.filter((c) => playableCardIds.has(c.id)).map((c) => c.id), clickCard)}
         >
-          {hand.map((c) => {
+          {hand.map((c, i) => {
             const playable = playableCardIds.has(c.id);
             const staged = view.passStaged.includes(c.id);
             const playableIds = hand.filter((x) => playableCardIds.has(x.id)).map((x) => x.id);
@@ -1045,6 +1047,7 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
               <button
                 key={c.id}
                 data-cardkey={c.id}
+                style={{ '--i': i, '--n': hand.length } as React.CSSProperties}
                 tabIndex={playable ? (isCursor ? 0 : -1) : -1}
                 aria-label={cardLabel(c, playable, staged ? 'picked to pass' : undefined)}
                 className={`card-btn ${playable ? 'playable' : 'dim'} ${staged ? 'staged' : ''} ${hint === c.id ? 'hinted' : ''} ${(isFish ? c.rank === askRank : selected === c.id) ? 'selected' : ''}`}
