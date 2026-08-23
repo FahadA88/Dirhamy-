@@ -283,6 +283,10 @@ export function createMatch(
       log(state, null, `${short(players[sbIdx])} posts the small blind (${cfg.smallBlind}). ${short(players[bbIdx])} posts the big blind (${cfg.bigBlind}).`);
     }
   }
+  // Pit deals the whole deck out at once, so a player can already be holding a full corner the
+  // instant the cards land — pitCheckWin() is otherwise only ever called after a trade, which
+  // would let a deal-time win go undetected (and possibly traded away) before anyone ever offers.
+  if (def.pit) pitCheckWin(state);
   fireRules(state, 'handStart', { playerId: state.players[state.turnIndex] });
   return state;
 }
@@ -2646,7 +2650,10 @@ function warStrength(def: MatchState['definition'], rank: string): number {
 }
 
 function applyWarMove(s: MatchState, playerId: string, move: Move): MatchState {
-  if (move.actionId !== 'warFlip' || s.players[s.turnIndex] !== playerId) return s;
+  // Every other family's apply function checks phase itself rather than relying only on the
+  // caller — matchService does gate on phase before ever reaching here, but the engine is
+  // documented as the referee, not something that only stays correct because callers behave.
+  if (s.phase !== 'playing' || move.actionId !== 'warFlip' || s.players[s.turnIndex] !== playerId) return s;
   const [a, b] = s.players;
   const battleZone = s.definition.zones.find((z) => z.shared && z.visibility === 'all')!.id;
   const handA = s.zones[`hand:${a}`];
@@ -2920,7 +2927,22 @@ function reflexCheckEnd(s: MatchState): boolean {
     }
   }
   const remaining = reflexActive(s);
-  if (remaining.length > 1) return false;
+  if (remaining.length > 1) {
+    // A non-empty pile that nobody can flip toward and nobody can slap right now is a dead
+    // table — everyone still "active" ran out of cards without the pile ever being slapped
+    // empty, so `pileEmpty` above never fires and nothing else would ever end this hand.
+    if (reflexNextFlipper(s, s.turnIndex) === null && !reflexSlapValid(s)) {
+      s.phase = 'roundOver';
+      const winner = s.players.reduce((best, p) =>
+        (s.zones[`hand:${p}`] || []).length > (s.zones[`hand:${best}`] || []).length ? p : best, s.players[0]);
+      s.winner = winner;
+      for (const p of s.players) s.scores[p] = p === winner ? 1 : 0;
+      log(s, null, `Game over — nobody can flip or slap what's left. ${short(winner)} holds the most cards.`);
+      finalizeMatchProgress(s);
+      return true;
+    }
+    return false;
+  }
   s.phase = 'roundOver';
   const winner = remaining[0] ?? s.players.reduce((best, p) =>
     (s.zones[`hand:${p}`] || []).length > (s.zones[`hand:${best}`] || []).length ? p : best, s.players[0]);

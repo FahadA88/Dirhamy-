@@ -122,6 +122,10 @@ section('Pit — the market has no turn order (Pit)');
   s.zones['hand:B'] = [card('D1', '5', 'D'), card('D2', '6', 'D')];
   s.zones['hand:C'] = [card('H1', '7', 'H')];
   s.market = []; s.nextOfferId = 1;
+  // createMatch's own real deal (before we overwrite it above with this test's tiny hand-crafted
+  // one) can itself land a deal-time corner and end the match — that's the real deal-time win
+  // check working as intended, just incidental to what this test is actually exercising.
+  s.phase = 'playing'; s.winner = null;
 
   check('everyone is "acting" at once — there is no turn to wait for',
     actingPlayers(s).includes('A') && actingPlayers(s).includes('C'));
