@@ -25,6 +25,35 @@ import { recordResult } from '../social/records';
 
 const HUMAN = 'P1';
 const SUIT_ORDER: Record<string, number> = { S: 0, H: 1, C: 2, D: 3, JOKER: 4 };
+
+/**
+ * Where each opponent sits, given how many of them there are. You are always at the bottom
+ * of the screen, so the others fill the rest of the table the way people actually sit round
+ * one: the seat that plays after you on your left, then round the top, to your right. Listing
+ * the arrangements is clearer than deriving them, and there are only five.
+ */
+/**
+ * Third-person verbs the engine writes about a seat, and what they become once that seat is
+ * addressed as "you". Only the forms that actually appear in the log are listed; a verb that
+ * is not here is left exactly as written, so an unlisted one reads oddly rather than wrongly.
+ */
+const YOU_VERB: Record<string, string> = {
+  wins: 'win', takes: 'take', is: 'are', was: 'were', has: 'have', scores: 'score',
+  passes: 'pass', posts: 'post', plays: 'play', draws: 'draw', discards: 'discard',
+  deals: 'deal', bids: 'bid', asks: 'ask', withdraws: 'withdraw', trades: 'trade',
+  spots: 'spot', slaps: 'slap', sits: 'sit', reveals: 'reveal', picks: 'pick',
+  offers: 'offer', melds: 'meld', makes: 'make', leads: 'lead', lays: 'lay',
+  knocks: 'knock', holds: 'hold', goes: 'go', folds: 'fold', flips: 'flip',
+  corners: 'corner', completes: 'complete', checks: 'check', calls: 'call', fishes: 'fish',
+};
+
+const SEAT_RING: Record<number, string[]> = {
+  1: ['t'],
+  2: ['l', 'r'],
+  3: ['l', 't', 'r'],
+  4: ['l', 'tl', 'tr', 'r'],
+  5: ['l', 'tl', 't', 'tr', 'r'],
+};
 const SUIT_NAMES: Record<string, string> = { C: 'Clubs', D: 'Diamonds', H: 'Hearts', S: 'Spades' };
 const SHAPE_NAME: Record<number, string> = { 1: 'single', 2: 'pair', 3: 'triple', 4: 'four', 5: 'five' };
 
@@ -528,12 +557,51 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
     if (seat) return seat.id === me ? `${seat.name} (you)` : seat.name;
     return id === me ? settings.playerName : settings.botLabels ? `Bot ${id.slice(1)}` : id;
   };
+  /*
+    The engine writes its log with raw seat ids — "P4 played 9♣" — because naming players is
+    none of its business. The table is where names live, so it puts them back before anyone
+    reads the line; otherwise the log talks about P4 while the seat above it says Bot 4.
+    Only ids that are actually seats at this table are substituted.
+  */
+  const logName = (id: string) => {
+    if (id === me) return 'You';
+    const seat = plan?.find((s) => s.id === id);
+    return seat ? seat.name : settings.botLabels ? `Bot ${id.slice(1)}` : id;
+  };
+  const humanise = (text: string) => {
+    const named = text.replace(/\bP(\d+)\b/g, (m, n) =>
+      view.players.some((p) => p.id === `P${n}`) ? logName(`P${n}`) : m);
+    // The engine writes about a seat in the third person, so once P1 becomes "You" the verbs
+    // have to follow: "You wins the showdown and takes the pot" is not a sentence anybody
+    // would write. Done a sentence at a time, and only where you are the subject, so the
+    // second half of "You post the blind. Bot 2 posts the big blind." is left alone. Verbs
+    // are corrected where a subject can actually reach them — at the start, after "and",
+    // after a dash — rather than anywhere in the line, which would catch nouns too.
+    const perSentence = named
+      .split(/(?<=\.)\s+/)
+      .map((sentence) => (/^You\b/.test(sentence)
+        ? sentence.replace(/(^You\s+|\band\s+|—\s+)([a-z]+)/g,
+            (m, pre, v) => (YOU_VERB[v] ? `${pre}${YOU_VERB[v]}` : m))
+        : sentence))
+      .join(' ');
+    // And wherever "You" is the subject mid-sentence — "Round over — You goes out."
+    return perSentence.replace(/\bYou\s+([a-z]+)/g,
+      (m, v) => (YOU_VERB[v] ? `You ${YOU_VERB[v]}` : m));
+  };
   const teamOf = (id: string): string | null => {
     if (!view.teams) return null;
     const i = view.teams.findIndex((t) => t.includes(id));
     return i >= 0 ? `Team ${i === 0 ? 'A' : 'B'}` : null;
   };
   const backCls = `card back style-${settings.cardBack}`;
+  // The others, in the order they sit round the table from your left — not raw seat order,
+  // which would put the player after you in a different place depending on where you sit.
+  const opponents = useMemo(() => {
+    const all = view.players;
+    const mine = all.findIndex((p) => p.id === me);
+    if (mine < 0) return all.filter((p) => p.id !== me);
+    return [...all.slice(mine + 1), ...all.slice(0, mine)];
+  }, [view.players, me]);
 
   return (
     <div className="table-wrap">
@@ -551,28 +619,39 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
         onDone={() => setDealing(false)}
       />}
       <div className="felt-content">
-      {view.matchTarget != null && (
-        <ScorePad view={view} me={me} nameOf={nameOf}
-          lowWins={def.scoring.winner === 'lowestTotal'} />
-      )}
-      <div className="opponents">
-        {view.players.filter((p) => p.id !== me).map((p) => {
+      <div className={`opponents ring-${opponents.length}`}>
+        {opponents.map((p, i) => {
           const askable = isFish && view.isYourTurn && !!askRank && p.handCount > 0;
+          // How many backs to draw. A neat, readable fan beats a dozen slivers; the exact
+          // number is on the chip below, which is where anyone actually reads it.
+          const backs = Math.max(1, Math.min(p.handCount, 6));
           return (
             <div key={p.id}
-              className={`seat ${p.isTurn ? 'active' : ''} ${askable ? 'askable' : ''}`}
+              className={`seat at-${SEAT_RING[opponents.length]?.[i] ?? 't'} ${p.isTurn ? 'active' : ''} ${askable ? 'askable' : ''}`}
               onClick={() => { if (askable) submit({ actionId: 'ask', target: p.id, rank: askRank! }); }}>
-              <div className="seat-name">{nameOf(p.id)}{p.isTurn ? ' ⏳' : ''}</div>
-              <div className="fanned">
-                {Array.from({ length: Math.min(p.handCount, 12) }).map((_, i) => (<div key={i} className={backCls} />))}
+              <div className="seat-head">
+                <span className="seat-name">{nameOf(p.id)}</span>
+                {teamOf(p.id) && <span className="team-tag">{teamOf(p.id)}</span>}
               </div>
-              <div className="count">
-                {p.handCount}{view.mode === 'trick' && (view.tricksWon?.[p.id] ?? 0) > 0 ? ` · ${view.tricksWon?.[p.id]} won` : ''}
-                {view.mode === 'trick' && view.bids?.[p.id] !== undefined ? ` · bid ${view.bids[p.id]}` : ''}
-                {isFish ? ` · ${view.booksWon?.[p.id] ?? 0} books` : ''}
-                {view.mode === 'climb' && view.finished?.includes(p.id) ? ` · out #${view.finished.indexOf(p.id) + 1}` : ''}
+              <div className="fanned" aria-hidden="true">
+                {Array.from({ length: backs }).map((_, k) => (<div key={k} className={backCls} />))}
               </div>
-              {teamOf(p.id) && <div className="team-tag">{teamOf(p.id)}</div>}
+              <div className="seat-stats">
+                <span className="count-chip" title={`${p.handCount} cards in hand`}>
+                  {p.handCount === 0 ? 'out' : `${p.handCount}`}
+                </span>
+                {view.mode === 'trick' && view.bids?.[p.id] !== undefined && (
+                  <span className="stat">{view.tricksWon?.[p.id] ?? 0}/{view.bids[p.id]}<i>tricks</i></span>
+                )}
+                {view.mode === 'trick' && view.bids?.[p.id] === undefined && (view.tricksWon?.[p.id] ?? 0) > 0 && (
+                  <span className="stat">{view.tricksWon?.[p.id]}<i>won</i></span>
+                )}
+                {isFish && <span className="stat">{view.booksWon?.[p.id] ?? 0}<i>books</i></span>}
+                {view.mode === 'climb' && view.finished?.includes(p.id) && (
+                  <span className="stat">#{view.finished.indexOf(p.id) + 1}<i>out</i></span>
+                )}
+              </div>
+              {p.isTurn && <div className="seat-turn" aria-label="their turn" />}
               {askable && <div className="ask-hint">Ask for {askRank}s</div>}
             </div>
           );
@@ -682,10 +761,19 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
                 </div>
               ))
             : <div className="trick-empty">{view.isYourTurn ? 'Your lead' : '…'}</div>}
+          {/* Trump decides every trick, so it is a badge you can find at a glance rather
+              than a line of grey mono text under the cards. */}
           <div className="trick-meta">
-            Trump {view.trumpSuit && view.trumpSuit !== 'none' ? SUIT_SYMBOLS[view.trumpSuit] : '—'}
-            {view.lead ? ` · led ${SUIT_SYMBOLS[view.lead]}` : ''}
-            {view.maker ? ` · ${nameOf(view.maker)} called it${view.alone ? ' alone' : ''}` : ''}
+            <span className={`trump-badge ${view.trumpSuit && view.trumpSuit !== 'none' ? `suit-${view.trumpSuit}` : 'none'}`}>
+              <i>trump</i>
+              <b>{view.trumpSuit && view.trumpSuit !== 'none' ? SUIT_SYMBOLS[view.trumpSuit] : 'none'}</b>
+            </span>
+            {view.lead && (
+              <span className={`lead-badge suit-${view.lead}`}><i>led</i><b>{SUIT_SYMBOLS[view.lead]}</b></span>
+            )}
+            {view.maker && (
+              <span className="trick-note">{nameOf(view.maker)} called it{view.alone ? ' alone' : ''}</span>
+            )}
           </div>
         </div>
       ) : isFish ? (
@@ -1226,16 +1314,25 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
       */}
       <div className="sr-only" role="status" aria-live="polite">
         {view.phase === 'playing'
-          ? `${lastLine}${lastLine ? ' ' : ''}${view.isYourTurn ? 'Your turn.' : ''}`
-          : lastLine}
+          ? `${humanise(lastLine)}${lastLine ? ' ' : ''}${view.isYourTurn ? 'Your turn.' : ''}`
+          : humanise(lastLine)}
       </div>
 
+      {/* The pad and the log are both a record of the game, so they sit together under the
+          table. On the felt the pad was clipped by the table edge and landed on whoever was
+          sitting on the right. */}
+      <div className="table-record">
+      {view.matchTarget != null && (
+        <ScorePad view={view} me={me} nameOf={nameOf}
+          lowWins={def.scoring.winner === 'lowestTotal'} />
+      )}
       {settings.showLog && (
         <div className="log">
           <div className="log-head">Game log</div>
-          {view.log.slice().reverse().map((e) => (<div key={e.t} className="log-row">{e.text}</div>))}
+          {view.log.slice().reverse().map((e) => (<div key={e.t} className="log-row">{humanise(e.text)}</div>))}
         </div>
       )}
+      </div>
     </div>
   );
 }
