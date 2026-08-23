@@ -1267,8 +1267,26 @@ function bootLocal(
   return new LocalTableClient(m.matchId, service);
 }
 
-function sortHand(hand: Card[], def: GameDefinition, mode: 'off' | 'rank' | 'suit'): Card[] {
-  if (mode === 'off') return hand;
+// What "sort by rank" and "sort by suit" mean is the same everywhere, but which of the two is
+// actually the natural default is not: a trick game wants its suits grouped so you can see what's
+// protected in each one, a climbing game has no suits worth grouping by at all, a rummy game wants
+// suit order because a run needs to read as a sequence, and so on. This is what 'auto' resolves to
+// — a sensible starting point per game, not a fixed rule imposed on every game alike.
+function defaultSortFor(def: GameDefinition): 'off' | 'rank' | 'suit' {
+  if (def.climb) return 'rank';    // suit carries no meaning in a climbing game
+  if (def.fish) return 'rank';     // you ask opponents for a rank
+  if (def.bluff) return 'rank';    // a claim is a same-rank group from your hand
+  if (def.poker) return 'rank';    // hand strength reads by rank (pairs, trips, straights)
+  if (def.rummy) return 'suit';    // a run only reads as one in suit order
+  if (def.pit) return 'suit';      // the suits ARE the commodities being traded
+  if (def.trick) return 'suit';    // grouping shows what you're holding in reserve, suit by suit
+  if (def.meta.family === 'shedding-matching') return 'suit'; // Crazy Eights, Switch, Trade Winds
+  return 'off'; // war, reflex, solitaire, set: no hand order the game itself suggests
+}
+
+function sortHand(hand: Card[], def: GameDefinition, mode: 'auto' | 'off' | 'rank' | 'suit'): Card[] {
+  const resolved = mode === 'auto' ? defaultSortFor(def) : mode;
+  if (resolved === 'off') return hand;
   // Rank strength isn't always the deck's raw listing order: climbing games (President,
   // Undertow) define their own low→high order, and trick games with aceHigh treat the ace as
   // the top card rather than wherever it falls in the deck listing.
@@ -1280,7 +1298,7 @@ function sortHand(hand: Card[], def: GameDefinition, mode: 'off' | 'rank' | 'sui
     return i < 0 ? 99 : i;
   };
   const copy = hand.slice();
-  if (mode === 'rank') copy.sort((a, b) => rankIdx(a.rank) - rankIdx(b.rank) || SUIT_ORDER[a.suit] - SUIT_ORDER[b.suit]);
+  if (resolved === 'rank') copy.sort((a, b) => rankIdx(a.rank) - rankIdx(b.rank) || SUIT_ORDER[a.suit] - SUIT_ORDER[b.suit]);
   else copy.sort((a, b) => SUIT_ORDER[a.suit] - SUIT_ORDER[b.suit] || rankIdx(a.rank) - rankIdx(b.rank));
   return copy;
 }

@@ -277,9 +277,9 @@ function CardsSection({ s, set }: { s: Settings; set: Setter }) {
         </Row>
       )}
 
-      <Row label="Sort your hand" keywords="order arrange rank suit">
+      <Row label="Sort your hand" hint="Auto picks whatever order actually suits the game — suit-grouped for a trick game, by rank for a climbing game, and so on." keywords="order arrange rank suit auto">
         <Seg value={s.sort} onChange={(v) => set('sort', v as Settings['sort'])}
-          options={[['off', 'As dealt'], ['rank', 'By rank'], ['suit', 'By suit']]} />
+          options={[['auto', 'Auto'], ['off', 'As dealt'], ['rank', 'By rank'], ['suit', 'By suit']]} />
       </Row>
     </>
   );

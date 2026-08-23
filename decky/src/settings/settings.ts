@@ -46,7 +46,10 @@ export interface CustomBack {
 export const MAX_BACK_IMAGE = 400_000;
 export type Surface = 'soft' | 'glass' | 'plain';
 export type Highlight = 'glow' | 'outline' | 'lift' | 'off';
-export type SortMode = 'off' | 'rank' | 'suit';
+// 'auto' resolves to whatever order actually suits the game being played (see defaultSortFor()
+// in Table.tsx) — suit-grouped for a trick game, rank for a climbing game, and so on. The other
+// three are an explicit override a player can pick regardless of what the game would suggest.
+export type SortMode = 'auto' | 'off' | 'rank' | 'suit';
 export type BotSpeed = 'slow' | 'normal' | 'fast' | 'instant';
 /**
  * How hard the opponents try. `random` is kept because old saved settings hold it and because a
@@ -145,7 +148,7 @@ export const defaultSettings: Settings = {
   botSpeed: 'normal',
   botDiff: 'normal',
   highlight: 'glow',
-  sort: 'off',
+  sort: 'auto',
   confirmPlays: false,
   showLog: true,
   sound: false,
