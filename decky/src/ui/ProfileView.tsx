@@ -40,13 +40,29 @@ export function ProfileView() {
   const pct = (n: number) => `${Math.round(n * 100)}%`;
 
   if (summary.played === 0) {
+    /*
+      An empty record used to be one line on an otherwise blank screen, which answers the
+      question "why did I open this?" with "no reason". The badges already know how to draw
+      themselves unearned, and showing what there is to go after is a better answer than a
+      shrug — so the page shows what a record would look like once there is one.
+    */
     return (
       <section className="profile">
         <ProfileHead name={settings.playerName} avatar={settings.avatar} summary={summary} />
         <div className="empty-state">
           <p className="es-mark" aria-hidden="true">🂠</p>
-          <h3>Nothing here yet</h3>
-          <p className="muted">Finish a game and it starts keeping score. Practice games do not count.</p>
+          <h3>No finished games yet</h3>
+          <p className="muted">
+            Win, lose or draw, every finished game lands here — results, streaks and how you do
+            at each one. Practice games are left out on purpose.
+          </p>
+        </div>
+        <div className="section-head">
+          <h2>Up for grabs</h2>
+          <p className="shelf-blurb">{earned.length} badges, none of them earned yet.</p>
+        </div>
+        <div className="badge-grid">
+          {earned.map((b) => <BadgeCard key={b.id} badge={b} />)}
         </div>
       </section>
     );

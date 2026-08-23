@@ -153,15 +153,25 @@ export function chooseMove(
   }
 
   // Bidding (Spades): estimate tricks from high cards + long trump.
+  //
+  // A weaker bot mis-reads its hand; it does not lose its mind. Picking uniformly from the
+  // legal bids — which is what the slip used to do here — had easy bots bidding thirteen,
+  // claiming every trick in the hand, several times a match. That is not a worse player, it
+  // is a broken one, and it makes the scorepad nonsense. So the estimate is always made, and
+  // a slip moves it by a trick or two instead of replacing it.
   if (moves[0].actionId === 'bid') {
-    if (mode === 'random') { const r = nextRandom(botSeed); return { move: moves[Math.floor(r.value * moves.length)], botSeed: r.state }; }
     const hand = state.zones[`hand:${playerId}`] || [];
     const trump = state.definition.trick?.trump;
     let bid = 0;
     for (const c of hand) if (c.rank === 'A' || c.rank === 'K') bid++;
     const trumpCount = trump && trump !== 'none' ? hand.filter((c) => c.suit === trump).length : 0;
     if (trumpCount > 3) bid += trumpCount - 3;
-    bid = Math.min(bid, moves.length - 1);
+    if (mode === 'random') {
+      const r = nextRandom(botSeed);
+      botSeed = r.state;
+      bid += Math.floor(r.value * 5) - 2;          // out by up to two tricks either way
+    }
+    bid = Math.max(0, Math.min(bid, moves.length - 1));
     const pick = moves.find((m) => m.choice === String(bid)) || moves[0];
     return { move: pick, botSeed };
   }
