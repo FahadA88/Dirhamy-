@@ -47,6 +47,62 @@ const YOU_VERB: Record<string, string> = {
   corners: 'corner', completes: 'complete', checks: 'check', calls: 'call', fishes: 'fish',
 };
 
+/**
+ * What the hint should say when the move it suggests is not a card you can point at. The
+ * engine names its own actions — `rummyDraw`, `orderUp`, `climbPass` — and those are internal
+ * vocabulary a player has never been shown, so each one gets a sentence instead.
+ */
+function describeHint(m: Move, nameOf: (id: string) => string): string {
+  const a = m.actionId;
+  switch (a) {
+    case 'bid': return `Bid ${m.choice ?? ''}.`.replace(' .', '.');
+    case 'contractBid': return `Bid ${m.level ?? ''} ${m.strain ?? ''}.`.replace(/\s+\./, '.');
+    case 'passBid': return 'Pass on the bidding.';
+    case 'orderUp': return 'Order it up.';
+    case 'nameTrump': return `Name ${m.choice ?? 'trump'} as trump.`;
+    case 'dealerDiscard': return 'Discard one to the kitty.';
+    case 'drawStock': case 'fishDraw': return 'Draw from the stock.';
+    case 'drawDiscard': return 'Take the discard.';
+    case 'drawCard': return 'Draw a card.';
+    case 'rummyDiscard': return 'Discard a card.';
+    case 'meld': return 'Lay down that meld.';
+    case 'layOff': return 'Lay it off on a meld already down.';
+    case 'knock': return 'Knock — your deadwood is low enough.';
+    case 'ask': return `Ask ${m.target ? nameOf(m.target) : 'someone'} for ${m.rank ?? 'a rank'}s.`;
+    case 'climbPass': return 'Pass — you cannot beat that.';
+    case 'climbNoBomb': return 'Let it stand.';
+    case 'climbBomb': return 'Drop a bomb on it.';
+    case 'bluffChallenge': return 'Call that claim a lie.';
+    case 'reflexFlip': return 'Flip the next card.';
+    case 'reflexSlap': return 'Slap it!';
+    case 'warFlip': return 'Flip.';
+    case 'pokerCheck': return 'Check.';
+    case 'pokerCall': return 'Call.';
+    case 'pokerFold': return 'Fold.';
+    case 'pitAccept': return 'Take that trade.';
+    case 'pitOffer': return 'Put an offer up.';
+    case 'pitCancel': return 'Withdraw your offer.';
+    case 'callSet': return 'Call that set.';
+    case 'setPass': return 'Nothing there — pass.';
+    case 'choosePass': return 'Pick a card to pass.';
+    case 'resolveChoice': return `Choose ${m.choice ?? 'a suit'}.`;
+    case 'solDraw': case 'solDeal': return 'Turn the stock.';
+    case 'solRedeal': return 'Go through the stock again.';
+    default: return 'There is a move available.';
+  }
+}
+
+/**
+ * Remove a leading "<name> " from a line that is already filed under that name, and put the
+ * capital back on whatever now starts it. "You bid 0 (nil)." under a column reading "You"
+ * becomes "Bid 0 (nil)."
+ */
+function stripLeadingName(text: string, name: string): string {
+  if (!name || !text.toLowerCase().startsWith(name.toLowerCase() + ' ')) return text;
+  const rest = text.slice(name.length + 1);
+  return rest.charAt(0).toUpperCase() + rest.slice(1);
+}
+
 const SEAT_RING: Record<number, string[]> = {
   1: ['t'],
   2: ['l', 'r'],
@@ -294,7 +350,12 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
     const m = clientRef.current.hint(me);
     if (!m) { setToast({ text: 'No legal move to suggest right now.', tone: 'info' }); return; }
     setHint(m.cardId ?? m.cards?.[0] ?? null);
-    setToast({ text: m.cardId || m.cards?.length ? 'Try the glowing card.' : `Try "${m.actionId}".`, tone: 'info' });
+    // A hint that is not about a card has to say what to do in words. Naming the raw action
+    // — Try "rummyDraw" — is the engine's vocabulary, not anything a player has been shown.
+    setToast({
+      text: m.cardId || m.cards?.length ? 'Try the glowing card.' : describeHint(m, nameOf),
+      tone: 'info',
+    });
   }
 
   function openHistory() {
@@ -303,6 +364,13 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
   }
 
   function askTakeback() {
+    // requestTakeback answers null both for "done, nobody's permission needed" and for
+    // "there was nothing to take back", so on a table where no move has been made yet this
+    // cheerfully reported taking one back. Ask first.
+    if (clientRef.current.history().length === 0) {
+      setToast({ text: 'Nothing to take back yet.', tone: 'info' });
+      return;
+    }
     const req = clientRef.current.requestTakeback(me);
     setBoard(clientRef.current.read(me));
     setToast(req
@@ -311,7 +379,13 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
   }
 
   const takeback = view.phase === 'playing' ? clientRef.current.pendingTakeback() : null;
-  const nameOfSeat = (id: string) => plan?.find((s) => s.id === id)?.name ?? id;
+  /*
+    A seat's name wherever one is needed outside the felt — the history list, the hand-off
+    screen, a take-back request. Without a seating plan this fell through to the raw id, so
+    the history panel listed "P1", "P2" while every seat at the table said "You" and "Bot 2".
+    `logName` is the same answer for the same question, so it is the one used.
+  */
+  const nameOfSeat = (id: string) => logName(id);
 
   useEffect(() => { setHint(null); }, [board]);
 
@@ -1311,7 +1385,10 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
                 <li key={h.n} className={replayAt !== null && h.n > replayAt ? 'ahead' : replayAt === h.n ? 'at' : ''}>
                   <span className="ml-n">{h.n}</span>
                   <span className="ml-seat">{nameOfSeat(h.seat)}</span>
-                  <span className="ml-text">{h.text}</span>
+                  {/* The row already has a column naming who moved, and the line now names
+                      them too, so it read "You  You bid 0 (nil)". Drop the lead-in when it
+                      is simply repeating the column beside it. */}
+                  <span className="ml-text">{stripLeadingName(humanise(h.text), nameOfSeat(h.seat))}</span>
                 </li>
               ))}
             </ol>
