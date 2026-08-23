@@ -4544,3 +4544,23 @@ button.bluff-go:disabled {
   box-shadow: none;
   cursor: default;
 }
+
+/* A strip of accent dots belongs on one line. The label beside it is `flex: 1 1 auto`, so it
+   took the whole row and left the control column narrow enough that seven 26px dots wrapped
+   to one per line — a tall empty band with a column of colours pinned to the right edge. The
+   label can shrink (it already sets min-width: 0); the dots cannot usefully. */
+.pref-control .swatches.inline { flex-wrap: nowrap; }
+/* And the dots keep their size: as flex children of a nowrap strip they shrink by default,
+   which turned seven 34px dots into seven 11px ones rather than widening the strip. */
+.pref-control .swatches.inline .swatch { flex: 0 0 auto; width: 26px; height: 26px; padding: 0; }
+.pref-control { min-width: 0; }
+
+/* The picture that sells the game, on the page you land on when you tap it. */
+.gd-art {
+  position: relative; height: 190px; border-radius: 14px; overflow: hidden;
+  margin: -4px 0 16px; border: 1px solid var(--panel-brd);
+}
+/* .gameart carries a fixed 132px height for the shelf card; inside a taller banner that
+   left a flat band under the cards, because height wins over the bottom offset. */
+.gd-art .gameart { position: absolute; inset: 0; height: 100%; border-bottom: none; }
+@media (max-width: 700px) { .gd-art { height: 140px; } }

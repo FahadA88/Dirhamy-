@@ -471,6 +471,9 @@ function GameDetail({ game, me, onBack, onPlay, onSetup, onOnline, onChanged, on
 
       <div className="gd-grid">
         <div className="panel glass">
+          {/* Every shelf card sells the game with a picture of it dealt; the page you land on
+              when you tap that card had none, and opened on a wall of text. */}
+          <div className="gd-art"><GameArt def={game.definition} id={game.id} /></div>
           <div className="gd-head">
             <div>
               <h2>{game.definition.meta.name}</h2>
