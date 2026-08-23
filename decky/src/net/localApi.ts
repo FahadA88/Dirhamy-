@@ -60,8 +60,8 @@ export class LocalApi implements MatchApi {
     const r = expectKind(this.send({ kind: 'agreeTakeback', matchId, seat }), 'takeback');
     return { pending: r.pending, applied: !!r.applied };
   }
-  async declineTakeback(matchId: string): Promise<void> {
-    expectKind(this.send({ kind: 'declineTakeback', matchId }), 'ack');
+  async declineTakeback(matchId: string, seat: string): Promise<void> {
+    expectKind(this.send({ kind: 'declineTakeback', matchId, seat }), 'ack');
   }
   async hint(matchId: string, seat: string): Promise<Move | null> {
     return expectKind(this.send({ kind: 'hint', matchId, seat }), 'hint').move;

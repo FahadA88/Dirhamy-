@@ -99,7 +99,7 @@ async function main() {
 
     svc.submit(m.matchId, seat, svc.legal(m.matchId, seat)[0]);
     svc.requestTakeback(m.matchId, seat);
-    svc.declineTakeback(m.matchId);
+    svc.declineTakeback(m.matchId, seat);
     check('a declined request leaves the move standing', svc.pendingTakeback(m.matchId) === null);
   }
 

@@ -121,8 +121,8 @@ export class WebSocketApi implements MatchApi {
     const r = expectKind(await this.call({ kind: 'agreeTakeback', matchId, seat }), 'takeback');
     return { pending: r.pending, applied: !!r.applied };
   }
-  async declineTakeback(matchId: string): Promise<void> {
-    expectKind(await this.call({ kind: 'declineTakeback', matchId }), 'ack');
+  async declineTakeback(matchId: string, seat: string): Promise<void> {
+    expectKind(await this.call({ kind: 'declineTakeback', matchId, seat }), 'ack');
   }
   async hint(matchId: string, seat: string): Promise<Move | null> {
     return expectKind(await this.call({ kind: 'hint', matchId, seat }), 'hint').move;

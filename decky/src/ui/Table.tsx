@@ -1147,7 +1147,7 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
         <div className="takeback-bar" role="alert">
           <span>{nameOfSeat(takeback.by)} wants to take their last move back.</span>
           <div className="tb-actions">
-            <button className="ghost sm" onClick={() => { clientRef.current.declineTakeback(); setBoard(clientRef.current.read(me)); }}>No</button>
+            <button className="ghost sm" onClick={() => { clientRef.current.declineTakeback(me); setBoard(clientRef.current.read(me)); }}>No</button>
             <button className="primary sm" onClick={() => { clientRef.current.agreeTakeback(me); setBoard(clientRef.current.read(me)); }}>
               Allow it ({takeback.agreed.length}/{takeback.needed.length})
             </button>

@@ -72,6 +72,9 @@ export class GameHost {
     const table: Table = { matchId: summary.matchId, code: summary.inviteCode, sockets: new Map(), open: true };
     this.tables.set(table.code, table);
     this.byMatch.set(table.matchId, table);
+    // The very first seat to act might already be a bot's (an all-bot filler table, or a game
+    // whose dealer/opener isn't seat 0) — step it before anyone has sent a single message.
+    this.stepBots(table);
     return { matchId: table.matchId, code: table.code };
   }
 
@@ -85,7 +88,28 @@ export class GameHost {
     if (!free) return { error: 'That table is full.' };
     this.service.setSeat(table.matchId, free.id, { kind: 'remote', name, connected: true });
     this.broadcast(table, { type: 'seats', matchId: table.matchId, at: Date.now() });
+    this.stepBots(table);
     return { matchId: table.matchId, seat: free.id };
+  }
+
+  /**
+   * Advance every bot seat that's ready to move, right now, without waiting for a client to ask.
+   * A browser tab's own bot-loop deliberately does nothing for a remote table (bots belong to the
+   * host, not to a guest's tab) — so without this, a hosted table with any bot seat would simply
+   * sit still forever the moment it became a bot's turn, since nobody would ever be left to step
+   * it. Broadcasts after every bot move so watching clients see each one land, not just the end.
+   */
+  private stepBots(table: Table): void {
+    // A hard cap, not a real limit — every family's own stalemate/no-legal-move handling is what
+    // actually ends a runaway sequence. This just guarantees a bug elsewhere can't wedge the host.
+    for (let i = 0; i < 500; i++) {
+      let r: { moved: boolean; seat?: string };
+      try { r = this.service.botStep(table.matchId); } catch { break; }
+      if (!r.moved) break;
+      let waitingOn: string[] = [];
+      try { waitingOn = this.service.summaryOf(table.matchId).waitingOn; } catch { break; }
+      this.broadcast(table, { type: 'changed', matchId: table.matchId, waitingOn, at: Date.now() });
+    }
   }
 
   /**
@@ -148,6 +172,9 @@ export class GameHost {
 
         if (res.ok && mutates(req) && table) {
           this.broadcast(table, eventFor(this.service, req));
+          // Whatever just happened may have handed the turn to a bot seat (or several, for a
+          // simultaneous-pass family) — step them now rather than waiting for another message.
+          this.stepBots(table);
         }
       });
 

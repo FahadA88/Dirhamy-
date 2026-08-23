@@ -1,5 +1,7 @@
 import { GameDefinition, Move, RedactedState } from '../engine/types';
-import { createMatch, applyMove, legalMoves, redact, isTerminal, isMatchOver, nextHand, actingPlayers } from '../engine/engine';
+import {
+  createMatch, applyMove, legalMoves, redact, isTerminal, isMatchOver, nextHand, actingPlayers, setZones,
+} from '../engine/engine';
 import { MatchState } from '../engine/types';
 import { pinDefinition, definitionFingerprint, migrate } from '../engine/migrate';
 import {
@@ -107,6 +109,13 @@ export interface TakebackRequest {
 }
 
 const UNDO_LIMIT = 400;
+// quickUndo() needs to walk back past however many bot replies happened since the player's own
+// last turn, not just the one most recent snapshot — a shallow stack of 1 (all agreeTakeback ever
+// needs, since it only ever pops the single most recent move) silently turned "undo my move" into
+// "undo whatever the bots just did", leaving the player's own misclick in place. This bound is
+// generous relative to the largest seat count (6) so a normal run of bot turns/interrupts between
+// a player's own turns is always covered, without keeping history forever the way solitaire does.
+const QUICK_UNDO_LIMIT = 40;
 
 export interface MatchStore {
   get(id: string): MatchRecord | undefined;
@@ -206,6 +215,36 @@ export class MatchService {
       return { ok: false, reason: 'It is not your turn.', view: redact(rec.state, playerId) };
     }
 
+    // The set family (Trio) is the one place a WRONG guess is itself a legal, penalised move —
+    // legalMoves() only ever lists combinations that are actually valid, since it also doubles
+    // as "is the board dead yet". Gating call attempts through that list the same way every
+    // other family is gated meant a genuine wrong call could never reach applyMove's penalty
+    // branch at all; it was always rejected here first as "not a legal move". A call is instead
+    // accepted whenever it names `set.size` distinct cards that are really on the board — the
+    // engine's own applySetMove is what decides whether that combination scores or costs a point.
+    if (rec.definition.set && move.actionId === 'callSet') {
+      const cfg = rec.definition.set;
+      const board = rec.state.zones[setZones.board] ?? [];
+      const boardIds = new Set(board.map((c) => c.id));
+      const picked = move.cards ?? [];
+      const validPick = picked.length === cfg.size
+        && new Set(picked).size === cfg.size
+        && picked.every((id) => boardIds.has(id));
+      if (!validPick) {
+        return {
+          ok: false,
+          reason: `Pick exactly ${cfg.size} different cards that are still on the board.`,
+          view: redact(rec.state, playerId),
+        };
+      }
+      this.remember(rec);
+      const before = rec.state.log.length;
+      rec.state = applyMove(rec.state, playerId, move);
+      this.recordMove(rec, playerId, move, before);
+      this.store.set(matchId, rec);
+      return { ok: true, view: redact(rec.state, playerId) };
+    }
+
     const allowed = legalMoves(rec.state, playerId);
     const match = allowed.find((m) => sameMove(m, move));
     if (!match) {
@@ -259,12 +298,15 @@ export class MatchService {
   requestTakeback(matchId: string, playerId: string): TakebackRequest | null {
     const rec = this.require(matchId);
     this.requireSeat(rec, playerId);
+    // A second request while one is already pending used to silently overwrite it — discarding
+    // whoever had already agreed, with nobody told. Surface the existing one instead of clobbering it.
+    if (rec.takeback) return { ...rec.takeback };
     if (rec.history.length === 0) return null;
     const others = rec.seats.filter((s) => s.kind !== 'bot' && s.id !== playerId).map((s) => s.id);
     rec.takeback = { by: playerId, needed: others, agreed: [], at: Date.now() };
     this.store.set(matchId, rec);
     // A table of one human and bots needs nobody's permission; resolve it straight away.
-    if (others.length === 0) { this.applyTakeback(rec); return null; }
+    if (others.length === 0) { this.applyTakeback(rec); this.store.set(matchId, rec); return null; }
     return { ...rec.takeback };
   }
 
@@ -284,8 +326,9 @@ export class MatchService {
     return { pending: null, applied: true };
   }
 
-  declineTakeback(matchId: string): void {
+  declineTakeback(matchId: string, playerId: string): void {
     const rec = this.require(matchId);
+    this.requireSeat(rec, playerId);
     rec.takeback = null;
     this.store.set(matchId, rec);
   }
@@ -381,7 +424,10 @@ export class MatchService {
   /** Publish the secret so the player can check every deal was fixed before they acted. */
   reveal(matchId: string): FairReveal & { handSeeds: number[] } {
     const rec = this.require(matchId);
-    if (!isMatchOver(rec.state) && !isTerminal(rec.state)) {
+    // isTerminal() is true after every single HAND, not the match — the server seed is fixed for
+    // the whole match and every later hand's seed derives from it, so revealing it once hand 1
+    // ends would let anyone precompute every hand still to come. Only isMatchOver() is safe here.
+    if (!isMatchOver(rec.state)) {
       throw new Error('The seed is revealed when the match ends, not before.');
     }
     return {
@@ -413,9 +459,12 @@ export class MatchService {
     const seatDiff = rec.seats.find((s) => s.id === seat)?.difficulty ?? difficulty;
     const r = chooseMove(rec.state, seat, rec.botSeed, seatDiff);
     rec.botSeed = r.botSeed;
-    // A bot goes through exactly the same validation as a person.
+    // A bot goes through exactly the same validation as a person — including refusing to guess:
+    // silently substituting allowed[0] here would mean a bug that makes chooseMove() disagree
+    // with legalMoves() plays a DIFFERENT move than the bot picked, with nothing to show it ever
+    // happened. Better to do nothing this tick (the caller retries) than to fake a move.
     const allowed = legalMoves(rec.state, seat);
-    const picked = allowed.find((m) => sameMove(m, r.move)) ?? allowed[0];
+    const picked = allowed.find((m) => sameMove(m, r.move));
     if (!picked) return { moved: false, view: redact(rec.state, viewer) };
 
     this.remember(rec);
@@ -490,12 +539,13 @@ export class MatchService {
   }
 
   /**
-   * Snapshot the position before a move. Patience keeps a deep stack for free undo; a table with
-   * opponents keeps a shallow one, because the only thing it can serve is a takeback the whole
-   * table agreed to, and that is always the most recent move.
+   * Snapshot the position before a move. Patience keeps a deep stack for free undo. Any other
+   * game keeps a bounded-but-not-shallow stack: an agreed takeback only ever pops the single most
+   * recent move, but quickUndo() needs to walk back past however many bot replies happened since
+   * the player's own last turn — see QUICK_UNDO_LIMIT.
    */
   private remember(rec: MatchRecord): void {
-    const limit = rec.definition.solitaire ? UNDO_LIMIT : 1;
+    const limit = rec.definition.solitaire ? UNDO_LIMIT : QUICK_UNDO_LIMIT;
     rec.history.push(rec.state);
     while (rec.history.length > limit) rec.history.shift();
   }

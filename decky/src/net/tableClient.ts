@@ -37,7 +37,7 @@ export interface TableClient {
   pendingTakeback(): TakebackRequest | null;
   requestTakeback(seat: string): TakebackRequest | null;
   agreeTakeback(seat: string): void;
-  declineTakeback(): void;
+  declineTakeback(seat: string): void;
   history(): MoveRecord[];
   botStep(humanSeats: string[], difficulty: BotMode): { moved: boolean };
   nextHand(): void;
@@ -82,7 +82,7 @@ export class LocalTableClient implements TableClient {
     return r;
   }
   agreeTakeback(seat: string) { this.service.agreeTakeback(this.matchId, seat); this.changed(); }
-  declineTakeback() { this.service.declineTakeback(this.matchId); this.changed(); }
+  declineTakeback(seat: string) { this.service.declineTakeback(this.matchId, seat); this.changed(); }
   history() { return this.service.history(this.matchId); }
   botStep(humanSeats: string[], difficulty: BotMode) {
     const r = this.service.botStep(this.matchId, humanSeats, difficulty);
@@ -209,9 +209,9 @@ export class RemoteTableClient implements TableClient {
       try { await this.api.agreeTakeback(this.matchId, seat); await this.refresh(); } catch { /* ignore */ }
     })();
   }
-  declineTakeback() {
+  declineTakeback(seat: string) {
     void (async () => {
-      try { await this.api.declineTakeback(this.matchId); await this.refresh(); } catch { /* ignore */ }
+      try { await this.api.declineTakeback(this.matchId, seat); await this.refresh(); } catch { /* ignore */ }
     })();
   }
 

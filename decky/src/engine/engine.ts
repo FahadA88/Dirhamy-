@@ -1315,8 +1315,9 @@ function applyTrickMove(s: MatchState, playerId: string, move: Move): MatchState
 
   // Bidding phase.
   if (s.bidding) {
-    if (move.actionId !== 'bid' || move.choice === undefined) return s;
-    s.bids[playerId] = parseInt(move.choice, 10);
+    const bidMoves = trickLegalMoves(s, playerId);
+    if (!bidMoves.some((m) => m.actionId === move.actionId && m.choice === move.choice)) return s;
+    s.bids[playerId] = parseInt(move.choice!, 10);
     log(s, playerId, `${short(playerId)} bids ${move.choice}${move.choice === '0' ? ' (nil)' : ''}.`);
     if (Object.keys(s.bids).length >= s.players.length) { s.bidding = false; s.turnIndex = 0; }
     else s.turnIndex = ((s.turnIndex + s.direction) % s.players.length + s.players.length) % s.players.length;
@@ -2479,7 +2480,8 @@ function layOffTargets(state: MatchState, hand: Card[]): { cardId: string; meldK
 
 function applyRummyMove(s: MatchState, playerId: string, move: Move): MatchState {
   const legal = rummyLegalMoves(s, playerId);
-  const ok = legal.find((m) => m.actionId === move.actionId && m.cardId === move.cardId && sameCards(m.cards, move.cards));
+  const ok = legal.find((m) => m.actionId === move.actionId && m.cardId === move.cardId
+    && m.choice === move.choice && sameCards(m.cards, move.cards));
   if (!ok) return s;
   const z = rummyZones(s.definition);
   const hand = s.zones[`hand:${playerId}`];
@@ -3177,7 +3179,7 @@ function pitCheckWin(s: MatchState): boolean {
 // all-different in each. That is why the deck had to be built from properties — with ranks and
 // suits there is nothing to be all-different about.
 
-const setZones = { board: 'set:board', deck: 'set:deck' };
+export const setZones = { board: 'set:board', deck: 'set:deck' };
 
 /** All-same or all-different, for every property. The whole game. */
 export function isValidSet(cards: Card[]): boolean {

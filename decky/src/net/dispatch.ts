@@ -32,7 +32,7 @@ export function handle(service: MatchService, req: Request): Response {
         const r = service.agreeTakeback(req.matchId, req.seat);
         return { ok: true, kind: 'takeback', pending: r.pending, applied: r.applied };
       }
-      case 'declineTakeback': service.declineTakeback(req.matchId); return { ok: true, kind: 'ack' };
+      case 'declineTakeback': service.declineTakeback(req.matchId, req.seat); return { ok: true, kind: 'ack' };
       case 'hint': return { ok: true, kind: 'hint', move: service.hint(req.matchId, req.seat) };
       case 'pendingTakeback':
         return { ok: true, kind: 'takeback', pending: service.pendingTakeback(req.matchId) };
@@ -51,13 +51,18 @@ export function handle(service: MatchService, req: Request): Response {
 /** Which requests change the table, and therefore need pushing to everyone watching. */
 export function mutates(req: Request): boolean {
   return req.kind === 'submit' || req.kind === 'botStep' || req.kind === 'nextHand'
-    || req.kind === 'agreeTakeback' || req.kind === 'setSeat' || req.kind === 'quickUndo';
+    || req.kind === 'agreeTakeback' || req.kind === 'setSeat' || req.kind === 'quickUndo'
+    // Requesting or declining a takeback changes what pendingTakeback() reports for everyone else
+    // at the table — without pushing these, an opponent only found out by coincidence, the next
+    // time some unrelated event happened to trigger a refresh.
+    || req.kind === 'requestTakeback' || req.kind === 'declineTakeback';
 }
 
 export function eventFor(service: MatchService, req: Request): TableEvent {
   let waitingOn: string[] = [];
   try { waitingOn = service.summaryOf(req.matchId).waitingOn; } catch { /* match gone */ }
   const type: TableEvent['type'] = req.kind === 'setSeat' ? 'seats'
-    : req.kind === 'agreeTakeback' ? 'takeback' : 'changed';
+    : req.kind === 'agreeTakeback' || req.kind === 'requestTakeback' || req.kind === 'declineTakeback' ? 'takeback'
+    : 'changed';
   return { type, matchId: req.matchId, waitingOn, at: Date.now() };
 }

@@ -62,8 +62,11 @@ export function chooseMove(
     // Even at its sharpest it misses sometimes, so a person gets a chance to see one first.
     const miss = mode === 'random' ? 0.85 : 0.45;
     if (r.value < miss) return { move: { actionId: 'setPass' }, botSeed };
+    // Having decided to call, actually call — moves also carries a trailing setPass, and picking
+    // across the whole array let the bot occasionally pass right after choosing not to.
+    const calls = moves.filter((m) => m.actionId === 'callSet');
     const pick = nextRandom(botSeed);
-    return { move: moves[Math.floor(pick.value * moves.length)], botSeed: pick.state };
+    return { move: calls[Math.floor(pick.value * calls.length)], botSeed: pick.state };
   }
 
   // A contract auction: bid what the hand can actually carry, and stop.
