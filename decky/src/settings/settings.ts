@@ -273,7 +273,10 @@ export const CARD_SIZES: Record<CardSize, { cw: number; ch: number; bw: number; 
 /** Multiplies every type size in the app. Cards scale separately, via Card size. */
 export const TEXT_SCALE: Record<TextSize, number> = { s: 0.92, m: 1, l: 1.14, xl: 1.3 };
 
-export const BOT_SPEED_MS: Record<BotSpeed, number> = { slow: 1100, normal: 600, fast: 280, instant: 40 };
+// A bot that moves the instant it's able to reads as rushed, not skilled — these are paced to
+// feel like someone actually looking at their hand. 'instant' stays near-zero on purpose: it's
+// the one tier meant for testing a game you built, not for playing against.
+export const BOT_SPEED_MS: Record<BotSpeed, number> = { slow: 1800, normal: 950, fast: 450, instant: 40 };
 
 const KEY = 'decky.settings.v1';
 
