@@ -578,7 +578,10 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
 .restart-btn {
   margin-left: 8px; background: transparent; color: var(--t-muted, var(--muted));
   border: 1px solid var(--t-line, var(--panel-brd)); border-radius: var(--r-pill);
-  padding: 5px 12px; font: inherit; font-size: 12px; cursor: pointer;
+  /* 27px tall was small for a cursor and far too small for anything else. Touch gets 44
+     further down; this is the comfortable floor everywhere else. */
+  min-height: 34px; padding: 6px 14px; font: inherit; font-size: 12.5px; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
 }
 .restart-btn:hover { color: var(--t-ink, var(--ink)); border-color: currentColor; }
 
