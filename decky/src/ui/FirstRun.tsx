@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useDismissable } from './useEscape';
+import { catalog } from '../games/catalog';
 
 // The first thing somebody sees.
 //
@@ -19,13 +20,25 @@ interface Card {
   body: string;
 }
 
+/** Spelt out up to a point, because "21 games" in the middle of a sentence reads like a spec. */
+const WORDS = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine',
+  'ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen',
+  'eighteen', 'nineteen', 'twenty', 'twenty-one', 'twenty-two', 'twenty-three', 'twenty-four'];
+const GAME_COUNT = (() => {
+  const n = catalog.length;
+  const w = WORDS[n] ?? String(n);
+  return w.charAt(0).toUpperCase() + w.slice(1);
+})();
+
 const CARDS: Card[] = [
   {
     mark: '🂡',
     title: 'Everything here is a real game',
-    body: 'Twenty games, dealt and refereed properly — the same rules your family argues about, '
-      + 'enforced by something that cannot be argued with. Play against bots, pass one device '
-      + 'around, or open a table for people somewhere else.',
+    // Counted, not written down: this said "Twenty games" while the button under it offered
+    // to show you twenty-one, and a number in prose goes stale the moment one is added.
+    body: `${GAME_COUNT} games, dealt and refereed properly — the same rules your family argues `
+      + 'about, enforced by something that cannot be argued with. Play against bots, pass one '
+      + 'device around, or open a table for people somewhere else.',
   },
   {
     mark: '✎',

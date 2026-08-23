@@ -4464,3 +4464,49 @@ header h1 {
 .trump-badge { background: rgba(214, 175, 92, .16); border-color: rgba(214, 175, 92, .42); }
 .trump-badge.none b { font-size: 12px; color: var(--t-muted, rgba(255, 255, 255, .6)); }
 .trick-note { font-size: 11.5px; color: var(--t-muted, rgba(255, 255, 255, .6)); }
+
+/* The game log is the story of the hand, not a debug console. It was monospace green on a
+   dark panel, every line the same weight and colour, so nothing stood out and the whole
+   thing read like stdout. The newest line is the one being looked for, so it leads. */
+.log-head {
+  font-family: inherit; letter-spacing: .02em; font-size: 12px; font-weight: 700;
+  color: var(--muted); text-transform: none; margin-bottom: 9px;
+}
+.log-row {
+  padding: 3px 0; line-height: 1.45;
+  border-bottom: 1px solid transparent;
+}
+/* Newest first in the markup, so the first row is the most recent thing that happened. */
+.log-row:first-of-type { color: var(--ink); font-weight: 600; }
+.log-row:nth-of-type(2) { color: var(--muted); }
+.log-row:nth-of-type(n+3) { color: var(--muted); opacity: .72; }
+.felt ~ .table-record .log-row:first-of-type { color: var(--ink); }
+
+/* A shelf that scrolls says so. Cut off hard at the container edge, a half-visible card reads
+   as a layout fault; a fade and a button on the side that has more read as an invitation. */
+.rail-wrap { position: relative; }
+.rail-wrap::before, .rail-wrap::after {
+  content: ""; position: absolute; top: 0; bottom: 14px; width: 64px;
+  pointer-events: none; opacity: 0; transition: opacity .18s; z-index: 2;
+}
+.rail-wrap::before { left: 0; background: linear-gradient(90deg, var(--bg) 10%, transparent); }
+.rail-wrap::after { right: 0; background: linear-gradient(270deg, var(--bg) 10%, transparent); }
+.rail-wrap.has-left::before, .rail-wrap.has-right::after { opacity: 1; }
+
+.rail-nudge {
+  position: absolute; top: 40%; z-index: 3;
+  width: 36px; height: 36px; border-radius: 50%; cursor: pointer;
+  display: grid; place-items: center; font-size: 20px; line-height: 1;
+  background: var(--panel); color: var(--ink);
+  border: 1px solid var(--panel-brd);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, .34);
+  transition: transform .16s, border-color .16s;
+}
+.rail-nudge.left { left: -6px; }
+.rail-nudge.right { right: -6px; }
+.rail-nudge:hover { transform: scale(1.08); border-color: var(--green); }
+/* A touch screen scrolls with a finger and does not need the buttons. */
+@media (hover: none) { .rail-nudge { display: none; } }
+
+/* The shelves each had a line written for them that was never shown. */
+.shelf-blurb { margin: 0; color: var(--muted); font-size: 13px; }

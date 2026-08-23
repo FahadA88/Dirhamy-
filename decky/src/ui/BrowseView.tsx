@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { GameDefinition } from '../engine/types';
 import {
   Collection, Filters, KINDS, PublishedGame, SortKey,
@@ -328,15 +328,54 @@ function Shelf({ collection, onOpen, onPlay, onChanged }: {
   onPlay: (g: PublishedGame) => void;
   onChanged: () => void;
 }) {
+  /*
+    A shelf holds more than fits, so it scrolls — but it used to end by clipping a card in
+    half against the container edge, which reads as a broken layout rather than an invitation.
+    The rail now says which way there is more to go: it fades on whichever side has something
+    past it, and offers a button to get there.
+  */
+  const rail = useRef<HTMLDivElement>(null);
+  const [edge, setEdge] = useState<{ left: boolean; right: boolean }>({ left: false, right: false });
+
+  const measure = useCallback(() => {
+    const el = rail.current;
+    if (!el) return;
+    const slack = el.scrollWidth - el.clientWidth;
+    setEdge({ left: el.scrollLeft > 4, right: slack > 4 && el.scrollLeft < slack - 4 });
+  }, []);
+
+  useEffect(() => {
+    measure();
+    const el = rail.current;
+    if (!el) return;
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [measure, collection.games.length]);
+
+  const nudge = (dir: 1 | -1) => {
+    const el = rail.current;
+    if (el) el.scrollBy({ left: dir * Math.max(232, el.clientWidth * 0.8), behavior: 'smooth' });
+  };
+
   return (
     <section className="shelf">
       <div className="section-head">
         <h2>{collection.title}</h2>
+        {collection.blurb && <p className="shelf-blurb">{collection.blurb}</p>}
       </div>
-      <div className="shelf-rail">
-        {collection.games.map((g) => (
-          <ShelfCard key={g.id} game={g} onOpen={() => onOpen(g.id)} onPlay={() => onPlay(g)} onChanged={onChanged} />
-        ))}
+      <div className={`rail-wrap ${edge.left ? 'has-left' : ''} ${edge.right ? 'has-right' : ''}`}>
+        <div className="shelf-rail" ref={rail} onScroll={measure}>
+          {collection.games.map((g) => (
+            <ShelfCard key={g.id} game={g} onOpen={() => onOpen(g.id)} onPlay={() => onPlay(g)} onChanged={onChanged} />
+          ))}
+        </div>
+        {edge.left && (
+          <button className="rail-nudge left" onClick={() => nudge(-1)} aria-label={`Scroll ${collection.title} back`}>‹</button>
+        )}
+        {edge.right && (
+          <button className="rail-nudge right" onClick={() => nudge(1)} aria-label={`Scroll ${collection.title} on`}>›</button>
+        )}
       </div>
     </section>
   );

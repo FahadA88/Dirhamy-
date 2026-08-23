@@ -347,6 +347,35 @@ export function collections(games: PublishedGame[]): Collection[] {
       games: games.filter((g) => !g.builtIn).sort((a, b) => b.updatedAt - a.updatedAt).slice(0, 8),
     },
   ];
+  /*
+    The shelves are filters over the same library, so without this a game lands on every
+    shelf it happens to satisfy: Solitaire is a staff pick, it is under ten minutes, and it
+    is a one-player game, so it appeared three times on one screen and the front page looked
+    broken. Each game is claimed by whichever shelf says the most about it — being the only
+    thing you can play alone is more particular than being short — and the shelves are still
+    shown in the order set out above.
+
+    The two personal shelves are simply absent from the list below, so they are never
+    filtered: "your favourites" and "pick up where you left off" are answers to a question
+    you asked, and a game belongs on them however else it happens to be filed.
+  */
+  const BY_SPECIFICITY = ['solo', 'community', 'written', 'staff', 'quick'];
+  const claimed = new Set<string>();
+  for (const id of BY_SPECIFICITY) {
+    const shelf = out.find((c) => c.id === id);
+    if (!shelf) continue;
+    shelf.games = shelf.games.filter((g) => !claimed.has(g.id));
+    for (const g of shelf.games) claimed.add(g.id);
+  }
+
+  // Whatever no shelf above happened to describe. Without this the front page quietly showed
+  // eight of twenty-one games and the rest existed only behind the search box.
+  out.push({
+    id: 'rest', title: 'The rest of the shelf',
+    blurb: 'Everything else, in one place.',
+    games: games.filter((g) => !claimed.has(g.id)),
+  });
+
   return out.filter((c) => c.games.length > 0);
 }
 
@@ -432,11 +461,46 @@ export function complexityOf(def: GameDefinition): number {
   return Math.max(1, Math.min(5, Math.round(score)));
 }
 
+/**
+ * About what one hand of this game is worth, so a points target can be read as a number of
+ * hands. Assuming a flat twenty-five put Spades — a race to 500, at roughly a hundred a hand
+ * — at twenty hands and a shelf label of 160 minutes, which is not a game anybody clicks.
+ */
+function pointsPerHand(def: GameDefinition): number {
+  if (def.trick?.scoreBy === 'penalty') {
+    // Every penalty card is dealt out every hand, so the whole pot is scored each time. The
+    // map is keyed by suit, by rank, or by one named card, and each means a different number
+    // of cards — "every heart is worth one" is thirteen points a hand, not one.
+    const pot = Object.entries(def.trick.penaltyPoints ?? {}).reduce((a, [key, v]) => {
+      if (key.length >= 2) return a + v;                       // a single card, e.g. "SQ"
+      if ('CDHS'.includes(key)) return a + v * 13;             // a whole suit
+      return a + v * 4;                                        // a rank, four of them
+    }, 0);
+    return Math.max(4, pot || 26);
+  }
+  if (def.trick) {
+    // A trick game pays per trick, and a hand holds one trick per card dealt. Euchre and its
+    // relatives pay a point or two a hand instead, which a small target is the tell for.
+    if ((def.scoring.target ?? 0) <= 15) return 1.5;
+    const dealt = def.setup.find((s) => s.op === 'deal')?.countPerPlayer ?? 10;
+    return Math.max(10, dealt * 8);
+  }
+  return 25;   // shedding, climbing and melding games settle around here
+}
+
 /** Rough playtime in minutes, from hand size, player count and whether it's a race to a target. */
 export function playtimeOf(def: GameDefinition): number {
-  const seats = def.meta.players.max;
-  const hands = def.scoring.target ? Math.max(2, Math.round(def.scoring.target / 25)) : 1;
-  const base = def.solitaire ? 8 : def.trick ? 4 + seats : 3 + seats * 1.5;
+  // A game that seats two to six is nearly always played at a normal table rather than at its
+  // absolute maximum, and quoting the slowest possible seating made every game look long.
+  const seats = Math.min(def.meta.players.max, 4);
+  const hands = def.scoring.target
+    ? Math.min(12, Math.max(2, Math.round(def.scoring.target / pointsPerHand(def))))
+    : 1;
+  // How long one hand takes is mostly how many cards each player has to get through — a
+  // five-card Euchre hand is nothing like a thirteen-card one — with the table adding a
+  // little on top for everyone else's turns.
+  const dealt = def.setup.find((s) => s.op === 'deal')?.countPerPlayer ?? 7;
+  const base = def.solitaire ? 8 : 1 + dealt * 0.45 + seats * 0.3;
   return Math.max(3, Math.round(base * hands));
 }
 
