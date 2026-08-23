@@ -659,8 +659,11 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
         : sentence))
       .join(' ');
     // And wherever "You" is the subject mid-sentence — "Round over — You goes out."
-    return perSentence.replace(/\bYou\s+([a-z]+)/g,
+    const agreed = perSentence.replace(/\bYou\s+([a-z]+)/g,
       (m, v) => (YOU_VERB[v] ? `You ${YOU_VERB[v]}` : m));
+    // The possessive too: a seat id takes "'s", but "You" takes "Your", so a partnership
+    // game announced "Round over — You's team wins".
+    return agreed.replace(/\bYou's\b/g, 'Your');
   };
   const teamOf = (id: string): string | null => {
     if (!view.teams) return null;
