@@ -4349,8 +4349,10 @@ header h1 {
   .opponents .seat { position: absolute; pointer-events: auto; width: 146px; padding: 9px 10px; }
   .seat.at-l  { left: 0;                top: 152px; }
   .seat.at-r  { right: 0;               top: 152px; }
-  .seat.at-tl { left: 13%;              top: 2%; }
-  .seat.at-tr { right: 13%;             top: 2%; }
+  /* Clear of the side seats by a whole seat width plus a gap. At 13% of the felt these
+     landed within a pixel or two of the seat below them and the two panels overlapped. */
+  .seat.at-tl { left: 172px;            top: 2%; }
+  .seat.at-tr { right: 172px;           top: 2%; }
   .seat.at-t  { left: 50%; transform: translateX(-50%); top: 0; }
 
   /* Two opponents face each other across the table rather than hugging the top. */
@@ -4392,6 +4394,23 @@ header h1 {
   box-shadow: 0 0 12px var(--glow, rgba(214, 175, 92, .5));
 }
 .seat.active { background: rgba(214, 175, 92, .1); box-shadow: 0 0 0 1px rgba(214, 175, 92, .34), 0 8px 26px rgba(0, 0, 0, .28); }
+
+/* Seven and eight-player games (Showdown Poker, Pit) put six or seven opponents round the
+   table. There is no honest ring for that on this width -- and SEAT_RING has no arrangement
+   past five, so they all took the top slot and stacked on top of one another. A crowded
+   table is a row. */
+@media (min-width: 900px) {
+  .opponents.ring-6, .opponents.ring-7 {
+    position: static; display: flex; gap: 8px; justify-content: center; flex-wrap: nowrap;
+    margin-bottom: 10px;
+  }
+  .opponents.ring-6 .seat, .opponents.ring-7 .seat {
+    position: static; flex: 1 1 0; min-width: 0; width: auto; padding: 8px 6px;
+  }
+  .ring-6 .fanned .card.back, .ring-7 .fanned .card.back { width: 30px; height: 43px; margin-left: -19px; }
+  /* The ring's gutters and headroom are for a ring; a row needs neither. */
+  .felt-content:has(.ring-6), .felt-content:has(.ring-7) { padding: 10px 12px 0; }
+}
 
 /* On a phone the ring does not fit; the row is the right shape there. */
 @media (max-width: 899px) {
@@ -4564,3 +4583,12 @@ button.bluff-go:disabled {
    left a flat band under the cards, because height wins over the bottom offset. */
 .gd-art .gameart { position: absolute; inset: 0; height: 100%; border-bottom: none; }
 @media (max-width: 700px) { .gd-art { height: 140px; } }
+
+/* Betting buttons read as a ladder: the safe move is the bright one, anything that commits
+   more of your stack is quieter, and the all-in is marked rather than merely large. */
+.poker-actions .ghost.bet { border-color: rgba(214, 175, 92, .42); color: var(--t-ink, #fff); }
+.poker-actions .ghost.bet:hover:not(:disabled) { border-color: var(--green); }
+.poker-actions .ghost.bet.allin {
+  border-style: dashed; border-color: rgba(255, 110, 130, .6); color: #ff9fb0;
+}
+.poker-actions .ghost.bet.allin:hover:not(:disabled) { border-color: #ff6e82; color: #ffc2cd; }

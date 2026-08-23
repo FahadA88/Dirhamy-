@@ -91,12 +91,17 @@ export function PlayView() {
             </span>
           )}
           <button className="ghost sm" onClick={() => setHelpFor(game)}>Rules</button>
+          {/* The range comes from the game. Hard-coded 2..6, this offered seats Spades cannot
+              use and — worse — never offered the seventh and eighth that Showdown Poker and
+              Pit both declare, so the top of their range was unreachable. */}
           {!game.solitaire && !plan && !session && (
             <div className="seat-control">
               <span>Seats</span>
-              {[2, 3, 4, 5, 6].map((n) => (
+              {Array.from(
+                { length: game.meta.players.max - game.meta.players.min + 1 },
+                (_, i) => game.meta.players.min + i,
+              ).map((n) => (
                 <button key={n} className={`seg-btn ${seats === n ? 'on' : ''}`}
-                  disabled={n < game.meta.players.min || n > game.meta.players.max}
                   onClick={() => setSeats(n)}>{n}</button>
               ))}
             </div>

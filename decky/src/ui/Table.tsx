@@ -1064,15 +1064,28 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
                 </div>
               ))}
             </div>
+            {/*
+              Check and call are the safe, ordinary moves, so they lead. Everything that puts
+              more of your stack in is quieter, and shoving the lot is quieter still with the
+              amount spelt out — every one of these was equally loud pink, which put "Call 5"
+              and "Raise to 200" side by side as identical buttons.
+            */}
             <div className="poker-actions">
-              {myLegal.filter((m) => m.actionId?.startsWith('poker')).map((m, i) => (
-                <button key={i} className={m.actionId === 'pokerFold' ? 'ghost danger' : 'primary'} onClick={() => submit(m)}>
-                  {m.actionId === 'pokerCheck' ? 'Check'
-                    : m.actionId === 'pokerCall' ? `Call ${(view.currentBet ?? 0) - (view.committed?.[me] ?? 0)}`
-                    : m.actionId === 'pokerFold' ? 'Fold'
-                    : `${m.actionId === 'pokerBet' ? 'Bet' : 'Raise to'} ${m.amount}`}
-                </button>
-              ))}
+              {myLegal.filter((m) => m.actionId?.startsWith('poker')).map((m, i) => {
+                const allIn = m.actionId !== 'pokerFold' && (m.amount ?? 0) >= (view.chips?.[me] ?? 0) + (view.committed?.[me] ?? 0);
+                const cls = m.actionId === 'pokerFold' ? 'ghost danger'
+                  : m.actionId === 'pokerCheck' || m.actionId === 'pokerCall' ? 'primary'
+                  : allIn ? 'ghost bet allin' : 'ghost bet';
+                return (
+                  <button key={i} className={cls} onClick={() => submit(m)}>
+                    {m.actionId === 'pokerCheck' ? 'Check'
+                      : m.actionId === 'pokerCall' ? `Call ${(view.currentBet ?? 0) - (view.committed?.[me] ?? 0)}`
+                      : m.actionId === 'pokerFold' ? 'Fold'
+                      : allIn ? `All in · ${m.amount}`
+                      : `${m.actionId === 'pokerBet' ? 'Bet' : 'Raise to'} ${m.amount}`}
+                  </button>
+                );
+              })}
             </div>
           </div>
         ) : isPit ? (
