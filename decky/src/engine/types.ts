@@ -304,7 +304,10 @@ export interface ZoneDef {
 
 export type SetupStep =
   | { op: 'shuffle'; zone: string }
-  | { op: 'deal'; from: string; to: string; countPerPlayer: number }
+  // countPerPlayer is the fallback; countByPlayers overrides it for a specific seat count, for
+  // the handful of games (Crazy Eights, Go Fish, Rummy…) whose real deal size actually depends
+  // on how many are at the table rather than being one fixed number.
+  | { op: 'deal'; from: string; to: string; countPerPlayer: number; countByPlayers?: Record<number, number> }
   | { op: 'dealAll'; from: string; to: string } // distribute every card round-robin
   | { op: 'move'; from: string; to: string; count: number };
 

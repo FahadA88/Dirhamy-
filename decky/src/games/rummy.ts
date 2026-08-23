@@ -26,7 +26,8 @@ export const rummy: GameDefinition = {
   ],
   setup: [
     { op: 'shuffle', zone: 'draw' },
-    { op: 'deal', from: 'draw', to: 'hand', countPerPlayer: 7 },
+    // Heads-up deals 10 each; three or four deals 7 — the real rule, not one fixed count.
+    { op: 'deal', from: 'draw', to: 'hand', countPerPlayer: 7, countByPlayers: { 2: 10 } },
     { op: 'move', from: 'draw', to: 'discard', count: 1 },
   ],
   turnFlow: { order: 'clockwise', startPlayer: 'first', actionsPerTurn: { min: 1, max: 1 } },

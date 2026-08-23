@@ -197,7 +197,8 @@ export function createMatch(
       state.zones[key] = result;
       state.rngState = rngState;
     } else if (step.op === 'deal') {
-      for (let i = 0; i < step.countPerPlayer; i++) {
+      const count = step.countByPlayers?.[players.length] ?? step.countPerPlayer;
+      for (let i = 0; i < count; i++) {
         for (const p of players) {
           const card = state.zones[step.from].pop();
           if (card) state.zones[zoneKey(def, step.to, p)].push(card);

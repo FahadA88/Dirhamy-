@@ -24,7 +24,8 @@ export const crazyEights: GameDefinition = {
   ],
   setup: [
     { op: 'shuffle', zone: 'draw' },
-    { op: 'deal', from: 'draw', to: 'hand', countPerPlayer: 5 },
+    // Heads-up deals 7 each; three or more deals 5 — the real rule, not one fixed count.
+    { op: 'deal', from: 'draw', to: 'hand', countPerPlayer: 5, countByPlayers: { 2: 7 } },
     { op: 'move', from: 'draw', to: 'discard', count: 1 },
   ],
   turnFlow: {

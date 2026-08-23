@@ -24,7 +24,8 @@ export const goFish: GameDefinition = {
   ],
   setup: [
     { op: 'shuffle', zone: 'ocean' },
-    { op: 'deal', from: 'ocean', to: 'hand', countPerPlayer: 7 },
+    // 2-3 players get 7 cards each; 4 or more get 5 — the real rule, not one fixed count.
+    { op: 'deal', from: 'ocean', to: 'hand', countPerPlayer: 7, countByPlayers: { 4: 5, 5: 5 } },
   ],
   turnFlow: { order: 'clockwise', startPlayer: 'first', actionsPerTurn: { min: 1, max: 1 } },
   actions: [],

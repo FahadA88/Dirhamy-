@@ -86,7 +86,7 @@ export function validate(def: GameDefinition): ValidationResult {
   const deckSize = ((13 - excluded) * 4 + (def.deck.includeJokers ? 2 : 0)) * copies;
   const dealt = def.setup
     .filter((s) => s.op === 'deal')
-    .reduce((n, s: any) => n + s.countPerPlayer * def.meta.players.max, 0);
+    .reduce((n, s: any) => n + (s.countByPlayers?.[def.meta.players.max] ?? s.countPerPlayer) * def.meta.players.max, 0);
   if (dealt > deckSize) {
     err('deck.overdeal', `Dealing ${dealt} cards to ${def.meta.players.max} players exceeds the ${deckSize}-card deck.`);
   } else if (!isSpecial && dealt > deckSize * 0.75) {
