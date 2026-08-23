@@ -107,6 +107,7 @@ export function createMatch(
     market: [],
     nextOfferId: 1,
     highBid: null,
+    rummyMeldSizes: [],
     log: [],
     matchScores: carry?.matchScores ?? Object.fromEntries(players.map((p) => [p, 0])),
     handScores: carry?.handScores ?? [],
@@ -2456,22 +2457,22 @@ function rummyLegalMoves(state: MatchState, playerId: string): Move[] {
   return moves;
 }
 
-// Melds already on the table, grouped back out of the shared pile so cards can be added to them.
+// Melds already on the table, grouped back out of the shared flat pile so cards can be added to
+// them. The pile itself carries no separators, so this reads state.rummyMeldSizes — the length
+// of each group, in order, updated wherever a meld is laid or laid off onto — rather than
+// guessing boundaries back out of the cards themselves, which is genuinely ambiguous whenever one
+// group happens to end in the same suit the next one starts with.
 function tableMelds(state: MatchState): Card[][] {
   const z = rummyZones(state.definition);
   if (!z.melds) return [];
   const cards = state.zones[z.melds] || [];
-  const cfg = state.definition.rummy!;
   const out: Card[][] = [];
-  let cur: Card[] = [];
-  for (const c of cards) {
-    if (cur.length === 0) { cur = [c]; continue; }
-    const sameSet = cur.every((x) => x.rank === c.rank);
-    const sameRun = cur.every((x) => x.suit === c.suit);
-    if (sameSet || sameRun) cur.push(c); else { out.push(cur); cur = [c]; }
+  let i = 0;
+  for (const size of state.rummyMeldSizes) {
+    out.push(cards.slice(i, i + size));
+    i += size;
   }
-  if (cur.length) out.push(cur);
-  return out.filter((m) => m.length >= Math.min(cfg.setMin, cfg.runMin));
+  return out;
 }
 
 function layOffTargets(state: MatchState, hand: Card[]): { cardId: string; meldKey: string }[] {
@@ -2536,18 +2537,18 @@ function applyRummyMove(s: MatchState, playerId: string, move: Move): MatchState
   }
 
   if (move.actionId === 'layOff') {
+    const meldIdx = parseInt(move.choice ?? '', 10);
     const melds = tableMelds(s);
-    const meld = melds[parseInt(move.choice ?? '', 10)];
+    const meld = melds[meldIdx];
     const i = hand.findIndex((c) => c.id === move.cardId);
     if (!meld || i < 0) return s;
     const [card] = hand.splice(i, 1);
-    // Rebuild the shared pile with the card inserted into its meld, so groupings survive.
-    const rebuilt: Card[] = [];
-    for (const m of melds) {
-      rebuilt.push(...m);
-      if (m === meld) rebuilt.push(card);
-    }
-    if (z.melds) s.zones[z.melds] = rebuilt;
+    // Rebuild the shared pile with the card inserted into its meld, and grow that meld's tracked
+    // size to match — rummyMeldSizes is what lets tableMelds() find this same group again next
+    // time, rather than having to guess its boundaries back out of the flat card list.
+    melds[meldIdx] = [...meld, card];
+    if (z.melds) s.zones[z.melds] = melds.flat();
+    s.rummyMeldSizes[meldIdx] += 1;
     s.stallCount = 0;
     log(s, playerId, `${short(playerId)} lays ${cardLabel(card)} onto a meld.`);
     if (s.zones[`hand:${playerId}`].length === 0) endRummyRound(s, playerId);
@@ -2559,6 +2560,7 @@ function applyRummyMove(s: MatchState, playerId: string, move: Move): MatchState
     const melded = hand.filter((c) => ids.has(c.id));
     s.zones[`hand:${playerId}`] = hand.filter((c) => !ids.has(c.id));
     if (z.melds) s.zones[z.melds].push(...melded);
+    s.rummyMeldSizes.push(melded.length);
     s.stallCount = 0;
     log(s, playerId, `${short(playerId)} melds ${melded.map(cardLabel).join(' ')}.`);
     if (s.zones[`hand:${playerId}`].length === 0) endRummyRound(s, playerId);

@@ -546,6 +546,12 @@ export interface MatchState {
   nextOfferId: number;
   // numeric (Bridge-style) contract auction: the standing high bid, if any.
   highBid: { player: string; level: number; strain: Strain } | null;
+  // rummy: the shared melds zone is one flat pile of cards with no separators, so this is the
+  // record of where each group actually starts and ends — the length of each meld, in order.
+  // Without it, re-deriving groups from the flat array by "same rank or same suit" adjacency is
+  // ambiguous whenever one group happens to end in the same suit the next one starts with, and
+  // silently drops cards that get parsed into the wrong (and then too-short-to-keep) group.
+  rummyMeldSizes: number[];
   ply: number;                           // moves resolved this hand, all families (rules read it)
   log: LogEntry[];
 }

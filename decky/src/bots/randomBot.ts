@@ -394,7 +394,7 @@ export function chooseMove(
       if (cancels.length > 0) return { move: cancels[Math.floor(r.value * cancels.length)], botSeed: r.state };
     }
     const offers = moves.filter((m) => m.actionId === 'pitOffer');
-    if (offers.length === 0) return { move: moves[0], botSeed };
+    if (offers.length === 0) return { move: moves[0], botSeed: r.state };
     return { move: offers[Math.floor(r.value * offers.length)], botSeed: r.state };
   }
 
