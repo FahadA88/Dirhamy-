@@ -35,15 +35,25 @@ await open('Solitaire');
 const undoBtn = p.locator('button', { hasText: /^Undo$/ });
 ok('undo is disabled on a fresh deal', await undoBtn.isDisabled());
 const beforeMoves = await p.locator('.sol-stat').first().textContent();
-await p.locator('.sol-card.live').first().click();
-await p.waitForTimeout(150);
-const targets = p.locator('.sol-col.target, .sol-slot.target');
-if (await targets.count()) await targets.first().click(); else await p.locator('.sol-slot.stock').click();
-await p.waitForTimeout(200);
-const afterMoves = await p.locator('.sol-stat').first().textContent();
+// Keep trying until the counter actually moves. A single tap-and-hope left the board
+// untouched whenever the first live card had nowhere to go, and the whole suite then died
+// on the disabled Undo button below rather than reporting a failure.
+let afterMoves = beforeMoves;
+for (let attempt = 0; attempt < 8 && afterMoves === beforeMoves; attempt++) {
+  const live = p.locator('.sol-card.live');
+  const n = await live.count();
+  if (n) await live.nth(attempt % n).click({ timeout: 2000 }).catch(() => {});
+  await p.waitForTimeout(160);
+  const targets = p.locator('.sol-col.target, .sol-slot.target');
+  if (await targets.count()) await targets.first().click({ timeout: 2000 }).catch(() => {});
+  else await p.locator('.sol-slot.stock').click({ timeout: 2000 }).catch(() => {});
+  await p.waitForTimeout(220);
+  afterMoves = await p.locator('.sol-stat').first().textContent();
+}
 ok(`a move advanced the counter (${beforeMoves.trim()} -> ${afterMoves.trim()})`, beforeMoves !== afterMoves);
-ok('undo is now enabled', !(await undoBtn.isDisabled()));
-await undoBtn.click(); await p.waitForTimeout(200);
+const undoReady = !(await undoBtn.isDisabled());
+ok('undo is now enabled', undoReady);
+if (undoReady) { await undoBtn.click(); await p.waitForTimeout(200); }
 ok('undo rolled the counter back', (await p.locator('.sol-stat').first().textContent()) === beforeMoves);
 await p.locator('button', { hasText: /^Hint$/ }).click(); await p.waitForTimeout(200);
 ok('hint highlights a card', (await p.locator('.sol-card.hinted').count()) > 0);
@@ -61,7 +71,17 @@ console.log('\nA reload resumes the same match, not a new deal');
 await p.goto(base, { waitUntil: 'networkidle' });
 await p.evaluate(() => { Object.keys(localStorage).filter(k => k.startsWith('decky.match.') || k === 'decky.session.v1').forEach(k => localStorage.removeItem(k)); });
 await open('Crazy Eights');
-for (let i = 0; i < 4; i++) { const c = p.locator('.card-btn.playable, .draw-btn'); if (await c.count()) await c.first().click(); await p.waitForTimeout(250); }
+// Play until the log has enough in it to be worth resuming, rather than a fixed four
+// clicks: a click that lands on a card the bots have already made unplayable leaves the log
+// where it was, and the resume check below then compared two lines against two.
+for (let i = 0; i < 20 && (await p.locator('.log-row').count()) < 6; i++) {
+  if (await p.locator('.match-scoreboard').count()) break;
+  const suit = p.locator('.suit-choices button');
+  if (await suit.count()) { await suit.first().click({ timeout: 1500 }).catch(() => {}); await p.waitForTimeout(150); continue; }
+  const c = p.locator('.card-btn.playable, .draw-btn');
+  if (await c.count()) await c.first().click({ timeout: 1500 }).catch(() => {});
+  await p.waitForTimeout(220);
+}
 ok('the hand is still in play', (await p.locator('.match-scoreboard').count()) === 0);
 const logBefore = await p.locator('.log-row').allTextContents();
 await p.reload({ waitUntil: 'networkidle' });

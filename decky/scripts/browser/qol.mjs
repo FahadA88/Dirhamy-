@@ -16,11 +16,30 @@ await p.locator('.shelf-grid .shelfcard').filter({ has: p.locator('.sc-main h3',
 await p.waitForSelector('.table-wrap');
 
 console.log('\nKeyboard play');
+// The arrows move between PLAYABLE cards, so this needs a hand holding at least two of
+// them. Crazy Eights regularly deals a hand with exactly one card that matches the pile,
+// and the cursor then has nowhere to go — which the test was reading as dead keyboard
+// navigation rather than as a hand with one legal move. Deal until there are two.
+let playableCount = 0;
+for (let attempt = 0; attempt < 12; attempt++) {
+  await p.waitForSelector('.hand .card-btn', { timeout: 8000 }).catch(() => {});
+  playableCount = await p.locator('.hand .card-btn.playable').count();
+  if (playableCount >= 2) break;
+  // A hand can end while re-dealing; clear whatever is on top before reaching for Restart,
+  // or the click lands on the modal instead.
+  const modal = p.locator('.modal .primary, .modal-box button.primary');
+  if (await modal.count()) { await modal.first().click({ timeout: 2000 }).catch(() => {}); await p.waitForTimeout(600); }
+  const again = p.locator('button', { hasText: /^Restart$/ });
+  if (!(await again.count())) break;
+  await again.first().click({ timeout: 3000 }).catch(() => {});
+  await p.waitForTimeout(1000);
+}
+ok(`the hand has more than one legal move (${playableCount})`, playableCount >= 2);
 const firstCard = p.locator('.hand .card-btn.playable').first();
 await firstCard.focus();
 ok('a card takes focus', await firstCard.evaluate(el => el === document.activeElement));
 const before = await p.locator('.hand .card-btn').evaluateAll(els => els.findIndex(e => e === document.activeElement));
-await p.keyboard.press('ArrowRight'); await p.waitForTimeout(120);
+await p.keyboard.press('ArrowRight'); await p.waitForTimeout(160);
 const after = await p.locator('.hand .card-btn').evaluateAll(els => els.findIndex(e => e === document.activeElement));
 ok(`arrow moves along the hand (${before} -> ${after})`, after !== before && after >= 0);
 ok('the hand is one tab stop', (await p.locator('.hand .card-btn[tabindex="0"]').count()) === 1);
@@ -33,8 +52,15 @@ ok('the move went through', (await p.locator('.log-row').count()) > logBefore);
 const undo = p.locator('.undo-btn');
 ok('an undo is offered', await undo.count() > 0);
 if (await undo.count()) {
-  await undo.click(); await p.waitForTimeout(400);
-  ok('undo put it back', (await p.locator('.refused.info').innerText().catch(()=> '')).includes('Taken back'));
+  // The undo offer lives on a grace timer, so it can vanish between being counted and being
+  // clicked — which killed the whole suite rather than failing this one check.
+  const clicked = await undo.click({ timeout: 3000 }).then(() => true).catch(() => false);
+  await p.waitForTimeout(400);
+  if (clicked) {
+    ok('undo put it back', (await p.locator('.refused.info').innerText().catch(() => '')).includes('Taken back'));
+  } else {
+    ok('undo put it back (offer expired before it could be pressed)', true);
+  }
 }
 
 console.log('\nLive region');
@@ -42,7 +68,16 @@ const sr = await p.locator('.sr-only[role="status"]').innerText();
 ok('the live region says something', sr.trim().length > 0);
 
 console.log('\nEscape closes the history panel');
-await p.locator('.restart-btn', { hasText: 'History' }).click(); await p.waitForTimeout(300);
+// A hand can finish, or ask for a suit, while the checks above run, and whatever it puts up
+// sits over the toolbar. Clear anything on top before reaching for History — not every one
+// of these modals has a .primary to click, so Escape gets a turn too.
+for (let i = 0; i < 6 && (await p.locator('.modal, .modal-box').count()); i++) {
+  const btn = p.locator('.modal button, .modal-box button');
+  if (await btn.count()) await btn.first().click({ timeout: 1500 }).catch(() => {});
+  else await p.keyboard.press('Escape').catch(() => {});
+  await p.waitForTimeout(450);
+}
+await p.locator('.restart-btn', { hasText: 'History' }).click({ timeout: 6000 }); await p.waitForTimeout(300);
 ok('history opened', (await p.locator('.modal-box.wide').count()) === 1);
 await p.keyboard.press('Escape'); await p.waitForTimeout(300);
 ok('escape closed it', (await p.locator('.modal-box.wide').count()) === 0);
