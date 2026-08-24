@@ -475,6 +475,15 @@ export interface MatchState {
   // trick-taking state (unused by shedding games)
   lead: Suit | null;        // led suit of the current trick
   trickPlays: { player: string; card: Card }[]; // cards played into the current trick
+  /**
+   * The trick that was just taken, kept until the next card is led.
+   *
+   * Purely a report — the rules never read it. It exists because a trick used to vanish the
+   * instant it was won: four cards appeared one at a time and then the middle of the table was
+   * empty again before anyone could see who had beaten what. The table shows this until the
+   * next lead and sweeps it to the winner.
+   */
+  lastTrick?: { plays: { player: string; card: Card }[]; winner: string } | null;
   tricksWon: Record<string, number>;
   bids: Record<string, number>; // trick bids (Spades)
   bidding: boolean;         // true while the bidding phase is open
@@ -622,6 +631,8 @@ export interface RedactedState {
   deadwood?: number;       // gin: what this viewer's unmatched cards are currently worth
   battle?: Card[];
   trick?: { player: string; card: Card }[];
+  /** The trick just taken, held until somebody leads again. */
+  lastTrick?: { plays: { player: string; card: Card }[]; winner: string };
   lead?: Suit | null;
   tricksWon?: Record<string, number>;
   finished?: string[];

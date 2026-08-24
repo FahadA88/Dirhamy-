@@ -716,6 +716,15 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
     return [...all.slice(mine + 1), ...all.slice(0, mine)];
   }, [view.players, me]);
 
+  // Which edge of the table a player sits on, so a card they play can come from where they are
+  // rather than fading into existence in the middle of the felt.
+  const seatSideOf = (id: string) => {
+    if (id === me) return 'me';
+    const i = opponents.findIndex((p) => p.id === id);
+    if (i < 0) return 't';
+    return SEAT_RING[opponents.length]?.[i] ?? 't';
+  };
+
   return (
     <div className="table-wrap">
     <div className="table" data-felt={settings.tableFelt}>
@@ -866,14 +875,32 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
         </div>
       ) : view.mode === 'trick' ? (
         <div className="center trick-area">
-          {view.trick && view.trick.length > 0
-            ? view.trick.map((t) => (
-                <div key={t.player} className="trick-card">
+          {view.trick && view.trick.length > 0 ? (
+            view.trick.map((t) => (
+              <div key={`${t.player}:${t.card.id}`} className="trick-card" data-from={seatSideOf(t.player)}>
+                <CardFace card={t.card} />
+                <div className="pile-label">{nameOf(t.player)}</div>
+              </div>
+            ))
+          ) : view.lastTrick ? (
+            /* The trick that was just taken. It used to blink out the moment the fourth card
+               landed, so you never saw what beat what — now it stays until the next lead and
+               slides away towards whoever won it. */
+            <div className={`trick-taken to-${seatSideOf(view.lastTrick.winner)}`}>
+              {view.lastTrick.plays.map((t) => (
+                <div key={`${t.player}:${t.card.id}`}
+                  className={`trick-card ${t.player === view.lastTrick!.winner ? 'took-it' : ''}`}>
                   <CardFace card={t.card} />
                   <div className="pile-label">{nameOf(t.player)}</div>
                 </div>
-              ))
-            : <div className="trick-empty">{view.isYourTurn ? 'Your lead' : '…'}</div>}
+              ))}
+              <div className="trick-won">
+                {view.lastTrick.winner === me ? 'You take it' : `${nameOf(view.lastTrick.winner)} takes it`}
+              </div>
+            </div>
+          ) : (
+            <div className="trick-empty">{view.isYourTurn ? 'Your lead' : '…'}</div>
+          )}
           {/* Trump decides every trick, so it is a badge you can find at a glance rather
               than a line of grey mono text under the cards. */}
           <div className="trick-meta">
@@ -905,7 +932,7 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
         <div className="center war-center">
           {view.battle && view.battle.length > 0
             ? view.battle.map((c, i) => (
-                <div key={c.id} className="trick-card">
+                <div key={c.id} className="trick-card" data-from={i % 2 === 0 ? 'me' : 't'}>
                   <CardFace card={c} />
                   <div className="pile-label">{i % 2 === 0 ? nameOf(view.players[0].id) : nameOf(view.players[1].id)}</div>
                 </div>
@@ -919,7 +946,10 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
             <div className="pile-label">Stock · {view.zones.draw?.count ?? 0}</div>
           </div>
           <div className="pile">
-            {top ? <CardFace card={top} /> : <div className="card big empty" />}
+            {/* Keyed by the card, so a new top card is a new element and lands rather than
+                cross-fading in place. */}
+            {top ? <div key={top.id} className="landed"><CardFace card={top} /></div>
+                 : <div className="card big empty" />}
             <div className="pile-label">Discard</div>
           </div>
           {view.zones.melds && view.zones.melds.cards.length > 0 && (
@@ -959,7 +989,10 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
             <div className="pile-label">Draw · {view.zones.draw?.count ?? 0}</div>
           </div>
           <div className="pile">
-            {top ? <CardFace card={top} /> : <div className="card big empty" />}
+            {/* Keyed by the card, so a new top card is a new element and lands rather than
+                cross-fading in place. */}
+            {top ? <div key={top.id} className="landed"><CardFace card={top} /></div>
+                 : <div className="card big empty" />}
             <div className="pile-label">Discard{activeSuit ? ` · suit ${SUIT_SYMBOLS[activeSuit] ?? activeSuit}` : ''}</div>
           </div>
         </div>
@@ -1361,15 +1394,25 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
         const lowWins = def.scoring.winner === 'lowestTotal';
         const ranked = finals.slice().sort((a, b) => (lowWins ? a[1] - b[1] : b[1] - a[1]));
         return (
-          <div className="modal">
+          <div className="modal final-modal">
             {iWon && <Confetti pieces={64} spread="rain" />}
+            {iWon && <Confetti pieces={40} spread="burst" />}
+            {/* A shaft of light behind the box, so a win arrives rather than appears. */}
+            <div className={`cb-beam ${iWon ? 'won' : ''}`} aria-hidden="true" />
             <div className={`modal-box celebrate final ${iWon ? 'won' : ''}`}>
-              <span className="cb-crown" aria-hidden="true">{iWon ? '★' : '☆'}</span>
+              <span className="cb-crown" aria-hidden="true">
+                <span className="cb-ring" />
+                <span className="cb-mark">{iWon ? '★' : '☆'}</span>
+              </span>
               <span className="cb-kicker">{view.matchTarget != null ? 'Match over' : 'Game over'}</span>
-              <h3>{iWon ? 'You win' : `${nameOf(view.matchWinner ?? view.winner ?? '')} wins`}</h3>
-              <ol className="podium">
+              <h3 data-text={iWon ? 'You win' : `${nameOf(view.matchWinner ?? view.winner ?? '')} wins`}>
+                {iWon ? 'You win' : `${nameOf(view.matchWinner ?? view.winner ?? '')} wins`}
+              </h3>
+              {/* Counted in from the bottom of the table up, so the winner's row lands last. */}
+              <ol className="podium" style={{ '--rows': ranked.length - 1 } as React.CSSProperties}>
                 {ranked.map(([p, sc], i) => (
-                  <li key={p} className={`${p === me ? 'mine' : ''} ${i === 0 ? 'first' : ''}`}>
+                  <li key={p} className={`${p === me ? 'mine' : ''} ${i === 0 ? 'first' : ''}`}
+                    style={{ '--r': i } as React.CSSProperties}>
                     <span className="pd-rank">{i + 1}</span>
                     <span className="pd-name">{nameOf(p)}</span>
                     <b className="pd-score">{sc}</b>

@@ -60,6 +60,7 @@ export function createMatch(
     stallCount: 0,
     lead: null,
     trickPlays: [],
+    lastTrick: null,
     tricksWon: Object.fromEntries(players.map((p) => [p, 0])),
     bids: {},
     bidding: !!def.trick?.bidding,
@@ -562,6 +563,9 @@ function cloneState(state: MatchState): MatchState {
     tricksWon: { ...state.tricksWon },
     bids: { ...state.bids },
     trickPlays: state.trickPlays.map((t) => ({ ...t })),
+    lastTrick: state.lastTrick
+      ? { winner: state.lastTrick.winner, plays: state.lastTrick.plays.map((t) => ({ ...t })) }
+      : null,
     finished: state.finished.slice(),
     booksWon: { ...state.booksWon },
     pendingChoice: state.pendingChoice ? { ...state.pendingChoice } : null,
@@ -1355,7 +1359,7 @@ function applyTrickMove(s: MatchState, playerId: string, move: Move): MatchState
   hand.splice(idx, 1);
   const trickZone = s.definition.zones.find((z) => z.type === 'trick')!;
   s.zones[trickZone.id].push(card);
-  if (s.trickPlays.length === 0) s.lead = suitOf(s, card) as MatchState['lead'];
+  if (s.trickPlays.length === 0) { s.lead = suitOf(s, card) as MatchState['lead']; s.lastTrick = null; }
   const brk = s.definition.trick!.brokenSuit;
   if (brk && card.suit === brk && !s.brokenSuitPlayed) {
     s.brokenSuitPlayed = true;
@@ -1494,6 +1498,8 @@ function resolveTrick(s: MatchState, trickZoneId: string): void {
     s.scores[winner.player] = (s.scores[winner.player] ?? 0) + pts;
   }
 
+  // Hold the finished trick for the table to show until somebody leads again.
+  s.lastTrick = { plays: s.trickPlays.map((t) => ({ ...t })), winner: winner.player };
   s.zones[trickZoneId] = [];
   s.trickPlays = [];
   s.lead = null;
@@ -3420,6 +3426,10 @@ export function redact(state: MatchState, viewer: string): RedactedState {
     deadwood: state.definition.rummy?.knock !== undefined
       ? bestArrangement(state, state.zones[`hand:${viewer}`] || []).deadwood : undefined,
     trick: state.definition.trick ? state.trickPlays.map((t) => ({ ...t })) : undefined,
+    // The trick just taken, so the table can show it being collected instead of blinking out.
+    lastTrick: state.definition.trick && state.lastTrick
+      ? { winner: state.lastTrick.winner, plays: state.lastTrick.plays.map((t) => ({ ...t })) }
+      : undefined,
     lead: state.definition.trick ? state.lead : undefined,
     tricksWon: state.definition.trick ? { ...state.tricksWon } : undefined,
     finished: state.definition.climb ? state.finished.slice() : undefined,
