@@ -5060,3 +5060,66 @@ button.bluff-go:disabled {
 }
 :root[data-motion="reduced"] .modal-box.celebrate.handend,
 :root[data-motion="reduced"] .war-center .trick-card { animation: none !important; }
+
+/* ============================================================================
+   KENT
+   Four cards face up that anybody may take, the letters each pair has spelt,
+   and the tell — which is the whole game and therefore has to be the loudest
+   thing on the table without being a button that says "I have four kings".
+   ============================================================================ */
+.kent-center { flex-direction: column; align-items: center; gap: 16px; }
+
+.kent-letters { display: flex; gap: 18px; }
+.kent-pair { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--t-muted, var(--muted)); }
+.kent-pair i { font-style: normal; letter-spacing: .06em; text-transform: uppercase; font-size: 10.5px; margin-inline-end: 2px; }
+.kent-pair b { display: flex; gap: 3px; }
+.kent-pair em {
+  font-style: normal; font-weight: 800; font-size: 13px; line-height: 1;
+  inline-size: 18px; block-size: 18px; display: grid; place-items: center;
+  border-radius: 4px; border: 1px solid var(--t-line, var(--panel-brd));
+  color: var(--t-muted, var(--muted)); opacity: .5;
+}
+.kent-pair em.got {
+  opacity: 1; color: #241700; border-color: transparent;
+  background: linear-gradient(180deg, var(--gold-hi), var(--gold));
+}
+.kent-pair.mine i { color: var(--gold); }
+
+.kent-pool { display: flex; gap: 10px; }
+.kent-poolcard {
+  background: none; border: 0; padding: 0; cursor: pointer; border-radius: 9px;
+  transition: transform 140ms, filter 140ms;
+}
+.kent-poolcard:disabled { cursor: default; filter: saturate(.7) brightness(.86); }
+.kent-poolcard.live .card.face { box-shadow: 0 0 0 2px var(--gold-hi), 0 8px 22px rgba(0,0,0,.45); }
+.kent-poolcard.live:hover { transform: translateY(-6px); }
+.kent-poolcard:focus-visible { outline: 3px solid var(--gold-hi); outline-offset: 3px; }
+
+.kent-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; justify-content: center; }
+.kent-note { font-size: 13px; color: var(--t-muted, var(--muted)); }
+.kent-note.mine { color: var(--gold); font-weight: 650; }
+.kent-go { font-size: 16px; padding: 12px 26px; }
+.kent-go.stop { background: linear-gradient(180deg, #e0705f, #b4392c 52%, #7d2418 100%); }
+
+/* The tell: a card room's raised eyebrow. Loud enough to catch out of the corner of an eye,
+   which is exactly what it is for. */
+.kent-tell {
+  position: absolute; left: 50%; bottom: -13px; translate: -50% 0;
+  padding: 3px 12px; border-radius: 999px; white-space: nowrap;
+  font-size: 11px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase;
+  color: #241700; background: linear-gradient(180deg, var(--gold-hi), var(--gold));
+  box-shadow: 0 0 0 3px rgba(224, 182, 75, .28), 0 6px 18px rgba(0, 0, 0, .4);
+  animation: tell-in 220ms cubic-bezier(.2, 1.5, .4, 1) both, tell-pulse 900ms ease-in-out infinite 220ms;
+}
+@keyframes tell-in { from { opacity: 0; scale: .5; } to { opacity: 1; scale: 1; } }
+@keyframes tell-pulse {
+  0%, 100% { box-shadow: 0 0 0 3px rgba(224, 182, 75, .28), 0 6px 18px rgba(0, 0, 0, .4); }
+  50%      { box-shadow: 0 0 0 8px rgba(224, 182, 75, .06), 0 6px 18px rgba(0, 0, 0, .4); }
+}
+@media (prefers-reduced-motion: reduce) { .kent-tell { animation: none; } }
+:root[data-motion="reduced"] .kent-tell { animation: none; }
+
+@media (max-width: 780px) {
+  .kent-pool { flex-wrap: wrap; justify-content: center; }
+  .kent-letters { gap: 12px; }
+}

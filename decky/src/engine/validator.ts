@@ -38,9 +38,10 @@ export function validate(def: GameDefinition): ValidationResult {
   const isReflex = !!def.reflex;
   const isPoker = !!def.poker;
   const isPit = !!def.pit;
+  const isKent = !!def.kent;
   const isSet = !!def.set;
   const isSpecial = isTrick || isClimb || isFish || isRummy || isWar || isSolitaire
-    || isBluff || isReflex || isPoker || isPit || isSet;
+    || isBluff || isReflex || isPoker || isPit || isSet || isKent;
 
   // --- players ---
   // Patience is played alone, and spotting sets on a shared board works just as well solo, so
@@ -48,6 +49,11 @@ export function validate(def: GameDefinition): ValidationResult {
   if (!isSolitaire && !isSet && def.meta.players.min < 2) err('players.min', 'A game needs at least 2 players.');
   if (def.meta.players.max < def.meta.players.min) {
     err('players.range', 'Max players is below min players.');
+  }
+  // A game that seats in pairs has to be able to reach its own maximum in pairs.
+  const step = def.meta.players.step ?? 1;
+  if (step > 1 && (def.meta.players.max - def.meta.players.min) % step !== 0) {
+    err('players.step', `Seats go up in ${step}s, so max must be a whole number of steps above min.`);
   }
 
   // --- zones: engine expectations ---

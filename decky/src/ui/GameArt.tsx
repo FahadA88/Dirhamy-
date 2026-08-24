@@ -234,6 +234,20 @@ const SCENES: Record<string, Scene> = {
     ],
   },
 
+  // Kent: four of a kind in one hand, and the look across the table that gives it away.
+  'classic-kent': {
+    cloth: CLOTH.forest,
+    mark: { glyph: '\u25C9', x: 78, y: 26, size: 30, turn: 0 },
+    cards: [
+      { r: '7', s: 'S', x: 20, y: 58, rot: -12, z: 3, scale: 0.9 },
+      { r: '7', s: 'H', x: 32, y: 56, rot: -5, z: 4, scale: 0.9 },
+      { r: '7', s: 'D', x: 44, y: 56, rot: 3, z: 5, scale: 0.9 },
+      { r: '7', s: 'C', x: 56, y: 58, rot: 10, z: 6, scale: 0.9 },
+      { r: 'K', s: 'S', x: 74, y: 62, rot: -4, z: 2, back: true, scale: 0.8 },
+      { r: 'Q', s: 'H', x: 86, y: 64, rot: 5, z: 1, back: true, scale: 0.8 },
+    ],
+  },
+
   // Spider: eight columns, and the run you are trying to complete.
   'classic-spider': {
     cloth: CLOTH.ink,

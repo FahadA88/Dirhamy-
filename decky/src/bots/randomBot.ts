@@ -390,6 +390,98 @@ export function chooseMove(
     return { move: moves.find((m) => m.actionId === 'pokerCall') ?? moves.find((m) => m.actionId === 'pokerFold') ?? moves[0], botSeed: r.state };
   }
 
+  // Kent. Three things matter and they are all about the tell.
+  //
+  // Your partner has signalled: call it, that is the whole game. An opponent has signalled:
+  // call it off — but not every time, because a bot that never misses a tell is not an
+  // opponent, it is a wall, and spotting one is the only thing a person is actually racing.
+  // Nothing showing: collect. Pick the rank you hold most of and trade towards it.
+  if (moves.some((m) => m.actionId === 'kentCall' || m.actionId === 'kentStop'
+    || m.actionId === 'kentSignal' || m.actionId === 'kentSwap')) {
+    const call = moves.find((m) => m.actionId === 'kentCall');
+    if (call) return { move: call, botSeed };
+    const stop = moves.find((m) => m.actionId === 'kentStop');
+    if (stop) {
+      const r = nextRandom(botSeed);
+      // Even at its sharpest it looks away sometimes: a bot that never misses a tell is not an
+      // opponent, and spotting one is the only thing a person is racing it for.
+      const miss = mode === 'random' ? 0.75 : 0.3;
+      if (r.value >= miss) return { move: stop, botSeed: r.state };
+      return { move: { actionId: 'kentWait' }, botSeed: r.state };
+    }
+    const waiting = moves.find((m) => m.actionId === 'kentWait');
+    if (waiting) return { move: waiting, botSeed };
+    const signal = moves.find((m) => m.actionId === 'kentSignal');
+    if (signal) return { move: signal, botSeed };
+
+    const hand = state.zones[`hand:${playerId}`] || [];
+    const pool = state.zones['kent:pool'] || [];
+    const count = (rank: string, without?: string) =>
+      hand.filter((c) => c.rank === rank && c.id !== without).length;
+
+    // Collect what the table can actually give you, and know when to give up on a rank.
+    //
+    // Holding out for the fourth king is how a person plays and it is also how four bots lock
+    // a game solid: three of them sit on three of a kind, the fourth card of each is in
+    // somebody else's hand, and no swap on earth improves anyone. Left like that they traded
+    // equivalent cards back and forth for four thousand moves without a single pile changing.
+    //
+    // So: take a swap only if it makes your biggest pile bigger. If nothing does, the table
+    // cannot help — turn it over. And every so often, when turning it over has not helped
+    // either, break your own pile up and start again on a rank the table is actually offering,
+    // which is precisely what a player does when they work out the card is not coming.
+    const mine = Math.max(0, ...hand.map((c) => count(c.rank)));
+    let best: Move | null = null;
+    let bestScore = mine;
+    for (const m of moves) {
+      if (m.actionId !== 'kentSwap') continue;
+      const taken = pool.find((c) => c.id === m.poolId);
+      const given = hand.find((c) => c.id === m.cardId);
+      if (!taken || !given) continue;
+      const after = count(taken.rank, m.cardId) + 1;
+      const kept = Math.max(after, ...hand.filter((c) => c.id !== m.cardId).map((c) => count(c.rank, m.cardId)));
+      if (kept > bestScore) { bestScore = kept; best = m; }
+    }
+    if (best) return { move: best, botSeed };
+
+    const refresh = moves.find((m) => m.actionId === 'kentRefresh');
+    const r = nextRandom(botSeed);
+    const swapMoves = moves.filter((m) => m.actionId === 'kentSwap').map((m) => {
+      const taken = pool.find((c) => c.id === m.poolId);
+      const given = hand.find((c) => c.id === m.cardId);
+      return { m, gain: taken ? count(taken.rank, m.cardId) : -1, shed: given ? count(given.rank) : 9 };
+    });
+
+    // Giving up on the rank. Rarely, and on purpose: break your own pile and start again on
+    // whatever the table is offering. Without it four bots sit on three of a kind each with
+    // the fourth of every rank in somebody else's hand, and no swap on earth improves anyone.
+    if (r.value < 0.15 && swapMoves.length > 0) {
+      const give = swapMoves.slice().sort((a, b) => b.gain - a.gain || b.shed - a.shed)[0];
+      return { move: give.m, botSeed: r.state };
+    }
+    // Turning the table over is what brings ranks that are not yet in play into play, so it has
+    // to happen often or nobody ever completes anything. But three bots doing it in rotation and
+    // nothing else is forty seconds of a game log saying nothing happened, so half the time
+    // keep the pile and trade away your loneliest card instead — the cards still move, and the
+    // table still comes round often enough for the game to finish.
+    const r2 = nextRandom(r.state);
+    const useless = !pool.some((c) => count(c.rank) > 0);
+    if (refresh && (useless || r2.value < 0.5)) return { move: refresh, botSeed: r2.state };
+    if (swapMoves.length > 0) {
+      const keep = swapMoves.slice().sort((a, b) => b.gain - a.gain || a.shed - b.shed)[0];
+      return { move: keep.m, botSeed: r2.state };
+    }
+    if (refresh) return { move: refresh, botSeed: r2.state };
+
+    const swaps = moves.filter((m) => m.actionId === 'kentSwap');
+    if (swaps.length === 0) return { move: moves[0], botSeed };
+    const lonely = swaps.slice().sort((a, b) => {
+      const ca = hand.find((c) => c.id === a.cardId); const cb = hand.find((c) => c.id === b.cardId);
+      return count(ca?.rank ?? '') - count(cb?.rank ?? '');
+    })[0];
+    return { move: lonely, botSeed };
+  }
+
   // Pit: take a trade that's actually on the table before ever posting a new one — otherwise
   // every player just keeps re-offering and the market grows forever without a single trade
   // landing. Only post a fresh offer, in your scarcest suit, when nothing is acceptable and you

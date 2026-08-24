@@ -49,6 +49,8 @@ export function createMatch(
     matchScores: Record<string, number>; handScores: Record<string, number>[]; handNumber: number;
     /** Poker only: the stacks people are sitting down with, carried from the last hand. */
     chips?: Record<string, number>;
+    /** Kent only: the letters each pair has already spelt. */
+    kentLetters?: Record<string, number>;
   },
 ): MatchState {
   const state: MatchState = {
@@ -112,6 +114,8 @@ export function createMatch(
     actedThisRound: {},
     pokerPhase: 'bet',
     market: [],
+    kentTell: null,
+    kentLetters: {},
     nextOfferId: 1,
     highBid: null,
     rummyMeldSizes: [],
@@ -290,6 +294,16 @@ export function createMatch(
       state.turnIndex = n === 2 ? sbIdx : 2 % n;
       log(state, null, `${short(players[sbIdx])} posts the small blind (${cfg.smallBlind}). ${short(players[bbIdx])} posts the big blind (${cfg.bigBlind}).`);
     }
+  }
+  // Kent: four in the middle, face up, after the hands have gone out. The letters already
+  // spelt come in with the carry, because a round is one hand but a game is however many
+  // rounds it takes a pair to spell the word.
+  if (def.kent) {
+    const pool = (state.zones[kentZones.pool] ||= []);
+    const draw = state.zones['draw'] || [];
+    for (let i = 0; i < def.kent.poolSize; i++) { const c = draw.pop(); if (c) pool.push(c); }
+    state.kentLetters = { A: carry?.kentLetters?.A ?? 0, B: carry?.kentLetters?.B ?? 0 };
+    log(state, null, `Four on the table. Four of a kind and signal your partner — ${def.kent.letters.split('').join('-')} and you are out.`);
   }
   // Pit deals the whole deck out at once, so a player can already be holding a full corner the
   // instant the cards land — pitCheckWin() is otherwise only ever called after a trade, which
@@ -527,6 +541,7 @@ export function legalMoves(state: MatchState, playerId: string): Move[] {
   if (state.definition.reflex) return reflexLegalMoves(state, playerId);
   if (state.definition.poker) return pokerLegalMoves(state, playerId);
   if (state.definition.pit) return pitLegalMoves(state, playerId);
+  if (state.definition.kent) return kentLegalMoves(state, playerId);
   if (state.definition.set) return setLegalMoves(state);
 
   // Resolve a pending choice first (e.g. pick a suit after a wild).
@@ -586,6 +601,11 @@ function cloneState(state: MatchState): MatchState {
     folded: { ...state.folded },
     actedThisRound: { ...state.actedThisRound },
     market: state.market.map((o) => ({ ...o })),
+    // Kent's tell and its letters are state like everything else here: shared by reference they
+    // would leak across a take-back and across a replay, which is exactly what this clone
+    // exists to stop.
+    kentTell: state.kentTell ? { ...state.kentTell } : null,
+    kentLetters: { ...state.kentLetters },
     highBid: state.highBid ? { ...state.highBid } : null,
     log: state.log.slice(),
   };
@@ -808,6 +828,7 @@ export function applyMove(state: MatchState, playerId: string, move: Move): Matc
   if (def.reflex) return afterFamilyMove(applyReflexMove(s, playerId, move), playerId, handBefore);
   if (def.poker) return afterFamilyMove(applyPokerMove(s, playerId, move), playerId, handBefore);
   if (def.pit) return afterFamilyMove(applyPitMove(s, playerId, move), playerId, handBefore);
+  if (def.kent) return afterFamilyMove(applyKentMove(s, playerId, move), playerId, handBefore);
   if (def.set) return afterFamilyMove(applySetMove(s, playerId, move), playerId, handBefore);
 
   // Resolve a pending suit choice.
@@ -1123,6 +1144,7 @@ export function actingPlayers(state: MatchState): string[] {
   // Pit has no turn order at all — every player who still has legal moves is "acting" on
   // every tick, the same way a simultaneous pass works.
   if (state.definition.pit) return state.players.filter((p) => pitLegalMoves(state, p).length > 0);
+  if (state.definition.kent) return state.players.filter((p) => kentLegalMoves(state, p).length > 0);
   // Nobody's turn: everyone is looking at the same board, and whoever calls first gets it.
   if (state.definition.set) return setLegalMoves(state).length > 0 ? state.players.slice() : [];
   const current = state.players[state.turnIndex];
@@ -1168,6 +1190,27 @@ function finalizeMatchProgress(s: MatchState): void {
   // when the last hand has been played or somebody runs out of chips, and the biggest stack
   // takes it — one hand and out meant posting a blind, calling once, and being told the game
   // was over with everyone still holding nearly all their chips.
+  // Kent is scored in letters, not points. A round is a hand; the game is over when a pair has
+  // spelt the whole word, and the other pair has won it.
+  if (s.definition.kent) {
+    const word = s.definition.kent.letters.length;
+    const row: Record<string, number> = {};
+    for (const p of s.players) row[p] = s.scores[p] ?? 0;
+    s.handScores.push(row);
+    for (const p of s.players) s.matchScores[p] = (s.matchScores[p] ?? 0) + (s.scores[p] ?? 0);
+    const out = (['A', 'B'] as const).find((t) => (s.kentLetters[t] ?? 0) >= word);
+    if (out) {
+      const won = out === 'A' ? 'B' : 'A';
+      s.matchOver = true;
+      s.matchWinner = s.players.find((p) => kentTeamOf(s, p) === won) ?? null;
+      log(s, null, `Pair ${out} spells ${s.definition.kent.letters} — pair ${won} takes the game.`);
+    } else {
+      s.matchOver = false;
+      s.matchWinner = null;
+    }
+    return;
+  }
+
   if (s.definition.poker) {
     const start = s.definition.poker.startingChips;
     const row: Record<string, number> = {};
@@ -1245,6 +1288,7 @@ export function nextHand(state: MatchState, seed: number): MatchState {
     // Chips are the whole point of a betting game: the stack you finished the last hand with
     // is the stack you sit down with for the next one.
     chips: state.definition.poker ? { ...state.chips } : undefined,
+    kentLetters: state.definition.kent ? { ...state.kentLetters } : undefined,
   });
 }
 
@@ -3288,6 +3332,170 @@ function pitCheckWin(s: MatchState): boolean {
   return false;
 }
 
+// ---------- the kent family (partnership signalling, no turn order) ----------
+//
+// Kent — also played as Kemps, Canes or Signal. Everybody holds four cards and four more sit
+// face up in the middle. There is no turn order at all: any player may swap one of their cards
+// for one of the pool's whenever they like, and the pool is thrown in and re-dealt when it has
+// been picked over. Collect four of a kind and you have it — but saying so is exactly what you
+// must not do. You signal, and your PARTNER has to be the one who calls it.
+//
+// The signal is the whole game, and it is the part that does not survive being digitised
+// literally: across a table it is a raised eyebrow, and a raised eyebrow is not a move. Here
+// signalling puts a tell on your seat that every player can see for a few moves. Your partner
+// calling it wins the round; an opponent calling it off first hands the letter to you. What is
+// being raced is therefore the same thing that is raced at a real table — who is watching.
+//
+// The tell lapses after a number of MOVES, not milliseconds. The engine has no clock and must
+// not grow one: a rule that depends on wall time cannot be replayed from a seed and a list of
+// moves, and being able to do that is the one property every rule in here has to keep.
+
+export const kentZones = { pool: 'kent:pool' };
+
+/** Partners sit opposite, so pairs are the odd seats against the even ones. */
+export function kentTeamOf(s: MatchState, playerId: string): string {
+  return s.players.indexOf(playerId) % 2 === 0 ? 'A' : 'B';
+}
+
+function kentPool(s: MatchState): Card[] {
+  return (s.zones[kentZones.pool] ||= []);
+}
+
+/** Four of a kind — the hand you are trying to build, and the only reason to signal. */
+export function kentHasFour(s: MatchState, playerId: string): boolean {
+  const hand = s.zones[`hand:${playerId}`] || [];
+  if (hand.length < 2) return false;
+  return hand.every((c) => c.rank === hand[0].rank);
+}
+
+/** Is the tell still up? It lapses on its own, so nobody has to remember to take it down. */
+function kentTellLive(s: MatchState): boolean {
+  if (!s.kentTell) return false;
+  if (s.ply - s.kentTell.ply > s.definition.kent!.tellPlies) { s.kentTell = null; return false; }
+  return true;
+}
+
+function kentLegalMoves(state: MatchState, playerId: string): Move[] {
+  if (state.phase !== 'playing') return [];
+  const moves: Move[] = [];
+  const hand = state.zones[`hand:${playerId}`] || [];
+  const pool = state.zones[kentZones.pool] || [];
+  const tell = state.kentTell;
+  const tellUp = !!tell && state.ply - tell.ply <= state.definition.kent!.tellPlies;
+
+  if (tellUp && tell) {
+    if (tell.player !== playerId) {
+      const partners = kentTeamOf(state, tell.player) === kentTeamOf(state, playerId);
+      moves.push(partners ? { actionId: 'kentCall' } : { actionId: 'kentStop' });
+    }
+    // Looking away is a move.
+    //
+    // A tell lapses after a few MOVES, and moves are the only clock the engine has — so if
+    // every seat that could call simply declined to act, nothing would advance and the tell
+    // would hang there for ever. This is the seat that saw nothing: it costs the round
+    // nothing and it lets the moment pass, which is exactly what it is.
+    moves.push({ actionId: 'kentWait' });
+    return moves;
+  }
+
+  if (kentHasFour(state, playerId)) moves.push({ actionId: 'kentSignal' });
+  for (const mine of hand) {
+    for (const theirs of pool) moves.push({ actionId: 'kentSwap', cardId: mine.id, poolId: theirs.id });
+  }
+  // Nobody wants what is on the table: throw it in and turn four more.
+  if (pool.length > 0
+    && (state.zones['draw'] || []).length + (state.zones['discard'] || []).length >= pool.length) {
+    moves.push({ actionId: 'kentRefresh' });
+  }
+  return moves;
+}
+
+function applyKentMove(s: MatchState, playerId: string, move: Move): MatchState {
+  const cfg = s.definition.kent!;
+  const hand = s.zones[`hand:${playerId}`] || (s.zones[`hand:${playerId}`] = []);
+  const pool = kentPool(s);
+
+  if (move.actionId === 'kentSwap') {
+    if (kentTellLive(s)) return s;
+    const mine = hand.findIndex((c) => c.id === move.cardId);
+    const theirs = pool.findIndex((c) => c.id === move.poolId);
+    if (mine < 0 || theirs < 0) return s;
+    const given = hand[mine];
+    const taken = pool[theirs];
+    hand[mine] = taken;
+    pool[theirs] = given;
+    log(s, playerId, `${short(playerId)} swaps a card with the table.`);
+    return s;
+  }
+
+  if (move.actionId === 'kentRefresh') {
+    if (kentTellLive(s)) return s;
+    const draw = s.zones['draw'] || (s.zones['draw'] = []);
+    const spent = pool.splice(0, pool.length);
+    (s.zones['discard'] ||= []).push(...spent);
+    // The deck comes round again. Sixteen cards are in hands and four on the table, so a fifty-
+    // two card deck is spent after eight turnovers — and a table nobody can turn over is a
+    // table where the four you need may simply not be in play, which is not a game, it is a
+    // wait. What has been thrown in is shuffled and dealt again, the way it is at a real table.
+    if (draw.length < cfg.poolSize) {
+      const back = (s.zones['discard'] || []).splice(0);
+      const { result, rngState } = seededShuffle(back, s.rngState);
+      s.rngState = rngState;
+      draw.push(...result);
+    }
+    for (let i = 0; i < cfg.poolSize; i++) { const c = draw.pop(); if (c) pool.push(c); }
+    log(s, playerId, `${short(playerId)} turns the table over — ${cfg.poolSize} new cards.`);
+    return s;
+  }
+
+  if (move.actionId === 'kentSignal') {
+    if (kentTellLive(s) || !kentHasFour(s, playerId)) return s;
+    s.kentTell = { player: playerId, ply: s.ply };
+    log(s, playerId, `${short(playerId)} signals.`);
+    return s;
+  }
+
+  if (move.actionId === 'kentWait') return s;   // the ply it costs is the whole point
+
+  if (move.actionId === 'kentCall' || move.actionId === 'kentStop') {
+    if (!kentTellLive(s) || !s.kentTell) return s;
+    const teller = s.kentTell.player;
+    if (teller === playerId) return s;
+    const sameTeam = kentTeamOf(s, teller) === kentTeamOf(s, playerId);
+    // Who was right decides who takes a letter: a partner calling it wins the round for the
+    // pair, an opponent calling it off wins it for theirs.
+    const winners = sameTeam ? kentTeamOf(s, playerId) : kentTeamOf(s, playerId);
+    const losers = winners === 'A' ? 'B' : 'A';
+    log(s, playerId, sameTeam
+      ? `${short(playerId)} calls Kent — ${short(teller)} had four ${kentFourRank(s, teller)}s.`
+      : `${short(playerId)} calls it off — ${short(teller)} was signalling.`);
+    kentEndRound(s, winners, losers, playerId);
+    return s;
+  }
+
+  return s;
+}
+
+function kentFourRank(s: MatchState, playerId: string): string {
+  const hand = s.zones[`hand:${playerId}`] || [];
+  return hand[0]?.rank ?? '?';
+}
+
+/** A round is over: the losing pair takes a letter, and a fresh hand goes out. */
+function kentEndRound(s: MatchState, winners: string, losers: string, caller: string): void {
+  const cfg = s.definition.kent!;
+  s.kentLetters[losers] = (s.kentLetters[losers] ?? 0) + 1;
+  s.kentTell = null;
+  s.phase = 'roundOver';
+  for (const p of s.players) s.scores[p] = kentTeamOf(s, p) === winners ? 1 : 0;
+  // The round belongs to whoever spotted it. Naming whichever partner happens to sit first
+  // made every game in the self-play report look as though seats three and four never won one.
+  s.winner = caller;
+  const spelt = cfg.letters.slice(0, s.kentLetters[losers]);
+  log(s, null, `Pair ${losers} takes a letter — ${spelt.split('').join('-')}.`);
+  finalizeMatchProgress(s);
+}
+
 // ---------- the set family (spotting combinations on a shared board) ----------
 //
 // The odd one out. No turns, no hands, no pile: a board of cards is face up and everyone is
@@ -3458,13 +3666,14 @@ export function redact(state: MatchState, viewer: string): RedactedState {
         : state.definition.bluff ? bluffLegalMoves(state, viewer).length > 0
         : state.definition.reflex ? reflexLegalMoves(state, viewer).length > 0
         : state.definition.poker ? pokerLegalMoves(state, viewer).length > 0
+        : state.definition.kent ? kentLegalMoves(state, viewer).length > 0
         : state.definition.pit ? pitLegalMoves(state, viewer).length > 0
         : state.players[state.turnIndex] === viewer || climbBombMoves(state, viewer).length > 0),
     pendingChoice: state.pendingChoice,
     scores: { ...state.scores },
     log: state.log.slice(-40),
     mode: state.definition.solitaire ? 'solitaire' : state.definition.trick ? 'trick' : state.definition.climb ? 'climb' : state.definition.fish ? 'fish' : state.definition.rummy ? 'rummy' : state.definition.war ? 'war'
-      : state.definition.bluff ? 'bluff' : state.definition.reflex ? 'reflex' : state.definition.poker ? 'poker' : state.definition.pit ? 'pit' : state.definition.set ? 'set' : 'shedding',
+      : state.definition.bluff ? 'bluff' : state.definition.reflex ? 'reflex' : state.definition.poker ? 'poker' : state.definition.pit ? 'pit' : state.definition.kent ? 'kent' : state.definition.set ? 'set' : 'shedding',
     ...(state.definition.solitaire ? solitaireView(state) : {}),
     battle: state.definition.war ? (state.zones[state.definition.zones.find((z) => z.shared && z.visibility === 'all')!.id] || []).slice() : undefined,
     rummyPhase: state.definition.rummy ? state.rummyPhase : undefined,
@@ -3544,6 +3753,17 @@ export function redact(state: MatchState, viewer: string): RedactedState {
     // pit
     market: state.definition.pit ? state.market.map((o) => ({ ...o })) : undefined,
     cornerSize: state.definition.pit ? pitCorner(state) : undefined,
+    // kent: the middle of the table is face up to everybody by definition, the tell is the
+    // whole point of the game being visible, and the letters are written down in front of
+    // everyone. Nothing here is a leak; the hands stay hidden as they always were.
+    kentPool: state.definition.kent ? (state.zones[kentZones.pool] ?? []).map((c) => ({ ...c })) : undefined,
+    kentTell: state.definition.kent
+      ? (state.kentTell && state.ply - state.kentTell.ply <= state.definition.kent.tellPlies
+          ? { player: state.kentTell.player } : null)
+      : undefined,
+    kentLetters: state.definition.kent ? { ...state.kentLetters } : undefined,
+    kentWord: state.definition.kent ? state.definition.kent.letters : undefined,
+    kentReady: state.definition.kent ? kentHasFour(state, viewer) : undefined,
     // set: the board is face up to everyone by definition, so there is nothing to hide. The
     // deck count is public too — knowing how much is left is part of the game, not a leak.
     setBoard: state.definition.set ? (state.zones['set:board'] ?? []).map((c) => ({ ...c })) : undefined,

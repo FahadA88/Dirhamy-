@@ -7,6 +7,7 @@ import { ginRummy } from '../src/games/ginRummy';
 import { klondike } from '../src/games/klondike';
 import { freecell } from '../src/games/freecell';
 import { spider } from '../src/games/spider';
+import { kent } from '../src/games/kent';
 import { catalog } from '../src/games/catalog';
 import { createMatch, legalMoves, applyMove, actingPlayers, redact, nextHand } from '../src/engine/engine';
 import { chooseMove } from '../src/bots/randomBot';
@@ -651,6 +652,71 @@ section('Solitaire — Spider runs');
   check('dealing lays one card on each of the ten columns', d2.zones['stock'].length === before - 10, d2.zones['stock'].length);
   check('and turns them all face up',
     Array.from({ length: 10 }, (_, i) => d2.zones[`tab${i}`].slice(-1)[0]).every((c) => d2.faceUp[c.id]));
+}
+
+// Kent is decided by who spots the signal, so the outcome of a signal is stacked here rather
+// than waited for: random play reaches four of a kind eventually, but "eventually" is not a
+// test of what happens when it does.
+section('Kent — the signal, and who gets the letter');
+{
+  const P = ['P1', 'P2', 'P3', 'P4'];   // pairs are P1+P3 against P2+P4
+  const stack = (s: MatchState, who: string, rank: string) => {
+    // Give this seat four of a kind, taking the cards from wherever they are.
+    const wanted = ['S', 'H', 'D', 'C'].map((suit) => `${rank}${suit}`);
+    for (const key of Object.keys(s.zones)) {
+      s.zones[key] = s.zones[key].filter((c) => !wanted.includes(c.id));
+    }
+    s.zones[`hand:${who}`] = wanted.map((id) => ({ id, rank, suit: id.slice(-1) } as Card));
+    return s;
+  };
+
+  let s = stack(createMatch(kent, P, 77), 'P2', 'K');
+  check('four of a kind is what lets you signal',
+    legalMoves(s, 'P2').some((m) => m.actionId === 'kentSignal'));
+  check('and nobody else can signal on your hand',
+    !legalMoves(s, 'P1').some((m) => m.actionId === 'kentSignal'));
+
+  s = applyMove(s, 'P2', { actionId: 'kentSignal' });
+  check('the tell is up', !!s.kentTell && s.kentTell.player === 'P2');
+  check('the partner is offered the call',
+    legalMoves(s, 'P4').some((m) => m.actionId === 'kentCall'));
+  check('an opponent is offered the call-off',
+    legalMoves(s, 'P1').some((m) => m.actionId === 'kentStop'));
+  check('and the table is frozen while it is up',
+    !legalMoves(s, 'P1').some((m) => m.actionId === 'kentSwap'));
+  check('the seat that signalled can only wait',
+    legalMoves(s, 'P2').every((m) => m.actionId === 'kentWait'));
+
+  // The partner sees it: the pair takes the round, the other pair takes the letter.
+  let won = applyMove(s, 'P4', { actionId: 'kentCall' });
+  check('a partner calling it wins the round', won.phase === 'roundOver' && won.winner === 'P4', won.winner ?? '');
+  check('and the other pair takes the letter', won.kentLetters.A === 1 && won.kentLetters.B === 0,
+    JSON.stringify(won.kentLetters));
+
+  // An opponent sees it first: the letter goes the other way.
+  let lost = applyMove(s, 'P1', { actionId: 'kentStop' });
+  check('an opponent calling it off wins the round', lost.phase === 'roundOver' && lost.winner === 'P1');
+  check('and the letter goes to the pair that signalled', lost.kentLetters.B === 1 && lost.kentLetters.A === 0,
+    JSON.stringify(lost.kentLetters));
+
+  // The tell lapses on its own, so a signal nobody sees costs nothing.
+  let lapsed = s;
+  for (let i = 0; i < 5; i++) lapsed = applyMove(lapsed, 'P1', { actionId: 'kentWait' });
+  check('a signal nobody sees lapses', !legalMoves(lapsed, 'P4').some((m) => m.actionId === 'kentCall'));
+  check('and the table starts again', legalMoves(lapsed, 'P1').some((m) => m.actionId === 'kentSwap'));
+
+  // Spelling the word ends it.
+  let far = stack(createMatch(kent, P, 78), 'P2', 'Q');
+  far.kentLetters = { A: 3, B: 0 };
+  far = applyMove(far, 'P2', { actionId: 'kentSignal' });
+  far = applyMove(far, 'P1', { actionId: 'kentStop' });
+  check('a fourth letter does not end it for the pair that spelt nothing', !far.matchOver, JSON.stringify(far.kentLetters));
+  let out = stack(createMatch(kent, P, 79), 'P1', 'Q');
+  out.kentLetters = { A: 3, B: 0 };
+  out = applyMove(out, 'P1', { actionId: 'kentSignal' });
+  out = applyMove(out, 'P2', { actionId: 'kentStop' });
+  check('spelling KENT ends the game', out.matchOver && out.kentLetters.A === 4, JSON.stringify(out.kentLetters));
+  check('and the other pair has won it', !!out.matchWinner && P.indexOf(out.matchWinner) % 2 === 1, out.matchWinner ?? '');
 }
 
 // Redaction runs for every seat, in every classic, whether or not that seat is on turn — the

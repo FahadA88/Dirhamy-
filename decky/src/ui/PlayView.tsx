@@ -14,6 +14,16 @@ import { OnlineTable, OnlineSession } from './OnlineTable';
 import { hostInfo } from '../net/host';
 import { recordPlay } from '../library/library';
 
+
+// The nearest seat count this game can actually be dealt in. A partnership game seats in pairs,
+// so "three by default" has to become four rather than sliding to five and leaving somebody
+// without a partner.
+function seatsFor(def: GameDefinition, want: number): number {
+  const { min, max, step = 1 } = def.meta.players;
+  const clamped = Math.min(Math.max(want, min), max);
+  return min + Math.floor((clamped - min) / step) * step;
+}
+
 // Discover + play the classics library (and, once wired, published community games).
 export function PlayView() {
   const { settings } = useSettings();
@@ -65,7 +75,7 @@ export function PlayView() {
     return (
       <SeatSetup
         def={setupFor}
-        defaultSeats={Math.min(Math.max(settings.defaultSeats, setupFor.meta.players.min), setupFor.meta.players.max)}
+        defaultSeats={seatsFor(setupFor, settings.defaultSeats)}
         defaultName={settings.playerName}
         onCancel={() => setSetupFor(null)}
         onStart={(seatPlan, isPractice) => {
@@ -101,7 +111,7 @@ export function PlayView() {
               {Array.from(
                 { length: game.meta.players.max - game.meta.players.min + 1 },
                 (_, i) => game.meta.players.min + i,
-              ).map((n) => (
+              ).filter((n) => (n - game.meta.players.min) % (game.meta.players.step ?? 1) === 0).map((n) => (
                 <button key={n} className={`seg-btn ${seats === n ? 'on' : ''}`}
                   onClick={() => setSeats(n)}>{n}</button>
               ))}
@@ -140,7 +150,7 @@ export function PlayView() {
               // for every game whose table is bigger or smaller than the default, so Spades,
               // Hearts, Euchre and War all "resumed" into a fresh three-handed deal.
               if (def) {
-                setSeats(Math.min(Math.max(resumable.seats, def.meta.players.min), def.meta.players.max));
+                setSeats(seatsFor(def, resumable.seats));
                 setPlan(null); setPractice(false);
                 setResumeId(resumable.matchId); setGame(def); setResumable(null);
               }
@@ -186,7 +196,7 @@ export function PlayView() {
           setPlan(null);
           setPractice(false);
           setResumeId(null);
-          setSeats(Math.min(Math.max(settings.defaultSeats, def.meta.players.min), def.meta.players.max));
+          setSeats(seatsFor(def, settings.defaultSeats));
           setGame(def);
         }}
         onSetup={(def) => { recordPlay(def.meta.id); setSetupFor(def); }}

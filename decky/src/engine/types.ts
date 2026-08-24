@@ -29,7 +29,16 @@ export interface GameDefinition {
     id: string;
     name: string;
     description: string;
-    players: { min: number; max: number };
+    players: {
+      min: number;
+      max: number;
+      /**
+       * Seats this game can only be dealt in multiples of. A partnership game cannot seat five
+       * — somebody would have no partner — so it says two here and the seat picker offers four
+       * and six rather than four, five and six.
+       */
+      step?: number;
+    };
     family: string;
   };
   deck: {
@@ -81,6 +90,8 @@ export interface GameDefinition {
   poker?: PokerConfig;
   // Present iff this is a trading game — see PitConfig.
   pit?: PitConfig;
+  // Present iff this is Kent — see KentConfig.
+  kent?: KentConfig;
   set?: SetConfig;
   // Present iff this is a single-player patience game: build the tableau down, the foundations
   // up, and win by clearing the deck. No opponents, no turns, no bot.
@@ -135,6 +146,34 @@ export interface PokerConfig {
    * everybody still holding chips. Absent means one hand, which is what it used to be.
    */
   hands?: number;
+}
+
+/**
+ * Present iff this is Kent (also played as Kemps, Canes or Signal): a partnership game with no
+ * turn order at all.
+ *
+ * Everybody holds `handSize` cards and there are `poolSize` more face up in the middle. Any
+ * player may swap one of their cards for one of the pool's at any moment; the pool refreshes
+ * when it has been picked over. Collect four of a kind and you have it — but you do not say so.
+ * You signal, and your partner has to be the one who calls it. An opponent who spots the
+ * signal first calls it off and the letter goes to you instead.
+ *
+ * The signal is the whole game and it is the part that does not survive being digitised
+ * literally: across a table it is a raised eyebrow. Here it is a tell that shows on your seat
+ * and everyone can see it — so what is actually raced is the same thing that is raced at a
+ * real table, which is who is paying attention.
+ */
+export interface KentConfig {
+  handSize: number;
+  poolSize: number;
+  /**
+   * How long a tell stays up, counted in moves rather than milliseconds. The engine has no
+   * clock and must not grow one: a rule that depends on wall time cannot be replayed from a
+   * seed and a list of moves, which is the one thing every rule here has to be able to do.
+   */
+  tellPlies: number;
+  /** Letters to spell before a pair is out. K-E-N-T is four. */
+  letters: string;
 }
 
 // Present iff this is a trading game (Pit-style): no turn order at all. Any player may post an
@@ -560,6 +599,9 @@ export interface MatchState {
   // pit: open offers on the market. Any player may post or accept one at any time.
   market: { id: number; player: string; give: Suit; count: number; want: Suit }[];
   nextOfferId: number;
+  // kent: the tell currently showing, and how many letters each pair has spelt.
+  kentTell: { player: string; ply: number } | null;
+  kentLetters: Record<string, number>;
   // numeric (Bridge-style) contract auction: the standing high bid, if any.
   highBid: { player: string; level: number; strain: Strain } | null;
   // rummy: the shared melds zone is one flat pile of cards with no separators, so this is the
@@ -596,6 +638,7 @@ export interface Move {
   want?: string;           // pit: suit wanted (as Suit)
   level?: number;          // numeric auction: bid level 1..7
   strain?: string;         // numeric auction: bid strain
+  poolId?: string;         // kent: which face-up card to take from the middle
 }
 
 // ---------- Redacted (per-player) view ----------
@@ -623,7 +666,7 @@ export interface RedactedState {
   log: LogEntry[];
   // family-specific view
   mode: 'shedding' | 'trick' | 'climb' | 'fish' | 'rummy' | 'war' | 'solitaire'
-    | 'bluff' | 'reflex' | 'poker' | 'pit' | 'set';
+    | 'bluff' | 'reflex' | 'poker' | 'pit' | 'set' | 'kent';
   // solitaire
   tableau?: { id: string; cards: Card[]; faceDown: number }[];
   foundations?: { id: string; cards: Card[] }[];
@@ -689,6 +732,13 @@ export interface RedactedState {
   showdown?: { player: string; cards: Card[]; label: string }[]; // revealed only once the hand ends
   // pit
   market?: { id: number; player: string; give: Suit; count: number; want: Suit }[];
+  /** kent: the face-up pool, whose seat is showing a tell, and the letters each pair has. */
+  kentPool?: Card[];
+  kentTell?: { player: string } | null;
+  kentLetters?: Record<string, number>;
+  kentWord?: string;
+  /** kent: true when your own hand is four of a kind, so the table can offer the signal. */
+  kentReady?: boolean;
   cornerSize?: number;
   /** set: the face-up board, and what is left behind it. Both public by design. */
   setBoard?: Card[];

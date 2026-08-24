@@ -45,6 +45,7 @@ const YOU_VERB: Record<string, string> = {
   offers: 'offer', melds: 'meld', makes: 'make', leads: 'lead', lays: 'lay',
   knocks: 'knock', holds: 'hold', goes: 'go', folds: 'fold', flips: 'flip',
   corners: 'corner', completes: 'complete', checks: 'check', calls: 'call', fishes: 'fish',
+  swaps: 'swap', signals: 'signal', turns: 'turn', spells: 'spell',
 };
 
 /**
@@ -298,6 +299,7 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
   const isPoker = view.mode === 'poker';
   const isPit = view.mode === 'pit';
   const isSet = view.mode === 'set';
+  const isKent = view.mode === 'kent';
   // Groups of 2+ need a button — you can't express "these three cards" with one tap.
   const comboMoves = useMemo(
     () => myLegal.filter((m) => m.actionId === 'climbPlay' && (m.cards?.length ?? 1) > 1),
@@ -358,7 +360,7 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
     // idea. Pit, Trio and Slapjack have no turns: every seat is live at once, so forty
     // milliseconds a move is not speed, it is the bots finishing the entire game between the
     // deal and your first look at the table. Pit ended before a single offer could be read.
-    const noTurnOrder = isPit || isSet || isReflex;
+    const noTurnOrder = isPit || isSet || isReflex || isKent;
     // Spotting a set is not a turn, it is a race — so the bot's delay IS its skill, and the
     // difficulty setting has to spend itself there rather than on the miss chance alone. At half
     // a second a go, two bots between them called a set roughly every second: faster than anyone
@@ -378,11 +380,33 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
     // does not get a vote — it is about how long you wait for somebody else's turn, and these
     // games have no turns. Taking the larger of the two put every tier at the 950ms of "normal
     // speed" and a person beat the sharpest bot to every single slap.
+    // Kent is two games at once: a slow one where everybody trades with the table, and a fast
+    // one that starts the instant somebody signals. Only the second is a race, so only the
+    // second is paced by how sharp the opponents are.
+    const tellUp = !!view.kentTell;
     const delay = isSet ? (SET_THINK[settings.botDiff] ?? 5500)
       : isReflex ? (SLAP_THINK[settings.botDiff] ?? 900)
-      : Math.max(BOT_SPEED_MS[settings.botSpeed] ?? 950, noTurnOrder ? 500 : 0);
+      : isKent && tellUp ? (SLAP_THINK[settings.botDiff] ?? 900) * 1.5
+      : Math.max(BOT_SPEED_MS[settings.botSpeed] ?? 950, noTurnOrder ? 420 : 0);
+    // Everybody at once, where everybody is at once.
+    //
+    // A tick steps one bot, which is right at a table with a turn order because only one seat
+    // can act. Pit and Kent have no turn order — every seat is live the whole time — so
+    // stepping them in rotation runs the table at a third or a fifth of its real speed, and a
+    // game that takes two hundred moves takes two minutes to get going. They move together
+    // now, except while a tell is up: that part IS a race, and a race the other side gets to
+    // run all at once is not one.
+    const together = (isPit || isKent) && !view.kentTell
+      ? Math.max(1, clientRef.current.pending().filter((p) => !localSeats.includes(p)).length)
+      : 1;
     const timer = setTimeout(() => {
-      const r = clientRef.current.botStep(localSeats, settings.botDiff);
+      let any = false;
+      for (let i = 0; i < together; i++) {
+        const step = clientRef.current.botStep(localSeats, settings.botDiff);
+        if (!step.moved) break;
+        any = true;
+      }
+      const r = { moved: any };
       if (r.moved) { botRetries.current = 0; setBoard(clientRef.current.read(me)); return; }
       // The referee refused to guess: it picked a seat and that seat's chosen move was not on
       // its own legal list, so nothing happened. Nothing happening also means the position did
@@ -392,7 +416,7 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
       if (botRetries.current < 8) { botRetries.current += 1; setBotTick((n) => n + 1); }
     }, delay);
     return () => clearTimeout(timer);
-  }, [board, botTick, matchId, me, localSeats, view.phase, settings.botSpeed, settings.botDiff, isPit, isSet, isReflex]);
+  }, [board, botTick, matchId, me, localSeats, view.phase, view.kentTell, settings.botSpeed, settings.botDiff, isPit, isSet, isReflex, isKent]);
 
   // A fresh position means a fresh allowance of retries.
   useEffect(() => { botRetries.current = 0; }, [board]);
@@ -677,6 +701,9 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
   function clickCard(id: string) {
     if (!playableCardIds.has(id)) return;
     if (isFish) { const c = view.hand.find((x) => x.id === id); if (c) setAskRank(c.rank); playSound('ui', settings.sound); return; }
+    // Kent has nowhere to play a card TO: a card leaves your hand only by being traded for one
+    // on the table, so a click picks rather than plays.
+    if (isKent) { setSelected(selected === id ? null : id); playSound('ui', settings.sound); return; }
     if (settings.confirmPlays && selected !== id) { setSelected(id); playSound('ui', settings.sound); return; }
     if (playActionId === 'climbPlay') { submit({ actionId: 'climbPlay', cards: [id] }); return; }
     submit({ actionId: playActionId, cardId: id });
@@ -736,6 +763,13 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
     return agreed.replace(/\bYou's\b/g, 'Your');
   };
   const teamOf = (id: string): string | null => {
+    // Kent has partners but no `teams` config: partners sit opposite, so the pairs are the odd
+    // seats against the even ones — the same rule the engine uses to decide who may call whose
+    // signal. Knowing which side of the table you are on is most of playing it.
+    if (isKent) {
+      const i = view.players.findIndex((p) => p.id === id);
+      return i < 0 ? null : `Pair ${i % 2 === 0 ? 'A' : 'B'}`;
+    }
     if (!view.teams) return null;
     const i = view.teams.findIndex((t) => t.includes(id));
     return i >= 0 ? `Team ${i === 0 ? 'A' : 'B'}` : null;
@@ -816,7 +850,11 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
                   <span className="stat">#{view.finished.indexOf(p.id) + 1}<i>out</i></span>
                 )}
               </div>
-              {p.isTurn && <div className="seat-turn" aria-label="their turn" />}
+              {p.isTurn && !isKent && <div className="seat-turn" aria-label="their turn" />}
+              {/* The tell. It is meant to be seen — spotting it is the game. */}
+              {view.kentTell?.player === p.id && (
+                <div className="kent-tell" aria-label={`${nameOf(p.id)} is signalling`}>signalling</div>
+              )}
               {askable && <div className="ask-hint">Ask for {askRank}s</div>}
             </div>
           );
@@ -1049,6 +1087,70 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
               🤨 Call bluff!
             </button>
           )}
+        </div>
+      ) : isKent ? (
+        /*
+          The middle of a Kent table: four cards face up that anybody may take at any moment,
+          the letters each pair has spelt, and — when somebody signals — the one button that
+          decides the round.
+        */
+        <div className="center kent-center">
+          <div className="kent-letters">
+            {(['A', 'B'] as const).map((team) => (
+              <span key={team} className={`kent-pair ${teamOf(me) === `Pair ${team}` ? 'mine' : ''}`}>
+                <i>Pair {team}</i>
+                <b>{(view.kentWord ?? 'KENT').split('').map((ch, i) => (
+                  <em key={i} className={i < (view.kentLetters?.[team] ?? 0) ? 'got' : ''}>{ch}</em>
+                ))}</b>
+              </span>
+            ))}
+          </div>
+          <div className="kent-pool" role="group" aria-label="The four cards on the table">
+            {(view.kentPool ?? []).map((c) => {
+              const swap = myLegal.find((m) => m.actionId === 'kentSwap'
+                && m.cardId === selected && m.poolId === c.id);
+              return (
+                <button key={c.id} className={`kent-poolcard ${swap ? 'live' : ''}`}
+                  disabled={!swap}
+                  aria-label={`Take ${spokenCard(c.rank, c.suit)}${selected ? '' : ' — pick one of your own first'}`}
+                  title={swap ? 'Swap your picked card for this one' : 'Pick a card of your own first'}
+                  onClick={() => swap && submit(swap)}>
+                  <CardFace card={c} />
+                </button>
+              );
+            })}
+          </div>
+          <div className="kent-actions">
+            {view.kentTell ? (
+              view.kentTell.player === me ? (
+                <span className="kent-note mine">You signalled — hope somebody is watching…</span>
+              ) : myLegal.some((m) => m.actionId === 'kentCall') ? (
+                <button className="primary kent-go" onClick={() => submit({ actionId: 'kentCall' })}>
+                  ✋ Kent!
+                </button>
+              ) : myLegal.some((m) => m.actionId === 'kentStop') ? (
+                <button className="primary kent-go stop" onClick={() => submit({ actionId: 'kentStop' })}>
+                  ✋ Call it off!
+                </button>
+              ) : null
+            ) : (
+              <>
+                {view.kentReady && (
+                  <button className="primary kent-go signal" onClick={() => submit({ actionId: 'kentSignal' })}>
+                    Signal your partner
+                  </button>
+                )}
+                {myLegal.some((m) => m.actionId === 'kentRefresh') && (
+                  <button className="ghost sm" onClick={() => submit({ actionId: 'kentRefresh' })}>
+                    Nobody wants these — turn them over
+                  </button>
+                )}
+                <span className="kent-note">
+                  {selected ? 'Now take one from the table.' : 'Pick one of yours to trade away.'}
+                </span>
+              </>
+            )}
+          </div>
         </div>
       ) : isSet || isReflex || isPoker || isPit ? (
         /* Each of these has its own dedicated center-area UI rendered below (Reflex's slap pile,
@@ -1428,7 +1530,10 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
           {view.winner === me && <Confetti pieces={30} />}
           <div className={`modal-box celebrate handend ${view.winner === me ? 'won' : ''}`} ref={roundRef} role="dialog" aria-modal="true">
             <span className="cb-kicker">Hand {view.handNumber}</span>
-            <h3>{view.winner === me ? 'You take it' : `${nameOf(view.winner || '')} takes it`}</h3>
+            <h3>{view.winner === me ? 'You take it'
+              : isKent && view.winner && teamOf(view.winner) === teamOf(me)
+                ? `${nameOf(view.winner)} takes it — your pair`
+                : `${nameOf(view.winner || '')} takes it`}</h3>
             {/* What the hand did to you. In a betting game `scores` is the stack you are
                 holding, not what you won, so the hand's own row is what belongs here — and a
                 stack that went down wants a minus, not a plus. */}
@@ -1461,7 +1566,12 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
       )}
 
       {view.phase === 'roundOver' && view.matchOver && (() => {
-        const iWon = view.matchWinner === me || (view.matchWinner == null && view.winner === me);
+        // A pair game is won by a pair. The engine names one player as the winner — whichever
+        // partner sits first — so a player in the other seat of the winning pair would have been
+        // told their own partner beat them.
+        const iWon = isKent
+          ? !!view.matchWinner && teamOf(view.matchWinner) === teamOf(me)
+          : view.matchWinner === me || (view.matchWinner == null && view.winner === me);
         const finals = Object.entries(view.matchTarget != null ? (view.matchScores ?? view.scores) : view.scores);
         const lowWins = def.scoring.winner === 'lowestTotal';
         const ranked = finals.slice().sort((a, b) => (lowWins ? a[1] - b[1] : b[1] - a[1]));
@@ -1477,9 +1587,12 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
                 <span className="cb-mark">{iWon ? '★' : '☆'}</span>
               </span>
               <span className="cb-kicker">{view.matchTarget != null ? 'Match over' : 'Game over'}</span>
-              <h3 data-text={iWon ? 'You win' : `${nameOf(view.matchWinner ?? view.winner ?? '')} wins`}>
-                {iWon ? 'You win' : `${nameOf(view.matchWinner ?? view.winner ?? '')} wins`}
-              </h3>
+              {(() => {
+                const title = iWon ? (isKent ? 'Your pair wins' : 'You win')
+                  : isKent ? `${teamOf(view.matchWinner ?? '') ?? 'The other pair'} wins`
+                  : `${nameOf(view.matchWinner ?? view.winner ?? '')} wins`;
+                return <h3 data-text={title}>{title}</h3>;
+              })()}
               {/* Counted in from the bottom of the table up, so the winner's row lands last. */}
               <ol className="podium" style={{ '--rows': ranked.length - 1 } as React.CSSProperties}>
                 {ranked.map(([p, sc], i) => (
