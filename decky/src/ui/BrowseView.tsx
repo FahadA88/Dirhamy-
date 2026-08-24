@@ -36,6 +36,23 @@ const SORTS: { key: SortKey; label: string }[] = [
   { key: 'name', label: 'A–Z' },
 ];
 
+/**
+ * As much of a description as fits, ending on a full stop.
+ *
+ * The banner clamps to three lines, which cut Hearts off at "Whoever holds t…" — a sentence
+ * chopped mid-word reads like the page failed to load rather than like a summary. Take whole
+ * sentences up to roughly a banner's worth and stop there.
+ */
+function blurb(text: string, limit = 165): string {
+  const sentences = text.split(/(?<=\.)\s+/);
+  let out = '';
+  for (const sentence of sentences) {
+    if (out && (out + ' ' + sentence).length > limit) break;
+    out = out ? `${out} ${sentence}` : sentence;
+  }
+  return out || text.slice(0, limit);
+}
+
 export function BrowseView({ onPlay, onSetup, onOnline, onRemix }: {
   onPlay: (def: GameDefinition) => void;
   onSetup: (def: GameDefinition) => void;
@@ -254,7 +271,7 @@ function Carousel({ games, onOpen, onPlay }: {
             <div className="hero-body">
               <span className="hero-kicker">{at === 0 ? "Tonight's table" : 'Also worth a deal'}</span>
               <h2><button className="hero-title" onClick={() => onOpen(live.id)}>{live.definition.meta.name}</button></h2>
-              <p className="hero-blurb">{live.definition.meta.description}</p>
+              <p className="hero-blurb">{blurb(live.definition.meta.description)}</p>
               <Meta game={live} />
               <div className="hero-actions">
                 <button className="hero-cta" onClick={() => onPlay(live)}>Deal me in ▶</button>

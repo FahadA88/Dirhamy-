@@ -1,6 +1,7 @@
 import { Card } from '../engine/types';
-import { SUIT_SYMBOLS } from '../engine/deck';
 import { useSettings } from '../settings/SettingsContext';
+import { Suit, SuitId } from './Suit';
+import { CourtFigure } from './Court';
 
 // Four-color deck (a common accessibility option): clubs green, diamonds blue, hearts red,
 // spades black. Classic mode: red for hearts/diamonds, black for the rest.
@@ -32,7 +33,6 @@ const PIPS: Record<string, { x: number; y: number }[]> = {
 export function CardFace({ card }: { card: Card }) {
   const { settings } = useSettings();
   const red = card.suit === 'H' || card.suit === 'D';
-  const sym = SUIT_SYMBOLS[card.suit];
   const label = card.rank === 'JOKER' ? '★' : card.rank;
   const face = settings.cardFace;
   // Four-colour and letter-coded both recolour the suits; letters additionally spell them out.
@@ -42,12 +42,18 @@ export function CardFace({ card }: { card: Card }) {
   const pips = PIPS[card.rank];
   const isCourt = card.rank === 'J' || card.rank === 'Q' || card.rank === 'K';
 
+  const suit = card.suit as SuitId;
+
   return (
     <div className={`card face f-${face} ${red ? 'red' : 'black'} ${isCourt ? 'court' : ''}`} style={style}
       role="img"
       aria-label={card.rank === 'JOKER' ? 'Joker' : `${LONG_RANK[card.rank] ?? card.rank} of ${LONG_SUIT[card.suit] ?? card.suit}`}>
       <div className="holo" />
-      <div className="corner tl">{label}<span>{sym}</span>
+      {/* A hairline frame inside the trim, the way a printed deck is cut. */}
+      <div className="face-frame" aria-hidden="true" />
+      <div className="corner tl">
+        <b className="ix-rank">{label}</b>
+        <Suit suit={suit} className="ix-suit" />
         {face === 'letters' && <b className="suitletter">{SUIT_LETTER[card.suit]}</b>}
       </div>
 
@@ -60,20 +66,23 @@ export function CardFace({ card }: { card: Card }) {
           {pips.map((p, i) => (
             <span key={i} className="spot"
               style={{ left: `${p.x}%`, top: `${p.y}%`, transform: `translate(-50%,-50%) rotate(${p.y > 55 ? 180 : 0}deg)` }}>
-              {sym}
+              <Suit suit={suit} />
             </span>
           ))}
         </div>
       ) : isCourt ? (
-        <div className="court-art" aria-hidden="true">
-          <span className="court-letter">{label}</span>
-          <span className="court-suit">{sym}</span>
-        </div>
+        <div className="court-art" aria-hidden="true"><CourtFigure rank={label as 'J' | 'Q' | 'K'} suit={suit} /></div>
       ) : (
-        <div className="pip">{sym}</div>
+        // The ace, which every deck makes something of: one big suit inside a fine ring.
+        <div className="pip ace" aria-hidden="true">
+          <span className="ace-ring" />
+          <Suit suit={suit} />
+        </div>
       )}
 
-      <div className="corner br">{label}<span>{sym}</span>
+      <div className="corner br">
+        <b className="ix-rank">{label}</b>
+        <Suit suit={suit} className="ix-suit" />
         {(face === 'letters' || face === 'shapes') && <b className="suitletter">{SUIT_LETTER[card.suit]}</b>}
       </div>
     </div>

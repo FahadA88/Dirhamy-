@@ -122,9 +122,9 @@ export interface Settings {
 export const defaultSettings: Settings = {
   // Neon Table is the house look, and a card room after midnight is dark. Daylight is a choice.
   theme: 'dark',
-  accent: 'emerald',
-  cardBack: 'monogram',
-  tableFelt: 'neon',
+  accent: 'amber',
+  cardBack: 'lattice',
+  tableFelt: 'mahogany',
   cardFace: 'classic',
   customBack: null,
   cardSize: 'm',

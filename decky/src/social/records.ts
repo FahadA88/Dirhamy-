@@ -181,7 +181,7 @@ export function badges(catalogSize: number): Badge[] {
       progress: step(streak, 3), detail: `Best run: ${streak}`,
     },
     {
-      id: 'streak-7', name: 'Unbeaten', blurb: 'Win seven in a row.', mark: '🔥',
+      id: 'streak-7', name: 'Unbeaten', blurb: 'Win seven in a row.', mark: '✷',
       progress: step(streak, 7), detail: `Best run: ${streak}`,
     },
     {
@@ -189,7 +189,7 @@ export function badges(catalogSize: number): Badge[] {
       progress: step(won.size, 5), detail: `${won.size} different games won`,
     },
     {
-      id: 'completionist', name: 'The whole shelf', blurb: 'Win at every game in the library.', mark: '👑',
+      id: 'completionist', name: 'The whole shelf', blurb: 'Win at every game in the library.', mark: '♔',
       progress: catalogSize > 0 ? step(won.size, catalogSize) : 0,
       detail: `${won.size} of ${catalogSize} games won`,
     },

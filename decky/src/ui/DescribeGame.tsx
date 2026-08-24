@@ -18,10 +18,21 @@ import { useEffect } from 'react';
 // When it lands you get the real knobs and the real rules, in the editor, editable. Nothing is
 // a black box you have to accept whole.
 
+// Each one carries its own label. Chopping the prompt itself at thirty-four characters gave a
+// button that read "Bluff…" — a word and an ellipsis, which tells nobody what pressing it does.
 const EXAMPLES = [
-  'Bluff: everyone is dealt the whole deck. On your turn you put cards face down and claim a rank. Anyone can call you a liar — if they are right you take the pile, if they are wrong they do.',
-  'A trick-taking game for four in partnerships where hearts are worth minus one and the queen of spades is minus thirteen. First partnership to minus a hundred loses.',
-  'Like Crazy Eights, but a seven makes the next player draw two and a jack reverses the direction.',
+  {
+    label: 'Face down, and lie about it',
+    text: 'Bluff: everyone is dealt the whole deck. On your turn you put cards face down and claim a rank. Anyone can call you a liar — if they are right you take the pile, if they are wrong they do.',
+  },
+  {
+    label: 'Hearts, played in partnerships',
+    text: 'A trick-taking game for four in partnerships where hearts are worth minus one and the queen of spades is minus thirteen. First partnership to minus a hundred loses.',
+  },
+  {
+    label: 'Crazy Eights with a nasty seven',
+    text: 'Like Crazy Eights, but a seven makes the next player draw two and a jack reverses the direction.',
+  },
 ];
 
 export function DescribeGame({ onBuilt }: {
@@ -112,7 +123,7 @@ export function DescribeGame({ onBuilt }: {
       {!busy && !result && (
         <div className="describe-examples">
           {EXAMPLES.map((e, i) => (
-            <button key={i} className="chip" onClick={() => setText(e)}>{e.split(':')[0].slice(0, 34)}…</button>
+            <button key={i} className="chip" onClick={() => setText(e.text)} title={e.text}>{e.label}</button>
           ))}
         </div>
       )}

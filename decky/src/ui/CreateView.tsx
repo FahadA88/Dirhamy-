@@ -28,7 +28,7 @@ type Step = 'start' | 'design' | 'twists' | 'test' | 'publish';
 
 const STEPS: { id: Step; label: string; blurb: string }[] = [
   { id: 'start', label: 'Start', blurb: 'Pick a shape to build on.' },
-  { id: 'design', label: 'Design', blurb: 'Deck, deal, turns and scoring.' },
+  { id: 'design', label: 'Design', blurb: 'Deck, deal and scoring.' },
   { id: 'twists', label: 'Twists', blurb: 'Rules of your own.' },
   { id: 'test', label: 'Test', blurb: 'Play it and simulate it.' },
   { id: 'publish', label: 'Publish', blurb: 'Put it on the shelf.' },
