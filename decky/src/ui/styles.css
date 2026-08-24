@@ -102,10 +102,10 @@
   --ink: #180f34;
   --muted: #6b5f92;
   --dim: #9d93bd;
-  --hot: #e6006b;
-  --hot-hi: #ff3d8f;
-  --cyan: #0090b8;
-  --cyan-hi: #16b8e0;
+  --hot: #9a7628;
+  --hot-hi: #c2a055;
+  --cyan: #3a7a70;
+  --cyan-hi: #5a998e;
   --gold: #c98a00;
   --gold-hi: #e6a70c;
   --gold-dim: rgba(201, 138, 0, 0.14);
@@ -337,7 +337,7 @@ h2 { letter-spacing: -0.025em; color: var(--ink); font-size: 22px; font-weight: 
 .felt .seat.active { background: var(--t-seat); box-shadow: 0 0 0 1px var(--t-seat-line), 0 6px 20px rgba(0,0,0,0.18); }
 
 /* --- 1 · mahogany : padded leather rail, polished wood, chrome wells --- */
-.table[data-felt="mahogany"], .felt-swatch[data-felt="mahogany"], .pp-stage[data-felt="mahogany"] {
+.table[data-felt="mahogany"], .felt-swatch[data-felt="mahogany"], .pp-stage[data-felt="mahogany"], .pack-swatch[data-felt="mahogany"] {
   --rail-w: 30px; --rail-r: 30px; --felt-r: 16px; --felt-pad: 26px;
   /* Polished, not corrugated: a soft sheen band across a two-tone stain. */
   --rail-bg:
@@ -370,7 +370,7 @@ h2 { letter-spacing: -0.025em; color: var(--ink); font-size: 22px; font-weight: 
 }
 
 /* --- 2 · vegas : bright baize, house rules printed across it --- */
-.table[data-felt="vegas"], .felt-swatch[data-felt="vegas"], .pp-stage[data-felt="vegas"] {
+.table[data-felt="vegas"], .felt-swatch[data-felt="vegas"], .pp-stage[data-felt="vegas"], .pack-swatch[data-felt="vegas"] {
   --rail-w: 20px; --rail-r: 26px; --felt-r: 12px; --felt-pad: 26px;
   --rail-bg: linear-gradient(180deg, #d8dde0, #a8b2b8 40%, #78838a);
   --rail-shadow: inset 0 2px 0 rgba(255,255,255,0.8), 0 16px 38px rgba(20, 50, 35, 0.24);
@@ -390,7 +390,7 @@ h2 { letter-spacing: -0.025em; color: var(--ink); font-size: 22px; font-weight: 
 .vg-rule { fill: rgba(255,255,255,0.20); font-family: var(--mono); font-size: 11px; letter-spacing: 2.5px; }
 
 /* --- 3 · parlour : pale cloth, oak frame, chalked seat boxes --- */
-.table[data-felt="parlour"], .felt-swatch[data-felt="parlour"], .pp-stage[data-felt="parlour"] {
+.table[data-felt="parlour"], .felt-swatch[data-felt="parlour"], .pp-stage[data-felt="parlour"], .pack-swatch[data-felt="parlour"] {
   --rail-w: 22px; --rail-r: 20px; --felt-r: 8px; --felt-pad: 26px;
   --rail-bg:
     repeating-linear-gradient(93deg, rgba(255,240,220,0.07) 0 9px, rgba(96,60,26,0.09) 9px 19px),
@@ -413,7 +413,7 @@ h2 { letter-spacing: -0.025em; color: var(--ink); font-size: 22px; font-weight: 
 }
 
 /* --- 4 · midnight : black baize, one lit ring --- */
-.table[data-felt="midnight"], .felt-swatch[data-felt="midnight"], .pp-stage[data-felt="midnight"] {
+.table[data-felt="midnight"], .felt-swatch[data-felt="midnight"], .pp-stage[data-felt="midnight"], .pack-swatch[data-felt="midnight"] {
   --rail-w: 16px; --rail-r: 999px; --felt-r: 999px; --felt-pad: 34px;
   --rail-bg: linear-gradient(180deg, #23282b, #101315);
   --rail-shadow: inset 0 1px 0 rgba(255,255,255,0.10), 0 22px 60px rgba(0,0,0,0.5);
@@ -706,7 +706,7 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
 .table[data-felt="midnight"] .felt-content { max-width: 1080px; margin-inline: auto; }
 
 @media (max-width: 760px) {
-  .table[data-felt="midnight"], .felt-swatch[data-felt="midnight"], .pp-stage[data-felt="midnight"] { --rail-r: 34px; --felt-r: 26px; }
+  .table[data-felt="midnight"], .felt-swatch[data-felt="midnight"], .pp-stage[data-felt="midnight"], .pack-swatch[data-felt="midnight"] { --rail-r: 34px; --felt-r: 26px; }
   .table[data-felt="midnight"] .felt { padding: 22px; }
 }
 .opponents { display: flex; gap: 26px; justify-content: center; flex-wrap: wrap; }
@@ -2019,7 +2019,7 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
    Same token contract as the original four: a rail, a cloth, and the
    ink colours that read on it. Nothing here knows about the game.
    ============================================================ */
-.table[data-felt="concrete"], .felt-swatch[data-felt="concrete"], .pp-stage[data-felt="concrete"] {
+.table[data-felt="concrete"], .felt-swatch[data-felt="concrete"], .pp-stage[data-felt="concrete"], .pack-swatch[data-felt="concrete"] {
   --rail-w: 14px; --rail-r: 6px; --felt-r: 3px; --felt-pad: 22px;
   --rail-bg: linear-gradient(160deg, #8d8d89, #6f6f6c);
   --rail-shadow: inset 0 0 0 1px rgba(255,255,255,0.14), 0 12px 30px rgba(30,30,28,0.3);
@@ -2029,7 +2029,7 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
   --t-line: rgba(0,0,0,0.24); --t-panel: rgba(255,255,255,0.24);
   --t-seat: rgba(255,255,255,0.3); --t-seat-line: rgba(255,255,255,0.8);
 }
-.table[data-felt="darkglass"], .felt-swatch[data-felt="darkglass"], .pp-stage[data-felt="darkglass"] {
+.table[data-felt="darkglass"], .felt-swatch[data-felt="darkglass"], .pp-stage[data-felt="darkglass"], .pack-swatch[data-felt="darkglass"] {
   --rail-w: 8px; --rail-r: 12px; --felt-r: 8px; --felt-pad: 24px;
   --rail-bg: linear-gradient(160deg, #2b323b, #161b21);
   --rail-shadow: inset 0 0 0 1px rgba(255,255,255,0.2), 0 16px 40px rgba(0,0,0,0.5);
@@ -2039,7 +2039,7 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
   --t-line: rgba(255,255,255,0.14); --t-panel: rgba(255,255,255,0.07);
   --t-seat: rgba(255,255,255,0.09); --t-seat-line: rgba(160,210,240,0.6);
 }
-.table[data-felt="papermat"], .felt-swatch[data-felt="papermat"], .pp-stage[data-felt="papermat"] {
+.table[data-felt="papermat"], .felt-swatch[data-felt="papermat"], .pp-stage[data-felt="papermat"], .pack-swatch[data-felt="papermat"] {
   --rail-w: 0px; --rail-r: 4px; --felt-r: 4px; --felt-pad: 22px;
   --rail-bg: #efece4; --rail-shadow: none;
   --felt-bg: #f4f1e7;
@@ -2048,7 +2048,7 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
   --t-line: rgba(33,29,20,0.18); --t-panel: rgba(33,29,20,0.05);
   --t-seat: rgba(33,29,20,0.05); --t-seat-line: rgba(33,29,20,0.4);
 }
-.table[data-felt="velvet"], .felt-swatch[data-felt="velvet"], .pp-stage[data-felt="velvet"] {
+.table[data-felt="velvet"], .felt-swatch[data-felt="velvet"], .pp-stage[data-felt="velvet"], .pack-swatch[data-felt="velvet"] {
   --rail-w: 18px; --rail-r: 18px; --felt-r: 8px; --felt-pad: 26px;
   --rail-bg: linear-gradient(160deg, #3d0a16, #240610);
   --rail-shadow: inset 0 0 0 2px #c9a227, 0 16px 40px rgba(0,0,0,0.45);
@@ -2058,7 +2058,7 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
   --t-line: rgba(201,162,39,0.32); --t-panel: rgba(0,0,0,0.24);
   --t-seat: rgba(201,162,39,0.14); --t-seat-line: rgba(232,196,106,0.7);
 }
-.table[data-felt="marble"], .felt-swatch[data-felt="marble"], .pp-stage[data-felt="marble"] {
+.table[data-felt="marble"], .felt-swatch[data-felt="marble"], .pp-stage[data-felt="marble"], .pack-swatch[data-felt="marble"] {
   --rail-w: 12px; --rail-r: 8px; --felt-r: 4px; --felt-pad: 24px;
   --rail-bg: linear-gradient(160deg, #8f9299, #6d7077);
   --rail-shadow: inset 0 0 0 1px rgba(255,255,255,0.3), 0 14px 34px rgba(40,44,52,0.3);
@@ -2068,7 +2068,7 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
   --t-line: rgba(28,32,40,0.16); --t-panel: rgba(255,255,255,0.55);
   --t-seat: rgba(255,255,255,0.5); --t-seat-line: rgba(28,32,40,0.35);
 }
-.table[data-felt="zinc"], .felt-swatch[data-felt="zinc"], .pp-stage[data-felt="zinc"] {
+.table[data-felt="zinc"], .felt-swatch[data-felt="zinc"], .pp-stage[data-felt="zinc"], .pack-swatch[data-felt="zinc"] {
   --rail-w: 10px; --rail-r: 6px; --felt-r: 3px; --felt-pad: 22px;
   --rail-bg: linear-gradient(160deg, #55585e, #3b3e43);
   --rail-shadow: inset 0 0 0 1px rgba(255,255,255,0.22), 0 12px 30px rgba(0,0,0,0.34);
@@ -2078,7 +2078,7 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
   --t-line: rgba(0,0,0,0.2); --t-panel: rgba(255,255,255,0.26);
   --t-seat: rgba(255,255,255,0.3); --t-seat-line: rgba(20,23,27,0.4);
 }
-.table[data-felt="litedges"], .felt-swatch[data-felt="litedges"], .pp-stage[data-felt="litedges"] {
+.table[data-felt="litedges"], .felt-swatch[data-felt="litedges"], .pp-stage[data-felt="litedges"], .pack-swatch[data-felt="litedges"] {
   --rail-w: 6px; --rail-r: 12px; --felt-r: 10px; --felt-pad: 26px;
   --rail-bg: linear-gradient(160deg, #10101c, #07070f);
   --rail-shadow: inset 0 0 0 1px rgba(34,211,238,0.5), 0 0 34px rgba(34,211,238,0.28);
@@ -2088,7 +2088,7 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
   --t-line: rgba(34,211,238,0.28); --t-panel: rgba(34,211,238,0.09);
   --t-seat: rgba(34,211,238,0.1); --t-seat-line: rgba(34,211,238,0.7);
 }
-.table[data-felt="chalkboard"], .felt-swatch[data-felt="chalkboard"], .pp-stage[data-felt="chalkboard"] {
+.table[data-felt="chalkboard"], .felt-swatch[data-felt="chalkboard"], .pp-stage[data-felt="chalkboard"], .pack-swatch[data-felt="chalkboard"] {
   --rail-w: 14px; --rail-r: 8px; --felt-r: 4px; --felt-pad: 24px;
   --rail-bg: linear-gradient(160deg, #6b5535, #4a3a22);
   --rail-shadow: inset 0 0 0 1px rgba(255,240,220,0.2), 0 12px 30px rgba(20,18,12,0.4);
@@ -2098,7 +2098,7 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
   --t-line: rgba(255,255,255,0.24); --t-panel: rgba(255,255,255,0.07);
   --t-seat: rgba(255,255,255,0.06); --t-seat-line: rgba(255,255,255,0.55);
 }
-.table[data-felt="studio"], .felt-swatch[data-felt="studio"], .pp-stage[data-felt="studio"] {
+.table[data-felt="studio"], .felt-swatch[data-felt="studio"], .pp-stage[data-felt="studio"], .pack-swatch[data-felt="studio"] {
   --rail-w: 0px; --rail-r: 10px; --felt-r: 10px; --felt-pad: 26px;
   --rail-bg: #fbfbfa; --rail-shadow: none;
   --felt-bg: #ffffff;
@@ -2128,6 +2128,19 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
 .swatch:focus-visible { outline: 2px solid var(--oak); outline-offset: 2px; }
 .swatch.on { border-color: var(--oak); background: var(--oak-dim); color: var(--ink); font-weight: 700; }
 .swatch em { font-style: normal; text-align: center; line-height: 1.2; }
+/*
+  A swatch that is a tile with a label under it needs its own size back.
+  The round accent dot near the top of this sheet is also called `.swatch`, and it claims a
+  fixed 34×34 box. Everything that came later kept that box: a theme tile is 42px of cloth plus
+  a caption, so inside 34px of button — minus padding, minus the caption — the cloth was
+  squeezed to two pixels and every "whole look" in Preferences showed as a bare word with
+  nothing above it. Same for the table, face and back pickers.
+*/
+.swatches.packs .swatch, .swatches.tables .swatch,
+.swatches.faces .swatch, .swatches.backs .swatch {
+  inline-size: auto; block-size: auto;
+}
+.swatches.packs .pack-swatch { inline-size: 100%; flex: 0 0 auto; }
 
 /* A face swatch is a real card, drawn by the same rules as the table. */
 .sw-card {
@@ -3173,7 +3186,7 @@ button.ghost,
 /* The house button: a lit face over a solid edge that compresses under a press. */
 button.primary {
   position: relative;
-  background: linear-gradient(180deg, var(--hot-hi) 0%, var(--hot) 52%, #d81c6f 100%);
+  background: linear-gradient(180deg, var(--hot-hi) 0%, var(--hot) 52%, #a37e33 100%);
   color: #fff;
   border: 0;
   padding: 12px 24px;
@@ -3182,7 +3195,7 @@ button.primary {
   letter-spacing: .01em;
   cursor: pointer;
   box-shadow:
-    0 var(--lip) 0 #a30f4f,
+    0 var(--lip) 0 #6f5320,
     0 calc(var(--lip) + 8px) 20px rgba(201, 162, 74, .38),
     0 1px 0 rgba(255,255,255,.45) inset;
   transform: translateY(0);
@@ -3192,13 +3205,13 @@ button.primary {
    pseudo-class outranks the plain rule no matter how far down the sheet the plain rule is —
    which is how the house button kept turning a different colour under the pointer. */
 button.primary:hover {
-  background: linear-gradient(180deg, #ff85bb 0%, var(--hot-hi) 52%, var(--hot) 100%);
+  background: linear-gradient(180deg, #f2dbaa 0%, var(--hot-hi) 52%, var(--hot) 100%);
   border: 0;
   filter: none;
 }
 button.primary:active {
   transform: translateY(var(--lip));
-  box-shadow: 0 0 0 #a30f4f, 0 2px 8px rgba(201, 162, 74, .3), 0 1px 0 rgba(255,255,255,.3) inset;
+  box-shadow: 0 0 0 #6f5320, 0 2px 8px rgba(201, 162, 74, .3), 0 1px 0 rgba(255,255,255,.3) inset;
 }
 button.primary:disabled {
   background: var(--panel-hi); color: var(--dim); box-shadow: 0 var(--lip) 0 rgba(0,0,0,.28);
@@ -3245,7 +3258,7 @@ button.ghost.danger:hover { border-color: var(--red); color: var(--red); }
   color: #fff;
   background: linear-gradient(180deg, var(--hot-hi), var(--hot));
   border-color: transparent;
-  box-shadow: 0 2px 0 #a30f4f, 0 0 22px rgba(201, 162, 74,.5);
+  box-shadow: 0 2px 0 #6f5320, 0 0 22px rgba(201, 162, 74,.5);
 }
 .kindtab.on .kt-count { border-color: rgba(255,255,255,.55); opacity: .9; }
 
@@ -3309,7 +3322,7 @@ header h1 {
     radial-gradient(70% 90% at 50% 100%, rgba(76, 143, 132,.12), transparent 62%),
     #0a0620;
 }
-.table[data-felt="neon"], .felt-swatch[data-felt="neon"], .pp-stage[data-felt="neon"] {
+.table[data-felt="neon"], .felt-swatch[data-felt="neon"], .pp-stage[data-felt="neon"], .pack-swatch[data-felt="neon"] {
   --rail-w: 18px; --rail-r: 30px; --felt-r: 20px; --felt-pad: 30px;
   --rail-bg:
     linear-gradient(180deg, #2a1a52 0%, #170d33 48%, #241548 100%);
@@ -3779,8 +3792,8 @@ header h1 {
   animation: reflex-pulse 1.1s ease-in-out infinite;
 }
 @keyframes reflex-pulse {
-  0%, 100% { box-shadow: 0 var(--lip) 0 #a30f4f, 0 0 22px rgba(201, 162, 74,.4); }
-  50% { box-shadow: 0 var(--lip) 0 #a30f4f, 0 0 40px rgba(201, 162, 74,.75); }
+  0%, 100% { box-shadow: 0 var(--lip) 0 #6f5320, 0 0 22px rgba(201, 162, 74,.4); }
+  50% { box-shadow: 0 var(--lip) 0 #6f5320, 0 0 40px rgba(201, 162, 74,.75); }
 }
 @media (prefers-reduced-motion: reduce) { .reflex-slap { animation: none; } }
 :root[data-motion="reduced"] .reflex-slap { animation: none; }
@@ -3819,7 +3832,7 @@ header h1 {
    ========================================================================= */
 
 /* ---- a cloth you mixed yourself ---- */
-.table[data-felt="custom"], .felt-swatch[data-felt="custom"], .pp-stage[data-felt="custom"],
+.table[data-felt="custom"], .felt-swatch[data-felt="custom"], .pp-stage[data-felt="custom"], .pack-swatch[data-felt="custom"],
 .pack-swatch[data-felt="custom"] {
   --rail-w: 14px; --rail-r: 20px; --felt-r: 12px; --felt-pad: 24px;
   --rail-bg: var(--cf-rail, #241a12);

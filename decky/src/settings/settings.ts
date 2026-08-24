@@ -179,14 +179,17 @@ export interface ThemePack {
 }
 
 export const THEME_PACKS: ThemePack[] = [
-  { id: 'neon', name: 'Neon Table', blurb: 'The house look — a card room after midnight.', accent: 'emerald', tableFelt: 'neon', cardBack: 'monogram', cardFace: 'classic' },
+  // The house look leads the list, and it is the one the app opens on — so it is the one that
+  // shows as chosen until somebody changes something.
+  { id: 'club', name: 'The Card Room', blurb: 'The house look — mahogany, brass and green baize.', accent: 'amber', tableFelt: 'mahogany', cardBack: 'lattice', cardFace: 'classic' },
+  { id: 'neon', name: 'Neon Table', blurb: 'A card room after midnight, lit by the sign outside.', accent: 'emerald', tableFelt: 'neon', cardBack: 'monogram', cardFace: 'classic' },
   { id: 'parlour', name: 'Sunlit Parlour', blurb: 'Afternoon light on a quiet table.', accent: 'amber', tableFelt: 'parlour', cardBack: 'ivory', cardFace: 'typographic' },
   { id: 'midnight', name: 'Midnight Blue', blurb: 'Deep and cool, easy on the eyes.', accent: 'ocean', tableFelt: 'midnight', cardBack: 'neongrid', cardFace: 'big-index' },
   { id: 'autumn', name: 'Autumn Study', blurb: 'Mahogany, brass and old paper.', accent: 'amber', tableFelt: 'mahogany', cardBack: 'kraft', cardFace: 'woodcut' },
   { id: 'frost', name: 'Winter Frost', blurb: 'Cold marble and pale ink.', accent: 'teal', tableFelt: 'marble', cardBack: 'linen', cardFace: 'minimal' },
-  { id: 'spring', name: 'Spring Green', blurb: 'Fresh felt, bright cards.', accent: 'emerald', tableFelt: 'velvet', cardBack: 'lattice', cardFace: 'four-color' },
+  { id: 'spring', name: 'Spring Green', blurb: 'Fresh felt, bright cards.', accent: 'emerald', tableFelt: 'vegas', cardBack: 'lattice', cardFace: 'four-color' },
   { id: 'noir', name: 'Chalk & Noir', blurb: 'Blackboard green, chalk-white pips.', accent: 'slate', tableFelt: 'chalkboard', cardBack: 'halftone', cardFace: 'mono' },
-  { id: 'vegas', name: 'Vegas Red', blurb: 'Loud, warm and unmistakable.', accent: 'rose', tableFelt: 'vegas', cardBack: 'sunburst', cardFace: 'deco' },
+  { id: 'vegas', name: 'Vegas Red', blurb: 'Oxblood velvet and gold trim.', accent: 'rose', tableFelt: 'velvet', cardBack: 'sunburst', cardFace: 'deco' },
 ];
 
 export interface AccentPreset { name: string; green: string; greenD: string; emerald: string; lime: string; }
