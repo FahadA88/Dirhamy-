@@ -4368,6 +4368,12 @@ header h1 {
   /* Room for the ring. The top band belongs to the seats along the top, the gutters to the
      ones on either side, so whatever the game puts in the middle never lands on a player. */
   .felt-content { padding: 148px 156px 0; min-height: 520px; }
+  /* Your own hand is not in the middle — it is along the bottom edge, a long way under the
+     side seats — so it has no reason to pay for their gutters. Inside them it got 592px of a
+     904px felt, which for an eighteen-card hand meant a 34px sliver per card: narrower than a
+     fingertip, and narrow enough that the middle of a card belonged to the card in front of
+     it. Let the hand have the whole width back. */
+  .felt-content > .you { margin-inline: -156px; }
   /* One opponent sits alone at the top and needs less headroom than three across. */
   .ring-1 ~ * { --ring-top: 0; }
   .opponents.ring-1 ~ .center, .opponents.ring-1 ~ .bid-area { margin-top: 0; }

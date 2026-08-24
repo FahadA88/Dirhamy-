@@ -348,12 +348,20 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
     if (clientRef.current.remote) return;
     const waiting = clientRef.current.pending().some((p) => !localSeats.includes(p));
     if (!waiting) return;
+    // A floor for the games with no turn order.
+    //
+    // "Instant" means "don't make me wait for a bot to take its turn", which is a turn-based
+    // idea. Pit, Trio and Slapjack have no turns: every seat is live at once, so forty
+    // milliseconds a move is not speed, it is the bots finishing the entire game between the
+    // deal and your first look at the table. Pit ended before a single offer could be read.
+    const noTurnOrder = isPit || isSet || isReflex;
+    const delay = Math.max(BOT_SPEED_MS[settings.botSpeed] ?? 950, noTurnOrder ? 500 : 0);
     const timer = setTimeout(() => {
       const r = clientRef.current.botStep(localSeats, settings.botDiff);
       if (r.moved) setBoard(clientRef.current.read(me));
-    }, BOT_SPEED_MS[settings.botSpeed]);
+    }, delay);
     return () => clearTimeout(timer);
-  }, [board, matchId, me, localSeats, view.phase, settings.botSpeed, settings.botDiff]);
+  }, [board, matchId, me, localSeats, view.phase, settings.botSpeed, settings.botDiff, isPit, isSet, isReflex]);
 
   // Pass-and-play: when the table is waiting on a different local seat, put a hand-off screen up
   // rather than swapping the cards under the person still looking at them.
