@@ -86,6 +86,9 @@ export interface MatchRecord {
   nonce: number;
   handSeeds: number[];
   botSeed: number;
+  /** Round-robin cursor over the bot seats, so a table where everyone may act at once gives
+   *  every bot a go rather than the same one forever. */
+  botCursor?: number;
   createdAt: number;
   seats: Seat[];
   inviteCode: string;
@@ -453,8 +456,17 @@ export class MatchService {
     const viewer = humans[0] ?? rec.state.players[0];
     if (rec.state.phase !== 'playing') return { moved: false, view: redact(rec.state, viewer) };
 
-    const seat = actingPlayers(rec.state).find((p) => !humans.includes(p));
-    if (!seat) return { moved: false, view: redact(rec.state, viewer) };
+    // Whose go it is, when more than one seat may act.
+    //
+    // Taking the first acting bot is right in a game with a turn order, because there is only
+    // ever one. It is wrong in Pit, where nobody has a turn and every seat is always acting:
+    // the same bot was picked on every tick for the whole game, so Bot 2 posted and withdrew
+    // offers forever and no other bot ever moved a card. Step through them instead.
+    const waiting = actingPlayers(rec.state).filter((p) => !humans.includes(p));
+    if (waiting.length === 0) return { moved: false, view: redact(rec.state, viewer) };
+    const cursor = ((rec.botCursor ?? 0) % waiting.length + waiting.length) % waiting.length;
+    rec.botCursor = cursor + 1;
+    const seat = waiting[cursor];
 
     const seatDiff = rec.seats.find((s) => s.id === seat)?.difficulty ?? difficulty;
     const r = chooseMove(rec.state, seat, rec.botSeed, seatDiff);

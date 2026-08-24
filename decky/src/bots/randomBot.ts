@@ -1,5 +1,5 @@
 import { MatchState, Move } from '../engine/types';
-import { legalMoves, handDeadwood } from '../engine/engine';
+import { legalMoves, handDeadwood, pitCorner } from '../engine/engine';
 import { nextRandom } from '../engine/rng';
 
 // Because the engine enumerates legal moves, a bot works for ANY valid game for free.
@@ -395,14 +395,63 @@ export function chooseMove(
   // landing. Only post a fresh offer, in your scarcest suit, when nothing is acceptable and you
   // don't already have too many of your own sitting open.
   if (moves.some((m) => m.actionId === 'pitOffer' || m.actionId === 'pitAccept' || m.actionId === 'pitCancel')) {
-    const accepts = moves.filter((m) => m.actionId === 'pitAccept');
     const r = nextRandom(botSeed);
-    if (accepts.length > 0) return { move: accepts[Math.floor(r.value * accepts.length)], botSeed: r.state };
+    const hand = state.zones[`hand:${playerId}`] || [];
+    const held: Record<string, number> = {};
+    for (const c of hand) held[c.suit] = (held[c.suit] ?? 0) + 1;
+    // The commodity you are collecting: whatever you already hold most of. Without this the
+    // bots accepted anything going, so every trade undid the last one and no corner was ever
+    // assembled — four thousand random trades a game and the only finishes were hands that had
+    // been dealt a corner outright.
+    const suits = ['C', 'D', 'H', 'S'];
+    const byHolding = suits.slice().sort((a, b) => (held[b] ?? 0) - (held[a] ?? 0));
+    // Who else is collecting what is public: an open offer asking for hearts is somebody saying
+    // they want hearts. Two players quietly chasing the same commodity is a permanent deadlock —
+    // neither will ever hand the other a card of it — so back off a suit somebody else has
+    // already called, unless you are nearly home in it yourself.
+    const claimed = new Set(state.market.filter((o) => o.player !== playerId).map((o) => o.want));
+    const goal = pitCorner(state);
+    const target = byHolding.find((sut) => !claimed.has(sut as never) || (held[sut] ?? 0) >= goal - 2)
+      ?? byHolding[0];
+
+    // Take a trade only when it moves you towards that suit: you receive your commodity and pay
+    // in something else.
+    const accepts = moves
+      .filter((m) => m.actionId === 'pitAccept')
+      .map((m) => ({ m, o: state.market.find((x) => x.id === m.offerId) }))
+      .filter((x) => x.o && x.o.give === target && x.o.want !== target)
+      .sort((a, b) => (b.o!.count - a.o!.count));
+    if (accepts.length > 0) return { move: accepts[0].m, botSeed: r.state };
+
+    // Nothing worth taking. Post your own, paying with the suit you have least use for.
     const mine = state.market.filter((o) => o.player === playerId);
-    if (mine.length >= 2) {
-      const cancels = moves.filter((m) => m.actionId === 'pitCancel');
-      if (cancels.length > 0) return { move: cancels[Math.floor(r.value * cancels.length)], botSeed: r.state };
+    const spare = suits
+      .filter((sut) => sut !== target && (held[sut] ?? 0) > 0)
+      .sort((a, b) => (held[a] ?? 0) - (held[b] ?? 0));
+    const wanted = moves.filter((m) => m.actionId === 'pitOffer' && m.want === target
+      && m.give !== target && spare.includes(String(m.give)));
+    if (mine.length < 2 && wanted.length > 0) {
+      // Small parcels. A trade only happens if someone can fill the exact count asked for, so
+      // three-for-three offers sit unanswered while two bots stare at each other — the market
+      // moves when what is on it is easy to take.
+      const best = wanted.sort((a, b) => {
+        const byCount = Number(a.cards?.[0] ?? 0) - Number(b.cards?.[0] ?? 0);
+        return byCount !== 0 ? byCount : spare.indexOf(String(a.give)) - spare.indexOf(String(b.give));
+      })[0];
+      return { move: best, botSeed: r.state };
     }
+    // Nothing on the table helps and there is nothing new worth posting. Take any trade that at
+    // least does not cost you your own commodity — standing perfectly still is how a table of
+    // four bots, each guarding a different suit, sat and stared at each other forever.
+    const harmless = moves
+      .filter((m) => m.actionId === 'pitAccept')
+      .map((m) => ({ m, o: state.market.find((x) => x.id === m.offerId) }))
+      .filter((x) => x.o && x.o.want !== target);
+    if (harmless.length > 0) return { move: harmless[Math.floor(r.value * harmless.length)].m, botSeed: r.state };
+
+    // Two of your own already sitting unanswered: pull one rather than flood the market.
+    const cancels = moves.filter((m) => m.actionId === 'pitCancel');
+    if (cancels.length > 0) return { move: cancels[Math.floor(r.value * cancels.length)], botSeed: r.state };
     const offers = moves.filter((m) => m.actionId === 'pitOffer');
     if (offers.length === 0) return { move: moves[0], botSeed: r.state };
     return { move: offers[Math.floor(r.value * offers.length)], botSeed: r.state };

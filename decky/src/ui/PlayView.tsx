@@ -19,7 +19,8 @@ export function PlayView() {
   const { settings } = useSettings();
   const [game, setGame] = useState<GameDefinition | null>(null);
   const [seats, setSeats] = useState(settings.defaultSeats);
-  const [resumable, setResumable] = useState<{ gameId: string; name: string } | null>(null);
+  const [resumable, setResumable] = useState<
+    { gameId: string; name: string; matchId: string; seats: number } | null>(null);
   const [helpFor, setHelpFor] = useState<GameDefinition | null>(null);
   const [plan, setPlan] = useState<Seat[] | null>(null);
   const [setupFor, setSetupFor] = useState<GameDefinition | null>(null);
@@ -47,7 +48,7 @@ export function PlayView() {
     const saved = resumableSession();
     if (!saved) return;
     const def = catalog.find((g) => g.meta.id === saved.gameId);
-    if (def) setResumable({ gameId: saved.gameId, name: def.meta.name });
+    if (def) setResumable({ gameId: saved.gameId, name: def.meta.name, matchId: saved.matchId, seats: saved.seats });
   }, []);
 
   if (onlineFor && !session) {
@@ -134,8 +135,15 @@ export function PlayView() {
             <button className="ghost sm" onClick={() => setResumable(null)}>Dismiss</button>
             <button className="primary sm" onClick={() => {
               const def = catalog.find((g) => g.meta.id === resumable.gameId);
-              // One game: the ordinary resume path in Table finds it. No id needed.
-              if (def) { setResumeId(null); setGame(def); setResumable(null); }
+              // Name the table. Leaving it to Table's own lookup dealt a brand new hand
+              // whenever the seat count on screen differed from the saved one — which it did
+              // for every game whose table is bigger or smaller than the default, so Spades,
+              // Hearts, Euchre and War all "resumed" into a fresh three-handed deal.
+              if (def) {
+                setSeats(Math.min(Math.max(resumable.seats, def.meta.players.min), def.meta.players.max));
+                setPlan(null); setPractice(false);
+                setResumeId(resumable.matchId); setGame(def); setResumable(null);
+              }
             }}>Resume →</button>
           </div>
         </div>

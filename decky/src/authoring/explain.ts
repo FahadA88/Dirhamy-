@@ -186,7 +186,7 @@ export function explainGame(def: GameDefinition): string[] {
     out.push('No side pots — going short on chips means folding, not a partial call.');
   } else if (def.pit) {
     out.push('No turns. Offer to trade cards of one suit for another, or accept anyone else\'s open offer, at any time.');
-    out.push(`First to hold ${def.pit.cornerSize} of one suit corners the market and wins.`);
+    out.push(`Corner the market — ${def.pit.cornerSize} cards of one suit — and you win. At a table too crowded to hold that many, a whole hand of one suit does it; the target is shown above your cards either way.`);
   } else {
     out.push('Play a card that matches the pile, or draw. First to empty their hand wins.');
   }

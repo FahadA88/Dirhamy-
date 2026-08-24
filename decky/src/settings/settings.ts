@@ -283,6 +283,28 @@ export const BOT_SPEED_MS: Record<BotSpeed, number> = { slow: 1800, normal: 950,
 
 const KEY = 'decky.settings.v1';
 
+// What each of the choice-shaped settings is allowed to be. Spreading whatever was in
+// localStorage over the defaults trusted it completely: a value this build no longer has — a
+// blob written by an older version, another tab, or a hand-edited key — silently became the
+// live setting. A bot speed that isn't one of the four reads back as undefined and paces the
+// bots at nought milliseconds, so the whole game plays itself out before the first card is on
+// screen; a card size that isn't one of the three throws on boot and the app never renders.
+const ALLOWED = {
+  theme: ['light', 'dark', 'system'],
+  accent: Object.keys(ACCENTS),
+  playerColor: Object.keys(ACCENTS),
+  cardSize: Object.keys(CARD_SIZES),
+  textSize: ['s', 'm', 'l', 'xl'],
+  surface: ['soft', 'glass', 'plain'],
+  highlight: ['glow', 'outline', 'lift', 'off'],
+  sort: ['auto', 'off', 'rank', 'suit'],
+  botSpeed: Object.keys(BOT_SPEED_MS),
+  botDiff: ['easy', 'normal', 'hard', 'smart', 'random'],
+  animSpeed: Object.keys(ANIM_SCALE),
+  motion: ['system', 'full', 'reduced'],
+  density: ['comfortable', 'compact'],
+} as const;
+
 export function loadSettings(): Settings {
   try {
     const raw = localStorage.getItem(KEY);
@@ -293,7 +315,22 @@ export function loadSettings(): Settings {
     if (saved.cardFace === undefined && saved.fourColor !== undefined) {
       saved.cardFace = saved.fourColor ? 'four-color' : 'classic';
     }
-    return { ...defaultSettings, ...saved };
+    const merged = { ...defaultSettings, ...saved } as Record<string, unknown>;
+    for (const [key, options] of Object.entries(ALLOWED)) {
+      if (!(options as readonly string[]).includes(String(merged[key]))) {
+        merged[key] = (defaultSettings as unknown as Record<string, unknown>)[key];
+      }
+    }
+    // The numbers, too: a seat count of nought seats nobody, and a negative clock never ticks.
+    const num = (v: unknown, lo: number, hi: number, fallback: number) =>
+      (typeof v === 'number' && Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : fallback);
+    merged.defaultSeats = num(merged.defaultSeats, 2, 8, defaultSettings.defaultSeats);
+    merged.undoGraceMs = num(merged.undoGraceMs, 0, 60000, defaultSettings.undoGraceMs);
+    merged.turnSeconds = num(merged.turnSeconds, 0, 3600, defaultSettings.turnSeconds);
+    if (typeof merged.playerName !== 'string' || !merged.playerName.trim()) {
+      merged.playerName = defaultSettings.playerName;
+    }
+    return merged as unknown as Settings;
   } catch {
     return { ...defaultSettings };
   }

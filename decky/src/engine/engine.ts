@@ -287,7 +287,22 @@ export function createMatch(
   // Pit deals the whole deck out at once, so a player can already be holding a full corner the
   // instant the cards land — pitCheckWin() is otherwise only ever called after a trade, which
   // would let a deal-time win go undetected (and possibly traded away) before anyone ever offers.
-  if (def.pit) pitCheckWin(state);
+  if (def.pit) {
+    // The deck is dealt out entire, so at three seats everyone holds seventeen cards and a
+    // corner of seven turned up ready-made in sixty per cent of deals — the game was over
+    // before a single offer was posted. A deal that already contains a corner is not a game,
+    // so it is thrown in and dealt again, the way a misdeal is at a real table.
+    for (let redeal = 0; redeal < 40 && pitDealtCorner(state); redeal++) {
+      const all: Card[] = [];
+      for (const p of state.players) { all.push(...(state.zones[`hand:${p}`] || [])); state.zones[`hand:${p}`] = []; }
+      const { result, rngState } = seededShuffle(all, state.rngState);
+      state.rngState = rngState;
+      result.forEach((c, i) => state.zones[`hand:${state.players[i % state.players.length]}`].push(c));
+    }
+    // Say what winning looks like at this table, since the number depends on how many sat down.
+    log(state, null, `Corner ${pitCorner(state)} of one suit to win.`);
+    pitCheckWin(state);
+  }
   fireRules(state, 'handStart', { playerId: state.players[state.turnIndex] });
   return state;
 }
@@ -3177,12 +3192,37 @@ function applyPitMove(s: MatchState, playerId: string, move: Move): MatchState {
   return s;
 }
 
+/**
+ * How many of one suit actually corners the market at this table.
+ *
+ * The whole deck goes out however many people sit down, so at eight seats a hand is six cards
+ * and a corner of seven was simply unreachable — that game could never end. The target is
+ * therefore capped at the size of the smallest hand.
+ *
+ * Hand sizes never change in Pit — a trade swaps equal counts — so this is stable for the whole
+ * game and can be quoted to the player up front.
+ */
+export function pitCorner(s: MatchState): number {
+  const smallestHand = Math.min(...s.players.map((p) => (s.zones[`hand:${p}`] || []).length));
+  return Math.max(2, Math.min(s.definition.pit!.cornerSize, smallestHand));
+}
+
+/** Is anyone already holding a corner? Used to reject a deal, before any move has been made. */
+function pitDealtCorner(s: MatchState): boolean {
+  const target = pitCorner(s);
+  return s.players.some((p) => {
+    const bySuit: Record<string, number> = {};
+    for (const c of s.zones[`hand:${p}`] || []) bySuit[c.suit] = (bySuit[c.suit] ?? 0) + 1;
+    return Object.values(bySuit).some((n) => n >= target);
+  });
+}
+
 function pitCheckWin(s: MatchState): boolean {
-  const cfg = s.definition.pit!;
+  const target = pitCorner(s);
   for (const p of s.players) {
     const bySuit: Record<string, number> = {};
     for (const c of s.zones[`hand:${p}`] || []) bySuit[c.suit] = (bySuit[c.suit] ?? 0) + 1;
-    if (Object.values(bySuit).some((n) => n >= cfg.cornerSize)) {
+    if (Object.values(bySuit).some((n) => n >= target)) {
       s.phase = 'roundOver';
       s.winner = p;
       for (const q of s.players) s.scores[q] = q === p ? 1 : 0;
@@ -3445,7 +3485,7 @@ export function redact(state: MatchState, viewer: string): RedactedState {
       : undefined,
     // pit
     market: state.definition.pit ? state.market.map((o) => ({ ...o })) : undefined,
-    cornerSize: state.definition.pit ? state.definition.pit.cornerSize : undefined,
+    cornerSize: state.definition.pit ? pitCorner(state) : undefined,
     // set: the board is face up to everyone by definition, so there is nothing to hide. The
     // deck count is public too — knowing how much is left is part of the game, not a leak.
     setBoard: state.definition.set ? (state.zones['set:board'] ?? []).map((c) => ({ ...c })) : undefined,

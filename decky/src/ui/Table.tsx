@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { MutableRefObject, useEffect, useMemo, useRef, useState } from 'react';
 import { Card, GameDefinition, Move, RedactedState } from '../engine/types';
 import { SUIT_SYMBOLS } from '../engine/deck';
 import { CardFace } from './Card';
@@ -184,7 +184,14 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
   const [history, setHistory] = useState<MoveRecord[]>([]);
   // The referee, and the last position it gave us. A local table makes its own client; an
   // online one is handed one already connected to the table it joined.
-  const clientRef = useRef<TableClient>(injected ?? bootLocal(def, players, false, resumeMatchId));
+  // useRef's argument is NOT lazy: it is evaluated on every render and the value thrown away
+  // on all but the first. Calling bootLocal there dealt a whole new match on every re-render of
+  // an ended table — Pit and Trio finish in under a second, so a single visit left three
+  // abandoned matches in the store and pointed the "unfinished game" pointer at the last of
+  // them. Boot once, into a null ref.
+  const bootRef = useRef<TableClient | null>(null);
+  if (bootRef.current === null) bootRef.current = injected ?? bootLocal(def, players, false, resumeMatchId);
+  const clientRef = bootRef as MutableRefObject<TableClient>;
   const [board, setBoard] = useState<Board>(() => clientRef.current.read(localSeats[0] ?? HUMAN));
   // One toast, two tones: a refusal is a red ✕, a status note is not.
   const [toast, setToast] = useState<{ text: string; tone: 'bad' | 'info' } | null>(null);
@@ -304,6 +311,27 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
   const knockMoves = useMemo(() => myLegal.filter((m) => m.actionId === 'knock'), [myLegal]);
   const layOffMoves = useMemo(() => myLegal.filter((m) => m.actionId === 'layOff'), [myLegal]);
   const discardMoves = useMemo(() => myLegal.filter((m) => m.actionId === 'dealerDiscard'), [myLegal]);
+  // pit: which suits you hold enough of to offer, and how many of the chosen one you could put
+  // up. Both come from the engine's own list of legal offers, so the form can never show a
+  // combination it would then refuse.
+  const pitGivable = useMemo(
+    () => (['C', 'D', 'H', 'S'] as const).filter((sut) => myLegal.some((m) => m.actionId === 'pitOffer' && m.give === sut)),
+    [myLegal],
+  );
+  const pitCounts = useMemo(
+    () => [1, 2, 3].filter((n) => myLegal.some((m) => m.actionId === 'pitOffer' && m.give === pitGive && m.cards?.[0] === String(n))),
+    [myLegal, pitGive],
+  );
+  useEffect(() => {
+    if (!isPit || pitGivable.length === 0) return;
+    if (!pitGivable.includes(pitGive)) { setPitGive(pitGivable[0]); return; }
+    if (pitWant === pitGive) {
+      setPitWant((['C', 'D', 'H', 'S'] as const).find((sut) => sut !== pitGive) ?? 'D');
+      return;
+    }
+    if (pitCounts.length && !pitCounts.includes(pitCount)) setPitCount(pitCounts[0]);
+  }, [isPit, pitGivable, pitCounts, pitGive, pitWant, pitCount]);
+
   const canFlip = myLegal.some((m) => m.actionId === 'warFlip');
   const myPile = view.players.find((p) => p.id === me)?.handCount ?? 0;
   const playActionId = view.needsPassChoice ? 'choosePass'
@@ -1178,10 +1206,18 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
           </div>
         ) : isPit ? (
           <div className="pit-controls">
+            {/* The target depends on how many people sat down, so it has to be on screen —
+                a row of counts with nothing to count towards told you nothing. */}
             <div className="pit-hand-summary">
+              <span className="pit-goal">Corner <b>{view.cornerSize}</b> of one suit</span>
               {(['C', 'D', 'H', 'S'] as const).map((suit) => {
                 const count = hand.filter((c) => c.suit === suit).length;
-                return count > 0 ? <span key={suit} className="chip">{count}× {SUIT_SYMBOLS[suit]}</span> : null;
+                const best = Math.max(0, ...(['C', 'D', 'H', 'S'] as const).map((x) => hand.filter((c) => c.suit === x).length));
+                return count > 0 ? (
+                  <span key={suit} className={`chip ${count === best ? 'lead' : ''}`}>
+                    {count}/{view.cornerSize} {SUIT_SYMBOLS[suit]}
+                  </span>
+                ) : null;
               })}
             </div>
             <div className="pit-market">
@@ -1199,17 +1235,26 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
                 </div>
               ))}
             </div>
+            {/*
+              Only what you can actually offer. The three menus used to list all four suits and
+              the counts one to three whatever you held, so a hand with no clubs in it opened on
+              "1 Club for Diamonds" with the button dead and nothing on screen saying why.
+            */}
             <div className="pit-offer-maker">
               <span className="muted">Offer</span>
               <select value={pitCount} onChange={(e) => setPitCount(+e.target.value)} aria-label="How many">
-                {[1, 2, 3].map((n) => <option key={n} value={n}>{n}</option>)}
+                {pitCounts.map((n) => <option key={n} value={n}>{n}</option>)}
               </select>
               <select value={pitGive} onChange={(e) => setPitGive(e.target.value as typeof pitGive)} aria-label="Give this suit">
-                {(['C', 'D', 'H', 'S'] as const).map((sut) => <option key={sut} value={sut}>{SUIT_SYMBOLS[sut]} {SUIT_NAMES[sut]}</option>)}
+                {pitGivable.map((sut) => (
+                  <option key={sut} value={sut}>{SUIT_SYMBOLS[sut]} {SUIT_NAMES[sut]}</option>
+                ))}
               </select>
               <span className="muted">for</span>
               <select value={pitWant} onChange={(e) => setPitWant(e.target.value as typeof pitWant)} aria-label="Want this suit">
-                {(['C', 'D', 'H', 'S'] as const).map((sut) => <option key={sut} value={sut}>{SUIT_SYMBOLS[sut]} {SUIT_NAMES[sut]}</option>)}
+                {(['C', 'D', 'H', 'S'] as const).filter((sut) => sut !== pitGive).map((sut) => (
+                  <option key={sut} value={sut}>{SUIT_SYMBOLS[sut]} {SUIT_NAMES[sut]}</option>
+                ))}
               </select>
               <button
                 className="primary sm"

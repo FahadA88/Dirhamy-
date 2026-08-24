@@ -3717,7 +3717,11 @@ header h1 {
 .poker-actions { display: flex; gap: 10px; flex-wrap: wrap; }
 .poker-actions .ghost.danger { border-color: rgba(255,77,94,.4); color: var(--red); }
 
-.pit-hand-summary { display: flex; gap: 8px; flex-wrap: wrap; }
+.pit-hand-summary { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.pit-goal { font-size: 13px; color: var(--muted); margin-right: 2px; }
+.pit-goal b { color: var(--text); font-variant-numeric: tabular-nums; }
+.pit-hand-summary .chip.lead { border-color: color-mix(in srgb, var(--accent) 60%, transparent);
+  color: var(--text); background: color-mix(in srgb, var(--accent) 16%, transparent); }
 .pit-market {
   display: flex; flex-direction: column; gap: 8px;
   max-height: 160px; overflow-y: auto;
