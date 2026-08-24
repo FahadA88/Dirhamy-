@@ -4626,3 +4626,30 @@ button.bluff-go:disabled {
     --bh: var(--ch);
   }
 }
+
+/* The kind tabs scroll like a shelf does, so they get the same edges. With thirteen
+   families rather than eight the row is well past a laptop's width. */
+.rail-wrap > .kindtabs { overflow-x: auto; }
+.rail-wrap:has(> .kindtabs)::before,
+.rail-wrap:has(> .kindtabs)::after { bottom: 0; width: 48px; }
+
+/* ============================================================
+   WHAT THE DEVICE AND THE PERSON ASKED FOR, LAST WORD
+   These answer a question about the machine or its owner — is there a
+   pointer that can hover, has this person asked for less movement — so
+   they have to outrank ordinary styling. Declared earlier in the file
+   they lost to later rules and quietly stopped applying: the play button
+   on a shelf card is painted at `opacity: 0` until hover, and on a
+   touchscreen hover never comes, so on a phone every card's play button
+   was invisible.
+   ============================================================ */
+@media (hover: none) {
+  /* Nothing reveals itself on hover where there is no hover. */
+  .sc-play { opacity: 1 !important; transform: none !important; }
+  /* A lift on hover is a mouse idea; on touch it makes things jump after a tap. */
+  .card-btn.playable:hover,
+  .sol-card.live:not(:disabled):hover,
+  .game-card:hover,
+  .felt-opt:hover,
+  .shelfcard:hover { transform: none; }
+}

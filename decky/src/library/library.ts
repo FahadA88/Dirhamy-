@@ -408,6 +408,11 @@ export const KINDS: { id: string; label: string; mark: string }[] = [
   { id: 'fish', label: 'Asking', mark: '🃁' },
   { id: 'rummy', label: 'Melding', mark: '🃋' },
   { id: 'war', label: 'Flipping', mark: '🃞' },
+  { id: 'bluff', label: 'Bluffing', mark: '🂢' },
+  { id: 'reflex', label: 'Reflex', mark: '🃏' },
+  { id: 'poker', label: 'Betting', mark: '🂫' },
+  { id: 'pit', label: 'Trading', mark: '🃑' },
+  { id: 'set', label: 'Spotting', mark: '🂪' },
   { id: 'solitaire', label: 'Patience', mark: '🂨' },
 ];
 
@@ -423,6 +428,14 @@ export function kindOf(def: GameDefinition): string {
   if (def.fish) return 'fish';
   if (def.rummy) return 'rummy';
   if (def.war) return 'war';
+  // Without these five, every game the interpreter grew after the original families fell
+  // through to "shedding" — so browsing for something like Crazy Eights turned up Showdown
+  // Poker, Pit and Slapjack, and the tab claimed eight shedding games where there are three.
+  if (def.bluff) return 'bluff';
+  if (def.reflex) return 'reflex';
+  if (def.poker) return 'poker';
+  if (def.pit) return 'pit';
+  if (def.set) return 'set';
   return 'shedding';
 }
 

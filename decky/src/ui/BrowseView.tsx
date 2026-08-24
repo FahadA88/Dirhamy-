@@ -292,48 +292,15 @@ function Carousel({ games, onOpen, onPlay }: {
 // ---------- the kind tabs ----------
 
 /** What sort of game are you in the mood for. Kinds with nothing in them are not offered. */
-function KindTabs({ value, onChange, games }: {
-  value: string; onChange: (k: string) => void; games: PublishedGame[];
+/**
+ * A row that is wider than its container, saying so. It fades on whichever side still has
+ * something past it and offers a button to get there; cut off hard at the container edge, a
+ * half-visible card or tab reads as a broken layout rather than as an invitation to scroll.
+ * Used by both the shelves and the kind tabs, which have the same problem.
+ */
+function EdgeScroller({ className, label, children }: {
+  className: string; label: string; children: React.ReactNode;
 }) {
-  const counts = useMemo(() => {
-    const m: Record<string, number> = {};
-    for (const g of games) { const k = kindOf(g.definition); m[k] = (m[k] ?? 0) + 1; }
-    return m;
-  }, [games]);
-  const tabs = KINDS.filter((k) => k.id === '' || (counts[k.id] ?? 0) > 0);
-  return (
-    <div className="kindtabs" role="tablist" aria-label="Kind of game">
-      {tabs.map((k) => (
-        <button
-          key={k.id || 'all'}
-          role="tab"
-          aria-selected={value === k.id}
-          className={`kindtab ${value === k.id ? 'on' : ''}`}
-          onClick={() => onChange(k.id)}
-        >
-          <span className="kt-mark" aria-hidden="true">{k.mark}</span>
-          <span className="kt-label">{k.label}</span>
-          <span className="kt-count">{k.id ? counts[k.id] : games.length}</span>
-        </button>
-      ))}
-    </div>
-  );
-}
-
-// ---------- shelves ----------
-
-function Shelf({ collection, onOpen, onPlay, onChanged }: {
-  collection: Collection;
-  onOpen: (id: string) => void;
-  onPlay: (g: PublishedGame) => void;
-  onChanged: () => void;
-}) {
-  /*
-    A shelf holds more than fits, so it scrolls — but it used to end by clipping a card in
-    half against the container edge, which reads as a broken layout rather than an invitation.
-    The rail now says which way there is more to go: it fades on whichever side has something
-    past it, and offers a button to get there.
-  */
   const rail = useRef<HTMLDivElement>(null);
   const [edge, setEdge] = useState<{ left: boolean; right: boolean }>({ left: false, right: false });
 
@@ -351,7 +318,7 @@ function Shelf({ collection, onOpen, onPlay, onChanged }: {
     const ro = new ResizeObserver(measure);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [measure, collection.games.length]);
+  }, [measure, children]);
 
   const nudge = (dir: 1 | -1) => {
     const el = rail.current;
@@ -359,24 +326,69 @@ function Shelf({ collection, onOpen, onPlay, onChanged }: {
   };
 
   return (
+    <div className={`rail-wrap ${edge.left ? 'has-left' : ''} ${edge.right ? 'has-right' : ''}`}>
+      <div className={className} ref={rail} onScroll={measure}
+        role={className === 'kindtabs' ? 'tablist' : undefined}
+        aria-label={className === 'kindtabs' ? label : undefined}>
+        {children}
+      </div>
+      {edge.left && (
+        <button className="rail-nudge left" onClick={() => nudge(-1)} aria-label={`Scroll ${label} back`}>&lsaquo;</button>
+      )}
+      {edge.right && (
+        <button className="rail-nudge right" onClick={() => nudge(1)} aria-label={`Scroll ${label} on`}>&rsaquo;</button>
+      )}
+    </div>
+  );
+}
+
+function KindTabs({ value, onChange, games }: {
+  value: string; onChange: (k: string) => void; games: PublishedGame[];
+}) {
+  const counts = useMemo(() => {
+    const m: Record<string, number> = {};
+    for (const g of games) { const k = kindOf(g.definition); m[k] = (m[k] ?? 0) + 1; }
+    return m;
+  }, [games]);
+  const tabs = KINDS.filter((k) => k.id === '' || (counts[k.id] ?? 0) > 0);
+  return (
+    <EdgeScroller className="kindtabs" label="Kind of game">
+      {tabs.map((k) => (
+        <button
+          key={k.id || 'all'}
+          role="tab"
+          aria-selected={value === k.id}
+          className={`kindtab ${value === k.id ? 'on' : ''}`}
+          onClick={() => onChange(k.id)}
+        >
+          <span className="kt-mark" aria-hidden="true">{k.mark}</span>
+          <span className="kt-label">{k.label}</span>
+          <span className="kt-count">{k.id ? counts[k.id] : games.length}</span>
+        </button>
+      ))}
+    </EdgeScroller>
+  );
+}
+
+// ---------- shelves ----------
+
+function Shelf({ collection, onOpen, onPlay, onChanged }: {
+  collection: Collection;
+  onOpen: (id: string) => void;
+  onPlay: (g: PublishedGame) => void;
+  onChanged: () => void;
+}) {
+  return (
     <section className="shelf">
       <div className="section-head">
         <h2>{collection.title}</h2>
         {collection.blurb && <p className="shelf-blurb">{collection.blurb}</p>}
       </div>
-      <div className={`rail-wrap ${edge.left ? 'has-left' : ''} ${edge.right ? 'has-right' : ''}`}>
-        <div className="shelf-rail" ref={rail} onScroll={measure}>
-          {collection.games.map((g) => (
-            <ShelfCard key={g.id} game={g} onOpen={() => onOpen(g.id)} onPlay={() => onPlay(g)} onChanged={onChanged} />
-          ))}
-        </div>
-        {edge.left && (
-          <button className="rail-nudge left" onClick={() => nudge(-1)} aria-label={`Scroll ${collection.title} back`}>‹</button>
-        )}
-        {edge.right && (
-          <button className="rail-nudge right" onClick={() => nudge(1)} aria-label={`Scroll ${collection.title} on`}>›</button>
-        )}
-      </div>
+      <EdgeScroller className="shelf-rail" label={collection.title}>
+        {collection.games.map((g) => (
+          <ShelfCard key={g.id} game={g} onOpen={() => onOpen(g.id)} onPlay={() => onPlay(g)} onChanged={onChanged} />
+        ))}
+      </EdgeScroller>
     </section>
   );
 }
