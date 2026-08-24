@@ -4595,3 +4595,34 @@ button.bluff-go:disabled {
   border-style: dashed; border-color: rgba(255, 110, 130, .6); color: #ff9fb0;
 }
 .poker-actions .ghost.bet.allin:hover:not(:disabled) { border-color: #ff6e82; color: #ffc2cd; }
+
+/* ============================================================
+   A PATIENCE BOARD THAT FITS THE SCREEN
+   The narrow-screen rules for the tableau sit near the top of this file
+   and set a 2px gap; the base rule several hundred lines below them sets
+   10px and won on source order, so Spider's ten columns came to
+   10x27 + 9x10 = 360px of board on a 390px phone and the last column ran
+   off the side. Restated here, where nothing outranks them.
+
+   The card width is derived from the column count rather than fixed, so
+   the same board fits a 320px phone as well as a 430px one — every
+   patience game sets --cols on its tableau, so this works for seven
+   columns as readily as ten.
+   ============================================================ */
+@media (max-width: 899px) {
+  .sol-tableau {
+    gap: 3px;
+    /* Columns may shrink below their content; without this the 1fr floor is
+       the card's own width and the grid overflows instead of fitting. */
+    grid-template-columns: repeat(var(--cols), minmax(0, 1fr));
+  }
+  .felt-content.sol {
+    /* Whatever is left after the page gutters, the rail and the felt padding,
+       shared between the columns — capped so a seven-column game does not
+       blow the cards up to fill the width. */
+    --cw: min(46px, calc((100vw - 76px - (var(--cols, 7) - 1) * 3px) / var(--cols, 7)));
+    --ch: calc(var(--cw) * 1.42);
+    --bw: var(--cw);
+    --bh: var(--ch);
+  }
+}

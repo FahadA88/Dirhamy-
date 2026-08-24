@@ -115,7 +115,10 @@ export function SolitaireTable({ def }: { def: GameDefinition }) {
           <TableDressing felt={settings.tableFelt} title={def.meta.name} />
           {/* Patience is dealt to columns, not to seats: one flick per column. */}
           <DealMotion seats={7} aim={['.sol-col']} round={matchId} onStart={() => setDealing(true)} onDone={() => setDealing(false)} />
-          <div className="felt-content sol">
+          {/* The column count is needed to size the cards so the whole board fits a narrow
+              screen, and custom properties only inherit downward — so it is set here rather
+              than only on the tableau. */}
+          <div className="felt-content sol" style={{ '--cols': cfg.columns } as React.CSSProperties}>
 
             <div className="sol-bar">
               <span className="sol-stat">{view.moveCount ?? 0} moves</span>
