@@ -999,7 +999,16 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
 /* fishing (Go Fish) */
 .seat.askable { cursor: pointer; box-shadow: 0 0 0 2px var(--green), 0 6px 20px var(--glow); }
 .seat.askable:hover { background: rgba(214, 175, 92, 0.1); }
-.ask-hint { margin-top: 6px; font-family: var(--mono); font-size: 11px; color: var(--green-d); }
+.seat.askable:hover .ask-hint { background: var(--green); color: #06210f; border-color: transparent; }
+/* This is the thing you press to take your turn, so it has to look pressable. In grey-green
+   mono at eleven pixels it read as a debug label printed under the seat. */
+.ask-hint {
+  margin-top: 8px; padding: 6px 12px; border-radius: 999px;
+  font-size: 12.5px; font-weight: 700; letter-spacing: .2px;
+  color: var(--green); border: 1px solid color-mix(in srgb, var(--green) 55%, transparent);
+  background: color-mix(in srgb, var(--green) 14%, transparent);
+  transition: background 140ms, color 140ms, border-color 140ms;
+}
 .fish-prompt { align-self: center; max-width: 240px; color: var(--muted); font-size: 13px; line-height: 1.5; }
 
 /* Spades bidding + teams */
@@ -3684,6 +3693,18 @@ header h1 {
 .bluff-controls, .reflex-controls, .poker-controls, .pit-controls {
   display: flex; flex-direction: column; gap: 14px; width: 100%;
 }
+/* The middle of a Bluff table: the pile, what was just claimed about it, and the one button
+   that calls it. */
+.bluff-center { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+.bluff-claimed {
+  padding: 9px 16px; border-radius: 999px; font-size: 14.5px;
+  border: 1px solid var(--panel-brd); background: rgba(255, 255, 255, .05); color: var(--muted);
+  animation: card-landed 300ms cubic-bezier(.3, .9, .35, 1) both;
+}
+.bluff-claimed b { color: var(--ink); font-weight: 750; }
+.bluff-claimed.mine { border-color: var(--hot); box-shadow: 0 0 18px rgba(255, 46, 136, .26); }
+.bluff-center .bluff-challenge { width: auto; margin-top: 0; }
+
 .bluff-info { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .bluff-pile {
   font-family: var(--mono); font-size: 12px; color: var(--muted);

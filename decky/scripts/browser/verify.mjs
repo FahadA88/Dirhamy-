@@ -25,9 +25,18 @@ await p.goto(base, { waitUntil: 'networkidle' });
 
 console.log('\nWar plays through the service');
 await open('War');
-for (let i = 0; i < 12; i++) { const f = p.locator('.war-controls .primary'); if (await f.count()) await f.click(); await p.waitForTimeout(120); }
+// Flip until five battles have actually resolved, rather than a fixed dozen clicks. A tie is a
+// war: it eats a click and the cards that go with it without ever writing a "wins" line, so a
+// run with two of them finished on four and failed a check that nothing was wrong with.
+let wlog = [];
+for (let i = 0; i < 40; i++) {
+  wlog = await p.locator('.log-row').allTextContents();
+  if (wlog.filter((l) => / wins /.test(l)).length >= 5) break;
+  const f = p.locator('.war-controls .primary');
+  if (await f.count()) await f.click({ timeout: 2000 }).catch(() => {});
+  await p.waitForTimeout(120);
+}
 const pile = await p.locator('.war-pile').textContent();
-const wlog = await p.locator(".log-row").allTextContents();
 ok(`flipping resolves battles (${wlog.length} log lines, pile ${pile.trim()})`, wlog.filter(l => / wins /.test(l)).length >= 5);
 
 console.log('\nSolitaire undo and hint come from the service');

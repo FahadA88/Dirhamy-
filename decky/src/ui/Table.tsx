@@ -978,11 +978,40 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
             </div>
           </div>
         </div>
-      ) : isSet || isBluff || isReflex || isPoker || isPit ? (
-        /* Each of these has its own dedicated center-area UI rendered below (Bluff's center-pile
-           count, Reflex's slap pile, Poker's pot, Pit's market) — none has a real draw/discard
-           zone, so falling through to the generic piles here would just be furniture on top of
-           the real thing, or (Set) furniture for a game that has neither at all. */
+      ) : isBluff ? (
+        /*
+          The pile everybody is lying about belongs in the middle of the table.
+          It used to be a small grey chip wedged in beside your name, which left the whole top
+          half of the felt empty and put the one thing every player is watching — how big the
+          pile has grown, and what was just claimed — nowhere near where anybody was looking.
+        */
+        <div className="center bluff-center">
+          <div className="pile">
+            {(view.centerCount ?? 0) > 0
+              ? <div className={`${backCls} big`} />
+              : <div className="card big empty" />}
+            <div className="pile-label">
+              {(view.centerCount ?? 0)} card{(view.centerCount ?? 0) === 1 ? '' : 's'} down
+            </div>
+          </div>
+          {view.pendingClaim && (
+            <div className={`bluff-claimed ${view.pendingClaim.player === me ? 'mine' : ''}`}>
+              <b>{view.pendingClaim.player === me ? 'You' : nameOf(view.pendingClaim.player)}</b>
+              {view.pendingClaim.player === me ? ' claim ' : ' claims '}
+              <b>{view.pendingClaim.count} × {view.pendingClaim.claimedRank}</b>
+            </div>
+          )}
+          {myLegal.some((m) => m.actionId === 'bluffChallenge') && (
+            <button className="primary bluff-challenge" onClick={() => submit({ actionId: 'bluffChallenge' })}>
+              🤨 Call bluff!
+            </button>
+          )}
+        </div>
+      ) : isSet || isReflex || isPoker || isPit ? (
+        /* Each of these has its own dedicated center-area UI rendered below (Reflex's slap pile,
+           Poker's pot, Pit's market) — none has a real draw/discard zone, so falling through to
+           the generic piles here would just be furniture on top of the real thing, or (Set)
+           furniture for a game that has neither at all. */
         null
       ) : (
         <div className="center">
@@ -1127,19 +1156,6 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
           </div>
         ) : isBluff ? (
           <div className="bluff-controls">
-            <div className="bluff-info">
-              <span className="bluff-pile">Center pile · {view.centerCount ?? 0} card{(view.centerCount ?? 0) === 1 ? '' : 's'}</span>
-              {view.pendingClaim && (
-                <span className={`bluff-claim ${view.pendingClaim.player === me ? 'mine' : ''}`}>
-                  {nameOf(view.pendingClaim.player)} claim{view.pendingClaim.player === me ? '' : 's'} {view.pendingClaim.count}× {view.pendingClaim.claimedRank}
-                </span>
-              )}
-            </div>
-            {myLegal.some((m) => m.actionId === 'bluffChallenge') && (
-              <button className="primary bluff-challenge" onClick={() => submit({ actionId: 'bluffChallenge' })}>
-                🤨 Call bluff!
-              </button>
-            )}
             {/* Your own cards stay visible even off your claim turn — you still need them to
                 decide whether to call the current claim. */}
             {hand.length > 0 && (() => {
