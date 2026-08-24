@@ -3253,7 +3253,12 @@ function applyPitMove(s: MatchState, playerId: string, move: Move): MatchState {
  */
 export function pitCorner(s: MatchState): number {
   const smallestHand = Math.min(...s.players.map((p) => (s.zones[`hand:${p}`] || []).length));
-  return Math.max(2, Math.min(s.definition.pit!.cornerSize, smallestHand));
+  // Never the whole hand. At seven and eight seats a hand is six or seven cards, and a target
+  // equal to it means cornering requires dumping every last odd card — including the suit
+  // nobody at the table is collecting. Those cards have no buyer, so the market locks solid
+  // with everyone one card short. Leaving one slot spare is the difference between a game that
+  // always ends and one that sometimes cannot.
+  return Math.max(2, Math.min(s.definition.pit!.cornerSize, smallestHand - 1));
 }
 
 /** Is anyone already holding a corner? Used to reject a deal, before any move has been made. */
