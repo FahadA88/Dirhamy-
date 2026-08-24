@@ -528,7 +528,7 @@ export function CreateView({ onPlay }: { onPlay?: (def: GameDefinition) => void 
             <span className="mini-label">A card is legal to play if it matches the top card by…</span>
             <label className="field row"><Switch on={knobs.matchSuit} onChange={(v) => set('matchSuit', v)} /><span>Suit (or the chosen wild suit)</span></label>
             <label className="field row"><Switch on={knobs.matchRank} onChange={(v) => set('matchRank', v)} /><span>Rank</span></label>
-            <label className="field row"><Switch on={knobs.matchColor} onChange={(v) => set('matchColor', v)} /><span>Color (red / black)</span></label>
+            <label className="field row"><Switch on={knobs.matchColor} onChange={(v) => set('matchColor', v)} /><span>Colour (red / black)</span></label>
           </Section>
 
           <Section title="Wild cards">
@@ -635,7 +635,7 @@ export function CreateView({ onPlay }: { onPlay?: (def: GameDefinition) => void 
           <h2>AI co-pilot</h2>
           <p className="hint">Describe rules in plain English. It fills the knobs and interviews you on gaps — you approve every change.</p>
           <textarea className="desc" rows={3} value={desc}
-            placeholder='e.g. "Two decks, remove 2s–5s. Match by suit, rank or color. 7s play again, aces are wild draw four, keep drawing until you can play."'
+            placeholder='e.g. "Two decks, remove 2s–5s. Match by suit, rank or colour. 7s play again, aces are wild draw four, keep drawing until you can play."'
             onChange={(e) => setDesc(e.target.value)} />
           <button className="primary" onClick={askCopilot} disabled={!desc.trim()}>✦ Ask co-pilot</button>
 
