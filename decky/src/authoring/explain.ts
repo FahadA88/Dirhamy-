@@ -183,6 +183,9 @@ export function explainGame(def: GameDefinition): string[] {
   } else if (def.poker) {
     out.push(`${def.poker.handSize} cards each. Check, bet, call, raise or fold in one round of betting, then a showdown.`);
     if (def.poker.smallBlind || def.poker.bigBlind) out.push(`Blinds: ${def.poker.smallBlind}/${def.poker.bigBlind}.`);
+    out.push((def.poker.hands ?? 1) > 1
+      ? `Everyone starts on ${def.poker.startingChips} chips and keeps their stack between hands. ${def.poker.hands} hands, and the biggest stack takes the table — run out before then and it ends there.`
+      : `Everyone starts on ${def.poker.startingChips} chips.`);
     out.push('No side pots — going short on chips means folding, not a partial call.');
   } else if (def.pit) {
     out.push('No turns. Offer to trade cards of one suit for another, or accept anyone else\'s open offer, at any time.');

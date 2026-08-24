@@ -128,6 +128,13 @@ export interface PokerConfig {
   smallBlind: number;      // 0 = no blinds, ante-only
   bigBlind: number;
   minRaise: number;        // smallest amount a raise must increase the bet by
+  /**
+   * How many hands a sitting lasts. Chips carry from one hand to the next and the biggest
+   * stack at the end wins; a player reaching zero ends it there and then. One hand and out
+   * was not a game — you posted a blind, called once, and the table said "game over" with
+   * everybody still holding chips. Absent means one hand, which is what it used to be.
+   */
+  hands?: number;
 }
 
 // Present iff this is a trading game (Pit-style): no turn order at all. Any player may post an

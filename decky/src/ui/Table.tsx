@@ -965,7 +965,9 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
         <div className="center">
           <div className="pile">
             {view.climbPile && view.climbPile.length > 0 ? (
-              <div className="climb-group">
+              /* Keyed by the whole play, so a pair or a triple lands together rather than
+                 replacing the last one in place with no motion at all. */
+              <div className="climb-group landed" key={view.climbPile.map((c) => c.id).join('|')}>
                 {view.climbPile.map((c) => <CardFace key={c.id} card={c} />)}
               </div>
             ) : <div className="card big empty" />}
@@ -1363,16 +1365,25 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
       {view.phase === 'roundOver' && !view.matchOver && (
         <div className="modal">
           {view.winner === me && <Confetti pieces={30} />}
-          <div className={`modal-box celebrate ${view.winner === me ? 'won' : ''}`} ref={roundRef} role="dialog" aria-modal="true">
+          <div className={`modal-box celebrate handend ${view.winner === me ? 'won' : ''}`} ref={roundRef} role="dialog" aria-modal="true">
             <span className="cb-kicker">Hand {view.handNumber}</span>
             <h3>{view.winner === me ? 'You take it' : `${nameOf(view.winner || '')} takes it`}</h3>
+            {/* What the hand did to you. In a betting game `scores` is the stack you are
+                holding, not what you won, so the hand's own row is what belongs here — and a
+                stack that went down wants a minus, not a plus. */}
             <p className="scores">
-              {Object.entries(view.scores).map(([p, s]) => (
-                <span key={p} className={p === me ? 'mine' : ''}>{nameOf(p)} <b>+{s}</b></span>
+              {Object.entries(isPoker ? (view.handScores.slice(-1)[0] ?? view.scores) : view.scores).map(([p, s]) => (
+                <span key={p} className={p === me ? 'mine' : ''}>
+                  {nameOf(p)} <b>{s >= 0 ? '+' : '−'}{Math.abs(s)}</b>
+                </span>
               ))}
             </p>
             <div className="match-scoreboard">
-              <div className="ms-title">Race to {view.matchTarget}</div>
+              <div className="ms-title">
+                {isPoker
+                  ? `Chips · hand ${view.handNumber} of ${def.poker?.hands ?? 1}`
+                  : `Race to ${view.matchTarget}`}
+              </div>
               {view.players
                 .slice()
                 .sort((a, b) => (view.matchScores?.[b.id] ?? 0) - (view.matchScores?.[a.id] ?? 0))

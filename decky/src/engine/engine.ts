@@ -45,7 +45,11 @@ export function createMatch(
   def: GameDefinition,
   players: string[],
   seed: number,
-  carry?: { matchScores: Record<string, number>; handScores: Record<string, number>[]; handNumber: number },
+  carry?: {
+    matchScores: Record<string, number>; handScores: Record<string, number>[]; handNumber: number;
+    /** Poker only: the stacks people are sitting down with, carried from the last hand. */
+    chips?: Record<string, number>;
+  },
 ): MatchState {
   const state: MatchState = {
     definition: def,
@@ -98,7 +102,9 @@ export function createMatch(
     bonus: {},
     pendingClaim: null,
     reflexOut: [],
-    chips: def.poker ? Object.fromEntries(players.map((p) => [p, def.poker!.startingChips])) : {},
+    chips: def.poker
+      ? Object.fromEntries(players.map((p) => [p, carry?.chips?.[p] ?? def.poker!.startingChips]))
+      : {},
     pot: 0,
     currentBet: 0,
     committed: {},
@@ -1154,6 +1160,40 @@ function finalizeMatchProgress(s: MatchState): void {
     if (s.bonus[p]) s.scores[p] = (s.scores[p] ?? 0) + s.bonus[p];
   }
   s.bonus = {};
+
+  // Chips are a stack, not a score to add up.
+  //
+  // A betting game's running total is what you are holding right now, so it is assigned rather
+  // than accumulated, and the scorepad's row is what the hand won or lost you. The sitting ends
+  // when the last hand has been played or somebody runs out of chips, and the biggest stack
+  // takes it — one hand and out meant posting a blind, calling once, and being told the game
+  // was over with everyone still holding nearly all their chips.
+  if (s.definition.poker) {
+    const start = s.definition.poker.startingChips;
+    const row: Record<string, number> = {};
+    for (const p of s.players) {
+      const before = s.handNumber === 1 ? start : (s.matchScores[p] ?? start);
+      row[p] = (s.chips[p] ?? 0) - before;
+      s.matchScores[p] = s.chips[p] ?? 0;
+    }
+    s.handScores.push(row);
+    const hands = s.definition.poker.hands ?? 1;
+    const broke = s.players.filter((p) => (s.chips[p] ?? 0) <= 0);
+    if (s.handNumber >= hands || broke.length > 0) {
+      s.matchOver = true;
+      let best = s.players[0];
+      for (const p of s.players) if ((s.chips[p] ?? 0) > (s.chips[best] ?? 0)) best = p;
+      s.matchWinner = best;
+      log(s, null, broke.length > 0
+        ? `${short(broke[0])} is out of chips — ${short(best)} takes the table with ${s.chips[best] ?? 0}.`
+        : `That's the last hand — ${short(best)} takes the table with ${s.chips[best] ?? 0}.`);
+    } else {
+      s.matchOver = false;
+      s.matchWinner = null;
+    }
+    return;
+  }
+
   // The scorepad's row for this hand, written before the roll-up so the column always sums to
   // the running total rather than merely agreeing with it by construction elsewhere.
   const row: Record<string, number> = {};
@@ -1202,6 +1242,9 @@ export function nextHand(state: MatchState, seed: number): MatchState {
     matchScores: { ...state.matchScores },
     handScores: state.handScores.map((r) => ({ ...r })),
     handNumber: state.handNumber + 1,
+    // Chips are the whole point of a betting game: the stack you finished the last hand with
+    // is the stack you sit down with for the next one.
+    chips: state.definition.poker ? { ...state.chips } : undefined,
   });
 }
 
