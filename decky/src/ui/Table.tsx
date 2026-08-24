@@ -950,7 +950,18 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
           {canDraw && <button className="draw-btn" onClick={() => submit({ actionId: 'drawCard' })}>Draw</button>}
           {canPass && <button className="draw-btn" onClick={() => submit({ actionId: 'climbPass' })}>Pass</button>}
           {canFishDraw && <button className="draw-btn" onClick={() => submit({ actionId: 'fishDraw' })}>Draw</button>}
-          {canDrawStock && <button className="draw-btn" onClick={() => submit({ actionId: 'drawStock' })}>Stock</button>}
+          {/* With nothing left in the stock this move does not draw a card — in Gin it ends
+              the hand as a wash, and elsewhere it turns the discards back over. A button
+              still labelled "Stock" gives no warning of either. */}
+          {canDrawStock && (
+            <button className="draw-btn" onClick={() => submit({ actionId: 'drawStock' })}
+              title={(view.zones.draw?.count ?? 0) > 0 ? 'Draw the top card of the stock'
+                : def.rummy?.knock !== undefined ? 'The stock is out — this ends the hand as a wash'
+                : 'The stock is out — this turns the discards back over'}>
+              {(view.zones.draw?.count ?? 0) > 0 ? 'Stock'
+                : def.rummy?.knock !== undefined ? 'Wash the hand' : 'Turn the discards over'}
+            </button>
+          )}
           {canDrawDiscard && <button className="draw-btn" onClick={() => submit({ actionId: 'drawDiscard' })}>Take</button>}
           {isRummy && view.rummyPhase === 'play' && view.meldMoves?.map((m, i) => (
             <button key={i} className="meld-btn" onClick={() => submit({ actionId: 'meld', cards: m.cards })}>Meld {m.label}</button>
