@@ -4307,14 +4307,31 @@ header h1 {
 .set-card.on { border-color: var(--gold, #d6af5c); transform: translateY(-5px); }
 .set-card:focus-visible { outline: 3px solid var(--cyan, #46d5ff); outline-offset: 2px; }
 
+/* A board card is a card. It was a flat white rectangle sitting on a table where every other
+   card had printed stock, a raking sheen and an edge you could see, and it read as a different
+   material — a sticker rather than a card. Same stock, same light, same thickness. */
 .attrcard {
+  position: relative;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: 5px; padding: 12px 8px;
   aspect-ratio: 5 / 7;
-  border-radius: 10px;
-  background: var(--card-bg, #fdfcf7);
-  box-shadow: 0 1px 0 var(--card-edge), 0 4px 12px rgba(0,0,0,0.3);
+  border-radius: 8px;
+  background: linear-gradient(160deg, #fffefb 0%, var(--card-bg) 42%, #f4efe2 100%);
+  box-shadow:
+    0 0.5px 0 var(--card-edge),
+    0 1.5px 0 color-mix(in srgb, var(--card-edge) 66%, #000),
+    0 4px 8px rgba(40, 28, 10, 0.26),
+    0 10px 20px rgba(40, 28, 10, 0.20);
+  transform: rotateX(7deg);
 }
+.attrcard::after {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  background: linear-gradient(118deg,
+    rgba(255,255,255,.55) 0%, rgba(255,255,255,.10) 26%, rgba(255,255,255,0) 46%,
+    rgba(0,0,0,.05) 78%, rgba(0,0,0,.10) 100%);
+  mix-blend-mode: soft-light;
+}
+.set-board { perspective: 1400px; perspective-origin: 50% 40%; }
 .ac-shape { display: block; inline-size: 62%; }
 .ac-shape svg { display: block; inline-size: 100%; block-size: auto; }
 

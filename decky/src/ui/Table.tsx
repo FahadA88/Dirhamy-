@@ -201,6 +201,10 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
   // this only holds them back on screen so they appear to arrive rather than to have been
   // there all along.
   const [dealing, setDealing] = useState(false);
+  // Nudges the bot loop when a step did nothing, so one seat that cannot move is not the end of
+  // the game. Reset whenever the position actually changes.
+  const [botTick, setBotTick] = useState(0);
+  const botRetries = useRef(0);
   // bluff: which of your own cards are staged for the next claim, and what rank you'll claim
   // them as. Cleared on every submit and every fresh deal.
   const [bluffSelected, setBluffSelected] = useState<string[]>([]);
@@ -355,13 +359,43 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
     // milliseconds a move is not speed, it is the bots finishing the entire game between the
     // deal and your first look at the table. Pit ended before a single offer could be read.
     const noTurnOrder = isPit || isSet || isReflex;
-    const delay = Math.max(BOT_SPEED_MS[settings.botSpeed] ?? 950, noTurnOrder ? 500 : 0);
+    // Spotting a set is not a turn, it is a race — so the bot's delay IS its skill, and the
+    // difficulty setting has to spend itself there rather than on the miss chance alone. At half
+    // a second a go, two bots between them called a set roughly every second: faster than anyone
+    // can scan twelve cards, and a person finished a whole game on nought while the bots split
+    // seven between them. These are how long a bot looks before it says anything.
+    const SET_THINK: Record<string, number> = {
+      easy: 9000, normal: 5500, hard: 3000, smart: 3000, random: 9000,
+    };
+    // Slapjack is the same argument at a shorter scale. The bot always slaps the moment it is
+    // allowed to, with no hesitation and nothing the difficulty setting touches — so a tier a
+    // player had chosen made no difference whatever to the only game in the catalogue that is
+    // purely about reflexes. This is how long a hand takes to come down.
+    const SLAP_THINK: Record<string, number> = {
+      easy: 1700, normal: 900, hard: 430, smart: 430, random: 2100,
+    };
+    // In a race the delay is not pacing, it is the opponent's skill, so the bot-speed setting
+    // does not get a vote — it is about how long you wait for somebody else's turn, and these
+    // games have no turns. Taking the larger of the two put every tier at the 950ms of "normal
+    // speed" and a person beat the sharpest bot to every single slap.
+    const delay = isSet ? (SET_THINK[settings.botDiff] ?? 5500)
+      : isReflex ? (SLAP_THINK[settings.botDiff] ?? 900)
+      : Math.max(BOT_SPEED_MS[settings.botSpeed] ?? 950, noTurnOrder ? 500 : 0);
     const timer = setTimeout(() => {
       const r = clientRef.current.botStep(localSeats, settings.botDiff);
-      if (r.moved) setBoard(clientRef.current.read(me));
+      if (r.moved) { botRetries.current = 0; setBoard(clientRef.current.read(me)); return; }
+      // The referee refused to guess: it picked a seat and that seat's chosen move was not on
+      // its own legal list, so nothing happened. Nothing happening also means the position did
+      // not change, and this effect is keyed on the position — so without a nudge the table
+      // would sit there forever waiting for a bot that never gets asked again. Try the next
+      // seat, a few times, then stop rather than spin.
+      if (botRetries.current < 8) { botRetries.current += 1; setBotTick((n) => n + 1); }
     }, delay);
     return () => clearTimeout(timer);
-  }, [board, matchId, me, localSeats, view.phase, settings.botSpeed, settings.botDiff, isPit, isSet, isReflex]);
+  }, [board, botTick, matchId, me, localSeats, view.phase, settings.botSpeed, settings.botDiff, isPit, isSet, isReflex]);
+
+  // A fresh position means a fresh allowance of retries.
+  useEffect(() => { botRetries.current = 0; }, [board]);
 
   // Pass-and-play: when the table is waiting on a different local seat, put a hand-off screen up
   // rather than swapping the cards under the person still looking at them.
@@ -755,13 +789,22 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
                 <span className="seat-name">{nameOf(p.id)}</span>
                 {teamOf(p.id) && <span className="team-tag">{teamOf(p.id)}</span>}
               </div>
-              <div className="fanned" aria-hidden="true">
-                {Array.from({ length: backs }).map((_, k) => (<div key={k} className={backCls} />))}
-              </div>
+              {/* Nobody holds cards in a spotting game — everything is face up on the board —
+                  so a fan of backs and the word "out" under it said the player had been knocked
+                  out of a game they were in fact winning. Show what they have actually got. */}
+              {p.handCount > 0 && (
+                <div className="fanned" aria-hidden="true">
+                  {Array.from({ length: backs }).map((_, k) => (<div key={k} className={backCls} />))}
+                </div>
+              )}
               <div className="seat-stats">
-                <span className="count-chip" title={`${p.handCount} cards in hand`}>
-                  {p.handCount === 0 ? 'out' : `${p.handCount}`}
-                </span>
+                {isSet ? (
+                  <span className="stat">{view.scores?.[p.id] ?? 0}<i>{(view.scores?.[p.id] ?? 0) === 1 ? 'set' : 'sets'}</i></span>
+                ) : (
+                  <span className="count-chip" title={`${p.handCount} cards in hand`}>
+                    {p.handCount === 0 ? 'out' : `${p.handCount}`}
+                  </span>
+                )}
                 {view.mode === 'trick' && view.bids?.[p.id] !== undefined && (
                   <span className="stat">{view.tricksWon?.[p.id] ?? 0}/{view.bids[p.id]}<i>tricks</i></span>
                 )}
@@ -1115,12 +1158,14 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
             game, which is about being first.
           */
           <div className="set-controls">
+            {/* Everyone else's score is on their seat now, so this row is about the board and
+                about you — the same line repeated in two places just made both harder to read. */}
             <div className="set-info">
               <span className="chip">{view.setDeckLeft ?? 0} left in the deck</span>
-              <span className="chip">Pick {view.setSize ?? 3}</span>
-              {Object.entries(view.scores).map(([p, sc]) => (
-                <span key={p} className={`chip ${p === me ? 'mine' : ''}`}>{nameOf(p)} {sc}</span>
-              ))}
+              <span className="chip">Pick {view.setSize ?? 3} that match</span>
+              <span className="chip mine">
+                You · {view.scores?.[me] ?? 0} {(view.scores?.[me] ?? 0) === 1 ? 'set' : 'sets'}
+              </span>
             </div>
             <div className="set-board" role="group" aria-label="The board">
               {(view.setBoard ?? []).map((c) => {

@@ -64,8 +64,20 @@ const undoReady = !(await undoBtn.isDisabled());
 ok('undo is now enabled', undoReady);
 if (undoReady) { await undoBtn.click(); await p.waitForTimeout(200); }
 ok('undo rolled the counter back', (await p.locator('.sol-stat').first().textContent()) === beforeMoves);
-await p.locator('button', { hasText: /^Hint$/ }).click(); await p.waitForTimeout(200);
-ok('hint highlights a card', (await p.locator('.sol-card.hinted').count()) > 0);
+// A hint points at the best move going, and sometimes the best move going is "turn the stock"
+// — which is not a card, so nothing lights up and a check that demanded a lit card failed on a
+// board where the hint was working perfectly well. Turn the stock and ask again.
+let hinted = 0;
+for (let tries = 0; tries < 6 && hinted === 0; tries++) {
+  await p.locator('button', { hasText: /^Hint$/ }).click({ timeout: 2000 }).catch(() => {});
+  await p.waitForTimeout(200);
+  hinted = await p.locator('.sol-card.hinted').count();
+  if (hinted === 0) {
+    await p.locator('.sol-slot.stock').click({ timeout: 2000 }).catch(() => {});
+    await p.waitForTimeout(220);
+  }
+}
+ok('hint highlights a card', hinted > 0);
 await p.screenshot({ path: '/tmp/sol-verify.png' });
 
 console.log('\nA refused move tells the player why');
