@@ -658,6 +658,19 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
     return playable ? name : `${name}, ${dimReason(c)}`;
   }
 
+  // A trick landing is its own small event, not silence until the whole hand ends. Keyed to
+  // the hand number too — a fresh hand's tricksWon restarts at 0, which is lower than
+  // wherever the last hand left off, so without the reset the first trick of every hand but
+  // the first would silently compare against the previous hand's count and stay quiet.
+  const prevTrickCount = useRef<{ hand: number; total: number } | null>(null);
+  useEffect(() => {
+    if (!view.tricksWon) return;
+    const total = Object.values(view.tricksWon).reduce((a, n) => a + n, 0);
+    const prev = prevTrickCount.current;
+    if (prev && prev.hand === view.handNumber && total > prev.total) playSound('trick', settings);
+    prevTrickCount.current = { hand: view.handNumber, total };
+  }, [view.tricksWon, view.handNumber, settings]);
+
   // Win sound, and the result that feeds the leaderboards.
   const prevPhase = useRef(view.phase);
   useEffect(() => {
@@ -719,7 +732,7 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
     if (move.actionId === 'drawCard' || move.actionId === 'fishDraw') playSound('draw', settings);
     if (move.actionId === 'ask') playSound('ui', settings);
     if (move.actionId === 'bluffClaim' || move.actionId === 'bluffChallenge') playSound('play', settings);
-    if (move.actionId === 'reflexSlap') playSound('win', settings);
+    if (move.actionId === 'reflexSlap') playSound('slap', settings);
     if (move.actionId === 'reflexFlip') playSound('play', settings);
     setToast(null);
     setSelected(null);
@@ -931,7 +944,7 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
         seats={view.players.length}
         aim={['.opponents .seat', '.hand']}
         round={`${matchId}:${view.handNumber}`}
-        onStart={() => setDealing(true)}
+        onStart={() => { setDealing(true); playSound('shuffle', settings); }}
         onDone={() => setDealing(false)}
       />}
       <div className="felt-content">
