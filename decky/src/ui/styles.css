@@ -2036,7 +2036,22 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
 [data-back="sunburst"]  .card.back::before { background: conic-gradient(from 0deg, #e8b23c 0 8deg, #7a2410 0 16deg); }
 [data-back="linen"]     .card.back::before { background: repeating-linear-gradient(0deg, rgba(0,0,0,.09) 0 2px, transparent 2px 4px), repeating-linear-gradient(90deg, rgba(0,0,0,.09) 0 2px, transparent 2px 4px), #c8bda4; }
 [data-back="neongrid"]  .card.back::before { background: repeating-linear-gradient(0deg, rgba(74,221,255,.5) 0 1px, transparent 1px 10px), repeating-linear-gradient(90deg, rgba(74,221,255,.5) 0 1px, transparent 1px 10px), linear-gradient(#0b0f2a, #170b34); }
-[data-back="kraft"]     .card.back::before { background: #c8b394; }
+[data-back="kraft"]     .card.back::before {
+  /*
+    Kraft paper, not a kraft-coloured rectangle. Every other back on this list is a pattern;
+    this was the one flat fill among them, which is exactly what a placeholder looks like
+    before somebody gets to it. The fibres are two overlapping diagonal grain lines at
+    different angles and spacings — real kraft paper's texture comes from crossed pulp fibres,
+    not from a single repeating stroke — under a corner vignette so the sheet reads as
+    slightly cupped rather than perfectly flat.
+  */
+  background:
+    repeating-linear-gradient(58deg, rgba(94,68,38,.10) 0 1px, transparent 1px 5px),
+    repeating-linear-gradient(-31deg, rgba(94,68,38,.07) 0 1px, transparent 1px 7px),
+    radial-gradient(120% 90% at 15% 10%, rgba(255,244,222,.22), transparent 55%),
+    radial-gradient(120% 90% at 85% 95%, rgba(60,40,20,.16), transparent 55%),
+    #c8b394;
+}
 [data-back="tartan"]    .card.back::before { background: repeating-linear-gradient(0deg, rgba(20,60,40,.65) 0 8px, transparent 8px 16px), repeating-linear-gradient(90deg, rgba(20,40,80,.6) 0 8px, transparent 8px 16px), #1d5c3c; }
 [data-back="marble"]    .card.back::before { background: radial-gradient(60% 40% at 30% 25%, #fff, transparent 60%), radial-gradient(50% 60% at 70% 70%, #dfe0e4, transparent 60%), linear-gradient(40deg, #e9eaee, #c9ccd4); }
 [data-back="circuit"]   .card.back::before { background: repeating-linear-gradient(90deg, rgba(214,175,92,.35) 0 1px, transparent 1px 11px), repeating-linear-gradient(0deg, rgba(214,175,92,.2) 0 1px, transparent 1px 7px), #0f2119; }
@@ -2064,7 +2079,20 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
   --rail-w: 14px; --rail-r: 6px; --felt-r: 3px; --felt-pad: 22px;
   --rail-bg: linear-gradient(160deg, #8d8d89, #6f6f6c);
   --rail-shadow: inset 0 0 0 1px rgba(255,255,255,0.14), 0 12px 30px rgba(30,30,28,0.3);
-  --felt-bg: linear-gradient(#9a9a97, #86867f);
+  /*
+    Poured concrete, not a grey rectangle. A plain two-stop gradient was the one cloth in the
+    set with no texture in it at all — every other finish has a nap, a grain or a weave.
+    Absolute-position dots were the first attempt, sized in the 0-1000 viewBox the expansion
+    joints use below; the felt itself renders at whatever the table actually measures, ten
+    times that or more, so a 1.5px fleck scaled up to invisible. Tiled instead, the way the
+    card backs' own dot and halftone patterns are: two small repeating tiles at different
+    sizes and offsets so the aggregate does not read as a grid, over the same top-lit gradient
+    as before.
+  */
+  --felt-bg:
+    radial-gradient(rgba(0,0,0,.16) 1px, transparent 1.3px) 0 0/9px 9px,
+    radial-gradient(rgba(255,255,255,.22) 1px, transparent 1.3px) 4px 5px/13px 13px,
+    linear-gradient(#9a9a97, #86867f);
   --felt-shadow: inset 0 0 0 2px rgba(255,255,255,0.5), inset 0 4px 16px rgba(0,0,0,0.18);
   --t-ink: #16160f; --t-muted: rgba(22,22,15,0.66); --t-key: #ff5a1f;
   --t-line: rgba(0,0,0,0.24); --t-panel: rgba(255,255,255,0.24);
@@ -2083,7 +2111,18 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
 .table[data-felt="papermat"], .felt-swatch[data-felt="papermat"], .pp-stage[data-felt="papermat"], .pack-swatch[data-felt="papermat"] {
   --rail-w: 0px; --rail-r: 4px; --felt-r: 4px; --felt-pad: 22px;
   --rail-bg: #efece4; --rail-shadow: none;
-  --felt-bg: #f4f1e7;
+  /*
+    A paper placemat has a grain to it — this was a flat fill, which on a rail-less table
+    (--rail-w: 0) left nothing textured anywhere in the whole design. Two crossed hairline
+    grids at different angles and spacings read as laid paper fibres rather than a repeating
+    tile, the way the kraft card back does it; a soft vignette in from the corners stands in
+    for the slight shadow a mat throws on the table under it.
+  */
+  --felt-bg:
+    repeating-linear-gradient(3deg, rgba(33,29,20,.035) 0 1px, transparent 1px 6px),
+    repeating-linear-gradient(93deg, rgba(33,29,20,.025) 0 1px, transparent 1px 9px),
+    radial-gradient(120% 90% at 50% 50%, transparent 60%, rgba(33,29,20,.05)),
+    #f4f1e7;
   --felt-shadow: inset 0 0 0 1px #ccc5b0;
   --t-ink: #211d14; --t-muted: rgba(33,29,20,0.6); --t-key: #8a1f16;
   --t-line: rgba(33,29,20,0.18); --t-panel: rgba(33,29,20,0.05);
@@ -2210,7 +2249,14 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
 .sw-back[data-back="sunburst"]::before { background: conic-gradient(from 0deg, #e8b23c 0 8deg, #7a2410 0 16deg); }
 .sw-back[data-back="linen"]::before { background: repeating-linear-gradient(0deg, rgba(0,0,0,.09) 0 2px, transparent 2px 4px), repeating-linear-gradient(90deg, rgba(0,0,0,.09) 0 2px, transparent 2px 4px), #c8bda4; }
 .sw-back[data-back="neongrid"]::before { background: repeating-linear-gradient(0deg, rgba(74,221,255,.5) 0 1px, transparent 1px 8px), repeating-linear-gradient(90deg, rgba(74,221,255,.5) 0 1px, transparent 1px 8px), linear-gradient(#0b0f2a, #170b34); }
-.sw-back[data-back="kraft"]::before { background: #c8b394; }
+.sw-back[data-back="kraft"]::before {
+  background:
+    repeating-linear-gradient(58deg, rgba(94,68,38,.10) 0 1px, transparent 1px 5px),
+    repeating-linear-gradient(-31deg, rgba(94,68,38,.07) 0 1px, transparent 1px 7px),
+    radial-gradient(120% 90% at 15% 10%, rgba(255,244,222,.22), transparent 55%),
+    radial-gradient(120% 90% at 85% 95%, rgba(60,40,20,.16), transparent 55%),
+    #c8b394;
+}
 .sw-back[data-back="tartan"]::before { background: repeating-linear-gradient(0deg, rgba(20,60,40,.65) 0 7px, transparent 7px 14px), repeating-linear-gradient(90deg, rgba(20,40,80,.6) 0 7px, transparent 7px 14px), #1d5c3c; }
 .sw-back[data-back="marble"]::before { background: radial-gradient(60% 40% at 30% 25%, #fff, transparent 60%), linear-gradient(40deg, #e9eaee, #c9ccd4); }
 .sw-back[data-back="circuit"]::before { background: repeating-linear-gradient(90deg, rgba(214,175,92,.35) 0 1px, transparent 1px 9px), repeating-linear-gradient(0deg, rgba(214,175,92,.2) 0 1px, transparent 1px 6px), #0f2119; }
@@ -3457,9 +3503,12 @@ header h1 {
 }
 .hero-more:hover { background: rgba(255,255,255,.24); border-color: #fff; }
 
-.car-arrow {
-  background: rgba(20,10,48,.72); border-color: rgba(201, 162, 74,.42); color: #fff;
-}
+/* car-arrow itself is set once, near the carousel — see the comment there. This section only
+   restyles the hover and the dots, which were the two things the palette sweep actually meant
+   to touch here; the arrow's own background used to be repeated below with the old neon
+   indigo (rgba(20,10,48)) still in it; a duplicate rule this far down the file wins on source
+   order regardless of what the real one says, so the button stayed a leftover navy circle
+   through the whole repaint. */
 .car-arrow:hover { background: var(--hot); border-color: var(--hot); box-shadow: 0 0 24px rgba(201, 162, 74,.6); }
 .car-dot { border-color: rgba(255,255,255,.34); }
 .car-dot.on { background: var(--hot); border-color: var(--hot); box-shadow: 0 0 14px rgba(201, 162, 74,.8); }
@@ -3824,6 +3873,14 @@ header h1 {
   box-shadow: 0 var(--lip) 0 #a97600, 0 0 22px rgba(255,197,49,.4);
 }
 .bluff-rankpicker { display: flex; flex-direction: column; gap: 8px; }
+/* One row that scrolls, not two rows that wrap — see the comment in Table.tsx. Edge fades
+   match the shelf rails' own, so a scrollable strip always looks like one at a glance. */
+.rank-rail {
+  flex-wrap: nowrap; overflow-x: auto; padding-bottom: 2px;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 16px, #000 calc(100% - 16px), transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 16px, #000 calc(100% - 16px), transparent);
+}
+.rank-rail button { flex: 0 0 auto; min-width: 44px; padding-inline: 12px; }
 
 .reflex-pile { display: flex; align-items: center; gap: 14px; }
 .reflex-pile .pile-card { transform: rotate(-3deg); }
@@ -4111,10 +4168,42 @@ header h1 {
 .badge-detail { font-style: normal; font-size: 11px; color: var(--muted); }
 
 /* ---- an empty record ---- */
-.empty-state { text-align: center; padding: 46px 20px; }
-.empty-state .es-mark { font-size: 42px; margin: 0 0 6px; opacity: 0.5; }
-.empty-state h3 { margin: 0 0 6px; font-family: var(--display); }
-.empty-state p { margin: 0; font-size: 13px; }
+/*
+   The Profile page with nothing on it yet.
+
+   Built to the same weight as the "Tonight's table" hero on Play, not as a smaller cousin
+   of it — a blank page and a quiet page look the same at a glance, and this one is supposed
+   to read as "you haven't started" rather than "this broke".
+*/
+.empty-hero {
+  position: relative; overflow: hidden;
+  text-align: center; padding: 54px 28px 44px;
+  border-radius: 22px; margin-bottom: 34px;
+  background:
+    radial-gradient(560px 280px at 50% 0%, rgba(214,175,92,0.14), transparent 70%),
+    linear-gradient(160deg, #0f2a1e 0%, #123c2a 60%, #175136 100%);
+  border: 1px solid rgba(214, 175, 92, 0.28);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 18px 50px rgba(0,0,0,0.5);
+  color: #f4f1e8;
+}
+/* A small fan of cards standing in for the record that isn't there yet. */
+.eh-cards { position: relative; height: 92px; margin-bottom: 14px; }
+.eh-card {
+  position: absolute; top: 0; left: 50%; width: 62px; height: 88px;
+  display: grid; place-items: center; font-family: var(--display); font-weight: 700; font-size: 17px;
+  background: #fbf8f0; color: #1c1814; border-radius: 8px;
+  box-shadow: 0 10px 24px rgba(0,0,0,0.35);
+}
+.eh-card.c1 { transform: translateX(-50%) rotate(-10deg) translateX(-38px); z-index: 1; opacity: .88; }
+.eh-card.c2 { transform: translateX(-50%) translateY(-6px); z-index: 2; }
+.eh-card.c3 { transform: translateX(-50%) rotate(10deg) translateX(38px); z-index: 1; opacity: .88; }
+.empty-hero h3 { margin: 0 0 8px; font-family: var(--display); font-size: clamp(22px, 3.4vw, 30px); color: #fff; }
+.empty-hero p { margin: 0 auto 22px; max-width: 46ch; font-size: 14px; color: rgba(255,255,255,0.72); }
+button.primary.lg { padding: 13px 28px; font-size: 15.5px; border-radius: 999px; }
+@media (max-width: 640px) {
+  .empty-hero { padding: 40px 18px 32px; }
+  .eh-card { width: 50px; height: 70px; font-size: 14px; }
+}
 
 /* ---- practising ---- */
 .practice-toggle {
@@ -4232,8 +4321,11 @@ header h1 {
 .ai-badge {
   display: inline-grid; place-items: center;
   inline-size: 20px; block-size: 20px; border-radius: 6px;
-  background: color-mix(in srgb, var(--violet, #8b5cf6) 26%, transparent);
-  border: 1px solid color-mix(in srgb, var(--violet, #8b5cf6) 55%, transparent);
+  /* --violet is always defined by the theme, so the fallback here never actually applies —
+     the old neon purple hex used to be what it fell back to, which read as a leftover even
+     though it never rendered. Left off so the color actually used is the only one written. */
+  background: color-mix(in srgb, var(--violet) 26%, transparent);
+  border: 1px solid color-mix(in srgb, var(--violet) 55%, transparent);
   color: var(--ink); font-size: 11px; line-height: 1;
 }
 .gd-written {

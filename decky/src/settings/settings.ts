@@ -51,6 +51,7 @@ export type Highlight = 'glow' | 'outline' | 'lift' | 'off';
 // three are an explicit override a player can pick regardless of what the game would suggest.
 export type SortMode = 'auto' | 'off' | 'rank' | 'suit';
 export type BotSpeed = 'slow' | 'normal' | 'fast' | 'instant';
+export type BotNaming = 'bot' | 'seat' | 'named';
 /**
  * How hard the opponents try. `random` is kept because old saved settings hold it and because a
  * genuinely random table is useful for testing; the three tiers are what a person picks.
@@ -102,7 +103,8 @@ export interface Settings {
   avatar: string;
   /** Your seat colour. One of the accent presets, so it always sits in the palette. */
   playerColor: AccentId;
-  botLabels: boolean;
+  /** How opponents are named: numbered seats, raw seat ids, or a name from the house pool. */
+  botNaming: BotNaming;
   defaultSeats: number;
   botSpeed: BotSpeed;
   botDiff: BotDiff;
@@ -143,7 +145,7 @@ export const defaultSettings: Settings = {
   playerName: 'You',
   avatar: '🂡',
   playerColor: 'emerald',
-  botLabels: true,
+  botNaming: 'bot',
   defaultSeats: 3,
   botSpeed: 'normal',
   botDiff: 'normal',
@@ -160,6 +162,29 @@ export const defaultSettings: Settings = {
 
 /** The glyphs offered as an avatar. Fixed set, so nothing needs screening. */
 export const AVATARS = ['🂡', '♠', '♥', '♦', '♣', '🎩', '🦊', '🐙', '🌙', '⭐', '🔥', '🎲', '🍀', '👑', '🤖', '🎯'];
+
+/*
+  The house pool. A short, cosmopolitan set of names that all read cleanly in the small type a
+  seat label gets — nothing longer than seven letters, nothing that collides with a suit, a
+  rank or a game term already in use around the table (no "Jack", no "King").
+*/
+export const BOT_NAMES = [
+  'Mara', 'Théo', 'Ines', 'Rune', 'Sable', 'Priya', 'Otto', 'Wren',
+  'Nadia', 'Cass', 'Iker', 'Yuki', 'Enzo', 'Lior', 'Petra', 'Amos',
+  'Suri', 'Diego', 'Noor', 'Finn',
+];
+
+/**
+ * Which house name a seat gets. Deterministic, so a name a player has seen once is the name
+ * they see all match — no state to keep, just a hash of the two things that identify a seat:
+ * the match it belongs to, and its id within that match.
+ */
+export function botNameFor(matchId: string, seatId: string): string {
+  const key = `${matchId}:${seatId}`;
+  let h = 0;
+  for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) | 0;
+  return BOT_NAMES[Math.abs(h) % BOT_NAMES.length];
+}
 
 /** How long a deal or flip takes, as a multiplier on the stylesheet's own timings. */
 export const ANIM_SCALE: Record<AnimSpeed, number> = { relaxed: 1.6, normal: 1, brisk: 0.45 };
@@ -306,17 +331,23 @@ const ALLOWED = {
   animSpeed: Object.keys(ANIM_SCALE),
   motion: ['system', 'full', 'reduced'],
   density: ['comfortable', 'compact'],
+  botNaming: ['bot', 'seat', 'named'],
 } as const;
 
 export function loadSettings(): Settings {
   try {
     const raw = localStorage.getItem(KEY);
     if (!raw) return { ...defaultSettings };
-    const saved = JSON.parse(raw) as Partial<Settings> & { fourColor?: boolean };
+    const saved = JSON.parse(raw) as Partial<Settings> & { fourColor?: boolean; botLabels?: boolean };
     // `fourColor` was a boolean before card faces became a choice of four. Anyone who had it on
     // keeps the deck they chose rather than being silently reset to classic.
     if (saved.cardFace === undefined && saved.fourColor !== undefined) {
       saved.cardFace = saved.fourColor ? 'four-color' : 'classic';
+    }
+    // `botLabels` was a boolean before a house pool of names became the third option. Its two
+    // old states map onto the two ends of the new one; nobody's choice moves under them.
+    if (saved.botNaming === undefined && saved.botLabels !== undefined) {
+      saved.botNaming = saved.botLabels ? 'bot' : 'seat';
     }
     const merged = { ...defaultSettings, ...saved } as Record<string, unknown>;
     for (const [key, options] of Object.entries(ALLOWED)) {

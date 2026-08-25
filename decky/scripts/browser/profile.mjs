@@ -17,7 +17,7 @@ console.log('\nAn empty record');
 await p.locator('nav button', { hasText: 'You' }).first().click();
 await p.waitForTimeout(300);
 ok('the profile opens', (await p.locator('.profile').count()) === 1);
-ok('it says there is nothing yet', (await p.locator('.empty-state').count()) === 1);
+ok('it says there is nothing yet', (await p.locator('.empty-hero').count()) === 1);
 
 console.log('\nWith games behind it');
 // Write results straight in: this is testing the page, not replaying twelve games through the UI.

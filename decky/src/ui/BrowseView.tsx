@@ -444,8 +444,21 @@ function Meta({ game }: { game: PublishedGame }) {
       <span className="sc-kind" title="Kind of game">{kindLabel(def)}</span>
       <span title="Players">♟ {p.min === p.max ? p.min : `${p.min}–${p.max}`}</span>
       <span title="Typical length">◷ {playtimeOf(def)}m</span>
-      <span title={`Weight ${weight} of 5`} className="sc-weight">
-        {'▮'.repeat(weight)}<i>{'▮'.repeat(5 - weight)}</i>
+      {/*
+        Bare pips read as a loading bar, not a rating — and unlike the pawn or the clock next
+        to them, a row of blocks has no built-in meaning to fall back on. A scale reads as
+        "weight", which a filled-in pip count then quantifies; the title spells out what more
+        of it costs you, since it is rules to learn and not, as a bar chart usually implies,
+        more time at the table. Not the gear from Preferences — that already means "settings"
+        on this same page, in the same header, and reusing it here would make one glyph answer
+        two unrelated questions.
+      */}
+      <span
+        title={`Complexity ${weight} of 5 — more rules to learn, not more time to play`}
+        aria-label={`Complexity ${weight} of 5`}
+        className="sc-weight"
+      >
+        ⚖ {'▮'.repeat(weight)}<i aria-hidden="true">{'▮'.repeat(5 - weight)}</i>
       </span>
       {rating !== null && <span className="sc-rating" title="Rating">★ {rating.toFixed(1)}</span>}
     </div>

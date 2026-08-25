@@ -21,7 +21,7 @@ export function App() {
       <main>
         {view === 'play' ? <PlayView />
           : view === 'create' ? <CreateView />
-          : <ProfileView />}
+          : <ProfileView onPlay={() => setView('play')} />}
       </main>
       <SettingsPanel open={settingsOpen} onClose={() => setSettingsOpen(false)} />
       <FirstRun />

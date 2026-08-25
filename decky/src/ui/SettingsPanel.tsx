@@ -353,9 +353,9 @@ function PlaySection({ s, set }: { s: Settings; set: Setter }) {
 function OpponentsSection({ s, set }: { s: Settings; set: Setter }) {
   return (
     <>
-      <Row label="How they are named" keywords="bot bots names labels seats opponents">
-        <Seg value={s.botLabels ? 'bot' : 'seat'} onChange={(v) => set('botLabels', v === 'bot')}
-          options={[['bot', 'Bot 2, Bot 3…'], ['seat', 'P2, P3…']]} />
+      <Row label="How they are named" hint="Named draws from a house pool — the same opponent keeps the same name for the whole match, never mid-hand." keywords="bot bots names labels seats opponents named personality character">
+        <Seg value={s.botNaming} onChange={(v) => set('botNaming', v as Settings['botNaming'])}
+          options={[['bot', 'Bot 2, Bot 3…'], ['seat', 'P2, P3…'], ['named', 'Mara, Théo…']]} />
       </Row>
       <Row label="How fast they play" hint="Instant is useful when you are testing a game you built." keywords="bot bots speed slow fast pace opponents">
         <Seg value={s.botSpeed} onChange={(v) => set('botSpeed', v as Settings['botSpeed'])}

@@ -8,7 +8,7 @@ import { DealMotion } from './DealMotion';
 import { ScorePad } from './ScorePad';
 import { Confetti } from './Confetti';
 import { useSettings } from '../settings/SettingsContext';
-import { BOT_SPEED_MS } from '../settings/settings';
+import { BOT_SPEED_MS, botNameFor } from '../settings/settings';
 import { playSound } from './sound';
 import { speak, stopSpeaking, spokenCard } from './speech';
 import { useTurnAlert } from './useTurnAlert';
@@ -755,10 +755,14 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
   const roundRef = useDismissable(view.phase === 'roundOver' && !view.matchOver, () => { /* pick next hand */ });
   const handoffRef = useDismissable(!!handoff, () => { /* the device has to change hands */ });
 
+  const botLabel = (id: string) =>
+    settings.botNaming === 'named' ? botNameFor(matchId, id)
+      : settings.botNaming === 'bot' ? `Bot ${id.slice(1)}`
+      : id;
   const nameOf = (id: string) => {
     const seat = plan?.find((s) => s.id === id);
     if (seat) return seat.id === me ? `${seat.name} (you)` : seat.name;
-    return id === me ? settings.playerName : settings.botLabels ? `Bot ${id.slice(1)}` : id;
+    return id === me ? settings.playerName : botLabel(id);
   };
   /*
     The engine writes its log with raw seat ids — "P4 played 9♣" — because naming players is
@@ -769,7 +773,7 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
   const logName = (id: string) => {
     if (id === me) return 'You';
     const seat = plan?.find((s) => s.id === id);
-    return seat ? seat.name : settings.botLabels ? `Bot ${id.slice(1)}` : id;
+    return seat ? seat.name : botLabel(id);
   };
   const humanise = (text: string) => {
     const named = text.replace(/\bP(\d+)\b/g, (m, n) =>
@@ -1475,7 +1479,11 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
             {myLegal.some((m) => m.actionId === 'bluffClaim') && (
               <div className="bluff-rankpicker">
                 <span className="muted">Tap up to four of the same card, then claim them as whatever you like:</span>
-                <div className="seg wrap">
+                {/* A wrapped grid ran to two full rows of pills — 13 ranks at a 62px floor
+                    each — which on a real laptop screen was the difference between the claim
+                    button living on the table and living below it. One scrolling row, the
+                    same convention the kind filter and the shelf rails already use. */}
+                <div className="seg rank-rail">
                   {def.deck.rankOrder.map((r) => (
                     <button key={r} className={bluffRank === r ? 'on' : ''} onClick={() => setBluffRank(r)}>{r}</button>
                   ))}

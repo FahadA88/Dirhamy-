@@ -14,7 +14,7 @@ import {
 
 type Tab = 'overview' | 'games' | 'badges';
 
-export function ProfileView() {
+export function ProfileView({ onPlay }: { onPlay: () => void }) {
   const { settings } = useSettings();
   const [tab, setTab] = useState<Tab>('overview');
 
@@ -46,16 +46,32 @@ export function ProfileView() {
       themselves unearned, and showing what there is to go after is a better answer than a
       shrug — so the page shows what a record would look like once there is one.
     */
+    /*
+      A start screen, not a dead end.
+
+      This used to be a 42px glyph, two lines of text and 46px of padding — a small card
+      floating in an otherwise empty page, which reads exactly like a page that failed to
+      load rather than like a page that has not started yet. It gets a real hero treatment
+      now, the same weight the "Tonight's table" panel gets on Play, with a button that
+      actually takes you there — the honest fix for a page with nothing to show is a door
+      to the page that will give it something.
+    */
     return (
       <section className="profile">
         <ProfileHead name={settings.playerName} avatar={settings.avatar} summary={summary} />
-        <div className="empty-state">
-          <p className="es-mark" aria-hidden="true">🂠</p>
-          <h3>No finished games yet</h3>
+        <div className="empty-hero">
+          <div className="eh-cards" aria-hidden="true">
+            <span className="eh-card c1">A♠</span>
+            <span className="eh-card c2">K♥</span>
+            <span className="eh-card c3">Q♦</span>
+          </div>
+          <h3>Nothing here yet — that's the whole story</h3>
           <p className="muted">
             Win, lose or draw, every finished game lands here — results, streaks and how you do
-            at each one. Practice games are left out on purpose.
+            at each one. Practice games are left out on purpose, so the first line in this
+            page is a real one.
           </p>
+          <button className="primary lg" onClick={onPlay}>Play a game ▶</button>
         </div>
         <div className="section-head">
           <h2>Up for grabs</h2>
