@@ -89,6 +89,12 @@ function describeHint(m: Move, nameOf: (id: string) => string): string {
     case 'resolveChoice': return `Choose ${m.choice ?? 'a suit'}.`;
     case 'solDraw': case 'solDeal': return 'Turn the stock.';
     case 'solRedeal': return 'Go through the stock again.';
+    case 'kentSwap': return 'Trade one of yours for one on the table.';
+    case 'kentRefresh': return 'Nothing there worth having — turn the table over.';
+    case 'kentSignal': return 'You have four of a kind. Signal your partner.';
+    case 'kentCall': return 'Your partner is signalling — call it.';
+    case 'kentStop': return 'Somebody opposite is signalling. Call it off.';
+    case 'kentWait': return 'Nothing to do but watch.';
     default: return 'There is a move available.';
   }
 }
@@ -383,10 +389,18 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
     // Kent is two games at once: a slow one where everybody trades with the table, and a fast
     // one that starts the instant somebody signals. Only the second is a race, so only the
     // second is paced by how sharp the opponents are.
+    // And the slow half of Kent is paced by difficulty as well. Sharp opponents trading at the
+    // speed of the loop assembled four of a kind and called it inside five seconds, which is
+    // before anybody has read their own hand: the first round of every game was over before the
+    // player had made a move. How fast the other three trade is most of how hard the game is.
+    const KENT_THINK: Record<string, number> = {
+      easy: 1700, normal: 1050, hard: 620, smart: 620, random: 1900,
+    };
     const tellUp = !!view.kentTell;
     const delay = isSet ? (SET_THINK[settings.botDiff] ?? 5500)
       : isReflex ? (SLAP_THINK[settings.botDiff] ?? 900)
       : isKent && tellUp ? (SLAP_THINK[settings.botDiff] ?? 900) * 1.5
+      : isKent ? (KENT_THINK[settings.botDiff] ?? 1050)
       : Math.max(BOT_SPEED_MS[settings.botSpeed] ?? 950, noTurnOrder ? 420 : 0);
     // Everybody at once, where everybody is at once.
     //
@@ -617,11 +631,22 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
   useEffect(() => {
     if (prevPhase.current !== 'roundOver' && view.phase === 'roundOver') {
       playSound('win', settings.sound);
-      const scores = view.matchTarget != null ? (view.matchScores ?? view.scores) : view.scores;
+      // Kent is scored in letters and won by a pair, and fewer letters is better. Recording it
+      // like every other game filed the round's one-nil under "lowest wins" and put the pair
+      // that had just LOST the round at the top of the table.
+      const scores = isKent ? {} : view.matchTarget != null ? (view.matchScores ?? view.scores) : view.scores;
       const highWins = view.matchTarget != null;
-      const standings = view.players
-        .map((p) => ({ name: nameOf(p.id), score: scores[p.id] ?? 0, isYou: localSeats.includes(p.id) }))
-        .sort((a, b) => (highWins ? b.score - a.score : a.score - b.score));
+      const standings = isKent
+        ? (['A', 'B'] as const)
+            .map((pair) => ({
+              name: `Pair ${pair}`,
+              score: view.kentLetters?.[pair] ?? 0,
+              isYou: view.players.some((p, i) => localSeats.includes(p.id) && (i % 2 === 0 ? 'A' : 'B') === pair),
+            }))
+            .sort((a, b) => a.score - b.score)
+        : view.players
+            .map((p) => ({ name: nameOf(p.id), score: scores[p.id] ?? 0, isYou: localSeats.includes(p.id) }))
+            .sort((a, b) => (highWins ? b.score - a.score : a.score - b.score));
       const winner = view.matchWinner ?? view.winner;
       recordResult({
         gameId: def.meta.id,
@@ -629,7 +654,9 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
         at: Date.now(),
         seats: view.players.length,
         standings,
-        youWon: !!winner && localSeats.includes(winner),
+        youWon: isKent
+          ? !!winner && teamOf(winner) === teamOf(me)
+          : !!winner && localSeats.includes(winner),
         highlight: highlightOf(view, me),
         practice,
       });
@@ -1189,7 +1216,9 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
           {isInterrupt && <span className="bomb-badge">💣 Bomb?</span>}
           {discardMoves.length > 0 && <span className="turn-badge">Discard one</span>}
           {/* "Your turn" is meaningless where there are no turns — everybody is always in. */}
-          {!view.passDirection && view.isYourTurn && !suitPickerOpen && !isInterrupt && !isSet && <span className="turn-badge">Your turn</span>}
+          {/* "Your turn" is meaningless where there are no turns — everybody is always in. */}
+          {!view.passDirection && view.isYourTurn && !suitPickerOpen && !isInterrupt && !isSet && !isPit && !isKent
+            && <span className="turn-badge">Your turn</span>}
           {isSet && view.isYourTurn && <span className="turn-badge">Find a set</span>}
           {!view.needsPassChoice && view.passDirection && <span className="waiting-badge">Waiting on {view.passWaitingOn}…</span>}
           {canDraw && <button className="draw-btn" onClick={() => submit({ actionId: 'drawCard' })}>Draw</button>}
@@ -1530,13 +1559,24 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
           {view.winner === me && <Confetti pieces={30} />}
           <div className={`modal-box celebrate handend ${view.winner === me ? 'won' : ''}`} ref={roundRef} role="dialog" aria-modal="true">
             <span className="cb-kicker">Hand {view.handNumber}</span>
-            <h3>{view.winner === me ? 'You take it'
-              : isKent && view.winner && teamOf(view.winner) === teamOf(me)
-                ? `${nameOf(view.winner)} takes it — your pair`
-                : `${nameOf(view.winner || '')} takes it`}</h3>
+            {/* A round of a partnership game is taken by a pair, not by whoever pressed the
+                button — "Bot 2 takes it" tells a player on Bot 2's side that they lost. */}
+            <h3>{isKent
+              ? (teamOf(view.winner ?? '') === teamOf(me)
+                  ? `Your pair takes it — ${nameOf(view.winner || '')} spotted it`
+                  : `${teamOf(view.winner ?? '') ?? 'The other pair'} takes it`)
+              : view.winner === me ? 'You take it'
+              : `${nameOf(view.winner || '')} takes it`}</h3>
             {/* What the hand did to you. In a betting game `scores` is the stack you are
                 holding, not what you won, so the hand's own row is what belongs here — and a
                 stack that went down wants a minus, not a plus. */}
+            {isKent ? (
+              <p className="scores">
+                <span className={teamOf(view.winner ?? '') === teamOf(me) ? 'mine' : ''}>
+                  {teamOf(view.winner ?? '') ?? 'A pair'} <b>takes the round</b>
+                </span>
+              </p>
+            ) : (
             <p className="scores">
               {Object.entries(isPoker ? (view.handScores.slice(-1)[0] ?? view.scores) : view.scores).map(([p, s]) => (
                 <span key={p} className={p === me ? 'mine' : ''}>
@@ -1544,21 +1584,31 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
                 </span>
               ))}
             </p>
+            )}
             <div className="match-scoreboard">
               <div className="ms-title">
                 {isPoker
                   ? `Chips · hand ${view.handNumber} of ${def.poker?.hands ?? 1}`
-                  : `Race to ${view.matchTarget}`}
+                  : isKent
+                    ? `Letters · ${view.kentWord ?? 'KENT'} and you are out`
+                    : `Race to ${view.matchTarget}`}
               </div>
-              {view.players
-                .slice()
-                .sort((a, b) => (view.matchScores?.[b.id] ?? 0) - (view.matchScores?.[a.id] ?? 0))
-                .map((p) => (
-                  <div key={p.id} className="ms-row">
-                    <span>{nameOf(p.id)}</span>
-                    <b>{view.matchScores?.[p.id] ?? 0}</b>
-                  </div>
-                ))}
+              {isKent
+                ? (['A', 'B'] as const).map((pair) => (
+                    <div key={pair} className="ms-row">
+                      <span>Pair {pair}{teamOf(me) === `Pair ${pair}` ? ' (yours)' : ''}</span>
+                      <b>{(view.kentWord ?? 'KENT').slice(0, view.kentLetters?.[pair] ?? 0) || '—'}</b>
+                    </div>
+                  ))
+                : view.players
+                    .slice()
+                    .sort((a, b) => (view.matchScores?.[b.id] ?? 0) - (view.matchScores?.[a.id] ?? 0))
+                    .map((p) => (
+                      <div key={p.id} className="ms-row">
+                        <span>{nameOf(p.id)}</span>
+                        <b>{view.matchScores?.[p.id] ?? 0}</b>
+                      </div>
+                    ))}
             </div>
             <button className="primary" onClick={playNextHand}>Next hand →</button>
           </div>
@@ -1572,9 +1622,17 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
         const iWon = isKent
           ? !!view.matchWinner && teamOf(view.matchWinner) === teamOf(me)
           : view.matchWinner === me || (view.matchWinner == null && view.winner === me);
-        const finals = Object.entries(view.matchTarget != null ? (view.matchScores ?? view.scores) : view.scores);
+        // Kent's standings are the two pairs and the letters they spelt, fewest first — the
+        // per-player one-nil from the last round says nothing about who won the game.
+        const finals: [string, string | number][] = isKent
+          ? (['A', 'B'] as const)
+              .map((pair) => [`Pair ${pair}`, view.kentLetters?.[pair] ?? 0] as [string, number])
+              .sort((a, b) => (a[1] as number) - (b[1] as number))
+              .map(([name, n]) => [name, (view.kentWord ?? 'KENT').slice(0, n as number) || '—'])
+          : Object.entries(view.matchTarget != null ? (view.matchScores ?? view.scores) : view.scores);
         const lowWins = def.scoring.winner === 'lowestTotal';
-        const ranked = finals.slice().sort((a, b) => (lowWins ? a[1] - b[1] : b[1] - a[1]));
+        const ranked = isKent ? finals
+          : finals.slice().sort((a, b) => (lowWins ? (a[1] as number) - (b[1] as number) : (b[1] as number) - (a[1] as number)));
         return (
           <div className="modal final-modal">
             {iWon && <Confetti pieces={64} spread="rain" />}
@@ -1596,10 +1654,10 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
               {/* Counted in from the bottom of the table up, so the winner's row lands last. */}
               <ol className="podium" style={{ '--rows': ranked.length - 1 } as React.CSSProperties}>
                 {ranked.map(([p, sc], i) => (
-                  <li key={p} className={`${p === me ? 'mine' : ''} ${i === 0 ? 'first' : ''}`}
+                  <li key={p} className={`${isKent ? (teamOf(me) === p ? 'mine' : '') : p === me ? 'mine' : ''} ${i === 0 ? 'first' : ''}`}
                     style={{ '--r': i } as React.CSSProperties}>
                     <span className="pd-rank">{i + 1}</span>
-                    <span className="pd-name">{nameOf(p)}</span>
+                    <span className="pd-name">{isKent ? p : nameOf(p)}</span>
                     <b className="pd-score">{sc}</b>
                   </li>
                 ))}

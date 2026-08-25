@@ -303,7 +303,7 @@ export function createMatch(
     const draw = state.zones['draw'] || [];
     for (let i = 0; i < def.kent.poolSize; i++) { const c = draw.pop(); if (c) pool.push(c); }
     state.kentLetters = { A: carry?.kentLetters?.A ?? 0, B: carry?.kentLetters?.B ?? 0 };
-    log(state, null, `Four on the table. Four of a kind and signal your partner — ${def.kent.letters.split('').join('-')} and you are out.`);
+    log(state, null, `${def.kent.poolSize} face up in the middle. Get four of a kind and signal your partner — spell ${def.kent.letters} and your pair is out.`);
   }
   // Pit deals the whole deck out at once, so a player can already be holding a full corner the
   // instant the cards land — pitCheckWin() is otherwise only ever called after a trade, which
@@ -3364,7 +3364,9 @@ function kentPool(s: MatchState): Card[] {
 /** Four of a kind — the hand you are trying to build, and the only reason to signal. */
 export function kentHasFour(s: MatchState, playerId: string): boolean {
   const hand = s.zones[`hand:${playerId}`] || [];
-  if (hand.length < 2) return false;
+  // A whole hand of one rank. Asking only that every card matches would let a hand of two
+  // count, which is not four of a kind and is not what anybody is signalling about.
+  if (hand.length !== s.definition.kent!.handSize) return false;
   return hand.every((c) => c.rank === hand[0].rank);
 }
 
@@ -3462,9 +3464,9 @@ function applyKentMove(s: MatchState, playerId: string, move: Move): MatchState 
     const teller = s.kentTell.player;
     if (teller === playerId) return s;
     const sameTeam = kentTeamOf(s, teller) === kentTeamOf(s, playerId);
-    // Who was right decides who takes a letter: a partner calling it wins the round for the
-    // pair, an opponent calling it off wins it for theirs.
-    const winners = sameTeam ? kentTeamOf(s, playerId) : kentTeamOf(s, playerId);
+    // Whoever spotted it wins the round, whichever side of the table they are on: a partner
+    // calling it takes it for their pair, an opponent calling it off takes it for theirs.
+    const winners = kentTeamOf(s, playerId);
     const losers = winners === 'A' ? 'B' : 'A';
     log(s, playerId, sameTeam
       ? `${short(playerId)} calls Kent — ${short(teller)} had four ${kentFourRank(s, teller)}s.`
