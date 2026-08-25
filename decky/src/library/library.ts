@@ -111,7 +111,7 @@ export function builtIns(): PublishedGame[] {
     createdAt: 1_700_000_000_000 + i * 1000,
     updatedAt: 1_700_000_000_000 + i * 1000,
     version: 1,
-    tags: [def.meta.family, 'classic'],
+    tags: [kindLabel(def), 'classic'],
     stats: stats[def.meta.id] ?? { plays: 0, favourites: 0, ratingSum: 0, ratingCount: 0 },
     builtIn: true,
     staffPick: staff.has(def.meta.id),
@@ -154,7 +154,7 @@ export function publish(input: PublishInput): PublishedGame {
     createdAt: existing?.createdAt ?? now,
     updatedAt: now,
     version: (existing?.version ?? 0) + 1,
-    tags: dedupe([...(input.tags ?? []), definition.meta.family]),
+    tags: dedupe([...(input.tags ?? []), kindLabel(definition)]),
     forkedFrom: input.forkedFrom ?? existing?.forkedFrom,
     stats: existing?.stats ?? { plays: 0, favourites: 0, ratingSum: 0, ratingCount: 0 },
     // Provenance survives a re-publish: editing a written game does not make it hand-made.

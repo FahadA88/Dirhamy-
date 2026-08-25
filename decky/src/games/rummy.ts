@@ -34,6 +34,11 @@ export const rummy: GameDefinition = {
   actions: [],
   triggers: [],
   endConditions: [{ id: 'handEmpty', when: { zoneCount: { zone: 'hand', of: 'anyPlayer', eq: 0 } }, result: 'roundOver' }],
-  scoring: { mode: 'lowestPoints', winner: 'lowestTotal', cardPoints: {}, target: null },
+  // A race to 30. One hand and never coming back was the only melding game in the catalogue
+  // with no session to carry a score across — but Rummy's score is a bare count of cards left
+  // in hand, not a deadwood value like Gin's, so copying Gin's target of 100 verbatim measured
+  // out to ~36 hands a match (self-play) against Gin's own ~11. 30 lands this game's sessions
+  // back in that same ~10-hand range at every supported seat count (2/3/4p, self-play).
+  scoring: { mode: 'lowestPoints', winner: 'lowestTotal', cardPoints: {}, target: 30 },
   rummy: { setMin: 3, runMin: 3, layOff: true },
 };

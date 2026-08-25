@@ -20,7 +20,7 @@ export const kent: GameDefinition = {
     id: 'classic-kent',
     name: 'Kent',
     description:
-      'Four cards each and four face up in the middle. No turns — swap with the table whenever you like. Get four of a kind and signal your partner without saying a word; if they call it first your pair wins the round, and if an opponent spots it first you take the letter. Four letters spells KENT and you are out.',
+      'Four cards each and four face up in the middle. No turns — swap with the table whenever you like. Get four of a kind and a tell goes up at your seat for the whole table to see — no words needed, just a race to notice it; if they call it first your pair wins the round, and if an opponent spots it first you take the letter. Four letters spells KENT and you are out.',
     players: { min: 4, max: 6, step: 2 },
     family: 'kent',
   },

@@ -182,7 +182,7 @@ export function explainGame(def: GameDefinition): string[] {
     out.push('Last player still holding cards wins.');
   } else if (def.kent) {
     out.push(`${def.kent.handSize} cards each and ${def.kent.poolSize} face up in the middle. There are no turns: swap one of yours for one of the table's whenever you like, and turn the middle over when nobody wants it.`);
-    out.push('Partners sit opposite. Collect four of a kind, then signal your partner without saying so — if they call it first your pair takes the round.');
+    out.push('Partners sit opposite. Collect four of a kind and a tell goes up at your seat for the whole table to see — if your partner reads it first your pair takes the round.');
     out.push(`An opponent who spots the signal first calls it off and the letter goes to you. ${def.kent.letters.split('').join('-')} and that pair is out.`);
   } else if (def.poker) {
     out.push(`${def.poker.handSize} cards each. Check, bet, call, raise or fold in one round of betting, then a showdown.`);
