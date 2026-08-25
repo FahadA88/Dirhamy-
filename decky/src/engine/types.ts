@@ -685,6 +685,7 @@ export interface RedactedState {
   tableau?: { id: string; cards: Card[]; faceDown: number }[];
   foundations?: { id: string; cards: Card[] }[];
   freeCells?: { id: string; card: Card | null }[];
+  moveCapacity?: number;                 // solitaire: how many cards a supermove can shift right now
   stockCount?: number;
   wasteCards?: Card[];
   redealsLeft?: number;

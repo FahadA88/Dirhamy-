@@ -17,9 +17,9 @@ export const trio: GameDefinition = {
     id: 'classic-trio',
     name: 'Trio',
     description:
-      'Not a deck of cards — twenty-seven combinations of colour, shape and count. Find three '
-      + 'where every property is all the same or all different. No turns: whoever sees it first '
-      + 'takes it, and a wrong call costs you.',
+      'Not a deck of cards — twenty-seven combinations of colour, shape and count, the same '
+      + 'puzzle sold elsewhere as the card game Set. Find three where every property is all the '
+      + 'same or all different. No turns: whoever sees it first takes it, and a wrong call costs you.',
     players: { min: 1, max: 6 },
     family: 'set',
   },

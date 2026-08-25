@@ -9,7 +9,7 @@ export const war: GameDefinition = {
     id: 'classic-war',
     name: 'War',
     description:
-      'The deck is split between two players. Each flip, both reveal their top card — the higher card takes both. A tie means war: three cards face-down, then flip again. Win by taking every card.',
+      'The deck is split between two players. Each flip, both reveal their top card — the higher card takes both. A tie means war: three cards face-down, then flip again. Win by taking every card — or, if it runs long enough to hit the round cap, by holding more of them when it does.',
     players: { min: 2, max: 2 },
     family: 'comparison',
   },

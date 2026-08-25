@@ -14,7 +14,7 @@ export const showdownPoker: GameDefinition = {
     id: 'classic-showdown-poker',
     name: 'Showdown Poker',
     description:
-      'Five cards each, blinds posted, one round of betting — check, bet, call, raise or fold — then a showdown. Eight hands, chips carried across all of them, biggest stack at the end takes the table.',
+      'Five cards each, blinds posted, one round of betting — check, bet, call, raise or fold — then a showdown. No side pots: if you cannot cover the current bet, folding is your only option. Eight hands, chips carried across all of them, biggest stack at the end takes the table.',
     players: { min: 2, max: 8 },
     family: 'poker',
   },

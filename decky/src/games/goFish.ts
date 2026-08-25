@@ -9,7 +9,7 @@ export const goFish: GameDefinition = {
     id: 'classic-go-fish',
     name: 'Go Fish',
     description:
-      'Ask another player for a rank you hold. If they have it you take all of it and ask again; if not, Go Fish and draw from the ocean. Collect all four of a rank to make a book. Most books wins.',
+      'Ask another player for a rank you hold. If they have it you take all of it and ask again; if not, Go Fish and draw from the ocean — draw the exact rank you asked for and you go again there too. Collect all four of a rank to make a book. Most books wins.',
     players: { min: 2, max: 5 },
     family: 'fishing',
   },

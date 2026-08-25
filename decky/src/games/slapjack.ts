@@ -10,7 +10,7 @@ export const slapjack: GameDefinition = {
     id: 'classic-slapjack',
     name: 'Slapjack',
     description:
-      'Flip your top card onto the shared pile on your turn. The instant a Jack lands on top, slap first and the whole pile is yours. Last player holding cards wins.',
+      'Flip your top card onto the shared pile on your turn. The instant a Jack lands on top — even on top of another Jack — slap first and the whole pile is yours; the slap button only ever appears when it is genuinely valid, so there is no risk in trying. Last player holding cards wins.',
     players: { min: 2, max: 6 },
     family: 'reflex',
   },

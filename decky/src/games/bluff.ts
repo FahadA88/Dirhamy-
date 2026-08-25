@@ -11,7 +11,7 @@ export const bluff: GameDefinition = {
     id: 'classic-bluff',
     name: 'Bluff',
     description:
-      'The deck is dealt out whole. On your turn, play 1-4 cards face down and claim a rank — true or not. Anyone else may call your bluff before the next claim lets it stand. Whoever is wrong takes the whole pile. First to empty their hand, unclaimed, wins.',
+      'The deck is dealt out whole. On your turn, play 1-4 cards face down and claim a rank — true or not. Anyone else may call your bluff, but only until your next claim — after that this one stands unchallenged for good. Whoever is wrong takes the whole pile. First to empty their hand, unclaimed, wins.',
     players: { min: 2, max: 6 },
     family: 'bluff',
   },

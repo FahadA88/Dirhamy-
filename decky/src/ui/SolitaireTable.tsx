@@ -125,6 +125,11 @@ export function SolitaireTable({ def }: { def: GameDefinition }) {
               {cfg.stock === 'waste' && (view.redealsLeft ?? -1) >= 0 && (
                 <span className="sol-stat">{view.redealsLeft} redeals</span>
               )}
+              {view.moveCapacity != null && (
+                <span className="sol-stat" title="How many cards a single move can shift right now">
+                  {view.moveCapacity} at once
+                </span>
+              )}
               <div className="sol-actions">
                 <button className="ghost sm" onClick={undo} disabled={!canUndo}>Undo</button>
                 <button className="ghost sm" onClick={showHint} disabled={moves.length === 0}>Hint</button>

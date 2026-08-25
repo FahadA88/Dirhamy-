@@ -2365,6 +2365,9 @@ function solitaireView(s: MatchState): Partial<RedactedState> {
     freeCells: Array.from({ length: cfg.freeCells }, (_, i) => ({
       id: solZones.free(i), card: (s.zones[solZones.free(i)] || [])[0] ?? null,
     })),
+    // Only meaningful where free cells make a supermove limit exist at all — Klondike and
+    // Spider have none, so solMoveCapacity is always Infinity for them and not worth exposing.
+    moveCapacity: cfg.freeCells > 0 ? solMoveCapacity(s, false) : undefined,
     stockCount: (s.zones[solZones.stock] || []).length,
     wasteCards: (s.zones[solZones.waste] || []).slice(-3),
     redealsLeft: s.redealsLeft,
