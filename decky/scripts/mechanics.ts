@@ -3,6 +3,7 @@
 import { undertow } from '../src/games/undertow';
 import { hearts } from '../src/games/hearts';
 import { euchre } from '../src/games/euchre';
+import { contractWhist } from '../src/games/contract';
 import { ginRummy } from '../src/games/ginRummy';
 import { klondike } from '../src/games/klondike';
 import { freecell } from '../src/games/freecell';
@@ -246,6 +247,90 @@ section('Trick-taking — shooting the moon');
   check('a split hand still totals 17 points', pot === 17, t.scores);
   check('a split hand does not invert', !t.log.some((l) => l.text.includes('SHOT THE MOON')), t.scores);
   check('a split hand remembers no shooter', t.shotMoon == null, t.shotMoon);
+}
+
+// ---------- Contract Whist: a grand slam ----------
+section('Trick-taking — a bid contract made as a slam');
+{
+  const P = ['A', 'B', 'C'];
+  // A three-trick Contract Whist: small enough to stack a grand slam deliberately. maxLevel
+  // tracks countPerPlayer, exactly as the real seven-card game ties its top bid to its hand size.
+  const mini: typeof contractWhist = {
+    ...contractWhist,
+    meta: { ...contractWhist.meta, id: 'test-mini-contract', name: 'Mini Contract' },
+    deck: { ...contractWhist.deck, excludeRanks: ['2', '3', '4', '5', '6', '7', '8', '9'] },
+    setup: [{ op: 'shuffle', zone: 'draw' }, { op: 'deal', from: 'draw', to: 'hand', countPerPlayer: 3 }],
+    trick: { ...contractWhist.trick!, numericAuction: { ...contractWhist.trick!.numericAuction!, maxLevel: 3 } },
+  };
+
+  const deal = (s: MatchState, hands: Record<string, string[]>) => {
+    const all = Object.values(s.zones).flat();
+    const byId = new Map(all.map((c) => [c.id, c]));
+    for (const p of P) s.zones[`hand:${p}`] = hands[p].map((id) => byId.get(id)!);
+    s.zones['draw'] = [];
+  };
+
+  // A holds every ace and king of a three-rank deck (A, K, Q only, after excluding 2-9 and 10/J):
+  // guaranteed to win all three tricks no matter what B and C hold or lead.
+  let s = createMatch(mini, P, 7);
+  deal(s, {
+    A: ['CA', 'DA', 'HA'],
+    B: ['CK', 'DK', 'HK'],
+    C: ['CQ', 'DQ', 'HQ'],
+  });
+  // Skip the auction entirely — the point of this fixture is the scoring, not the bidding —
+  // by placing A straight into the highest possible contract at NT, the same shape
+  // resolveAuction itself would have produced.
+  s.highBid = { player: 'A', level: 3, strain: 'NT' };
+  s.maker = 'A';
+  s.trumpSuit = null;
+  s.bidding = false;
+  // auctionRound is the real gate on whether a bid or a card is the legal move — leaving it
+  // as setup left it meant the "stacked" highBid above was just this hand's opening bid, and
+  // the loop below then auctioned for real, coincidentally settling at the level under test.
+  s.auctionRound = 0;
+  s.auctionPasses = 0;
+  s.phase = 'playing';
+  s.turnIndex = 0;
+
+  let guard = 0;
+  while (s.phase === 'playing' && guard++ < 40) {
+    const actor = actingPlayers(s)[0];
+    if (!actor) break;
+    const ms = legalMoves(s, actor);
+    if (ms.length === 0) break;
+    s = applyMove(s, actor, ms[0]);
+  }
+  check('the stacked hand finished', s.phase === 'roundOver', { phase: s.phase, guard });
+  check('A took every trick', s.tricksWon['A'] === 3, s.tricksWon);
+  check('the slam bonus is paid', (s.scores['A'] ?? 0) === 3 * 10 + 30, s.scores);
+  check('the state remembers it as a slam', s.roundOutcome === 'slam', s.roundOutcome);
+  check('every viewer sees the same outcome', P.every((p) => redact(s, p).roundOutcome === 'slam'), P.map((p) => redact(s, p).roundOutcome));
+
+  // A contract made without reaching the top level must not be mistaken for a slam.
+  let u = createMatch(mini, P, 7);
+  deal(u, {
+    A: ['CA', 'DA', 'CK'],
+    B: ['DK', 'HK', 'DQ'],
+    C: ['CQ', 'HQ', 'HA'],
+  });
+  u.highBid = { player: 'A', level: 1, strain: 'NT' };
+  u.maker = 'A';
+  u.trumpSuit = null;
+  u.bidding = false;
+  u.auctionRound = 0;
+  u.auctionPasses = 0;
+  u.phase = 'playing';
+  u.turnIndex = 0;
+  guard = 0;
+  while (u.phase === 'playing' && guard++ < 40) {
+    const actor = actingPlayers(u)[0];
+    if (!actor) break;
+    const ms = legalMoves(u, actor);
+    if (ms.length === 0) break;
+    u = applyMove(u, actor, ms[0]);
+  }
+  check('a modest contract made is not a slam', u.roundOutcome !== 'slam', u.roundOutcome);
 }
 
 // ---------- Euchre: auction, bowers, kitty, going alone ----------

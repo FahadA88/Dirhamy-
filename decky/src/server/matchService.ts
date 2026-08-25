@@ -66,6 +66,9 @@ export interface MatchSummary {
   /** Seats that owe a move right now — the basis of every "your turn" indicator. */
   waitingOn: string[];
   inviteCode: string;
+  /** Cumulative points across all hands played so far, for a resume list to show a position
+   *  in rather than just a name. */
+  matchScores: Record<string, number>;
 }
 
 export interface MoveResult {
@@ -547,6 +550,7 @@ export class MatchService {
       fair: { commit: rec.commit, clientSeed: rec.clientSeed, nonce: rec.nonce },
       waitingOn: rec.state.phase === 'playing' ? actingPlayers(rec.state) : [],
       inviteCode: rec.inviteCode,
+      matchScores: { ...rec.state.matchScores },
     };
   }
 

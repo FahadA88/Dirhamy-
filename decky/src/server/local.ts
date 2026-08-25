@@ -63,6 +63,8 @@ export function resumableSession(): SessionPointer | null {
 export interface OpenGame extends SessionPointer {
   /** True when this table is waiting on a seat this device plays. */
   yourTurn: boolean;
+  /** Cumulative score by player id, so a resume list can show a position, not just a name. */
+  matchScores: Record<string, number>;
 }
 
 /**
@@ -76,9 +78,14 @@ export function openGames(): OpenGame[] {
   for (const p of readOpen()) {
     try {
       const summary = service.summaryOf(p.matchId);
-      if (summary.phase !== 'playing') continue;
+      // Checking this list is the single most likely moment to catch a table between hands —
+      // that used to read as summary.phase !== 'playing' and drop the pointer for good right
+      // here, so glancing at the shelf between hands quietly erased the game it was showing
+      // you. matchOver is the actual "this table is done" signal; everything else (roundOver,
+      // a handoff, mid-auction) is the table still being alive, just not your move this instant.
+      if (summary.matchOver) continue;
       kept.push(p);
-      out.push({ ...p, yourTurn: summary.waitingOn.includes('P1') });
+      out.push({ ...p, yourTurn: summary.waitingOn.includes('P1'), matchScores: summary.matchScores });
     } catch { /* the record is gone; drop it */ }
   }
   if (kept.length !== readOpen().length) writeOpen(kept);

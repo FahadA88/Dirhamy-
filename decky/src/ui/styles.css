@@ -3716,6 +3716,7 @@ header h1 {
 /* Worth noticing even in the one hand out of a hundred where you are not the one who did it. */
 .modal-box.moonshot .cb-kicker { color: var(--gold-hi); }
 .modal-box.ginout .cb-kicker { color: var(--gold-hi); }
+.modal-box.slammade .cb-kicker { color: var(--gold-hi); }
 .modal-box.celebrate h3 {
   margin: 0 0 14px; font-size: clamp(28px, 5vw, 42px); font-weight: 900; letter-spacing: -.03em;
   background: linear-gradient(100deg, var(--gold-hi), var(--hot-hi) 58%, var(--cyan));
@@ -4515,6 +4516,7 @@ button.primary.lg { padding: 13px 28px; font-size: 15.5px; border-radius: 999px;
 .inprogress li.mine { border-color: color-mix(in srgb, var(--hot, #c9a24a) 45%, var(--panel-brd)); }
 .ip-name { flex: 1; min-inline-size: 120px; font-size: 14px; }
 .ip-seats { font-size: 12px; }
+.ip-score { font-size: 12px; font-variant-numeric: tabular-nums; }
 .ip-turn { font-size: 11px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); }
 .ip-turn.on { color: var(--hot, #c9a24a); }
 

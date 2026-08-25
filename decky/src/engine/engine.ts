@@ -1720,6 +1720,7 @@ function scoreContract(s: MatchState): void {
   if (!bid) {
     for (const p of s.players) s.scores[p] = 0;
     s.winner = s.players[0];
+    s.roundOutcome = null;
     return;
   }
   const declaring = teams.find((t) => t.includes(bid.player)) ?? [bid.player];
@@ -1729,9 +1730,10 @@ function scoreContract(s: MatchState): void {
 
   let declarerPts = 0;
   let defenderPts = 0;
+  s.roundOutcome = null;
   if (took >= need) {
     declarerPts = bid.level * cfg.trickValue + (took - need) * cfg.overtrickValue;
-    if (cfg.slamBonus && bid.level === cfg.maxLevel) declarerPts += cfg.slamBonus;
+    if (cfg.slamBonus && bid.level === cfg.maxLevel) { declarerPts += cfg.slamBonus; s.roundOutcome = 'slam'; }
     log(s, null, `${short(bid.player)} made ${bid.level}${strainLabel(bid.strain)} with ${took} tricks — ${declarerPts}.`);
   } else {
     defenderPts = (need - took) * cfg.undertrickValue;
@@ -3703,7 +3705,8 @@ export function redact(state: MatchState, viewer: string): RedactedState {
     ...(state.definition.solitaire ? solitaireView(state) : {}),
     battle: state.definition.war ? (state.lastBattle ?? []).map((b) => b.card) : undefined,
     shotMoon: state.definition.trick?.shootTheMoon ? (state.shotMoon ?? null) : undefined,
-    roundOutcome: state.definition.rummy?.knock !== undefined ? (state.roundOutcome ?? null) : undefined,
+    roundOutcome: (state.definition.rummy?.knock !== undefined || state.definition.trick?.numericAuction)
+      ? (state.roundOutcome ?? null) : undefined,
     rummyPhase: state.definition.rummy ? state.rummyPhase : undefined,
     meldMoves: state.definition.rummy && state.definition.rummy.knock === undefined
       && state.players[state.turnIndex] === viewer && state.rummyPhase === 'play'

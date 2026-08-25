@@ -314,6 +314,7 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
   // Gin and an undercut are the two gin-rummy endings worth a beat of their own; an ordinary
   // knock is the unremarkable case the generic "X takes it" heading already covers.
   const ginOutcome = view.roundOutcome === 'gin' || view.roundOutcome === 'undercut' ? view.roundOutcome : null;
+  const slamMade = view.roundOutcome === 'slam';
   // Groups of 2+ need a button — you can't express "these three cards" with one tap.
   const comboMoves = useMemo(
     () => myLegal.filter((m) => m.actionId === 'climbPlay' && (m.cards?.length ?? 1) > 1),
@@ -1729,9 +1730,9 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
 
       {view.phase === 'roundOver' && !view.matchOver && (
         <div className="modal">
-          {(view.winner === me || moonShooter === me) && <Confetti pieces={moonShooter ? 70 : ginOutcome === 'gin' ? 50 : 30} />}
-          <div className={`modal-box celebrate handend ${view.winner === me ? 'won' : ''} ${moonShooter ? 'moonshot' : ''} ${ginOutcome ? 'ginout' : ''}`} ref={roundRef} role="dialog" aria-modal="true">
-            <span className="cb-kicker">{moonShooter ? '☾ Shot the moon' : ginOutcome === 'gin' ? '♦ Gin' : ginOutcome === 'undercut' ? '⚡ Undercut' : `Hand ${view.handNumber}`}</span>
+          {(view.winner === me || moonShooter === me) && <Confetti pieces={moonShooter ? 70 : ginOutcome === 'gin' || slamMade ? 50 : 30} />}
+          <div className={`modal-box celebrate handend ${view.winner === me ? 'won' : ''} ${moonShooter ? 'moonshot' : ''} ${ginOutcome ? 'ginout' : ''} ${slamMade ? 'slammade' : ''}`} ref={roundRef} role="dialog" aria-modal="true">
+            <span className="cb-kicker">{moonShooter ? '☾ Shot the moon' : ginOutcome === 'gin' ? '♦ Gin' : ginOutcome === 'undercut' ? '⚡ Undercut' : slamMade ? '♛ Slam' : `Hand ${view.handNumber}`}</span>
             {/* A round of a partnership game is taken by a pair, not by whoever pressed the
                 button — "Bot 2 takes it" tells a player on Bot 2's side that they lost. */}
             <h3>{moonShooter
@@ -1740,6 +1741,8 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
               ? (view.winner === me ? 'You went gin' : `${nameOf(view.winner || '')} went gin`)
               : ginOutcome === 'undercut'
               ? (view.winner === me ? 'You undercut the knock' : `${nameOf(view.winner || '')} undercut your knock`)
+              : slamMade
+              ? (view.winner === me ? 'You bid it to the top and made it' : `${nameOf(view.winner || '')} bid it to the top and made it`)
               : isKent
               ? (teamOf(view.winner ?? '') === teamOf(me)
                   ? `Your pair takes it — ${nameOf(view.winner || '')} spotted it`

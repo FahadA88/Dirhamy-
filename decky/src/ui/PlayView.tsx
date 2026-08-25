@@ -24,6 +24,12 @@ function seatsFor(def: GameDefinition, want: number): number {
   return min + Math.floor((clamped - min) / step) * step;
 }
 
+function ordinal(n: number): string {
+  const r = n % 100;
+  if (r >= 11 && r <= 13) return `${n}th`;
+  return `${n}${['th', 'st', 'nd', 'rd'][n % 10] ?? 'th'}`;
+}
+
 // Discover + play the classics library (and, once wired, published community games).
 export function PlayView() {
   const { settings } = useSettings();
@@ -175,10 +181,22 @@ export function PlayView() {
             {inProgress.map((g) => {
               const def = catalog.find((d) => d.meta.id === g.gameId);
               if (!def) return null;
+              // Where you stand, not just what you're playing — the thing that actually decides
+              // whether a half-finished game is worth picking back up right now.
+              const standing = Object.values(g.matchScores ?? {});
+              const mine = g.matchScores?.['P1'] ?? 0;
+              const rank = standing.length > 1
+                ? 1 + standing.filter((v) => (def.scoring.winner === 'lowestTotal' ? v < mine : v > mine)).length
+                : null;
               return (
                 <li key={g.matchId} className={g.yourTurn ? 'mine' : ''}>
                   <span className="ip-name">{def.meta.name}</span>
                   <span className="ip-seats muted">{g.seats} seats</span>
+                  {standing.some((v) => v !== 0) && (
+                    <span className="ip-score muted">
+                      {mine}{rank ? ` · ${ordinal(rank)}` : ''}
+                    </span>
+                  )}
                   <span className={`ip-turn ${g.yourTurn ? 'on' : ''}`}>
                     {g.yourTurn ? 'Your turn' : 'Waiting'}
                   </span>

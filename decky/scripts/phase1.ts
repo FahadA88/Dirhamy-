@@ -3,6 +3,7 @@ import { MatchService } from '../src/server/matchService';
 import { LocalMatchStore } from '../src/server/localStore';
 import { crazyEights } from '../src/games/crazyEights';
 import { hearts } from '../src/games/hearts';
+import { ginRummy } from '../src/games/ginRummy';
 import { klondike } from '../src/games/klondike';
 import { migrate, pinDefinition, CURRENT_SCHEMA } from '../src/engine/migrate';
 import { commitTo, deriveSeed, verifyReveal, newServerSeed } from '../src/engine/fairness';
@@ -256,6 +257,50 @@ section('A match survives a reload without the client ever holding it');
 
   reloaded.end(m.matchId);
   check('ending a match clears its record', !JSON.stringify(Array.from(mem.keys())).includes(m.matchId));
+
+  delete (globalThis as { localStorage?: unknown }).localStorage;
+}
+
+section('A table between hands stays on the resume list');
+{
+  // openGames() used to prune on phase !== 'playing', which is also true of the few seconds
+  // between one hand ending and the next one being dealt — so glancing at the shelf at
+  // exactly the wrong moment permanently forgot a match that was nowhere near over. Reproduce
+  // that moment for real, against the same local.ts module the UI calls.
+  const mem = new Map<string, string>();
+  (globalThis as { localStorage?: unknown }).localStorage = {
+    getItem: (k: string) => mem.get(k) ?? null,
+    setItem: (k: string, v: string) => { mem.set(k, v); },
+    removeItem: (k: string) => { mem.delete(k); },
+    key: (i: number) => Array.from(mem.keys())[i] ?? null,
+    get length() { return mem.size; },
+  };
+
+  const { service: svc, rememberSession, openGames } = await import('../src/server/local');
+  const m = svc.create(ginRummy, 'classic-gin-rummy', ['P1', 'P2']);
+  rememberSession(m.matchId, 'classic-gin-rummy', 2);
+  check('freshly started, it is on the list', openGames().some((g) => g.matchId === m.matchId));
+
+  // Play the hand out — whoever can knock does, otherwise take the first legal move.
+  let guard = 0;
+  while (svc.summaryOf(m.matchId).phase === 'playing' && guard++ < 300) {
+    const acting = svc.summaryOf(m.matchId).waitingOn[0];
+    if (!acting) break;
+    const legal = svc.legal(m.matchId, acting);
+    const move = legal.find((mv) => mv.actionId === 'knock') ?? legal[0];
+    if (!move) break;
+    svc.submit(m.matchId, acting, move);
+  }
+  const between = svc.summaryOf(m.matchId);
+  check('the hand actually ended', between.phase !== 'playing', between.phase);
+  check('but a race to 100 is not decided by one hand', !between.matchOver);
+
+  const stillOpen = openGames();
+  check('the match survives the gap between hands', stillOpen.some((g) => g.matchId === m.matchId), stillOpen);
+
+  // And once it is genuinely finished, it does go away.
+  svc.end(m.matchId);
+  check('a match ended for real does leave the list', !openGames().some((g) => g.matchId === m.matchId));
 
   delete (globalThis as { localStorage?: unknown }).localStorage;
 }
