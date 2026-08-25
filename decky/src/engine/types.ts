@@ -530,6 +530,15 @@ export interface MatchState {
    * next lead and sweeps it to the winner.
    */
   lastTrick?: { plays: { player: string; card: Card }[]; winner: string } | null;
+  /**
+   * The last pair of cards flipped in War, kept for the table to draw.
+   *
+   * Deliberately a copy rather than the cards themselves. The flipped pair goes straight into
+   * the winner's hand, so holding the real objects in a shared zone as well put the same card
+   * in two places at once — which broke card conservation outright and, once cards started
+   * being animated by id, gave the flying-card layer two candidate homes for one card.
+   */
+  lastBattle?: { card: Card }[] | null;
   tricksWon: Record<string, number>;
   bids: Record<string, number>; // trick bids (Spades)
   bidding: boolean;         // true while the bidding phase is open

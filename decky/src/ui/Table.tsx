@@ -522,7 +522,7 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
     const res = clientRef.current.quickUndo(me);
     setUndoable(false);
     if (!res.ok) { setToast({ text: res.reason ?? 'Nothing to take back.', tone: 'bad' }); return; }
-    playSound('ui', settings.sound);
+    playSound('ui', settings);
     setSelected(null);
     setAskRank(null);
     setBluffSelected([]);
@@ -634,7 +634,7 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
   const prevPhase = useRef(view.phase);
   useEffect(() => {
     if (prevPhase.current !== 'roundOver' && view.phase === 'roundOver') {
-      playSound('win', settings.sound);
+      playSound('win', settings);
       // Kent is scored in letters and won by a pair, and fewer letters is better. Recording it
       // like every other game filed the round's one-nil under "lowest wins" and put the pair
       // that had just LOST the round at the top of the table.
@@ -666,7 +666,7 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
       });
     }
     prevPhase.current = view.phase;
-  }, [view.phase, settings.sound]);
+  }, [view.phase, settings.cardSounds, settings.soundVolume]);
 
   function playNextHand() {
     // Guarded because the button can be hit twice before the modal unmounts; the second call
@@ -683,16 +683,16 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
     if (!res.ok) {
       // The rules said no. Say why, instead of letting the tap disappear.
       setToast({ text: res.reason ?? 'That move is not legal here.', tone: 'bad' });
-      playSound('ui', settings.sound);
+      playSound('ui', settings);
       setSelected(null);
       return;
     }
-    if (move.actionId === 'playCard' || move.actionId === 'playToTrick' || move.actionId === 'climbPlay' || move.actionId === 'climbBomb') playSound('play', settings.sound);
-    if (move.actionId === 'drawCard' || move.actionId === 'fishDraw') playSound('draw', settings.sound);
-    if (move.actionId === 'ask') playSound('ui', settings.sound);
-    if (move.actionId === 'bluffClaim' || move.actionId === 'bluffChallenge') playSound('play', settings.sound);
-    if (move.actionId === 'reflexSlap') playSound('win', settings.sound);
-    if (move.actionId === 'reflexFlip') playSound('play', settings.sound);
+    if (move.actionId === 'playCard' || move.actionId === 'playToTrick' || move.actionId === 'climbPlay' || move.actionId === 'climbBomb') playSound('play', settings);
+    if (move.actionId === 'drawCard' || move.actionId === 'fishDraw') playSound('draw', settings);
+    if (move.actionId === 'ask') playSound('ui', settings);
+    if (move.actionId === 'bluffClaim' || move.actionId === 'bluffChallenge') playSound('play', settings);
+    if (move.actionId === 'reflexSlap') playSound('win', settings);
+    if (move.actionId === 'reflexFlip') playSound('play', settings);
     setToast(null);
     setSelected(null);
     setAskRank(null);
@@ -731,11 +731,11 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
 
   function clickCard(id: string) {
     if (!playableCardIds.has(id)) return;
-    if (isFish) { const c = view.hand.find((x) => x.id === id); if (c) setAskRank(c.rank); playSound('ui', settings.sound); return; }
+    if (isFish) { const c = view.hand.find((x) => x.id === id); if (c) setAskRank(c.rank); playSound('ui', settings); return; }
     // Kent has nowhere to play a card TO: a card leaves your hand only by being traded for one
     // on the table, so a click picks rather than plays.
-    if (isKent) { setSelected(selected === id ? null : id); playSound('ui', settings.sound); return; }
-    if (settings.confirmPlays && selected !== id) { setSelected(id); playSound('ui', settings.sound); return; }
+    if (isKent) { setSelected(selected === id ? null : id); playSound('ui', settings); return; }
+    if (settings.confirmPlays && selected !== id) { setSelected(id); playSound('ui', settings); return; }
     if (playActionId === 'climbPlay') { submit({ actionId: 'climbPlay', cards: [id] }); return; }
     submit({ actionId: playActionId, cardId: id });
   }
@@ -754,6 +754,28 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
   const suitRef = useDismissable(suitPickerOpen, () => { /* a suit must be chosen */ });
   const roundRef = useDismissable(view.phase === 'roundOver' && !view.matchOver, () => { /* pick next hand */ });
   const handoffRef = useDismissable(!!handoff, () => { /* the device has to change hands */ });
+
+  /*
+    A hand with exactly one legal move is not a decision, it is a formality — and making
+    someone find and tap the one card they were always going to play is friction with nothing
+    behind it. `legal` is already scoped to whoever's turn it actually is (see tableClient.ts),
+    so a single entry here means this player, right now, could not have done anything else.
+
+    Pit, Kent and Trio are turnless — everyone can always act, so "the only thing you could
+    legally do" is never the same as "the only thing on offer this turn", and playing it for
+    someone would take away the timing decision that is the entire game. Excluded on purpose.
+  */
+  useEffect(() => {
+    if (!settings.autoPlayForced) return;
+    if (isPit || isKent || isSet) return;
+    if (view.phase !== 'playing') return;
+    if (dealing || suitPickerOpen || handoff || takeback) return;
+    if (myLegal.length !== 1) return;
+    const only = myLegal[0];
+    const t = window.setTimeout(() => submit(only), 480);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [myLegal, isPit, isKent, isSet, dealing, suitPickerOpen, handoff, takeback, view.phase, settings.autoPlayForced]);
 
   const botLabel = (id: string) =>
     settings.botNaming === 'named' ? botNameFor(matchId, id)

@@ -112,13 +112,23 @@ export interface Settings {
   sort: SortMode;
   confirmPlays: boolean;
   showLog: boolean;
-  sound: boolean;
+  /** Cards landing, drawing, winning — the sounds a hand of cards makes. */
+  cardSounds: boolean;
+  /** Clicks, selections, refusals — the sounds the interface makes, separate from the cards. */
+  uiSounds: boolean;
+  /** 0-100. Applies to both categories above; muting either still mutes at 0. */
+  soundVolume: number;
   /** Read the table out loud through the browser's own voice. Off unless asked for. */
   speak: boolean;
   /** A few seconds to take back a misclick before the table moves on. 0 turns it off. */
   undoGraceMs: number;
   /** Optional clock. 0 is no clock at all, which is the default. */
   turnSeconds: number;
+  /** Looks a player mixed themselves and named, so a preset stops being the only way to
+      return to a combination once you've moved on from it. */
+  myLooks: MyLook[];
+  /** When exactly one move is legal, play it rather than waiting to be told to. */
+  autoPlayForced: boolean;
 }
 
 export const defaultSettings: Settings = {
@@ -146,6 +156,8 @@ export const defaultSettings: Settings = {
   avatar: '🂡',
   playerColor: 'emerald',
   botNaming: 'bot',
+  myLooks: [],
+  autoPlayForced: true,
   defaultSeats: 3,
   botSpeed: 'normal',
   botDiff: 'normal',
@@ -153,7 +165,9 @@ export const defaultSettings: Settings = {
   sort: 'auto',
   confirmPlays: false,
   showLog: true,
-  sound: false,
+  cardSounds: false,
+  uiSounds: false,
+  soundVolume: 70,
   speak: false,
   // Long enough to catch a misclick, short enough that nobody waits on it.
   undoGraceMs: 3000,
@@ -202,6 +216,10 @@ export interface ThemePack {
   cardBack: CardBack;
   cardFace: CardFace;
 }
+
+/** A look somebody mixed themselves and gave a name to. Same shape as a built-in pack, minus
+    the blurb — nobody is writing house copy for their own three-word combination. */
+export type MyLook = Omit<ThemePack, 'blurb'>;
 
 export const THEME_PACKS: ThemePack[] = [
   // The house look leads the list, and it is the one the app opens on — so it is the one that
@@ -334,11 +352,14 @@ const ALLOWED = {
   botNaming: ['bot', 'seat', 'named'],
 } as const;
 
+/** How loud, and which categories are on — the shape `playSound` actually needs. */
+export type SoundPrefs = Pick<Settings, 'cardSounds' | 'uiSounds' | 'soundVolume'>;
+
 export function loadSettings(): Settings {
   try {
     const raw = localStorage.getItem(KEY);
     if (!raw) return { ...defaultSettings };
-    const saved = JSON.parse(raw) as Partial<Settings> & { fourColor?: boolean; botLabels?: boolean };
+    const saved = JSON.parse(raw) as Partial<Settings> & { fourColor?: boolean; botLabels?: boolean; sound?: boolean };
     // `fourColor` was a boolean before card faces became a choice of four. Anyone who had it on
     // keeps the deck they chose rather than being silently reset to classic.
     if (saved.cardFace === undefined && saved.fourColor !== undefined) {
@@ -349,6 +370,10 @@ export function loadSettings(): Settings {
     if (saved.botNaming === undefined && saved.botLabels !== undefined) {
       saved.botNaming = saved.botLabels ? 'bot' : 'seat';
     }
+    // `sound` was one switch for every noise the app made. Split into cards and interface,
+    // both starting at whatever the one switch used to say, so nobody's silence gets undone.
+    if (saved.cardSounds === undefined && saved.sound !== undefined) saved.cardSounds = saved.sound;
+    if (saved.uiSounds === undefined && saved.sound !== undefined) saved.uiSounds = saved.sound;
     const merged = { ...defaultSettings, ...saved } as Record<string, unknown>;
     for (const [key, options] of Object.entries(ALLOWED)) {
       if (!(options as readonly string[]).includes(String(merged[key]))) {
@@ -364,6 +389,8 @@ export function loadSettings(): Settings {
     if (typeof merged.playerName !== 'string' || !merged.playerName.trim()) {
       merged.playerName = defaultSettings.playerName;
     }
+    if (!Array.isArray(merged.myLooks)) merged.myLooks = [];
+    merged.soundVolume = num(merged.soundVolume, 0, 100, defaultSettings.soundVolume);
     return merged as unknown as Settings;
   } catch {
     return { ...defaultSettings };

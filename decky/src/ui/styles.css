@@ -4002,6 +4002,39 @@ header h1 {
   box-shadow: 0 0 0 2px rgba(0,0,0,0.28);
 }
 
+/*
+   A look a player mixed and named themselves, sitting in the same grid as the built-in packs.
+   Same swatch, same size — the only thing that marks it as theirs is the small × that lets
+   them forget it, which a built-in pack doesn't offer because you can't delete the house look.
+*/
+.swatch.wide.mine { position: relative; }
+.mine-del {
+  position: absolute; top: 4px; right: 4px; z-index: 1;
+  display: grid; place-items: center; inline-size: 18px; block-size: 18px;
+  border-radius: 50%; background: rgba(0,0,0,.55); color: #fff; font-size: 12px; line-height: 1;
+  cursor: pointer; opacity: 0; transition: opacity 120ms;
+}
+.swatch.wide.mine:hover .mine-del, .swatch.wide.mine:focus-within .mine-del { opacity: 1; }
+.mine-del:hover { background: var(--red, #c4453f); }
+
+/* The empty slot that offers to remember whatever you've currently got mixed. */
+.save-mix-cta {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+  block-size: 42px; border: 1px dashed var(--panel-brd); border-radius: 8px; background: none;
+  color: var(--muted); cursor: pointer;
+}
+.save-mix-cta:hover { border-color: var(--ink); color: var(--ink); }
+.pk-plus { font-size: 18px; line-height: 1; font-weight: 700; }
+
+.save-mix { display: flex; flex-direction: column; gap: 6px; }
+.save-mix input {
+  font: inherit; font-size: 12px; padding: 6px 8px; border-radius: 6px;
+  border: 1px solid var(--panel-brd); background: var(--panel); color: var(--ink); width: 100%;
+}
+.save-mix-actions { display: flex; gap: 6px; }
+.save-mix-actions button { flex: 1 1 auto; }
+
+
 /* ---- animation speed ---- */
 /* Every timed thing multiplies its own duration by this, so one control moves them together. */
 .dealmotion, .dealmotion * { animation-duration: calc(var(--dm-dur, 620ms) * var(--anim-scale, 1)) !important; }
@@ -4090,6 +4123,8 @@ header h1 {
 }
 
 .profile-tabs { align-self: flex-start; }
+.profile-tabrow { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.profile-export { white-space: nowrap; }
 .profile-note { margin: 0; font-size: 13px; }
 .profile-panel { padding: 16px 18px; }
 .profile-panel h4 {

@@ -7,6 +7,32 @@ import { Seat } from '../server/matchService';
 // One screen covers what used to be three separate ideas: single-player against bots is a table
 // of one local seat and some bots; pass-and-play is several local seats; a mixed table is both.
 // The engine has never known the difference — this is where a person gets to say it.
+//
+// A plan built here is remembered per game. Pass-and-play exists so a household can name every
+// seat for themselves — "Mum", "Dad", "Sam" — and that naming used to evaporate the moment you
+// left the screen, so every single game of every session started back at "Player 2" and "Player
+// 3". It is saved under the game's own id, since a seat count and a cast of bots that suits
+// Hearts has no reason to survive a jump to Euchre.
+
+const PLAN_PREFIX = 'decky.seatplan.';
+
+type SavedSeat = Pick<Seat, 'name' | 'kind' | 'difficulty'>;
+
+function loadPlan(gameId: string): SavedSeat[] | null {
+  try {
+    const raw = localStorage.getItem(PLAN_PREFIX + gameId);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : null;
+  } catch { return null; }
+}
+
+function savePlan(gameId: string, seats: Seat[]): void {
+  try {
+    const trimmed: SavedSeat[] = seats.map((s) => ({ name: s.name, kind: s.kind, difficulty: s.difficulty }));
+    localStorage.setItem(PLAN_PREFIX + gameId, JSON.stringify(trimmed));
+  } catch { /* storage full or unavailable — the plan just doesn't survive this time */ }
+}
 
 const KINDS: { value: Seat['kind']; label: string; blurb: string }[] = [
   { value: 'local', label: 'Person here', blurb: 'Plays on this device' },
@@ -29,15 +55,17 @@ export function SeatSetup({ def, defaultSeats, defaultName, onStart, onCancel }:
 }) {
   const min = def.meta.players.min;
   const max = def.meta.players.max;
-  const [count, setCount] = useState(Math.min(Math.max(defaultSeats, min), max));
-  const [seats, setSeats] = useState<Seat[]>(() => initial(Math.min(Math.max(defaultSeats, min), max), defaultName));
+  const savedPlan = loadPlan(def.meta.id);
+  const startCount = savedPlan ? Math.min(Math.max(savedPlan.length, min), max) : Math.min(Math.max(defaultSeats, min), max);
+  const [count, setCount] = useState(startCount);
+  const [seats, setSeats] = useState<Seat[]>(() => initial(startCount, defaultName, savedPlan));
   // Practice is a table you can learn at: it is not recorded and a move can always be taken back.
   const [practice, setPractice] = useState(false);
 
   function resize(n: number) {
     setCount(n);
     setSeats((prev) => {
-      const next = initial(n, defaultName);
+      const next = initial(n, defaultName, savedPlan);
       // Keep what was already configured rather than resetting every chair on a resize.
       for (let i = 0; i < Math.min(prev.length, n); i++) next[i] = prev[i];
       return next;
@@ -115,7 +143,7 @@ export function SeatSetup({ def, defaultSeats, defaultName, onStart, onCancel }:
 
         <div className="step-actions">
           <button className="ghost" onClick={onCancel}>Cancel</button>
-          <button className="primary" onClick={() => onStart(seats, practice)}>Deal →</button>
+          <button className="primary" onClick={() => { savePlan(def.meta.id, seats); onStart(seats, practice); }}>Deal →</button>
         </div>
       </div>
     </div>
@@ -127,11 +155,14 @@ function defaultNameFor(kind: Seat['kind'], i: number, you: string): string {
   return `Bot ${i + 1}`;
 }
 
-function initial(n: number, you: string): Seat[] {
-  return Array.from({ length: n }, (_, i) => ({
-    id: `P${i + 1}`,
-    name: defaultNameFor(i === 0 ? 'local' : 'bot', i, you),
-    kind: (i === 0 ? 'local' : 'bot') as Seat['kind'],
-    difficulty: 'normal' as const,
-  }));
+function initial(n: number, you: string, saved?: SavedSeat[] | null): Seat[] {
+  return Array.from({ length: n }, (_, i) => {
+    const kind = (saved?.[i]?.kind ?? (i === 0 ? 'local' : 'bot')) as Seat['kind'];
+    return {
+      id: `P${i + 1}`,
+      name: saved?.[i]?.name || defaultNameFor(kind, i, you),
+      kind,
+      difficulty: saved?.[i]?.difficulty ?? 'normal',
+    };
+  });
 }

@@ -47,8 +47,8 @@ export function SolitaireTable({ def }: { def: GameDefinition }) {
     setPick(null);
     setHint(null);
     const res = service.submit(matchId, ME, m);
-    if (!res.ok) { playSound('ui', settings.sound); return; }
-    playSound(m.to?.startsWith('found') ? 'win' : 'play', settings.sound);
+    if (!res.ok) { playSound('ui', settings); return; }
+    playSound(m.to?.startsWith('found') ? 'win' : 'play', settings);
     refresh(matchId);
   }
 
@@ -56,7 +56,7 @@ export function SolitaireTable({ def }: { def: GameDefinition }) {
     if (!service.undo(matchId, ME).ok) return;
     setPick(null);
     setHint(null);
-    playSound('ui', settings.sound);
+    playSound('ui', settings);
     refresh(matchId);
   }
 
@@ -70,7 +70,7 @@ export function SolitaireTable({ def }: { def: GameDefinition }) {
 
   function showHint() {
     setHint(service.hint(matchId, ME));
-    playSound('ui', settings.sound);
+    playSound('ui', settings);
   }
 
   // Tapping a card: pick it up, or drop what you're holding onto it.

@@ -39,6 +39,26 @@ export function ProfileView({ onPlay }: { onPlay: () => void }) {
 
   const pct = (n: number) => `${Math.round(n * 100)}%`;
 
+  /*
+    Every result lives in this one browser. Clear site data, switch devices, or the browser
+    just decides storage is full, and a hundred games of history are gone with no warning and
+    no way back — because there was never a way out. This is the way out: the exact JSON the
+    rest of the page already reads, so a saved file is a real backup rather than a summary that
+    has thrown information away.
+  */
+  function exportRecord() {
+    const payload = { exportedAt: new Date().toISOString(), player: settings.playerName, results };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `decky-record-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
   if (summary.played === 0) {
     /*
       An empty record used to be one line on an otherwise blank screen, which answers the
@@ -88,11 +108,17 @@ export function ProfileView({ onPlay }: { onPlay: () => void }) {
     <section className="profile">
       <ProfileHead name={settings.playerName} avatar={settings.avatar} summary={summary} />
 
-      <div className="seg profile-tabs" role="tablist" aria-label="Your record">
-        {([['overview', 'Overview'], ['games', 'By game'], ['badges', 'Badges']] as [Tab, string][]).map(([id, label]) => (
-          <button key={id} role="tab" aria-selected={tab === id} className={tab === id ? 'on' : ''}
-            onClick={() => setTab(id)}>{label}</button>
-        ))}
+      <div className="profile-tabrow">
+        <div className="seg profile-tabs" role="tablist" aria-label="Your record">
+          {([['overview', 'Overview'], ['games', 'By game'], ['badges', 'Badges']] as [Tab, string][]).map(([id, label]) => (
+            <button key={id} role="tab" aria-selected={tab === id} className={tab === id ? 'on' : ''}
+              onClick={() => setTab(id)}>{label}</button>
+          ))}
+        </div>
+        <button className="ghost sm profile-export" onClick={exportRecord}
+          title="Save every result on this device as a JSON file">
+          Download your record ↓
+        </button>
       </div>
 
       {tab === 'overview' && (

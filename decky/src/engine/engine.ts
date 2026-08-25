@@ -67,6 +67,7 @@ export function createMatch(
     lead: null,
     trickPlays: [],
     lastTrick: null,
+    lastBattle: null,
     tricksWon: Object.fromEntries(players.map((p) => [p, 0])),
     bids: {},
     bidding: !!def.trick?.bidding,
@@ -587,6 +588,7 @@ function cloneState(state: MatchState): MatchState {
     lastTrick: state.lastTrick
       ? { winner: state.lastTrick.winner, plays: state.lastTrick.plays.map((t) => ({ ...t })) }
       : null,
+    lastBattle: state.lastBattle ? state.lastBattle.map((b) => ({ card: { ...b.card } })) : null,
     finished: state.finished.slice(),
     booksWon: { ...state.booksWon },
     pendingChoice: state.pendingChoice ? { ...state.pendingChoice } : null,
@@ -1297,7 +1299,7 @@ export function nextHand(state: MatchState, seed: number): MatchState {
 // Trump is normally fixed by the definition, but an auction game names it per hand. Both kinds
 // of auction count: a contract auction sets it from the winning strain, and no-trump leaves it
 // unset on purpose, which is exactly 'none'.
-function trumpOf(s: MatchState): Suit | 'none' {
+export function trumpOf(s: MatchState): Suit | 'none' {
   const cfg = s.definition.trick!;
   if (cfg.auction || cfg.numericAuction) return s.trumpSuit ?? 'none';
   return cfg.trump;
@@ -1307,7 +1309,7 @@ const SAME_COLOUR: Record<string, string> = { C: 'S', S: 'C', H: 'D', D: 'H' };
 
 // The left bower is a trump card, not a card of its printed suit — for following suit AND for
 // resolving the trick. Every suit comparison in this family goes through here.
-function suitOf(s: MatchState, card: Card): string {
+export function suitOf(s: MatchState, card: Card): string {
   const t = trumpOf(s);
   if (!s.definition.trick!.bowers || t === 'none') return card.suit;
   if (card.rank === 'J' && card.suit === SAME_COLOUR[t]) return t;
@@ -1315,7 +1317,7 @@ function suitOf(s: MatchState, card: Card): string {
 }
 
 // Rank within a trick: right bower tops, then left bower, then the rest of the rank order.
-function trickStrength(s: MatchState, card: Card): number {
+export function trickStrength(s: MatchState, card: Card): number {
   const cfg = s.definition.trick!;
   const t = trumpOf(s);
   if (cfg.bowers && t !== 'none' && card.rank === 'J') {
@@ -1564,11 +1566,24 @@ function nextIndex(s: MatchState): number {
   return i;
 }
 
+/**
+ * What a card is worth in the trick currently on the table: trump beats the led suit, the led
+ * suit beats a discard, and within a category it is plain rank (bowers included).
+ *
+ * Exported because the bots have to answer "would this card take it?" and the only correct
+ * answer is the referee's own. A bot with its own private idea of what beats what is a bot
+ * that mis-plays exactly where the rules are most interesting — bowers, trump, a void.
+ */
+export function trickValueOf(s: MatchState, card: Card): number {
+  const trump = trumpOf(s);
+  const suit = suitOf(s, card);
+  const category = trump !== 'none' && suit === trump ? 2 : suit === s.lead ? 1 : 0;
+  return category * 10000 + trickStrength(s, card);
+}
+
 function resolveTrick(s: MatchState, trickZoneId: string): void {
   const cfg = s.definition.trick!;
-  const trump = trumpOf(s);
-  const category = (suit: string) => (trump !== 'none' && suit === trump ? 2 : suit === s.lead ? 1 : 0);
-  const value = (c: Card) => category(suitOf(s, c)) * 10000 + trickStrength(s, c);
+  const value = (c: Card) => trickValueOf(s, c);
 
   let winner = s.trickPlays[0];
   for (const play of s.trickPlays) if (value(play.card) > value(winner.card)) winner = play;
@@ -2765,10 +2780,8 @@ function applyWarMove(s: MatchState, playerId: string, move: Move): MatchState {
   // documented as the referee, not something that only stays correct because callers behave.
   if (s.phase !== 'playing' || move.actionId !== 'warFlip' || s.players[s.turnIndex] !== playerId) return s;
   const [a, b] = s.players;
-  const battleZone = s.definition.zones.find((z) => z.shared && z.visibility === 'all')!.id;
   const handA = s.zones[`hand:${a}`];
   const handB = s.zones[`hand:${b}`];
-  s.zones[battleZone] = [];
   const pot: Card[] = [];
 
   let guard = 0;
@@ -2777,7 +2790,9 @@ function applyWarMove(s: MatchState, playerId: string, move: Move): MatchState {
     const cb = handB.shift();
     if (!ca || !cb) { if (ca) pot.push(ca); if (cb) pot.push(cb); break; }
     pot.push(ca, cb);
-    s.zones[battleZone] = [ca, cb];
+    // What the table shows, as a copy. The real cards are on their way into the winner's hand
+    // a few lines below, and a card cannot be in two places at once — see MatchState.lastBattle.
+    s.lastBattle = [{ card: { ...ca } }, { card: { ...cb } }];
     const sa = warStrength(s.definition, ca.rank);
     const sb = warStrength(s.definition, cb.rank);
     if (sa !== sb) {
@@ -3677,7 +3692,7 @@ export function redact(state: MatchState, viewer: string): RedactedState {
     mode: state.definition.solitaire ? 'solitaire' : state.definition.trick ? 'trick' : state.definition.climb ? 'climb' : state.definition.fish ? 'fish' : state.definition.rummy ? 'rummy' : state.definition.war ? 'war'
       : state.definition.bluff ? 'bluff' : state.definition.reflex ? 'reflex' : state.definition.poker ? 'poker' : state.definition.pit ? 'pit' : state.definition.kent ? 'kent' : state.definition.set ? 'set' : 'shedding',
     ...(state.definition.solitaire ? solitaireView(state) : {}),
-    battle: state.definition.war ? (state.zones[state.definition.zones.find((z) => z.shared && z.visibility === 'all')!.id] || []).slice() : undefined,
+    battle: state.definition.war ? (state.lastBattle ?? []).map((b) => b.card) : undefined,
     rummyPhase: state.definition.rummy ? state.rummyPhase : undefined,
     meldMoves: state.definition.rummy && state.definition.rummy.knock === undefined
       && state.players[state.turnIndex] === viewer && state.rummyPhase === 'play'

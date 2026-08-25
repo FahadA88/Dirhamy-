@@ -6,7 +6,7 @@ import { pullSafety, pushSafety, syncCode, useSyncCode } from '../social/safety'
 import { hostInfo } from '../net/host';
 import {
   ACCENTS, AVATARS, AccentId, BACKS, CardBack, CardFace, CustomBack, CustomFelt, FACES, FELTS,
-  MAX_BACK_IMAGE, Settings, TableFelt, THEME_PACKS,
+  MAX_BACK_IMAGE, MyLook, Settings, TableFelt, THEME_PACKS,
 } from '../settings/settings';
 
 // Preferences.
@@ -152,6 +152,25 @@ function LookSection({ s, set }: { s: Settings; set: Setter }) {
   // change any of them afterwards and no pack is highlighted, which is the honest answer.
   const activePack = THEME_PACKS.find((p) => p.accent === s.accent && p.tableFelt === s.tableFelt
     && p.cardBack === s.cardBack && p.cardFace === s.cardFace);
+  const mine = s.myLooks ?? [];
+  const activeMine = mine.find((p) => p.accent === s.accent && p.tableFelt === s.tableFelt
+    && p.cardBack === s.cardBack && p.cardFace === s.cardFace);
+  // Mixed something nobody made a button for yet. A preset used to be the only way back to a
+  // combination once you moved past it — pick another pack and the mix you had was just gone,
+  // with no record it ever existed. This is that record.
+  const unsaved = !activePack && !activeMine;
+  const [naming, setNaming] = useState(false);
+  const [name, setName] = useState('');
+  function saveMix() {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    const look: MyLook = {
+      id: `mine-${Date.now().toString(36)}`, name: trimmed,
+      accent: s.accent, tableFelt: s.tableFelt, cardBack: s.cardBack, cardFace: s.cardFace,
+    };
+    set('myLooks', [...mine, look]);
+    setNaming(false); setName('');
+  }
   return (
     <>
       <Row label="A whole look" hint="Sets the accent, cloth, back and face together. Everything stays editable afterwards." keywords="theme pack preset season look style bundle" wide>
@@ -169,6 +188,40 @@ function LookSection({ s, set }: { s: Settings; set: Setter }) {
               <em>{p.name}</em>
             </button>
           ))}
+          {mine.map((p) => (
+            <button key={p.id} className={`swatch wide mine ${activeMine?.id === p.id ? 'on' : ''}`}
+              title={`Your own look: ${p.name}`} aria-pressed={activeMine?.id === p.id}
+              onClick={() => {
+                set('accent', p.accent); set('tableFelt', p.tableFelt);
+                set('cardBack', p.cardBack); set('cardFace', p.cardFace);
+              }}>
+              <span className="pack-swatch" data-felt={p.tableFelt}>
+                <span className="pk-dot" style={{ background: ACCENTS[p.accent].emerald }} />
+              </span>
+              <em>{p.name}</em>
+              <span className="mine-del" role="button" tabIndex={0} aria-label={`Forget the look "${p.name}"`}
+                onClick={(e) => { e.stopPropagation(); set('myLooks', mine.filter((m) => m.id !== p.id)); }}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); set('myLooks', mine.filter((m) => m.id !== p.id)); } }}
+              >×</span>
+            </button>
+          ))}
+          {unsaved && (
+            naming ? (
+              <form className="swatch wide save-mix" onSubmit={(e) => { e.preventDefault(); saveMix(); }}>
+                <input autoFocus value={name} onChange={(e) => setName(e.target.value)}
+                  placeholder="Name this look" maxLength={24} aria-label="Name for this look" />
+                <div className="save-mix-actions">
+                  <button type="submit" className="primary sm" disabled={!name.trim()}>Save</button>
+                  <button type="button" className="ghost sm" onClick={() => { setNaming(false); setName(''); }}>Cancel</button>
+                </div>
+              </form>
+            ) : (
+              <button className="swatch wide save-mix-cta" onClick={() => setNaming(true)}>
+                <span className="pk-plus" aria-hidden="true">+</span>
+                <em>Save this mix</em>
+              </button>
+            )
+          )}
         </div>
       </Row>
       <Row label="Theme" hint="The room after midnight, or the same room with the lights on." keywords="light dark mode night">
@@ -327,6 +380,9 @@ function PlaySection({ s, set }: { s: Settings; set: Setter }) {
       <Row label="Confirm before playing" hint="Tap once to pick the card, again to play it." keywords="confirm double tap mistake">
         <Toggle on={s.confirmPlays} onChange={(v) => set('confirmPlays', v)} label="Confirm before playing" />
       </Row>
+      <Row label="Play a forced move" hint="When you have exactly one legal move, it plays itself instead of waiting to be told to." keywords="forced auto single only legal move">
+        <Toggle on={s.autoPlayForced} onChange={(v) => set('autoPlayForced', v)} label="Play a forced move automatically" />
+      </Row>
       <Row label="Game log" hint="The running account of what everyone did." keywords="log history record">
         <Toggle on={s.showLog} onChange={(v) => set('showLog', v)} label="Game log" />
       </Row>
@@ -380,8 +436,20 @@ function MotionSection({ s, set }: { s: Settings; set: Setter }) {
         <Seg value={s.animSpeed} onChange={(v) => set('animSpeed', v as Settings['animSpeed'])}
           options={[['relaxed', 'Relaxed'], ['normal', 'Normal'], ['brisk', 'Brisk']]} />
       </Row>
-      <Row label="Sound" hint="Short tones on play, draw and win. Nothing else." keywords="audio sound mute volume">
-        <Toggle on={s.sound} onChange={(v) => set('sound', v)} label="Sound" />
+      <Row label="Card sounds" hint="Short tones when a card plays, draws or wins." keywords="audio sound mute volume card play draw win">
+        <Toggle on={s.cardSounds} onChange={(v) => set('cardSounds', v)} label="Card sounds" />
+      </Row>
+      <Row label="Interface sounds" hint="A tone on a selection, or a refusal — the table itself, not the cards on it." keywords="audio sound mute volume interface ui click select refuse">
+        <Toggle on={s.uiSounds} onChange={(v) => set('uiSounds', v)} label="Interface sounds" />
+      </Row>
+      <Row label="Volume" hint="Applies to both categories above." keywords="audio sound volume loud quiet">
+        <div className="pref-range">
+          <input type="range" min={0} max={100} step={5} value={s.soundVolume}
+            aria-label="Sound volume"
+            disabled={!s.cardSounds && !s.uiSounds}
+            onChange={(e) => set('soundVolume', +e.target.value)} />
+          <b>{s.soundVolume}</b>
+        </div>
       </Row>
       <Row label="Moving background" keywords="background ambient 3d">
         <Toggle on={s.ambient3d} onChange={(v) => set('ambient3d', v)} label="Moving background" />

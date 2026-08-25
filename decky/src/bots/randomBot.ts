@@ -1,5 +1,5 @@
 import { MatchState, Move } from '../engine/types';
-import { legalMoves, handDeadwood, pitCorner } from '../engine/engine';
+import { legalMoves, handDeadwood, pitCorner, trickTeams, trickValueOf } from '../engine/engine';
 import { nextRandom } from '../engine/rng';
 
 // Because the engine enumerates legal moves, a bot works for ANY valid game for free.
@@ -223,9 +223,94 @@ export function chooseMove(
       return { move: best, botSeed };
     }
 
-    let best = moves[0];
-    for (const m of moves) if (strength(m.cardId) < strength(best.cardId)) best = m;
-    return { move: best, botSeed };
+    /*
+      Games where tricks are the point (Spades, Euchre, Contract Whist).
+
+      This used to be one line — play the lowest legal card, always — which meant a bot that
+      had just bid five tricks, or won a contract at level four, played every hand exactly as
+      if it were trying to lose. The bid was a promise nothing downstream ever tried to keep,
+      and since bidding is the whole point of all three of those games, that quietly hollowed
+      them out.
+
+      The policy now is the ordinary one a person plays: work out whether you still need
+      tricks, then either try to win the trick as cheaply as you can or get out of it as
+      cheaply as you can. `trickValueOf` is the referee's own comparison, so the bot's idea of
+      "would this take it" is right about trump, about bowers, and about a discard being worth
+      nothing — the three places a hand-rolled guess goes wrong.
+    */
+    const teams = trickTeams(state);
+    const myTeam = teams.find((t) => t.includes(playerId)) ?? [playerId];
+    const partnerWinning = state.trickPlays.length > 0 && (() => {
+      let lead = state.trickPlays[0];
+      for (const p of state.trickPlays) if (trickValueOf(state, p.card) > trickValueOf(state, lead.card)) lead = p;
+      return lead.player !== playerId && myTeam.includes(lead.player);
+    })();
+    const highSoFar = state.trickPlays.length > 0
+      ? Math.max(...state.trickPlays.map((t) => trickValueOf(state, t.card)))
+      : -1;
+
+    /*
+      Do we still want tricks?
+
+      Three different games ask this three different ways. Spades hands every seat its own
+      number, and an overtrick past the team's total is a bag rather than a prize. Contract
+      Whist gives one side a promise via the auction — `highBid`, not `bids`, which is a
+      separate field entirely — and the defenders want every trick they can take because each
+      one is an undertrick the other side pays for. Euchre names a maker but no number, so
+      tricks are simply the score.
+    */
+    const teamTricks = myTeam.reduce((n, p) => n + (state.tricksWon[p] ?? 0), 0);
+    const contract = state.highBid;
+    let wantTricks: boolean;
+    if (state.bids?.[playerId] === 0) {
+      // A nil bid is the opposite instruction: take nothing at all.
+      wantTricks = false;
+    } else if (contract) {
+      const declaring = teams.find((t) => t.includes(contract.player)) ?? [contract.player];
+      if (declaring.includes(playerId)) {
+        const need = contract.level + (state.definition.trick?.numericAuction?.book ?? 0);
+        wantTricks = declaring.reduce((n, p) => n + (state.tricksWon[p] ?? 0), 0) < need;
+      } else {
+        wantTricks = true;   // every trick the defence takes is one the contract is short
+      }
+    } else if (state.bids) {
+      const teamBid = myTeam.reduce((n, p) => n + (state.bids![p] ?? 0), 0);
+      wantTricks = teamTricks < teamBid;
+    } else {
+      wantTricks = true;
+    }
+
+    const val = (id?: string) => { const c = cardOf(id); return c ? trickValueOf(state, c) : -1; };
+    const winners = moves.filter((m) => val(m.cardId) > highSoFar);
+    const losers = moves.filter((m) => val(m.cardId) <= highSoFar);
+
+    const cheapestOf = (pool: Move[]) => {
+      let pick = pool[0];
+      for (const m of pool) if (val(m.cardId) < val(pick.cardId)) pick = m;
+      return pick;
+    };
+    const dearestOf = (pool: Move[]) => {
+      let pick = pool[0];
+      for (const m of pool) if (val(m.cardId) > val(pick.cardId)) pick = m;
+      return pick;
+    };
+
+    // Leading, with nothing down yet: lead your best when you need tricks, your worst when
+    // you are trying not to take any more.
+    if (state.trickPlays.length === 0) {
+      return { move: wantTricks ? dearestOf(moves) : cheapestOf(moves), botSeed };
+    }
+
+    // Partner already has it — no reason to spend a card beating your own side.
+    if (partnerWinning) return { move: cheapestOf(moves), botSeed };
+
+    if (wantTricks && winners.length > 0) {
+      // Take it, but with the cheapest card that actually does.
+      return { move: cheapestOf(winners), botSeed };
+    }
+    // Either the trick is not worth taking or nothing here can take it: throw the least useful
+    // card. Falling back to `moves` matters — when every legal card would win, one must be played.
+    return { move: cheapestOf(losers.length > 0 ? losers : moves), botSeed };
   }
 
   // Rummy: draw the discard when it connects with the hand; meld greedily; discard the least
