@@ -541,6 +541,8 @@ export interface MatchState {
   lastBattle?: { card: Card }[] | null;
   /** Who swept every penalty point this hand, if anyone — cleared each time scoring runs. */
   shotMoon?: string | null;
+  /** How a gin-rummy hand just ended, for the table to name it as more than a score delta. */
+  roundOutcome?: 'gin' | 'undercut' | 'knock' | null;
   tricksWon: Record<string, number>;
   bids: Record<string, number>; // trick bids (Spades)
   bidding: boolean;         // true while the bidding phase is open
@@ -693,6 +695,8 @@ export interface RedactedState {
   battle?: Card[];
   /** Who swept every penalty point this hand, if the game plays that way and anyone did. */
   shotMoon?: string | null;
+  /** How a gin-rummy hand just ended. */
+  roundOutcome?: 'gin' | 'undercut' | 'knock' | null;
   trick?: { player: string; card: Card }[];
   /** The trick just taken, held until somebody leads again. */
   lastTrick?: { plays: { player: string; card: Card }[]; winner: string };

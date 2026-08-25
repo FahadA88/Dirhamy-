@@ -40,7 +40,7 @@ const PATTERNS: [CustomBack['pattern'], string][] = [
 ];
 const EMBLEMS = ['', '♠', '♥', '♦', '♣', '★', '✦', '❖', '⚜'];
 
-type SectionId = 'look' | 'table' | 'cards' | 'you' | 'play' | 'opponents' | 'motion' | 'access';
+type SectionId = 'look' | 'table' | 'cards' | 'you' | 'play' | 'opponents' | 'motion' | 'access' | 'about';
 
 const SECTIONS: { id: SectionId; label: string; mark: string; blurb: string }[] = [
   { id: 'look', label: 'Appearance', mark: '◐', blurb: 'Light or dark, and the accent through the site.' },
@@ -51,6 +51,7 @@ const SECTIONS: { id: SectionId; label: string; mark: string; blurb: string }[] 
   { id: 'opponents', label: 'Opponents', mark: '☻', blurb: 'Who you play against and how fast.' },
   { id: 'motion', label: 'Motion & sound', mark: '♪', blurb: 'Animation, background, audio.' },
   { id: 'access', label: 'Accessibility', mark: '◎', blurb: 'Text, contrast, and reducing movement.' },
+  { id: 'about', label: 'About', mark: 'ⓘ', blurb: 'What this is, and what it is not.' },
 ];
 
 /** The live search term, so a row can decide for itself whether it is a match. */
@@ -144,6 +145,7 @@ function body(id: SectionId, s: Settings, set: Setter): React.ReactNode {
     case 'opponents': return <OpponentsSection s={s} set={set} />;
     case 'motion': return <MotionSection s={s} set={set} />;
     case 'access': return <AccessSection s={s} set={set} />;
+    case 'about': return <AboutSection />;
   }
 }
 
@@ -503,6 +505,43 @@ function AccessSection({ s, set }: { s: Settings; set: Setter }) {
       </Row>
       <Row label="Read the table aloud" hint="Speaks each move and your hand through the browser's own voice. Separate from a screen reader, which is always supported." keywords="speech speak voice audio blind narrate tts">
         <Toggle on={s.speak} onChange={(v) => set('speak', v)} label="Read the table aloud" />
+      </Row>
+    </>
+  );
+}
+
+function AboutSection() {
+  return (
+    <>
+      <Row label="What this is" wide keywords="about engine data-driven interpreter">
+        <p className="about-p">
+          Decky plays cards. One interpreter reads a game's rules and runs it — the same
+          interpreter for all twenty-something games in the shelf and for anything built in
+          Create. There is no per-game code hiding underneath; a game here is a description,
+          not a program.
+        </p>
+      </Row>
+      <Row label="The rules are data" wide keywords="about eval custom rules trust">
+        <p className="about-p">
+          A rule reads as when this happens, if that is true, then do this — never a script.
+          Nothing a game defines is ever executed as code, including anything written by the
+          AI game-writer in Create. A definition is also fixed the moment a table is dealt, so
+          a game cannot change under you partway through a match.
+        </p>
+      </Row>
+      <Row label="A fair deal" wide keywords="about fairness commit reveal seed hash random shuffle">
+        <p className="about-p">
+          Before a hand is dealt, the server commits to the shuffle it is about to use by
+          publishing a hash of its secret seed — fixed before a single card moves, checkable
+          against the seed once the hand is revealed. The shuffle cannot be steered afterward
+          to suit how the deal turns out.
+        </p>
+      </Row>
+      <Row label="No money" wide keywords="about gambling betting stakes real money">
+        <p className="about-p">
+          Nothing here is played for money, and nothing ever will be. Chips, pots and bids in
+          the poker-family games are scorekeeping, not currency.
+        </p>
       </Row>
     </>
   );

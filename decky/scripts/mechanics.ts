@@ -438,6 +438,7 @@ section('Rummy — knocking, deadwood and lay-off (Gin Rummy)');
   check('the knocker won', scored.winner === 'A', { winner: scored.winner, scores: scored.scores });
   check('the knocker scores the spread (10 - 6)', scored.scores['A'] === 4, scored.scores);
   check('the knock is logged', scored.log.some((l) => l.text.includes('knocks')));
+  check('an ordinary knock records that outcome', scored.roundOutcome === 'knock', scored.roundOutcome);
 
   // Gin: no deadwood at all pays the bonus.
   const ginHand = ['S4', 'S5', 'S6', 'S7', 'H9', 'D9', 'C9', 'CA', 'DA', 'HA', 'SK'];
@@ -448,6 +449,7 @@ section('Rummy — knocking, deadwood and lay-off (Gin Rummy)');
   check('gin is announced', g.log.some((l) => l.text.includes('GIN')), g.log.slice(-2).map((l) => l.text));
   check('gin pays the 25 bonus on top of the spread', (g.scores['A'] ?? 0) > 25, g.scores);
   check('the defender scores nothing', g.scores['B'] === 0, g.scores);
+  check('gin records that outcome', g.roundOutcome === 'gin', g.roundOutcome);
 
   // Undercut: the knocker throws with 9 deadwood, the defender is sitting on less.
   const loose = setup(['S4', 'S5', 'S6', 'H9', 'D9', 'C9', 'D2', 'D3', 'CA', 'H3', 'SK'],
@@ -457,6 +459,7 @@ section('Rummy — knocking, deadwood and lay-off (Gin Rummy)');
   check('undercut goes to the defender', u.winner === 'B', { winner: u.winner, scores: u.scores });
   check('undercut is announced', u.log.some((l) => l.text.includes('Undercut')), u.log.slice(-2).map((l) => l.text));
   check('undercut pays the 25 bonus', (u.scores['B'] ?? 0) >= 25, u.scores);
+  check('undercut records that outcome', u.roundOutcome === 'undercut', u.roundOutcome);
 
   // Lay-off: the defender's spare 8♠ hangs off the knocker's 4-5-6-7♠ run and stops counting.
   const withLayoff = setup(['S4', 'S5', 'S6', 'S7', 'H9', 'D9', 'C9', 'C2', 'D3', 'HA', 'SK'],

@@ -69,6 +69,7 @@ export function createMatch(
     lastTrick: null,
     lastBattle: null,
     shotMoon: null,
+    roundOutcome: null,
     tricksWon: Object.fromEntries(players.map((p) => [p, 0])),
     bids: {},
     bidding: !!def.trick?.bidding,
@@ -591,6 +592,7 @@ function cloneState(state: MatchState): MatchState {
       : null,
     lastBattle: state.lastBattle ? state.lastBattle.map((b) => ({ card: { ...b.card } })) : null,
     shotMoon: state.shotMoon ?? null,
+    roundOutcome: state.roundOutcome ?? null,
     finished: state.finished.slice(),
     booksWon: { ...state.booksWon },
     pendingChoice: state.pendingChoice ? { ...state.pendingChoice } : null,
@@ -2729,18 +2731,22 @@ function endGinRound(s: MatchState, knocker: string): void {
   if (mine.deadwood === 0) {
     s.scores[knocker] = theirDeadwood + (cfg.ginBonus ?? 0);
     s.winner = knocker;
+    s.roundOutcome = 'gin';
     log(s, knocker, `GIN — ${short(knocker)} scores ${s.scores[knocker]}.`);
   } else if (theirDeadwood < mine.deadwood) {
     s.scores[defender] = mine.deadwood - theirDeadwood + (cfg.undercutBonus ?? 0);
     s.winner = defender;
+    s.roundOutcome = 'undercut';
     log(s, defender, `Undercut! ${short(defender)} scores ${s.scores[defender]} (${theirDeadwood} v ${mine.deadwood}).`);
   } else if (theirDeadwood === mine.deadwood) {
     s.scores[defender] = cfg.undercutBonus ?? 0;
     s.winner = defender;
+    s.roundOutcome = 'undercut';
     log(s, defender, `Undercut on a tie — ${short(defender)} scores ${s.scores[defender]}.`);
   } else {
     s.scores[knocker] = theirDeadwood - mine.deadwood;
     s.winner = knocker;
+    s.roundOutcome = 'knock';
     log(s, knocker, `${short(knocker)} scores ${s.scores[knocker]} (${mine.deadwood} v ${theirDeadwood}).`);
   }
   finalizeMatchProgress(s);
@@ -3697,6 +3703,7 @@ export function redact(state: MatchState, viewer: string): RedactedState {
     ...(state.definition.solitaire ? solitaireView(state) : {}),
     battle: state.definition.war ? (state.lastBattle ?? []).map((b) => b.card) : undefined,
     shotMoon: state.definition.trick?.shootTheMoon ? (state.shotMoon ?? null) : undefined,
+    roundOutcome: state.definition.rummy?.knock !== undefined ? (state.roundOutcome ?? null) : undefined,
     rummyPhase: state.definition.rummy ? state.rummyPhase : undefined,
     meldMoves: state.definition.rummy && state.definition.rummy.knock === undefined
       && state.players[state.turnIndex] === viewer && state.rummyPhase === 'play'

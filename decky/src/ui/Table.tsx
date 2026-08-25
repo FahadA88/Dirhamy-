@@ -311,6 +311,9 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
   const isSet = view.mode === 'set';
   const isKent = view.mode === 'kent';
   const moonShooter = view.shotMoon ?? null;
+  // Gin and an undercut are the two gin-rummy endings worth a beat of their own; an ordinary
+  // knock is the unremarkable case the generic "X takes it" heading already covers.
+  const ginOutcome = view.roundOutcome === 'gin' || view.roundOutcome === 'undercut' ? view.roundOutcome : null;
   // Groups of 2+ need a button — you can't express "these three cards" with one tap.
   const comboMoves = useMemo(
     () => myLegal.filter((m) => m.actionId === 'climbPlay' && (m.cards?.length ?? 1) > 1),
@@ -624,11 +627,34 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
     }
   }
 
+  /** Why a dimmed card cannot be played — the same reasons the service would give on a
+   *  refused submit, worked out here from what the client already has so a card can say why
+   *  before it is ever tapped, not only after. Mirrors matchService's explainIllegal, minus
+   *  the cases that need state the client is never handed (see redact()). */
+  function dimReason(c: Card): string {
+    if (myLegal.length === 0) return 'You have no legal moves right now';
+    if (def.trick) {
+      if (view.lead && c.suit !== view.lead && hand.some((h) => h.suit === view.lead)) {
+        return `must follow ${SUIT_NAMES[view.lead]} — you still hold one`;
+      }
+      if (def.trick.leadCard && myLegal.length === 1 && myLegal[0].cardId) return 'the opening lead is forced';
+      if (def.trick.brokenSuit && !view.brokenSuitPlayed && c.suit === def.trick.brokenSuit) {
+        return `${SUIT_NAMES[def.trick.brokenSuit]} have not been broken yet`;
+      }
+    }
+    if (def.climb && view.climbPile && view.climbPile.length > 0) {
+      const shape = SHAPE_NAME[view.climbPile.length] ?? `${view.climbPile.length} of a kind`;
+      return `needs a ${shape} beating the ${view.climbPile[0].rank} on the pile`;
+    }
+    return 'not a legal move right now';
+  }
+  function capitalize(s: string): string { return s.charAt(0).toUpperCase() + s.slice(1); }
+
   /** What a card should be called out loud, plus why it cannot be played if it cannot. */
   function cardLabel(c: Card, playable: boolean, extra?: string): string {
     const name = spokenCard(c.rank, c.suit);
     if (extra) return `${name}, ${extra}`;
-    return playable ? name : `${name}, not playable`;
+    return playable ? name : `${name}, ${dimReason(c)}`;
   }
 
   // Win sound, and the result that feeds the leaderboards.
@@ -1677,7 +1703,7 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
                 disabled={!playable}
                 onFocus={() => { if (idx >= 0) setCursor(idx); }}
                 onClick={() => clickCard(c.id)}
-                title={staged ? 'Picked to pass' : playable ? (isFish ? 'Pick this rank to ask for' : view.needsPassChoice ? 'Give this card away' : settings.confirmPlays && selected !== c.id ? 'Click to select' : 'Play this card') : 'Not a legal move right now'}
+                title={staged ? 'Picked to pass' : playable ? (isFish ? 'Pick this rank to ask for' : view.needsPassChoice ? 'Give this card away' : settings.confirmPlays && selected !== c.id ? 'Click to select' : 'Play this card') : capitalize(dimReason(c))}
               >
                 <CardFace card={c} />
               </button>
@@ -1703,13 +1729,17 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
 
       {view.phase === 'roundOver' && !view.matchOver && (
         <div className="modal">
-          {(view.winner === me || moonShooter === me) && <Confetti pieces={moonShooter ? 70 : 30} />}
-          <div className={`modal-box celebrate handend ${view.winner === me ? 'won' : ''} ${moonShooter ? 'moonshot' : ''}`} ref={roundRef} role="dialog" aria-modal="true">
-            <span className="cb-kicker">{moonShooter ? '☾ Shot the moon' : `Hand ${view.handNumber}`}</span>
+          {(view.winner === me || moonShooter === me) && <Confetti pieces={moonShooter ? 70 : ginOutcome === 'gin' ? 50 : 30} />}
+          <div className={`modal-box celebrate handend ${view.winner === me ? 'won' : ''} ${moonShooter ? 'moonshot' : ''} ${ginOutcome ? 'ginout' : ''}`} ref={roundRef} role="dialog" aria-modal="true">
+            <span className="cb-kicker">{moonShooter ? '☾ Shot the moon' : ginOutcome === 'gin' ? '♦ Gin' : ginOutcome === 'undercut' ? '⚡ Undercut' : `Hand ${view.handNumber}`}</span>
             {/* A round of a partnership game is taken by a pair, not by whoever pressed the
                 button — "Bot 2 takes it" tells a player on Bot 2's side that they lost. */}
             <h3>{moonShooter
               ? (moonShooter === me ? 'You swept every point' : `${nameOf(moonShooter)} swept every point`)
+              : ginOutcome === 'gin'
+              ? (view.winner === me ? 'You went gin' : `${nameOf(view.winner || '')} went gin`)
+              : ginOutcome === 'undercut'
+              ? (view.winner === me ? 'You undercut the knock' : `${nameOf(view.winner || '')} undercut your knock`)
               : isKent
               ? (teamOf(view.winner ?? '') === teamOf(me)
                   ? `Your pair takes it — ${nameOf(view.winner || '')} spotted it`
