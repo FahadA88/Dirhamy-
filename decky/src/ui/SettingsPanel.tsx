@@ -488,6 +488,15 @@ function AccessSection({ s, set }: { s: Settings; set: Setter }) {
           onChange={(v) => set('cardFace', (v === 'off' ? 'classic' : v) as CardFace)}
           options={[['off', 'Off'], ['letters', 'Letters'], ['shapes', 'Shapes']]} />
       </Row>
+      <Row
+        label="See it as"
+        hint="Filters the whole app through a colour-vision deficiency, so a choice like the one above can be checked rather than taken on faith. Turn it back off when you're done — it applies everywhere, not just here."
+        keywords="colourblind colorblind deficiency protanopia deuteranopia tritanopia simulate preview accessibility"
+        wide
+      >
+        <Seg value={s.colorVisionSim} onChange={(v) => set('colorVisionSim', v as Settings['colorVisionSim'])}
+          options={[['off', 'Off'], ['protanopia', 'Protanopia'], ['deuteranopia', 'Deuteranopia'], ['tritanopia', 'Tritanopia']]} />
+      </Row>
       <Row label="Animation" hint="The same control as in Motion & sound — here because it is the one people look for." keywords="motion reduce vestibular system">
         <Seg value={s.motion} onChange={(v) => set('motion', v as Settings['motion'])}
           options={[['system', 'Match device'], ['full', 'Full'], ['reduced', 'Reduced']]} />

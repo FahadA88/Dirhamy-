@@ -27,6 +27,10 @@ export type CardFace =
   | 'minimal' | 'block' | 'typographic' | 'woodcut' | 'duplex'
   | 'chunky' | 'mono' | 'contrast' | 'deco' | 'handdrawn' | 'neon' | 'linen';
 export type TextSize = 's' | 'm' | 'l' | 'xl';
+/** Simulates the app through a colour-vision deficiency, so a player choosing the
+ *  colour-safe face or checking a design decision can see it the way it is meant to help,
+ *  rather than taking the "colour-safe" label on faith. */
+export type ColorVisionSim = 'off' | 'protanopia' | 'deuteranopia' | 'tritanopia';
 
 /** What somebody can change about a back they make. Deliberately a small, safe set. */
 export interface CustomBack {
@@ -86,6 +90,7 @@ export interface Settings {
   textSize: TextSize;
   /** Heavier strokes, looser letter-spacing, no italics — for low vision and dyslexia. */
   legibleText: boolean;
+  colorVisionSim: ColorVisionSim;
   surface: Surface;
   ambient3d: boolean;
   orbs: boolean;
@@ -142,6 +147,7 @@ export const defaultSettings: Settings = {
   cardSize: 'm',
   textSize: 'm',
   legibleText: false,
+  colorVisionSim: 'off',
   surface: 'soft',
   ambient3d: true,
   orbs: true,
@@ -350,6 +356,7 @@ const ALLOWED = {
   motion: ['system', 'full', 'reduced'],
   density: ['comfortable', 'compact'],
   botNaming: ['bot', 'seat', 'named'],
+  colorVisionSim: ['off', 'protanopia', 'deuteranopia', 'tritanopia'],
 } as const;
 
 /** How loud, and which categories are on — the shape `playSound` actually needs. */
@@ -459,4 +466,5 @@ export function applySettings(s: Settings): void {
   root.setAttribute('data-text', s.textSize);
   root.setAttribute('data-legible', s.legibleText ? 'on' : 'off');
   root.style.setProperty('--text-scale', String(TEXT_SCALE[s.textSize]));
+  root.setAttribute('data-colorvision', s.colorVisionSim);
 }
