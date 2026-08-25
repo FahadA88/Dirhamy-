@@ -14,7 +14,7 @@ import { MiniTable } from './MiniTable';
 import { TEMPLATES } from '../authoring/templates';
 import { RuleDraft } from '../authoring/ruleKit';
 import { explainGame } from '../authoring/explain';
-import { publish, complexityOf, playtimeOf } from '../library/library';
+import { publish, complexityOf, playtimeOf, kindLabel } from '../library/library';
 import { checkName, checkText } from '../social/safety';
 import { useSettings } from '../settings/SettingsContext';
 import { DescribeGame } from './DescribeGame';
@@ -690,7 +690,7 @@ export function CreateView({ onPlay }: { onPlay?: (def: GameDefinition) => void 
           <div className="build-summary">
             <div className="bs-head">What you've built</div>
             <dl className="bs-facts">
-              <div><dt>Family</dt><dd>{def.meta.family}</dd></div>
+              <div><dt>Family</dt><dd>{kindLabel(def)}</dd></div>
               <div><dt>Players</dt><dd>{def.meta.players.min === def.meta.players.max ? def.meta.players.min : `${def.meta.players.min}–${def.meta.players.max}`}</dd></div>
               <div><dt>Deck</dt><dd>{(def.deck.deckCount ?? 1) > 1 ? `${def.deck.deckCount} decks` : 'one deck'}{def.deck.includeJokers ? ' + jokers' : ''}{(def.deck.excludeRanks?.length ?? 0) > 0 ? ` − ${def.deck.excludeRanks!.length} ranks` : ''}</dd></div>
               <div><dt>Ends</dt><dd>{def.scoring.target != null ? `race to ${def.scoring.target}` : 'a single hand'}</dd></div>

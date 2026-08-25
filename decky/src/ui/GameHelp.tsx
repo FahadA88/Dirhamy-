@@ -2,6 +2,8 @@ import { explainGame } from '../authoring/explain';
 import { GameDefinition } from '../engine/types';
 import { useDismissable } from './useEscape';
 import { GameDiagram } from './GameDiagram';
+import { kindLabel } from '../library/library';
+import { termsFor } from './glossary';
 
 const FAMILY_HOW: Record<string, string[]> = {
   'shedding-matching': [
@@ -80,6 +82,7 @@ export function GameHelp({ def, onClose }: { def: GameDefinition; onClose: () =>
   // rules. explainGame() covers both, so the rules panel is never wrong about a custom game.
   const summary = explainGame(def);
   const cfg = def.solitaire;
+  const terms = termsFor(def);
 
   return (
     <div className="modal" onClick={onClose}>
@@ -105,13 +108,22 @@ export function GameHelp({ def, onClose }: { def: GameDefinition; onClose: () =>
 
         <div className="help-head">At a glance</div>
         <dl className="help-facts">
-          <div><dt>Family</dt><dd>{def.meta.family}</dd></div>
+          <div><dt>Family</dt><dd>{kindLabel(def)}</dd></div>
           <div><dt>Players</dt><dd>{def.meta.players.min === def.meta.players.max
             ? def.meta.players.min : `${def.meta.players.min}–${def.meta.players.max}`}</dd></div>
           {def.trick && <div><dt>Trump</dt><dd>{def.trick.auction ? 'named each hand' : def.trick.trump === 'none' ? 'none' : def.trick.trump}</dd></div>}
           {def.scoring.target != null && <div><dt>Match</dt><dd>race to {def.scoring.target}</dd></div>}
           {cfg && <div><dt>Board</dt><dd>{cfg.columns} columns · {cfg.foundations} foundations{cfg.freeCells ? ` · ${cfg.freeCells} free cells` : ''}</dd></div>}
         </dl>
+
+        {terms.length > 0 && (
+          <>
+            <div className="help-head">Words this game uses</div>
+            <dl className="help-glossary">
+              {terms.map((t) => <div key={t.term}><dt>{t.term}</dt><dd>{t.def}</dd></div>)}
+            </dl>
+          </>
+        )}
 
         <button className="primary" onClick={onClose}>Got it</button>
       </div>

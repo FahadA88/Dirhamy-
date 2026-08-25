@@ -610,6 +610,12 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
 .help-facts dt { font-family: var(--mono); color: var(--muted); min-width: 78px; }
 .help-facts dd { margin: 0; }
 
+/* Definitions run long, so — unlike help-facts — the term sits on its own line rather than
+   a fixed-width column fighting the sentence next to it for space. */
+.help-glossary { margin: 0; display: flex; flex-direction: column; gap: 10px; font-size: 13.5px; }
+.help-glossary dt { font-weight: 700; color: var(--ink); }
+.help-glossary dd { margin: 2px 0 0; color: var(--muted); line-height: 1.5; }
+
 .restart-btn {
   margin-left: 8px; background: transparent; color: var(--t-muted, var(--muted));
   border: 1px solid var(--t-line, var(--panel-brd)); border-radius: var(--r-pill);
