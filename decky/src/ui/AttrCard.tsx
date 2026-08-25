@@ -49,7 +49,7 @@ export function AttrCard({ card }: { card: Card }) {
   const fill = COLOURS[a.colour ?? ''] ?? a.colour ?? '#888';
 
   return (
-    <div className="attrcard" role="img" aria-label={describeAttrs(a)}>
+    <div className="attrcard" data-flight={card.id} role="img" aria-label={describeAttrs(a)}>
       {Array.from({ length: n }, (_, i) => (
         <span key={i} className="ac-shape"><Shape kind={a.shape ?? 'oval'} fill={fill} /></span>
       ))}

@@ -44,8 +44,13 @@ export function CardFace({ card }: { card: Card }) {
 
   const suit = card.suit as SuitId;
 
+  // Everywhere a specific card is drawn, it says which card it is (data-flight). That is the
+  // whole contract the flying-card layer needs: it can then tell that the six of clubs which was
+  // in your hand last render is the six of clubs now sitting in the middle, and throw it there
+  // rather than letting one vanish and another appear.
   return (
     <div className={`card face f-${face} ${red ? 'red' : 'black'} ${isCourt ? 'court' : ''}`} style={style}
+      data-flight={card.id}
       role="img"
       aria-label={card.rank === 'JOKER' ? 'Joker' : `${LONG_RANK[card.rank] ?? card.rank} of ${LONG_SUIT[card.suit] ?? card.suit}`}>
       <div className="holo" />

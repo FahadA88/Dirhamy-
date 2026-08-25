@@ -70,7 +70,9 @@ for (let i = 0; i < 4; i++) {
   await overlay.first().click({ timeout: 2000 }).catch(() => {});
   await p.waitForTimeout(250);
 }
-await p.locator('.restart-btn', { hasText: 'History' }).click();
+// History, take back and restart live behind the table menu now.
+await p.locator('.menu-btn').click();
+await p.locator('.menu-pop button', { hasText: 'History' }).click();
 await p.waitForSelector('.movelist');
 const rows = await p.locator('.movelist li').count();
 ok(`${rows} moves listed`, rows > 3);
@@ -80,7 +82,8 @@ console.log('       ' + first);
 await p.locator('.modal-box button.primary').click();
 
 console.log('\nAsking the table for a takeback');
-await p.locator('.restart-btn', { hasText: 'Take back' }).click();
+await p.locator('.menu-btn').click();
+await p.locator('.menu-pop button', { hasText: 'Take back' }).click();
 await p.waitForTimeout(300);
 const bar = await p.locator('.takeback-bar').count();
 const toast = await p.locator('.refused').textContent().catch(() => '');

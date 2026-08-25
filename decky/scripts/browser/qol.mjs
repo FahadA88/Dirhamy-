@@ -29,8 +29,10 @@ for (let attempt = 0; attempt < 12; attempt++) {
   // or the click lands on the modal instead.
   const modal = p.locator('.modal .primary, .modal-box button.primary');
   if (await modal.count()) { await modal.first().click({ timeout: 2000 }).catch(() => {}); await p.waitForTimeout(600); }
-  const again = p.locator('button', { hasText: /^Restart$/ });
-  if (!(await again.count())) break;
+  // Restart is in the table menu now.
+  await p.locator('.menu-btn').first().click({ timeout: 3000 }).catch(() => {});
+  const again = p.locator('.menu-pop button', { hasText: /^Restart/ });
+  if (!(await again.count())) { await p.keyboard.press('Escape').catch(() => {}); break; }
   await again.first().click({ timeout: 3000 }).catch(() => {});
   await p.waitForTimeout(1000);
 }
@@ -77,7 +79,8 @@ for (let i = 0; i < 6 && (await p.locator('.modal, .modal-box').count()); i++) {
   else await p.keyboard.press('Escape').catch(() => {});
   await p.waitForTimeout(450);
 }
-await p.locator('.restart-btn', { hasText: 'History' }).click({ timeout: 6000 }); await p.waitForTimeout(300);
+await p.locator('.menu-btn').first().click({ timeout: 6000 });
+await p.locator('.menu-pop button', { hasText: /^History/ }).click({ timeout: 6000 }); await p.waitForTimeout(300);
 ok('history opened', (await p.locator('.modal-box.wide').count()) === 1);
 await p.keyboard.press('Escape'); await p.waitForTimeout(300);
 ok('escape closed it', (await p.locator('.modal-box.wide').count()) === 0);

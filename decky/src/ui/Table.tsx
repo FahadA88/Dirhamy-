@@ -13,6 +13,7 @@ import { playSound } from './sound';
 import { speak, stopSpeaking, spokenCard } from './speech';
 import { useTurnAlert } from './useTurnAlert';
 import { useDismissable } from './useEscape';
+import { useCardFlights } from './cardFlight';
 import { service, rememberSession, forgetSession, resumableSession } from '../server/local';
 import { Board, LocalTableClient, TableClient } from '../net/tableClient';
 import { Seat, MoveRecord } from '../server/matchService';
@@ -187,6 +188,9 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
   const [me, setMe] = useState(localSeats[0] ?? HUMAN);
   const [handoff, setHandoff] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState(false);
+  // The three match-level buttons — history, take back, restart — live behind one control
+  // rather than on the line above your cards. See the .table-menu note below.
+  const [tableMenu, setTableMenu] = useState(false);
   const [hint, setHint] = useState<string | null>(null);
   const [history, setHistory] = useState<MoveRecord[]>([]);
   // The referee, and the last position it gave us. A local table makes its own client; an
@@ -746,6 +750,7 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
   // takes Escape: the others are asking for a decision the game cannot continue without, and
   // dismissing them would leave somebody looking at a table that will not move.
   const historyRef = useDismissable(showHistory, () => setShowHistory(false));
+  const menuRef = useDismissable(tableMenu, () => setTableMenu(false));
   const suitRef = useDismissable(suitPickerOpen, () => { /* a suit must be chosen */ });
   const roundRef = useDismissable(view.phase === 'roundOver' && !view.matchOver, () => { /* pick next hand */ });
   const handoffRef = useDismissable(!!handoff, () => { /* the device has to change hands */ });
@@ -820,9 +825,49 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
     return SEAT_RING[opponents.length]?.[i] ?? 't';
   };
 
+  /*
+    Where a card goes when it leaves your hand and turns up nowhere you can see.
+
+    Most cards do not need this: you play one and it lands in the trick, so the flying-card
+    layer can see both ends and throw it there. The two that vanish are a pass — three cards
+    into the hand of whoever sits in the passing direction — and Go Fish, where the player who
+    asked takes them off you. The pass target is remembered rather than read off the current
+    view, because by the render where the cards actually leave your hand the engine has already
+    cleared the pass and there is nothing left to read.
+  */
+  const [passTarget, setPassTarget] = useState<string | null>(null);
+  useEffect(() => {
+    if (!view.passDirection) return;
+    const n = view.players.length;
+    const i = view.players.findIndex((p) => p.id === me);
+    if (i < 0) return;
+    const offset = view.passDirection === 'left' ? 1
+      : view.passDirection === 'right' ? -1
+      : Math.floor(n / 2);
+    setPassTarget(view.players[((i + offset) % n + n) % n]?.id ?? null);
+  }, [view.passDirection, view.players, me]);
+
+  const passSink = isFish
+    ? (() => {
+        const asker = view.players.find((p) => p.isTurn && p.id !== me);
+        return asker ? `seat:${asker.id}` : undefined;
+      })()
+    : passTarget && passTarget !== me ? `seat:${passTarget}` : undefined;
+
+  // Cards move. Every container below carries a data-slot and every card a data-flight, and
+  // this watches the two between renders: anything that changed slot is thrown across the felt
+  // rather than disappearing from one place and reappearing in another. The deal has its own
+  // animation, so flights are held off while it runs.
+  //
+  // The layer hangs off .table rather than the wrapper around it because .table isolates: a
+  // dialog inside it cannot out-stack anything outside it, so a card in flight drew straight
+  // over the top of the wild-card suit picker.
+  const tableRef = useRef<HTMLDivElement | null>(null);
+  useCardFlights(tableRef, board, settings.motion !== 'reduced' && !dealing);
+
   return (
     <div className="table-wrap">
-    <div className="table" data-felt={settings.tableFelt}>
+    <div className="table" data-felt={settings.tableFelt} ref={tableRef}>
       <TableRail felt={settings.tableFelt} />
       <div className={`felt ${dealing ? 'dealing' : ''}`}>
       <TableDressing felt={settings.tableFelt} title={def.meta.name} />
@@ -836,6 +881,20 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
         onDone={() => setDealing(false)}
       />}
       <div className="felt-content">
+      {/*
+        What just happened, on the table.
+
+        The log lives under the felt, and on a laptop that is below the fold: to find out what
+        the player before you did you had to scroll away from the game. This is the last line
+        of that same log, in the corner of the cloth where nothing else ever sits — the dealer
+        saying it once, quietly, rather than a panel you have to go and read. Keyed by the
+        line so a new one fades in and an unchanged one stays still.
+      */}
+      {lastLine && (
+        <div className="felt-say" key={lastLine} aria-hidden="true">
+          <i /><span>{humanise(lastLine)}</span>
+        </div>
+      )}
       <div className={`opponents ring-${opponents.length}`}>
         {opponents.map((p, i) => {
           const askable = isFish && view.isYourTurn && !!askRank && p.handCount > 0;
@@ -844,6 +903,7 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
           const backs = Math.max(1, Math.min(p.handCount, 6));
           return (
             <div key={p.id}
+              data-slot={`seat:${p.id}`}
               className={`seat at-${SEAT_RING[opponents.length]?.[i] ?? 't'} ${p.isTurn ? 'active' : ''} ${askable ? 'askable' : ''}`}
               onClick={() => { if (askable) submit({ actionId: 'ask', target: p.id, rank: askRank! }); }}>
               <div className="seat-head">
@@ -860,21 +920,21 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
               )}
               <div className="seat-stats">
                 {isSet ? (
-                  <span className="stat">{view.scores?.[p.id] ?? 0}<i>{(view.scores?.[p.id] ?? 0) === 1 ? 'set' : 'sets'}</i></span>
+                  <span className="seat-stat">{view.scores?.[p.id] ?? 0}<i>{(view.scores?.[p.id] ?? 0) === 1 ? 'set' : 'sets'}</i></span>
                 ) : (
                   <span className="count-chip" title={`${p.handCount} cards in hand`}>
                     {p.handCount === 0 ? 'out' : `${p.handCount}`}
                   </span>
                 )}
                 {view.mode === 'trick' && view.bids?.[p.id] !== undefined && (
-                  <span className="stat">{view.tricksWon?.[p.id] ?? 0}/{view.bids[p.id]}<i>tricks</i></span>
+                  <span className="seat-stat">{view.tricksWon?.[p.id] ?? 0}/{view.bids[p.id]}<i>tricks</i></span>
                 )}
                 {view.mode === 'trick' && view.bids?.[p.id] === undefined && (view.tricksWon?.[p.id] ?? 0) > 0 && (
-                  <span className="stat">{view.tricksWon?.[p.id]}<i>won</i></span>
+                  <span className="seat-stat">{view.tricksWon?.[p.id]}<i>won</i></span>
                 )}
-                {isFish && <span className="stat">{view.booksWon?.[p.id] ?? 0}<i>books</i></span>}
+                {isFish && <span className="seat-stat">{view.booksWon?.[p.id] ?? 0}<i>books</i></span>}
                 {view.mode === 'climb' && view.finished?.includes(p.id) && (
-                  <span className="stat">#{view.finished.indexOf(p.id) + 1}<i>out</i></span>
+                  <span className="seat-stat">#{view.finished.indexOf(p.id) + 1}<i>out</i></span>
                 )}
               </div>
               {p.isTurn && !isKent && <div className="seat-turn" aria-label="their turn" />}
@@ -932,7 +992,7 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
       ) : view.mode === 'trick' && (view.auctionRound ?? 0) > 0 ? (
         <div className="center bid-area">
           {view.upcard && (
-            <div className="pile">
+            <div className="pile" data-slot="upcard">
               <CardFace card={view.upcard} />
               <div className="pile-label">Turned up</div>
             </div>
@@ -982,10 +1042,15 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
           ) : <div className="trick-empty">Bidding…</div>}
         </div>
       ) : view.mode === 'trick' ? (
-        <div className="center trick-area">
+        <div className="center trick-area" data-slot="trick">
           {view.trick && view.trick.length > 0 ? (
             view.trick.map((t) => (
-              <div key={`${t.player}:${t.card.id}`} className="trick-card" data-from={seatSideOf(t.player)}>
+              <div key={`${t.player}:${t.card.id}`} className="trick-card"
+                data-from={seatSideOf(t.player)}
+                /* Where this card came from, for the flying-card layer: your own plays are
+                   already tracked out of your hand, but an opponent's card has never been on
+                   screen before, so it has to be told which seat to fly out of. */
+                data-origin={t.player === me ? 'hand' : `seat:${t.player}`}>
                 <CardFace card={t.card} />
                 <div className="pile-label">{nameOf(t.player)}</div>
               </div>
@@ -1026,7 +1091,7 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
         </div>
       ) : isFish ? (
         <div className="center">
-          <div className="pile">
+          <div className="pile" data-slot="draw">
             <div className={`${backCls} big`} />
             <div className="pile-label">Ocean · {view.oceanCount ?? 0}</div>
           </div>
@@ -1037,10 +1102,12 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
           </div>
         </div>
       ) : isWar ? (
-        <div className="center war-center">
+        <div className="center war-center" data-slot="trick">
           {view.battle && view.battle.length > 0
             ? view.battle.map((c, i) => (
-                <div key={c.id} className="trick-card" data-from={i % 2 === 0 ? 'me' : 't'}>
+                <div key={c.id} className="trick-card"
+                  data-from={i % 2 === 0 ? 'me' : 't'}
+                  data-origin={i % 2 === 0 ? 'hand' : `seat:${view.players[1]?.id ?? ''}`}>
                   <CardFace card={c} />
                   <div className="pile-label">{i % 2 === 0 ? nameOf(view.players[0].id) : nameOf(view.players[1].id)}</div>
                 </div>
@@ -1049,11 +1116,11 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
         </div>
       ) : isRummy ? (
         <div className="center rummy-center">
-          <div className="pile">
+          <div className="pile" data-slot="draw">
             <div className={`${backCls} big`} />
             <div className="pile-label">Stock · {view.zones.draw?.count ?? 0}</div>
           </div>
-          <div className="pile">
+          <div className="pile" data-slot="discard">
             {/* Keyed by the card, so a new top card is a new element and lands rather than
                 cross-fading in place. */}
             {top ? <div key={top.id} className="landed"><CardFace card={top} /></div>
@@ -1061,7 +1128,7 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
             <div className="pile-label">Discard</div>
           </div>
           {view.zones.melds && view.zones.melds.cards.length > 0 && (
-            <div className="melds-box">
+            <div className="melds-box" data-slot="melds">
               <div className="pile-label">Melds</div>
               <div className="melds-row">
                 {view.zones.melds.cards.map((c) => <div key={c.id} className="meld-mini"><CardFace card={c} /></div>)}
@@ -1071,7 +1138,7 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
         </div>
       ) : isClimb ? (
         <div className="center">
-          <div className="pile">
+          <div className="pile" data-slot="trick">
             {view.climbPile && view.climbPile.length > 0 ? (
               /* Keyed by the whole play, so a pair or a triple lands together rather than
                  replacing the last one in place with no motion at all. */
@@ -1094,7 +1161,7 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
           pile has grown, and what was just claimed — nowhere near where anybody was looking.
         */
         <div className="center bluff-center">
-          <div className="pile">
+          <div className="pile" data-slot="center">
             {(view.centerCount ?? 0) > 0
               ? <div className={`${backCls} big`} />
               : <div className="card big empty" />}
@@ -1132,7 +1199,7 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
               </span>
             ))}
           </div>
-          <div className="kent-pool" role="group" aria-label="The four cards on the table">
+          <div className="kent-pool" data-slot="pool" role="group" aria-label="The four cards on the table">
             {(view.kentPool ?? []).map((c) => {
               const swap = myLegal.find((m) => m.actionId === 'kentSwap'
                 && m.cardId === selected && m.poolId === c.id);
@@ -1187,11 +1254,11 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
         null
       ) : (
         <div className="center">
-          <div className="pile">
+          <div className="pile" data-slot="draw">
             <div className={`${backCls} big`} />
             <div className="pile-label">Draw · {view.zones.draw?.count ?? 0}</div>
           </div>
-          <div className="pile">
+          <div className="pile" data-slot="discard">
             {/* Keyed by the card, so a new top card is a new element and lands rather than
                 cross-fading in place. */}
             {top ? <div key={top.id} className="landed"><CardFace card={top} /></div>
@@ -1203,9 +1270,26 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
 
       <div className={`you ${view.isYourTurn ? 'your-turn' : ''}`}>
         <div className="you-head">
+          {/*
+            Your own name, then your own numbers as chips.
+
+            It used to be one sentence — "Your hand · 1 won · bid 2 · Team A" — which read as
+            a caption rather than a scoreboard, and which grew until the buttons after it
+            wrapped onto a second line and pushed the cards further down the felt. Every
+            opponent already shows the same figures as chips on their seat; these are yours,
+            in the same shape.
+          */}
           <span>{isSet
             ? 'The board'
-            : settings.playerName === 'You' ? 'Your hand' : `${settings.playerName}’s hand`}{view.mode === 'trick' && (view.tricksWon?.[me] ?? 0) > 0 ? ` · ${view.tricksWon?.[me]} won` : ''}{view.mode === 'trick' && view.bids?.[me] !== undefined ? ` · bid ${view.bids[me]}` : ''}{isFish ? ` · ${view.booksWon?.[me] ?? 0} books` : ''}{teamOf(me) ? ` · ${teamOf(me)}` : ''}</span>
+            : settings.playerName === 'You' ? 'Your hand' : `${settings.playerName}’s hand`}</span>
+          {teamOf(me) && <span className="team-tag">{teamOf(me)}</span>}
+          {view.mode === 'trick' && view.bids?.[me] !== undefined && (
+            <span className="seat-stat">{view.tricksWon?.[me] ?? 0}/{view.bids[me]}<i>tricks</i></span>
+          )}
+          {view.mode === 'trick' && view.bids?.[me] === undefined && (view.tricksWon?.[me] ?? 0) > 0 && (
+            <span className="seat-stat">{view.tricksWon?.[me]}<i>won</i></span>
+          )}
+          {isFish && <span className="seat-stat">{view.booksWon?.[me] ?? 0}<i>books</i></span>}
           {view.needsPassChoice && (
             <span className="turn-badge">
               {view.passCount > 1
@@ -1276,11 +1360,36 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
               ↶ Undo
             </button>
           )}
-          <button className="restart-btn" onClick={openHistory} title="Every move so far">History</button>
-          {view.phase === 'playing' && !takeback && (
-            <button className="restart-btn" onClick={askTakeback} title="Ask the table to take your last move back">Take back</button>
-          )}
-          <button className="restart-btn" onClick={restart} title="Deal a fresh game">Restart</button>
+          {/*
+            Everything above this line is a move you can make right now. Everything below it is
+            about the match rather than the hand — worth reaching for once or twice a game, and
+            not worth three permanent buttons on the one row that decides how far up the felt
+            your cards sit. On a 1280px screen the row wrapped, and the cards dropped a line.
+          */}
+          <div className="table-menu">
+            <button className="restart-btn menu-btn" aria-haspopup="menu" aria-expanded={tableMenu}
+              onClick={() => setTableMenu((v) => !v)} title="History, take back, restart">
+              ⋯<span className="sr-only"> Table menu</span>
+            </button>
+            {tableMenu && (
+              <>
+                <div className="menu-scrim" onClick={() => setTableMenu(false)} aria-hidden="true" />
+                <div className="menu-pop" ref={menuRef} role="menu" aria-label="Table">
+                  <button role="menuitem" onClick={() => { setTableMenu(false); openHistory(); }}>
+                    History<i>every move so far</i>
+                  </button>
+                  {view.phase === 'playing' && !takeback && (
+                    <button role="menuitem" onClick={() => { setTableMenu(false); askTakeback(); }}>
+                      Take back<i>ask the table to undo your last move</i>
+                    </button>
+                  )}
+                  <button role="menuitem" onClick={() => { setTableMenu(false); restart(); }}>
+                    Restart<i>deal a fresh game</i>
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         </div>
         {isSet ? (
           /*
@@ -1298,7 +1407,7 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
                 You · {view.scores?.[me] ?? 0} {(view.scores?.[me] ?? 0) === 1 ? 'set' : 'sets'}
               </span>
             </div>
-            <div className="set-board" role="group" aria-label="The board">
+            <div className="set-board" data-slot="board" role="group" aria-label="The board">
               {(view.setBoard ?? []).map((c) => {
                 const on = setPicked.includes(c.id);
                 return (
@@ -1339,6 +1448,8 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
               return (
                 <div
                   className={`hand hl-${settings.highlight}`}
+                  data-slot="hand"
+                  data-sink="center"
                   role="group"
                   aria-label={`Your hand, ${hand.length} card${hand.length === 1 ? '' : 's'}`}
                   onKeyDown={myClaimTurn ? (e) => handKeys(e, hand.map((c) => c.id), toggleBluffCard) : undefined}
@@ -1384,7 +1495,7 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
           </div>
         ) : isReflex ? (
           <div className="reflex-controls">
-            <div className="reflex-pile">
+            <div className="reflex-pile" data-slot="trick">
               {view.pileTop ? <div className="pile-card"><CardFace card={view.pileTop} /></div> : <div className="empty-hand">— empty —</div>}
               <span className="muted">{view.zones.pile?.count ?? 0} on the pile</span>
             </div>
@@ -1407,7 +1518,7 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
                 <span className="chip">To call · {(view.currentBet ?? 0) - (view.committed?.[me] ?? 0)}</span>
               )}
             </div>
-            <div className="hand hl-off poker-hand" role="group" aria-label={`Your hand, ${hand.length} cards`}>
+            <div className="hand hl-off poker-hand" data-slot="hand" role="group" aria-label={`Your hand, ${hand.length} cards`}>
               {hand.map((c, i) => (
                 <div key={c.id} className="card-btn dim static" role="img" aria-label={spokenCard(c.rank, c.suit)}
                   style={{ '--i': i, '--n': hand.length } as React.CSSProperties}>
@@ -1508,6 +1619,11 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
         ) : (
         <div
           className={`hand hl-${settings.highlight}`}
+          data-slot="hand"
+          /* Where a card goes when it leaves your hand and is not visible anywhere else:
+             cards you pass go to the player you are passing to, and cards an opponent asks
+             you for go to whoever is asking. Without this they would simply blink out. */
+          data-sink={passSink}
           role="group"
           aria-label={`Your hand, ${hand.length} card${hand.length === 1 ? '' : 's'}`}
           onKeyDown={(e) => handKeys(e, hand.filter((c) => playableCardIds.has(c.id)).map((c) => c.id), clickCard)}
@@ -1674,6 +1790,10 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
 
       </div>
       </div>
+      {/* Where the flying copies are drawn. It belongs to React rather than being appended by
+          the hook, so nothing ever hands React a child it did not create. Inside .table, which
+          isolates, so a card in flight covers the felt and never a dialog over it. */}
+      <div className="flight-layer" aria-hidden="true" />
     </div>
 
       {handoff && (

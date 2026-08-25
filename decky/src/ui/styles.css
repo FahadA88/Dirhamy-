@@ -89,30 +89,47 @@
   --lip: 4px;
 }
 
-/* Daylight. Still the same neon signage, just with the lights on and white walls — not paper,
-   not a magazine. Everything saturated stays saturated. */
+/*
+   Daylight — the same room with the shutters open.
+
+   It used to be the old neon palette with the lights turned up: lilac walls, a violet that
+   nothing else in the app still used, and a glow that was still electric magenta long after
+   the dark theme had stopped being a nightclub. Half the audience opens this in a lit room,
+   and they got the half that was never redrawn.
+
+   Same room, same materials, same roles: warm plaster instead of near-black, brass that has
+   to darken to hold its own against white, and the cloth still doing the only real colour.
+   Ink is warm near-black rather than blue-black, because the walls are warm.
+*/
 :root[data-theme="light"] {
-  --bg0: #eceaf8;
-  --bg1: #f6f4ff;
-  --panel: #ffffff;
+  --bg0: #ece5d8;          /* the room, shutters open */
+  --bg1: #f6f2ea;
+  --panel: #fffdf8;        /* a surface with something on it */
   --panel-solid: #ffffff;
   --panel-hi: #ffffff;
-  --panel-brd: rgba(70, 40, 140, 0.16);
-  --panel-brd-hi: rgba(201, 162, 74, 0.6);
-  --ink: #180f34;
-  --muted: #6b5f92;
-  --dim: #9d93bd;
-  --hot: #9a7628;
-  --hot-hi: #c2a055;
-  --cyan: #3a7a70;
-  --cyan-hi: #5a998e;
-  --gold: #c98a00;
-  --gold-hi: #e6a70c;
-  --gold-dim: rgba(201, 138, 0, 0.14);
-  --violet: #7b3cf0;
+  --panel-brd: rgba(120, 96, 56, 0.22);
+  --panel-brd-hi: rgba(150, 118, 52, 0.62);
+  --ink: #1c1814;
+  --muted: #5c5347;
+  --dim: #8a7f6e;
+
+  /* Brass has to go darker in daylight to stay legible on white; verdigris comes up a little. */
+  --hot: #8a6a1f;
+  --hot-hi: #a8842f;
+  --cyan: #2f6d62;
+  --cyan-hi: #45897c;
+  --gold: #a87a12;
+  --gold-hi: #c69a2a;
+  --gold-dim: rgba(168, 122, 18, 0.14);
+  --violet: #7a5c34;
+  --lime: #4f7d57;
+  --red: #a8352f;
+  --amber: #a97516;
+
+  --card-edge: #d9d2c4;
   --input-bg: #ffffff;
-  --glow: rgba(230, 0, 107, 0.3);
-  --shadow-panel: 0 2px 0 rgba(70,40,140,.10), 0 14px 34px rgba(70, 40, 140, .14);
+  --glow: rgba(168, 122, 18, 0.26);
+  --shadow-panel: 0 1px 0 rgba(90, 70, 34, .08), 0 14px 34px rgba(90, 70, 34, .14);
 }
 
 * { box-sizing: border-box; }
@@ -472,14 +489,25 @@ h2 { letter-spacing: -0.025em; color: var(--ink); font-size: 22px; font-weight: 
   .drawer { width: min(94vw, 420px); }
 }
 
-/* Solitaire boards are grids of fixed columns, so the cards themselves have to shrink. One
-   ordered ladder — split across the file, the wider rule silently won and Spider ran off screen. */
+/*
+   Patience boards are grids of fixed columns, so on a narrow screen something has to give.
+
+   It used to be the cards: Spider's ten columns were squeezed to 27px wide on a phone, which
+   is a third of a fingertip and too small to read a rank on. The board then sat in the top
+   third of the screen with two thirds of black underneath it.
+
+   The card is the thing you cannot shrink. Below 780px the columns take a fixed width and the
+   tableau scrolls sideways — you see six columns of real cards and push the board along —
+   and the board takes the height it was already being given for nothing.
+
+   One ordered ladder: split across the file, the wider rule silently won and Spider ran off
+   screen.
+*/
 @media (max-width: 1100px) {
   .felt-content.sol { --cw: 58px; --ch: 82px; --bw: 58px; --bh: 82px; }
 }
 @media (max-width: 780px) {
-  .felt-content.sol { --cw: 40px; --ch: 57px; --bw: 40px; --bh: 57px; gap: 10px; }
-  .sol-tableau { gap: 4px; }
+  .felt-content.sol { --cw: 52px; --ch: 74px; --bw: 52px; --bh: 74px; gap: 12px; }
   .sol-top { gap: 8px; }
   .sol-group { gap: 5px; }
   .sol-bar { gap: 8px; }
@@ -487,12 +515,13 @@ h2 { letter-spacing: -0.025em; color: var(--ink); font-size: 22px; font-weight: 
 }
 @media (max-width: 480px) {
   .app { padding: 10px 6px 36px; }
-  /* Ten columns plus rail, felt padding and page gutters have to add up to under 390px. */
   .table[data-felt] { --rail-w: 6px; --felt-pad: 7px; }
   .table-wrap { --room-pad: 4px !important; }
-  .felt-content.sol { --cw: 27px; --ch: 39px; --bw: 27px; --bh: 39px; }
-  .sol-tableau { gap: 2px; }
-  .sol-group { flex-wrap: wrap; gap: 4px; }
+  /* Small enough that seven columns of Klondike still fit without scrolling, big enough that
+     the rank in the corner is a rank rather than a mark. Spider's ten scroll. */
+  .felt-content.sol { --cw: 46px; --ch: 65px; --bw: 46px; --bh: 65px; }
+  .sol-tableau { gap: 4px; }
+  .sol-group { flex-wrap: nowrap; gap: 4px; }
   .sol-slot.waste { width: calc(var(--cw) * 1.5); }
   .felt-content.sol .card.face .corner { font-size: 10px; top: 3px; left: 3px; }
   .felt-content.sol .card.face .corner span { font-size: 8px; }
@@ -1383,7 +1412,19 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
   display: flex; gap: 16px; overflow-x: auto; padding: 6px 2px 14px;
   scroll-snap-type: x proximity;
 }
-.shelf-rail > .shelfcard { flex: 0 0 216px; scroll-snap-align: start; }
+/*
+   A shelf card is 216px wide and grows into whatever the row does not use.
+
+   Fixed at 216px, a shelf of three sat in the left two-thirds of a 1030px rail and left a
+   third of the page as bare background — which reads as a row that failed to load rather
+   than a row that is short. Growing costs nothing when a shelf is long: five cards already
+   overflow, so there is no free space to share and they stay at 216 and scroll.
+*/
+.shelf-rail > .shelfcard {
+  flex: 1 0 216px;
+  max-inline-size: 360px;
+  scroll-snap-align: start;
+}
 .shelf-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; }
 
 /* A game is a dealt hand with a name under it. No paragraph, no chrome. */
@@ -4470,8 +4511,36 @@ header h1 {
   .ring-2 .seat.at-l, .ring-2 .seat.at-r { top: 96px; }
 
   /* Room for the ring. The top band belongs to the seats along the top, the gutters to the
-     ones on either side, so whatever the game puts in the middle never lands on a player. */
-  .felt-content { padding: 148px 156px 0; min-height: 520px; }
+     ones on either side, so whatever the game puts in the middle never lands on a player.
+     Only a table with a ring round it pays for one: patience has no opponents, and it was
+     paying 148px of empty cloth above the board and 156px down either side for seats that
+     do not exist. */
+  .felt-content:has(> .opponents) { padding: 148px 156px 0; }
+  .felt-content { min-height: 520px; }
+
+  /*
+    The middle of the table.
+
+    Everything used to stack from the top of that padding downwards, which meant the felt had
+    two different problems at once and they were the same problem. Games with a lot in the
+    middle pushed your hand down the page; games with little — a trick between leads, Kent's
+    four cards, a war of two — left the whole lower half as bare cloth with the trick clinging
+    to the top of it and your hand 34px underneath.
+
+    The band between the seats and your hand is now a region rather than a stack. Whatever the
+    game puts in the middle takes all of it and sits in the middle of what it takes, so the
+    trick lands in the optical centre of the table at every hand size, and your hand stays on
+    the bottom edge where a hand belongs.
+  */
+  .felt-content { display: flex; flex-direction: column; }
+  .felt-content > .center { flex: 1 1 auto; align-items: center; }
+  /* Set, Reflex, Poker and Pit have nothing in the middle at all — their board or their
+     betting round lives down in the hand area. Float that block in the band rather than
+     stretching it: the rule above your hand should stay a hand's width above your hand, not
+     ride up under the seats with the cards a long way below it. */
+  .felt-content:not(:has(> .center)) > .you { margin-block: auto; }
+  /* Two opponents sit opposite each other, not along the top. Nothing is up there to clear. */
+  .felt-content:has(.opponents.ring-2) { padding-top: 40px; }
   /* Your own hand is not in the middle — it is along the bottom edge, a long way under the
      side seats — so it has no reason to pay for their gutters. Inside them it got 592px of a
      904px felt, which for an eighteen-card hand meant a 34px sliver per card: narrower than a
@@ -4501,8 +4570,11 @@ header h1 {
   font-variant-numeric: tabular-nums; font-weight: 700; font-size: 12.5px;
   color: var(--t-ink, #fff);
 }
-.seat-stats .stat { font-size: 11.5px; color: var(--t-muted, rgba(255, 255, 255, .62)); font-variant-numeric: tabular-nums; }
-.seat-stats .stat i { font-style: normal; margin-left: 3px; opacity: .72; }
+/* Named apart from the Profile page's .stat, which is a bordered card with 14px of padding.
+   Sharing the word meant every seat that had won a trick drew a dark panel across its own fan
+   of cards, in every trick game, at every screen size. */
+.seat-stats .seat-stat { font-size: 11.5px; color: var(--t-muted, rgba(255, 255, 255, .62)); font-variant-numeric: tabular-nums; }
+.seat-stats .seat-stat i { font-style: normal; margin-left: 3px; opacity: .72; }
 
 /* Whose turn it is, as a mark on the seat rather than an hourglass in the name. */
 .seat { position: relative; }
@@ -4540,7 +4612,7 @@ header h1 {
   .seat-head .seat-name { font-size: 11px; }
   .count-chip { font-size: 11px; padding: 1px 6px; min-width: 22px; }
   .seat-stats { gap: 5px; margin-top: 4px; }
-  .seat-stats .stat { font-size: 10px; }
+  .seat-stats .seat-stat { font-size: 10px; }
   .team-tag { font-size: 9px; padding: 1px 5px; }
 }
 
@@ -4714,29 +4786,24 @@ button.bluff-go:disabled {
 
 /* ============================================================
    A PATIENCE BOARD THAT FITS THE SCREEN
-   The narrow-screen rules for the tableau sit near the top of this file
-   and set a 2px gap; the base rule several hundred lines below them sets
-   10px and won on source order, so Spider's ten columns came to
-   10x27 + 9x10 = 360px of board on a 390px phone and the last column ran
-   off the side. Restated here, where nothing outranks them.
-
    The card width is derived from the column count rather than fixed, so
-   the same board fits a 320px phone as well as a 430px one — every
+   the same board suits a 320px phone as well as a 430px one — every
    patience game sets --cols on its tableau, so this works for seven
    columns as readily as ten.
    ============================================================ */
 @media (max-width: 899px) {
-  .sol-tableau {
-    gap: 3px;
-    /* Columns may shrink below their content; without this the 1fr floor is
-       the card's own width and the grid overflows instead of fitting. */
-    grid-template-columns: repeat(var(--cols), minmax(0, 1fr));
-  }
   .felt-content.sol {
-    /* Whatever is left after the page gutters, the rail and the felt padding,
-       shared between the columns — capped so a seven-column game does not
-       blow the cards up to fill the width. */
-    --cw: min(46px, calc((100vw - 76px - (var(--cols, 7) - 1) * 3px) / var(--cols, 7)));
+    /*
+      Whatever is left after the page gutters, the rail and the felt padding, shared between
+      the columns — but with a floor as well as a ceiling.
+
+      It used to be a ceiling only, so the board always fitted the screen and the cards paid
+      for it: Spider's ten columns came out 27px wide on a phone, which is narrower than the
+      rank printed on them. Below 42px a card stops being a card, so below 42px the board
+      scrolls instead (see the end of this file). Seven columns still fit a 390px phone
+      without scrolling; ten never could, whatever we did to them.
+    */
+    --cw: clamp(42px, calc((100vw - 76px - (var(--cols, 7) - 1) * 4px) / var(--cols, 7)), 52px);
     --ch: calc(var(--cw) * 1.42);
     --bw: var(--cw);
     --bh: var(--ch);
@@ -4871,21 +4938,23 @@ button.bluff-go:disabled {
    A finished trick stays put for a moment, names its winner, then slides off
    the table towards them. `--sx`/`--sy` say which way that is.
 */
-/* The winner's name hangs under the cards, so the row of badges below has to move down out of
-   its way — without this they printed on top of each other. */
-.trick-taken { position: relative; display: flex; gap: 10px; align-items: flex-end; margin-bottom: 30px; }
+/* The winner's name used to hang under the cards, which is exactly where the trick's own row
+   of badges already is: "TRUMP none" and "You take it" printed straight through each other on
+   every trick of every trick game. It reads better over the top anyway — a banner on the
+   trick rather than a caption under it — and the space above the cards is free. */
+.trick-taken { position: relative; display: flex; gap: 10px; align-items: flex-end; }
 .trick-taken .trick-card { animation: none; }
 .trick-taken .trick-card.took-it .card.face {
   box-shadow: 0 0 0 2px var(--gold, #ffc531), 0 8px 22px rgba(255, 197, 49, .35),
     0 1px 0 var(--card-edge), 0 4px 8px rgba(40, 28, 10, .26);
 }
 .trick-won {
-  position: absolute; left: 50%; bottom: -26px; translate: -50% 0;
+  position: absolute; left: 50%; top: -28px; translate: -50% 0;
   font-size: 12.5px; font-weight: 750; letter-spacing: .3px; white-space: nowrap;
   color: var(--gold, #ffc531); text-shadow: 0 1px 8px rgba(0, 0, 0, .5);
   animation: won-in 300ms ease-out both;
 }
-@keyframes won-in { from { opacity: 0; translate: -50% 8px; } to { opacity: 1; translate: -50% 0; } }
+@keyframes won-in { from { opacity: 0; translate: -50% -8px; } to { opacity: 1; translate: -50% 0; } }
 
 @keyframes trick-swept {
   0%, 46%  { translate: 0 0; scale: 1; opacity: 1; }
@@ -5123,3 +5192,217 @@ button.bluff-go:disabled {
   .kent-pool { flex-wrap: wrap; justify-content: center; }
   .kent-letters { gap: 12px; }
 }
+
+
+/* ============================================================================
+   CARDS IN FLIGHT
+   The one layer everything travels through. A card that changes places gets a
+   copy of itself thrown along the path while the real one waits, hidden, at the
+   far end — so a card you play leaves your hand and crosses the felt instead of
+   being deleted in one place and created in another.
+
+   Nothing here is per-game. The layer is pinned to .table, which is both
+   positioned and isolated — so a card in flight covers the felt and the seats
+   but never a dialog that has opened over them.
+   ============================================================================ */
+
+.flight-layer {
+  position: absolute; inset: 0;
+  pointer-events: none;
+  overflow: visible;
+  /* Above the felt and the seats, below every dialog. */
+  z-index: 6;
+}
+
+.flight-card {
+  position: absolute;
+  will-change: transform;
+  /* A card off the table catches more light than one lying on it. */
+  filter: drop-shadow(0 14px 22px rgba(0, 0, 0, .45));
+}
+.flight-card > * {
+  width: 100%; height: 100%;
+  margin: 0;
+}
+/* A copy is scenery: nothing in it should look interactive or claim a cursor. */
+.flight-card, .flight-card * { cursor: default !important; }
+
+@media (prefers-reduced-motion: reduce) { .flight-layer { display: none; } }
+:root[data-motion="reduced"] .flight-layer { display: none; }
+
+
+/* ============================================================================
+   THE TABLE MENU
+   History, take back and restart used to be three permanent buttons on the row
+   directly above your cards, next to Hint and Undo. At 1280px that row wrapped,
+   which pushed the whole hand a line further down the felt; at every width it
+   put five pieces of furniture between your name and your cards.
+
+   They are match-level, not move-level: reached for once or twice a game. One
+   control, and the row above your hand is about the hand again.
+   ============================================================================ */
+
+.table-menu { position: relative; display: inline-flex; }
+.menu-btn { letter-spacing: 2px; font-weight: 800; padding-inline: 12px; }
+/* Catches the click that closes it, without a dark sheet over the table. */
+.menu-scrim { position: fixed; inset: 0; z-index: 19; }
+.menu-pop {
+  position: absolute; right: 0; bottom: calc(100% + 8px); z-index: 20;
+  min-inline-size: 232px; padding: 6px;
+  background: var(--panel-solid); border: 1px solid var(--panel-brd);
+  border-radius: var(--r-md, 12px);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, .38), 0 1px 0 rgba(255, 255, 255, .05) inset;
+  animation: menu-in 140ms cubic-bezier(.2, .9, .3, 1) both;
+}
+@keyframes menu-in { from { opacity: 0; translate: 0 6px; } to { opacity: 1; translate: 0 0; } }
+.menu-pop button {
+  display: block; inline-size: 100%; text-align: left;
+  padding: 9px 12px; border: 0; border-radius: 9px;
+  background: none; color: var(--ink); font: inherit; font-size: 14px; font-weight: 600;
+  cursor: pointer;
+}
+.menu-pop button i {
+  display: block; font-style: normal; font-weight: 400; font-size: 12px;
+  color: var(--muted); margin-top: 2px;
+}
+.menu-pop button:hover, .menu-pop button:focus-visible { background: var(--sunk, rgba(255, 255, 255, .06)); }
+
+@media (prefers-reduced-motion: reduce) { .menu-pop { animation: none; } }
+:root[data-motion="reduced"] .menu-pop { animation: none; }
+
+/* Your own figures on the hand row, in the same shape as everybody else's on their seat. */
+.you-head .seat-stat { font-size: 12px; color: var(--t-muted, var(--muted)); font-variant-numeric: tabular-nums; }
+.you-head .seat-stat i { font-style: normal; margin-left: 3px; opacity: .72; }
+
+
+/* ============================================================================
+   THE DEALER'S MURMUR
+   One line on the cloth saying what just happened. The full log is under the
+   table, which on a laptop is below the fold — so the one thing you actually
+   need between turns ("Bot 4 played 2\2660") was the one thing you had to
+   scroll away from the game to read.
+
+   It sits in the top-left of the felt, which is the only rectangle no seat
+   arrangement ever uses: the side seats start 152px down and the corner seats
+   172px in. It is quiet on purpose. It is not a notification.
+   ============================================================================ */
+
+.felt-say {
+  position: absolute; top: 0; left: 0; z-index: 2;
+  display: flex; align-items: center; gap: 8px;
+  max-inline-size: min(38ch, 40%);
+  font-family: var(--mono); font-size: 12.5px; line-height: 1.35;
+  color: var(--t-muted, var(--muted));
+  pointer-events: none;
+  animation: say-in 320ms cubic-bezier(.2, .85, .3, 1) both;
+}
+.felt-say span {
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+/* A dealer's button, at the size the eye reads as punctuation. */
+.felt-say i {
+  flex: 0 0 auto; inline-size: 7px; block-size: 7px; border-radius: 50%;
+  background: var(--t-ink, #fff); opacity: .34;
+}
+@keyframes say-in { from { opacity: 0; translate: -6px 0; } to { opacity: 1; translate: 0 0; } }
+
+/* A crowded table puts a row of seats along the top, and the corner is theirs. */
+.felt-content:has(.ring-6) .felt-say, .felt-content:has(.ring-7) .felt-say { display: none; }
+/* Patience says everything in its own board; the log under it is already on screen. */
+.felt-content.sol .felt-say { display: none; }
+
+@media (max-width: 899px) {
+  /* Too narrow for a line of text beside the seats; the log is a scroll away, not a page. */
+  .felt-say { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { .felt-say { animation: none; } }
+:root[data-motion="reduced"] .felt-say { animation: none; }
+
+
+/* ============================================================================
+   A PATIENCE BOARD ON A PHONE
+   These have to sit at the end of the sheet. `.sol-tableau` is declared up with
+   the rest of the board, a media query carries no extra specificity, and the
+   plain rule further down the file therefore wins on source order alone — which
+   is how the first attempt at this changed nothing at all.
+   ============================================================================ */
+
+@media (max-width: 780px) {
+  /* Fixed columns, not fractions: a fraction has nothing to overflow with, so it just
+     shrinks the cards until Spider's ten fit and none of them can be read. */
+  .sol-tableau {
+    grid-template-columns: repeat(var(--cols), var(--cw));
+    justify-content: start;
+    gap: 4px;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: thin;
+    padding-bottom: 8px;
+    /* The board takes the screen it is on, instead of sitting in the top third of it. */
+    min-height: max(calc(var(--ch) * 3.4), 44vh);
+  }
+  /* The reserve, the waste and the foundations scroll as one row rather than wrapping into
+     a stack of half-rows above the board. */
+  .sol-top { flex-wrap: nowrap; overflow-x: auto; overscroll-behavior-x: contain; padding-bottom: 6px; }
+  .sol-group { flex-wrap: nowrap; }
+  .sol-group.founds { margin-left: 0; }
+  /* Both scrollers keep their own edges rather than dragging the page sideways with them. */
+  .sol-tableau, .sol-top { touch-action: pan-x pan-y; }
+}
+@media (max-width: 480px) {
+  .sol-tableau { gap: 4px; }
+}
+
+
+/* ============================================================================
+   NINE MARKS FOR NINE CLOTHS
+   Concrete, dark glass, paper, velvet, marble, zinc, lit edges, chalkboard and
+   studio all shipped with a full set of tokens and then borrowed midnight's
+   single ellipse, so nine different tables were printed with the same mark and
+   none of them said what you were playing.
+
+   Everything here draws in the cloth's own ink (--t-ink, --t-line), at an
+   opacity that reads as printing rather than as an object on the table. The
+   strokes do not scale: the box is stretched to whatever shape the felt is, and
+   a scaled stroke would come out thicker on one axis than the other.
+   ============================================================================ */
+
+.dressing.dr { width: 100%; height: 100%; display: block; }
+
+.dr .dr-line {
+  fill: none;
+  stroke: var(--t-line, rgba(255, 255, 255, .18));
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+}
+.dr .dr-line.faint { opacity: .5; }
+.dr .dr-line.thin { stroke-width: 1; }
+.dr .dr-line.gold   { stroke: rgba(201, 162, 39, .38); }
+.dr .dr-line.brass  { stroke: rgba(150, 118, 60, .34); }
+.dr .dr-line.lit    { stroke: rgba(34, 211, 238, .32); }
+.dr .dr-line.chalk  {
+  stroke: rgba(255, 255, 255, .26); stroke-width: 2.5;
+  stroke-linecap: round; stroke-dasharray: 26 3 40 2 18 4;
+}
+
+.dr .dr-rivet { fill: var(--t-ink, #fff); opacity: .22; }
+
+/* The name, in the cloth's own voice. */
+.dr .dr-name {
+  fill: var(--t-ink, #fff); opacity: .17;
+  font-family: var(--display); font-weight: 800;
+  font-size: 40px; letter-spacing: 9px;
+}
+.dr .dr-name.stencil { font-family: var(--mono); font-weight: 700; font-size: 30px; letter-spacing: 13px; opacity: .14; }
+.dr .dr-name.serif   { font-family: var(--display); font-weight: 700; font-size: 26px; letter-spacing: 7px; opacity: .3; }
+.dr .dr-name.mono    { font-family: var(--mono); font-weight: 600; font-size: 22px; letter-spacing: 10px; opacity: .13; }
+.dr .dr-name.gold    { fill: #c9a227; opacity: .3; }
+.dr .dr-name.brass   { fill: #96763c; opacity: .3; }
+.dr .dr-name.lit     { fill: #22d3ee; opacity: .26; }
+.dr .dr-name.chalk   { fill: #f2f4ef; opacity: .22; font-family: var(--display); letter-spacing: 11px; }
+
+/* A swatch is 90px wide. The mark is for a table, not a thumbnail — at that size it is a
+   smear, and the swatch is already telling you the colour, which is what it is for. */
+.felt-swatch .dressing.dr .dr-name, .pack-swatch .dressing.dr .dr-name,
+.pp-stage .dressing.dr .dr-name { display: none; }
