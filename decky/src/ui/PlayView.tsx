@@ -42,12 +42,15 @@ export function PlayView() {
   // Whether a host is even running. Until we know, the online button stays hidden rather than
   // appearing and then failing.
   const [hostUp, setHostUp] = useState(false);
+  // Distinct from hostUp itself: true once we've actually heard back, so "no host" can be
+  // said outright instead of guessed at during the moment the check is still in flight.
+  const [hostChecked, setHostChecked] = useState(false);
   // Every table still in play, so a second game does not quietly abandon the first.
   const [inProgress, setInProgress] = useState<OpenGame[]>([]);
   // Which table to pick back up, when one was chosen from the list.
   const [resumeId, setResumeId] = useState<string | null>(null);
 
-  useEffect(() => { void hostInfo().then((h) => setHostUp(h.up)); }, []);
+  useEffect(() => { void hostInfo().then((h) => setHostUp(h.up)).finally(() => setHostChecked(true)); }, []);
 
   // Refreshed whenever we come back to the shelf, which is the only time it is on screen.
   useEffect(() => { if (!game && !setupFor && !onlineFor) setInProgress(openGames()); },
@@ -201,6 +204,7 @@ export function PlayView() {
         }}
         onSetup={(def) => { recordPlay(def.meta.id); setSetupFor(def); }}
         onOnline={hostUp ? (def) => { recordPlay(def.meta.id); setOnlineFor(def); } : undefined}
+        onlineHostDown={hostChecked && !hostUp}
       />
     </div>
   );

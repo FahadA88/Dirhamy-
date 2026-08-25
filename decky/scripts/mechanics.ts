@@ -222,6 +222,8 @@ section('Trick-taking — shooting the moon');
   check('everyone else takes the whole pot (17)', ['B', 'C', 'D'].every((p) => s.scores[p] === 17), s.scores);
   check('the moon is announced', s.log.some((l) => l.text.includes('SHOT THE MOON')), s.log.slice(-4).map((l) => l.text));
   check('the shooter wins the hand', s.winner === 'A', s.winner);
+  check('the state remembers who shot it', s.shotMoon === 'A', s.shotMoon);
+  check('every viewer sees the same shooter', ['A', 'B', 'C', 'D'].every((p) => redact(s, p).shotMoon === 'A'), P.map((p) => redact(s, p).shotMoon));
 
   // A split hand must NOT invert — guard against the moon firing on an ordinary round. Here the
   // spade trick (13 for the Queen) and the heart trick (4) fall to different players.
@@ -243,6 +245,7 @@ section('Trick-taking — shooting the moon');
   const pot = P.reduce((a, p) => a + (t.scores[p] ?? 0), 0);
   check('a split hand still totals 17 points', pot === 17, t.scores);
   check('a split hand does not invert', !t.log.some((l) => l.text.includes('SHOT THE MOON')), t.scores);
+  check('a split hand remembers no shooter', t.shotMoon == null, t.shotMoon);
 }
 
 // ---------- Euchre: auction, bowers, kitty, going alone ----------

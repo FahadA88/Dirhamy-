@@ -883,7 +883,7 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
   max-width: min(92vw, 480px);
   padding: 11px 18px 11px 14px; border-radius: 999px;
   background: #2a1416; color: #ffd9d9;
-  border: 1px solid rgba(220, 38, 38, 0.55);
+  border: 1px solid color-mix(in srgb, var(--red) 55%, transparent);
   box-shadow: 0 10px 34px rgba(0, 0, 0, 0.42);
   font-size: 14px; line-height: 1.35; text-align: left;
   animation: refused-in 180ms cubic-bezier(0.2, 0.9, 0.3, 1.3);
@@ -891,7 +891,7 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
 .refused-mark {
   flex: 0 0 auto; width: 20px; height: 20px; border-radius: 50%;
   display: grid; place-items: center; font-size: 11px; font-weight: 800;
-  background: rgba(220, 38, 38, 0.85); color: #fff;
+  background: var(--red); color: #fff;
 }
 @keyframes refused-in {
   from { opacity: 0; transform: translate(-50%, 10px); }
@@ -906,7 +906,7 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
 .status-pill { font-family: var(--mono); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; padding: 4px 12px; border-radius: 999px; }
 .status-pill.green { background: rgba(214, 175, 92, 0.14); color: var(--green-d); border: 1px solid rgba(214, 175, 92, 0.4); }
 .status-pill.amber { background: rgba(217, 119, 6, 0.14); color: var(--amber); border: 1px solid rgba(217, 119, 6, 0.4); }
-.status-pill.red { background: rgba(220, 38, 38, 0.12); color: var(--red); border: 1px solid rgba(220, 38, 38, 0.4); }
+.status-pill.red { background: color-mix(in srgb, var(--red) 12%, transparent); color: var(--red); border: 1px solid color-mix(in srgb, var(--red) 40%, transparent); }
 
 .starters { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 12px; }
 .mini-label { color: var(--muted); font-size: 11.5px; font-family: var(--mono); letter-spacing: 0.3px; margin: 8px 0 4px; display: block; }
@@ -965,7 +965,7 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
 .validation { border-radius: 12px; padding: 12px 14px; font-size: 13px; border: 1px solid transparent; }
 .validation.green { background: rgba(214, 175, 92, 0.08); border-color: rgba(214, 175, 92, 0.25); }
 .validation.amber { background: rgba(217, 119, 6, 0.08); border-color: rgba(217, 119, 6, 0.25); }
-.validation.red { background: rgba(220, 38, 38, 0.08); border-color: rgba(220, 38, 38, 0.3); }
+.validation.red { background: color-mix(in srgb, var(--red) 8%, transparent); border-color: color-mix(in srgb, var(--red) 30%, transparent); }
 .validation ul { margin: 8px 0 0; padding-left: 16px; }
 .validation li { color: var(--muted); padding: 2px 0; }
 .validation li.error { color: var(--red); }
@@ -974,7 +974,7 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
 .test-row { display: flex; gap: 10px; margin-top: 14px; }
 .report { margin-top: 14px; padding: 14px; border-radius: 12px; font-size: 13px; display: grid; gap: 8px; grid-template-columns: 1fr 1fr; }
 .report.good { background: rgba(214, 175, 92, 0.07); border: 1px solid rgba(214, 175, 92, 0.25); }
-.report.bad { background: rgba(220, 38, 38, 0.08); border: 1px solid rgba(220, 38, 38, 0.3); }
+.report.bad { background: color-mix(in srgb, var(--red) 8%, transparent); border: 1px solid color-mix(in srgb, var(--red) 30%, transparent); }
 .metric { display: flex; flex-direction: column; gap: 2px; }
 .metric span { color: var(--muted); font-size: 11px; font-family: var(--mono); }
 .metric b { font-size: 15px; }
@@ -1120,6 +1120,16 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
 .war-center { flex-wrap: wrap; }
 .war-controls { display: flex; align-items: center; gap: 20px; padding: 10px 0; }
 .war-pile { font-family: var(--mono); color: var(--muted); }
+/* The battle cards already fly to the middle; the pile count is what they become once they
+   land, so a beat of pop keeps that landing from reading as a silent teleport. Keyed on the
+   count itself, so it replays every change without a manual timer to reset it. */
+.war-pile-n { display: inline-block; color: var(--ink); animation: pile-pop 360ms cubic-bezier(0.2, 0.9, 0.3, 1.3); }
+@keyframes pile-pop {
+  0% { transform: scale(1.6); color: var(--gold-hi); }
+  100% { transform: scale(1); color: var(--ink); }
+}
+@media (prefers-reduced-motion: reduce) { .war-pile-n { animation: none; } }
+:root[data-motion="reduced"] .war-pile-n { animation: none; }
 
 /* match play */
 .match-bar {
@@ -1241,7 +1251,7 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
 }
 .mini-table.broken {
   border-radius: 14px; padding: 26px; text-align: center;
-  background: rgba(220, 38, 38, 0.07); border: 1px solid rgba(220, 38, 38, 0.35);
+  background: color-mix(in srgb, var(--red) 7%, transparent); border: 1px solid color-mix(in srgb, var(--red) 35%, transparent);
 }
 .mini-broken-mark { font-size: 22px; color: var(--red); }
 .mini-table.broken p { margin: 6px 0 0; font-size: 13px; color: var(--red); }
@@ -1280,7 +1290,7 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
 
 .issue-list { list-style: none; padding: 0; margin: 12px 0 0; }
 .issue { font-size: 12.5px; padding: 8px 12px; border-radius: 8px; margin-bottom: 6px; line-height: 1.45; }
-.issue.error { background: rgba(220, 38, 38, 0.09); color: var(--red); border-left: 3px solid var(--red); }
+.issue.error { background: color-mix(in srgb, var(--red) 9%, transparent); color: var(--red); border-left: 3px solid var(--red); }
 
 .published-ok { text-align: center; padding: 20px 10px; }
 .pub-mark {
@@ -1582,8 +1592,14 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
   font-size: 11px; padding: 3px 10px; border-radius: 999px;
   background: var(--panel-brd); color: var(--muted);
 }
-.gd-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; }
-.ghost.danger { color: var(--red); border-color: rgba(220, 38, 38, 0.4); }
+.gd-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; align-items: center; }
+/* Explains the gap where the online button would be, rather than leaving the option to look
+   like it never existed. Not a button — there is nothing to click until a host answers. */
+.gd-online-off {
+  font-size: 13px; color: var(--muted); padding: 9px 4px;
+  border-bottom: 1px dashed var(--panel-brd); cursor: help;
+}
+.ghost.danger { color: var(--red); border-color: color-mix(in srgb, var(--red) 40%, transparent); }
 .gd-sub { margin: 20px 0 10px; font-size: 15px; }
 .gd-avg { font-family: var(--mono); font-size: 12px; color: var(--amber); font-weight: 400; }
 
@@ -3631,6 +3647,11 @@ header h1 {
   display: block; width: 100%;
   padding: clamp(3px, calc(var(--rail-w, 8px) * 0.45), 8px);
   border-radius: clamp(5px, calc(var(--rail-r, 10px) * 0.5), 16px);
+  /* Studio and Marble draw a near-white rail to match a near-white felt — right on the
+     table, where it sits on the page's own shadow, wrong here, where the swatch would
+     otherwise vanish into an equally light dialog. A picker-only edge, not part of the felt
+     itself, so the live table is untouched. */
+  box-shadow: inset 0 0 0 1px var(--panel-brd);
 }
 .swatches.tables .fs-felt {
   height: 44px;
@@ -3691,6 +3712,8 @@ header h1 {
   letter-spacing: 2.6px; text-transform: uppercase; color: var(--muted);
   margin-bottom: 6px;
 }
+/* Worth noticing even in the one hand out of a hundred where you are not the one who did it. */
+.modal-box.moonshot .cb-kicker { color: var(--gold-hi); }
 .modal-box.celebrate h3 {
   margin: 0 0 14px; font-size: clamp(28px, 5vw, 42px); font-weight: 900; letter-spacing: -.03em;
   background: linear-gradient(100deg, var(--gold-hi), var(--hot-hi) 58%, var(--cyan));
@@ -3900,7 +3923,6 @@ header h1 {
 .poker-hand { pointer-events: none; }
 .card-btn.static { cursor: default; }
 .poker-actions { display: flex; gap: 10px; flex-wrap: wrap; }
-.poker-actions .ghost.danger { border-color: rgba(255,77,94,.4); color: var(--red); }
 
 .pit-hand-summary { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .pit-goal { font-size: 13px; color: var(--muted); margin-right: 2px; }

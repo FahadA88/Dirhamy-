@@ -53,11 +53,15 @@ function blurb(text: string, limit = 165): string {
   return out || text.slice(0, limit);
 }
 
-export function BrowseView({ onPlay, onSetup, onOnline, onRemix }: {
+export function BrowseView({ onPlay, onSetup, onOnline, onlineHostDown, onRemix }: {
   onPlay: (def: GameDefinition) => void;
   onSetup: (def: GameDefinition) => void;
   /** Play this one with other people. Absent when no host is running. */
   onOnline?: (def: GameDefinition) => void;
+  /** True once we've checked and no host answered — distinct from onOnline simply being
+   *  absent while that check is still in flight, so the detail page can explain rather than
+   *  silently drop the option. */
+  onlineHostDown?: boolean;
   onRemix?: (game: PublishedGame) => void;
 }) {
   const { settings } = useSettings();
@@ -97,6 +101,7 @@ export function BrowseView({ onPlay, onSetup, onOnline, onRemix }: {
           onPlay={() => { onPlay(game.definition); }}
           onSetup={() => { onSetup(game.definition); }}
           onOnline={onOnline ? () => { onOnline(game.definition); } : undefined}
+          onlineHostDown={onlineHostDown}
           onChanged={refresh}
           onProfile={(a) => { setDetail(null); setProfile(a); }}
           onRemix={onRemix}
@@ -467,13 +472,14 @@ function Meta({ game }: { game: PublishedGame }) {
 
 // ---------- detail ----------
 
-function GameDetail({ game, me, onBack, onPlay, onSetup, onOnline, onChanged, onProfile, onRemix }: {
+function GameDetail({ game, me, onBack, onPlay, onSetup, onOnline, onlineHostDown, onChanged, onProfile, onRemix }: {
   game: PublishedGame;
   me: string;
   onBack: () => void;
   onPlay: () => void;
   onSetup: () => void;
   onOnline?: () => void;
+  onlineHostDown?: boolean;
   onChanged: () => void;
   onProfile: (author: string) => void;
   onRemix?: (g: PublishedGame) => void;
@@ -550,6 +556,11 @@ function GameDetail({ game, me, onBack, onPlay, onSetup, onOnline, onChanged, on
             {!game.definition.solitaire && <button className="ghost" onClick={onSetup}>Set up a table</button>}
             {!game.definition.solitaire && onOnline && (
               <button className="ghost" onClick={onOnline}>Play with people</button>
+            )}
+            {!game.definition.solitaire && !onOnline && onlineHostDown && (
+              <span className="gd-online-off" title="Run `npm run host` on a machine everyone here can reach, then reload.">
+                Play with people — needs a host running
+              </span>
             )}
             {onRemix && (
               <button className="ghost" onClick={() => { const f = fork(game.id, me); onChanged(); if (f) onRemix(f); }}>

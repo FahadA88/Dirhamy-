@@ -68,6 +68,7 @@ export function createMatch(
     trickPlays: [],
     lastTrick: null,
     lastBattle: null,
+    shotMoon: null,
     tricksWon: Object.fromEntries(players.map((p) => [p, 0])),
     bids: {},
     bidding: !!def.trick?.bidding,
@@ -589,6 +590,7 @@ function cloneState(state: MatchState): MatchState {
       ? { winner: state.lastTrick.winner, plays: state.lastTrick.plays.map((t) => ({ ...t })) }
       : null,
     lastBattle: state.lastBattle ? state.lastBattle.map((b) => ({ card: { ...b.card } })) : null,
+    shotMoon: state.shotMoon ?? null,
     finished: state.finished.slice(),
     booksWon: { ...state.booksWon },
     pendingChoice: state.pendingChoice ? { ...state.pendingChoice } : null,
@@ -1809,6 +1811,7 @@ function endTrickRound(s: MatchState): void {
     if (cfg.shootTheMoon) {
       const pot = s.players.reduce((a, p) => a + (s.scores[p] ?? 0), 0);
       const shooter = pot > 0 ? s.players.find((p) => (s.scores[p] ?? 0) === pot) : undefined;
+      s.shotMoon = shooter ?? null;
       if (shooter) {
         for (const p of s.players) s.scores[p] = p === shooter ? 0 : pot;
         log(s, shooter, `${short(shooter)} SHOT THE MOON — everyone else takes ${pot}.`);
@@ -3693,6 +3696,7 @@ export function redact(state: MatchState, viewer: string): RedactedState {
       : state.definition.bluff ? 'bluff' : state.definition.reflex ? 'reflex' : state.definition.poker ? 'poker' : state.definition.pit ? 'pit' : state.definition.kent ? 'kent' : state.definition.set ? 'set' : 'shedding',
     ...(state.definition.solitaire ? solitaireView(state) : {}),
     battle: state.definition.war ? (state.lastBattle ?? []).map((b) => b.card) : undefined,
+    shotMoon: state.definition.trick?.shootTheMoon ? (state.shotMoon ?? null) : undefined,
     rummyPhase: state.definition.rummy ? state.rummyPhase : undefined,
     meldMoves: state.definition.rummy && state.definition.rummy.knock === undefined
       && state.players[state.turnIndex] === viewer && state.rummyPhase === 'play'

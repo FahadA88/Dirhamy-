@@ -539,6 +539,8 @@ export interface MatchState {
    * being animated by id, gave the flying-card layer two candidate homes for one card.
    */
   lastBattle?: { card: Card }[] | null;
+  /** Who swept every penalty point this hand, if anyone — cleared each time scoring runs. */
+  shotMoon?: string | null;
   tricksWon: Record<string, number>;
   bids: Record<string, number>; // trick bids (Spades)
   bidding: boolean;         // true while the bidding phase is open
@@ -689,6 +691,8 @@ export interface RedactedState {
   meldMoves?: { cards: string[]; label: string }[];
   deadwood?: number;       // gin: what this viewer's unmatched cards are currently worth
   battle?: Card[];
+  /** Who swept every penalty point this hand, if the game plays that way and anyone did. */
+  shotMoon?: string | null;
   trick?: { player: string; card: Card }[];
   /** The trick just taken, held until somebody leads again. */
   lastTrick?: { plays: { player: string; card: Card }[]; winner: string };

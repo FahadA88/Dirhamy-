@@ -310,6 +310,7 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
   const isPit = view.mode === 'pit';
   const isSet = view.mode === 'set';
   const isKent = view.mode === 'kent';
+  const moonShooter = view.shotMoon ?? null;
   // Groups of 2+ need a button — you can't express "these three cards" with one tap.
   const comboMoves = useMemo(
     () => myLegal.filter((m) => m.actionId === 'climbPlay' && (m.cards?.length ?? 1) > 1),
@@ -1643,7 +1644,7 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
           </div>
         ) : isWar ? (
           <div className="war-controls">
-            <span className="war-pile">Your pile · {myPile} cards</span>
+            <span className="war-pile">Your pile · <b key={myPile} className="war-pile-n">{myPile}</b> cards</span>
             {canFlip && <button className="primary" onClick={() => submit({ actionId: 'warFlip' })}>⚔ Flip</button>}
           </div>
         ) : (
@@ -1702,12 +1703,14 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
 
       {view.phase === 'roundOver' && !view.matchOver && (
         <div className="modal">
-          {view.winner === me && <Confetti pieces={30} />}
-          <div className={`modal-box celebrate handend ${view.winner === me ? 'won' : ''}`} ref={roundRef} role="dialog" aria-modal="true">
-            <span className="cb-kicker">Hand {view.handNumber}</span>
+          {(view.winner === me || moonShooter === me) && <Confetti pieces={moonShooter ? 70 : 30} />}
+          <div className={`modal-box celebrate handend ${view.winner === me ? 'won' : ''} ${moonShooter ? 'moonshot' : ''}`} ref={roundRef} role="dialog" aria-modal="true">
+            <span className="cb-kicker">{moonShooter ? '☾ Shot the moon' : `Hand ${view.handNumber}`}</span>
             {/* A round of a partnership game is taken by a pair, not by whoever pressed the
                 button — "Bot 2 takes it" tells a player on Bot 2's side that they lost. */}
-            <h3>{isKent
+            <h3>{moonShooter
+              ? (moonShooter === me ? 'You swept every point' : `${nameOf(moonShooter)} swept every point`)
+              : isKent
               ? (teamOf(view.winner ?? '') === teamOf(me)
                   ? `Your pair takes it — ${nameOf(view.winner || '')} spotted it`
                   : `${teamOf(view.winner ?? '') ?? 'The other pair'} takes it`)
