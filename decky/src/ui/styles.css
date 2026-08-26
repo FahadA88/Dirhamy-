@@ -3168,7 +3168,18 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
    note in SiteNav. Nothing here needs to switch them off. */
 
 /* --- 1. top bar (today) --- */
-.nav-bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 8px; }
+/* Worklist #10: Bluff's rank picker and Kent's four cards can run taller than a laptop
+   viewport, so the page scrolls — and until now the bar carrying "All games" and Rules
+   scrolled away with it, right when a claim needed making. Sticky, with the same glass
+   the floating dock already uses, so it survives a scroll instead of chasing it. */
+.nav-bar {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 8px;
+  position: sticky; top: 0; z-index: 25;
+  padding-block: 10px;
+  background: color-mix(in srgb, var(--panel-solid) 88%, transparent);
+  backdrop-filter: blur(12px);
+  border-radius: 0 0 16px 16px;
+}
 
 /* --- 2. side rail --- */
 /* A fixed column down the left. The page moves over to make room, which is what makes it read
