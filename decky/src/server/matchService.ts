@@ -7,7 +7,7 @@ import { pinDefinition, definitionFingerprint, migrate } from '../engine/migrate
 import {
   FairCommit, FairReveal, commitTo, deriveSeed, newClientSeed, newServerSeed,
 } from '../engine/fairness';
-import { chooseMove, BotMode } from '../bots/randomBot';
+import { chooseMove, estimateTrickWins, BotMode } from '../bots/randomBot';
 import { chooseSolitaireMove, positionKey } from '../bots/solitaireBot';
 
 // ---------------------------------------------------------------------------
@@ -429,6 +429,20 @@ export class MatchService {
     const allowed = legalMoves(rec.state, playerId);
     if (allowed.length === 0) return null;
     return chooseMove(rec.state, playerId, rec.botSeed, 'smart').move;
+  }
+
+  /**
+   * Worklist #64: "bidding is the hardest thing in the catalogue and the hardest to guess at. A
+   * rough count of likely tricks, on request, in the bidding panel only." Read-only, on request
+   * — the same estimate a bidding bot already makes of its own hand (see estimateTrickWins),
+   * so a player asking gets the identical honest read the table's own bots bid from. null
+   * outside a trick-taking game's bid, where the question doesn't apply.
+   */
+  handStrength(matchId: string, playerId: string): number | null {
+    const rec = this.require(matchId);
+    this.requireSeat(rec, playerId);
+    if (rec.state.phase !== 'playing' || !rec.definition.trick) return null;
+    return estimateTrickWins(rec.state, playerId);
   }
 
   /** Deal the next hand of a match, drawing a fresh seed from the committed chain. */

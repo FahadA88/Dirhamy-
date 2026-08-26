@@ -1126,8 +1126,11 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
 /* Spades bidding + teams */
 .bid-area { min-height: 160px; }
 .bid-panel { text-align: center; align-self: center; }
-.bid-title { font-family: var(--mono); color: var(--green-d); margin-bottom: 12px; }
+.bid-title { font-family: var(--mono); color: var(--green-d); margin-bottom: 12px; display: flex; align-items: center; justify-content: center; gap: 10px; }
 .bid-buttons { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; max-width: 460px; }
+/* Worklist #64: a rough tricks estimate, asked for rather than shown unprompted. */
+.estimate-btn { font-family: inherit; font-weight: 400; padding: 3px 10px; font-size: 11px; }
+.bid-kicker { display: flex; align-items: center; justify-content: center; gap: 10px; }
 .bid-btn { min-width: 44px; padding: 10px 12px; border-radius: 10px; cursor: pointer; font: inherit; font-weight: 700;
   background: var(--panel-solid); color: var(--ink); border: 1px solid var(--panel-brd); transition: 0.14s; }
 .bid-btn:hover { border-color: transparent; color: #fff; background: linear-gradient(135deg, var(--emerald), var(--green)); transform: translateY(-2px); }

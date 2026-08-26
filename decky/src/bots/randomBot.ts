@@ -9,6 +9,24 @@ import { nextRandom } from '../engine/rng';
 const HIGH = new Set(['K', 'Q', 'J', '10']);
 
 /**
+ * A rough count of likely tricks from a hand: aces and kings, plus a bonus for a long trump
+ * suit — the same estimate a bidding bot makes of its own hand, so a player asking "how strong
+ * is this?" gets the identical honest read the table's own bots bid from, not a second opinion
+ * invented for the occasion (worklist #64). Deliberately not more than that: a real read on a
+ * bidding hand also weighs void suits, finesses and what partner is likely to hold, none of
+ * which a pre-play count can see — "rough" is the whole promise being made here.
+ */
+export function estimateTrickWins(state: MatchState, playerId: string): number {
+  const hand = state.zones[`hand:${playerId}`] || [];
+  const trump = state.definition.trick?.trump;
+  let bid = 0;
+  for (const c of hand) if (c.rank === 'A' || c.rank === 'K') bid++;
+  const trumpCount = trump && trump !== 'none' ? hand.filter((c) => c.suit === trump).length : 0;
+  if (trumpCount > 3) bid += trumpCount - 3;
+  return bid;
+}
+
+/**
  * How hard a bot tries. Underneath there are only two players — the heuristic one and the
  * coin-flipping one — and a tier is how often you get each. That is a real difference in
  * strength rather than a label: an easy bot genuinely throws away good cards.
@@ -160,12 +178,7 @@ export function chooseMove(
   // is a broken one, and it makes the scorepad nonsense. So the estimate is always made, and
   // a slip moves it by a trick or two instead of replacing it.
   if (moves[0].actionId === 'bid') {
-    const hand = state.zones[`hand:${playerId}`] || [];
-    const trump = state.definition.trick?.trump;
-    let bid = 0;
-    for (const c of hand) if (c.rank === 'A' || c.rank === 'K') bid++;
-    const trumpCount = trump && trump !== 'none' ? hand.filter((c) => c.suit === trump).length : 0;
-    if (trumpCount > 3) bid += trumpCount - 3;
+    let bid = estimateTrickWins(state, playerId);
     if (mode === 'random') {
       const r = nextRandom(botSeed);
       botSeed = r.state;

@@ -507,6 +507,14 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
     });
   }
 
+  // Worklist #64: a rough count of likely tricks, asked for rather than shown unprompted — the
+  // same estimate a bidding bot already makes of its own hand.
+  function showHandStrength() {
+    const n = clientRef.current.handStrength(me);
+    if (n === null) { setToast({ text: 'No estimate to make right now.', tone: 'info' }); return; }
+    setToast({ text: `Rough read: about ${n} trick${n === 1 ? '' : 's'} in this hand.`, tone: 'info' });
+  }
+
   function openHistory() {
     setHistory(clientRef.current.history());
     setShowHistory(true);
@@ -1227,7 +1235,10 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
         */
         <div className="center bid-area">
           <div className="bid-panel contract-panel">
-            <span className="bid-kicker">The auction</span>
+            <span className="bid-kicker">
+              The auction
+              <button className="ghost sm estimate-btn" onClick={showHandStrength}>Estimate</button>
+            </span>
             <p className="bid-line">
               {view.highBid
                 ? <>Standing bid <b>{view.highBid.level}{view.highBid.strain === 'NT' ? 'NT' : SUIT_SYMBOLS[view.highBid.strain]}</b> by {nameOf(view.highBid.player)}</>
@@ -1301,7 +1312,12 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
         <div className="center bid-area">
           {view.isYourTurn ? (
             <div className="bid-panel">
-              <div className="bid-title">Your bid</div>
+              <div className="bid-title">
+                Your bid
+                {/* Worklist #64: "bidding is the hardest thing in the catalogue and the hardest
+                    to guess at. A rough count of likely tricks, on request." */}
+                <button className="ghost sm estimate-btn" onClick={showHandStrength}>Estimate</button>
+              </div>
               <div className="bid-buttons">
                 {Array.from({ length: view.hand.length + 1 }, (_, n) => (
                   <button key={n} className="bid-btn" onClick={() => submit({ actionId: 'bid', choice: String(n) })}>

@@ -45,6 +45,8 @@ export interface TableClient {
   submit(seat: string, move: Move): { ok: boolean; reason?: string };
   quickUndo(seat: string): { ok: boolean; reason?: string };
   hint(seat: string): Move | null;
+  /** null outside a trick-taking bid, or for an online table (not wired over the socket yet). */
+  handStrength(seat: string): number | null;
   pending(): string[];
   pendingTakeback(): TakebackRequest | null;
   requestTakeback(seat: string): TakebackRequest | null;
@@ -88,6 +90,7 @@ export class LocalTableClient implements TableClient {
     return { ok: r.ok, reason: r.reason };
   }
   hint(seat: string) { return this.service.hint(this.matchId, seat); }
+  handStrength(seat: string) { return this.service.handStrength(this.matchId, seat); }
   pending() { return this.service.pending(this.matchId); }
   pendingTakeback() { return this.service.pendingTakeback(this.matchId); }
   requestTakeback(seat: string) {
@@ -217,6 +220,9 @@ export class RemoteTableClient implements TableClient {
     this.cachedHint = null;
     return m;
   }
+
+  // Not wired over the socket yet, same as fairness() below — null is the honest answer.
+  handStrength(): number | null { return null; }
 
   pending(): string[] { return this.waiting; }
   pendingTakeback(): TakebackRequest | null { return this.cachedTakeback; }
