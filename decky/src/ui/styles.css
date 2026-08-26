@@ -365,13 +365,13 @@ h2 { letter-spacing: -0.025em; color: var(--ink); font-size: 22px; font-weight: 
 /* --- cloth-aware text --- */
 .felt .seat-name, .felt .match-chip b, .felt .you-head > span:first-child, .felt .ms-row { color: var(--t-ink); }
 .felt .count, .felt .pile-label, .felt .trick-empty, .felt .trick-meta, .felt .empty-hand,
-.felt .rummy-hint, .felt .match-chip, .felt .waiting-badge, .felt .mini-label { color: var(--t-muted); }
+.felt .rummy-hint, .felt .match-chip, .felt .waiting-badge, .felt .upnext-badge, .felt .mini-label { color: var(--t-muted); }
 .felt .match-hand i { font-style: normal; color: var(--muted); }
 .match-hand, .felt .bid-title, .felt .team-tag { color: var(--t-key); }
 .felt .you { border-top-color: var(--t-line); }
 .felt .match-bar { background: var(--t-panel); border-color: var(--t-line); }
 .felt .team-tag { background: var(--t-panel); }
-.felt .waiting-badge { background: var(--t-panel); border-color: var(--t-line); }
+.felt .waiting-badge, .felt .upnext-badge { background: var(--t-panel); border-color: var(--t-line); }
 .felt .seat.active { background: var(--t-seat); box-shadow: 0 0 0 1px var(--t-seat-line), 0 6px 20px rgba(0,0,0,0.18); }
 
 /* --- 1 · mahogany : padded leather rail, polished wood, chrome wells --- */
@@ -1192,6 +1192,9 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
 
 /* card passing */
 .waiting-badge { font-family: var(--mono); font-size: 11px; color: var(--muted); background: rgba(0,0,0,0.04); border: 1px solid var(--panel-brd); border-radius: 999px; padding: 3px 10px; }
+
+/* Worklist #56: turn order from here, not just whose turn it is right now. */
+.upnext-badge { font-family: var(--mono); font-size: 11px; color: var(--muted); background: rgba(0,0,0,0.04); border: 1px solid var(--panel-brd); border-radius: 999px; padding: 3px 10px; }
 
 /* ============================================================
    PHASE 2 — the rule builder

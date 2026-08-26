@@ -867,6 +867,31 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
 
   const hand = useMemo(() => sortHand(view.hand, def, settings.sort), [view.hand, def, settings.sort]);
 
+  // Worklist #56: you can already see whose turn it is; the thing missing was who is after
+  // them, which is what planning a discard actually needs. Pit, Kent, Set and Reflex have no
+  // turn order at all — everyone is live at once — so there is no "next" to name there. A
+  // shedding player who has emptied their hand is out for the rest of the hand and skipped;
+  // predicting a future skip card (a played 2, an ace) is not something planning ahead could
+  // ever promise, so this walks seats, not the moves still to come.
+  const upNext = useMemo(() => {
+    // A simultaneous pass — everybody picks 3 cards at once — has no live "turn" to be after;
+    // isTurn during it is whatever it last was, not a real position in an order.
+    if (isPit || isKent || isSet || isReflex || view.phase !== 'playing'
+      || view.needsPassChoice || view.passDirection) return [];
+    const n = view.players.length;
+    if (n <= 1) return [];
+    const curIdx = view.players.findIndex((p) => p.isTurn);
+    if (curIdx < 0) return [];
+    const order: string[] = [];
+    let i = curIdx;
+    for (let steps = 0; steps < n - 1 && order.length < 2; steps++) {
+      i = ((i + view.direction) % n + n) % n;
+      const p = view.players[i];
+      if (p.handCount > 0 || view.mode !== 'shedding') order.push(p.id);
+    }
+    return order;
+  }, [view.players, view.direction, view.mode, view.phase, isPit, isKent, isSet, isReflex]);
+
   // Worklist #59: naming a card from a MoveRecord logged earlier in the match, once it may no
   // longer be in view.hand at all. The definition's own deck is a pure function of def, so a
   // lookup built from it names any card the match ever dealt, not just the ones still in play.
@@ -1527,6 +1552,11 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
             && <span className="turn-badge">Your turn</span>}
           {isSet && view.isYourTurn && <span className="turn-badge">Find a set</span>}
           {!view.needsPassChoice && view.passDirection && <span className="waiting-badge">Waiting on {view.passWaitingOn}…</span>}
+          {upNext.length > 0 && (
+            <span className="upnext-badge" title="Turn order from here">
+              Up next: {upNext.map((id) => nameOf(id)).join(' → ')}
+            </span>
+          )}
           {canDraw && <button className="draw-btn" onClick={() => submit({ actionId: 'drawCard' })}>Draw</button>}
           {canPass && <button className="draw-btn" onClick={() => submit({ actionId: 'climbPass' })}>Pass</button>}
           {canFishDraw && <button className="draw-btn" onClick={() => submit({ actionId: 'fishDraw' })}>Draw</button>}

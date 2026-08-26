@@ -3695,6 +3695,7 @@ export function redact(state: MatchState, viewer: string): RedactedState {
       handCount: (state.zones[`hand:${p}`] || []).length,
       isTurn: i === state.turnIndex && state.phase === 'playing',
     })),
+    direction: state.direction,
     zones,
     hand: (state.zones[`hand:${viewer}`] || []).slice(),
     vars: { ...state.vars },

@@ -679,6 +679,9 @@ export interface RedactedState {
   gameName: string;
   you: string;
   players: { id: string; handCount: number; isTurn: boolean }[];
+  /** Which way play is moving round the table — reversible in the games that carry a reverse
+   *  card. Not secret information; every player at a real table can already see this. */
+  direction: 1 | -1;
   zones: Record<string, RedactedZone>;
   hand: Card[];            // convenience: your own hand
   vars: Record<string, string>;
