@@ -105,6 +105,10 @@ export interface MatchRecord {
   // Prior states, for undo. Only kept where taking a move back can't reveal anything an
   // opponent has since acted on — patience, and a takeback everyone has agreed to.
   history: MatchState[];
+  // Worklist #55: states undo has popped, for patience's redo. Cleared the moment a real move
+  // is made — see remember() — since redoing into a future a different move has already
+  // overwritten would replay a hand that no longer exists.
+  redoHistory: MatchState[];
 }
 
 /**
@@ -192,6 +196,7 @@ export class MatchService {
       moves: [],
       takeback: null,
       history: [],
+      redoHistory: [],
     };
     this.store.set(rec.matchId, rec);
     return this.summary(rec);
@@ -408,7 +413,28 @@ export class MatchService {
     this.requireSeat(rec, playerId);
     const prev = rec.history.pop();
     if (!prev) return { ok: false, reason: 'Nothing to take back.', view: redact(rec.state, playerId) };
+    rec.redoHistory.push(rec.state);
     rec.state = prev;
+    this.store.set(matchId, rec);
+    return { ok: true, view: redact(rec.state, playerId) };
+  }
+
+  /** Worklist #55: "patience has no redo... which is most of what undo is for in patience" —
+   *  trying a line of play, stepping back through it with undo, then stepping back INTO it
+   *  rather than replaying it by hand. Only ever available for the moves undo itself just
+   *  popped; a real move in between clears it (see remember()). */
+  canRedo(matchId: string): boolean {
+    const rec = this.require(matchId);
+    return !!rec.definition.solitaire && rec.redoHistory.length > 0;
+  }
+
+  redo(matchId: string, playerId: string): MoveResult {
+    const rec = this.require(matchId);
+    this.requireSeat(rec, playerId);
+    const next = rec.redoHistory.pop();
+    if (!next) return { ok: false, reason: 'Nothing to redo.', view: redact(rec.state, playerId) };
+    rec.history.push(rec.state);
+    rec.state = next;
     this.store.set(matchId, rec);
     return { ok: true, view: redact(rec.state, playerId) };
   }
@@ -606,6 +632,9 @@ export class MatchService {
     const limit = rec.definition.solitaire ? UNDO_LIMIT : QUICK_UNDO_LIMIT;
     rec.history.push(rec.state);
     while (rec.history.length > limit) rec.history.shift();
+    // A real move just happened, so whatever undo had queued up to redo is a future that no
+    // longer exists.
+    if (rec.redoHistory.length > 0) rec.redoHistory = [];
   }
 
   private recordMove(rec: MatchRecord, seat: string, move: Move, logLenBefore: number, advisorMove?: Move): void {

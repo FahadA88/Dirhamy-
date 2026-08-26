@@ -25,6 +25,7 @@ export function SolitaireTable({ def, daily = false }: { def: GameDefinition; da
   const [pick, setPick] = useState<{ zone: string; cardId: string } | null>(null);
   const [hint, setHint] = useState<Move | null>(null);
   const [canUndo, setCanUndo] = useState(false);
+  const [canRedo, setCanRedo] = useState(false);
   // Records today's result exactly once, the moment this specific match ends — not on every
   // re-render while roundOver stays true, and not on a later reload of the same finished match.
   const recordedDaily = useRef(false);
@@ -51,6 +52,7 @@ export function SolitaireTable({ def, daily = false }: { def: GameDefinition; da
   function refresh(id: string) {
     setBoard({ matchId: id, view: service.view(id, ME) });
     setCanUndo(service.canUndo(id));
+    setCanRedo(service.canRedo(id));
   }
 
   function commit(m: Move) {
@@ -70,10 +72,22 @@ export function SolitaireTable({ def, daily = false }: { def: GameDefinition; da
     refresh(matchId);
   }
 
+  // Worklist #55: "patience has no redo... which is most of what undo is for in patience" —
+  // step back through a line of play with Undo, then step back into it with this rather than
+  // replaying it by hand.
+  function redo() {
+    if (!service.redo(matchId, ME).ok) return;
+    setPick(null);
+    setHint(null);
+    playSound('ui', settings);
+    refresh(matchId);
+  }
+
   function newDeal() {
     setPick(null);
     setHint(null);
     setCanUndo(false);
+    setCanRedo(false);
     try { service.end(matchId); } catch { /* already gone */ }
     recordedDaily.current = false;
     setBoard(boot(def, daily));
@@ -143,6 +157,7 @@ export function SolitaireTable({ def, daily = false }: { def: GameDefinition; da
               )}
               <div className="sol-actions">
                 <button className="ghost sm" onClick={undo} disabled={!canUndo}>Undo</button>
+                <button className="ghost sm" onClick={redo} disabled={!canRedo}>Redo</button>
                 <button className="ghost sm" onClick={showHint} disabled={moves.length === 0}>Hint</button>
                 {/* Today's Deal is one deal, the same for everyone playing today — a "new deal"
                     button here would just be a way to quietly stop playing it. */}
