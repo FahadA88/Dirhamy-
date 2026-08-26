@@ -504,6 +504,9 @@ function AccessSection({ s, set }: { s: Settings; set: Setter }) {
         <Seg value={s.motion} onChange={(v) => set('motion', v as Settings['motion'])}
           options={[['system', 'Match device'], ['full', 'Full'], ['reduced', 'Reduced']]} />
       </Row>
+      <Row label="One-handed mode" hint="On a narrow phone, moves a bid, a bet or an offer below your hand instead of the centre of the felt — closer to where a thumb holding the phone actually reaches." keywords="one hand thumb reach mobile phone bid bet offer">
+        <Toggle on={s.oneHandedMode} onChange={(v) => set('oneHandedMode', v)} label="One-handed mode" />
+      </Row>
       <Row
         label="Carry your block list to another device"
         hint="Type this code on your other device to bring your blocks and mutes with you. Anyone who has the code can read and change that list, so treat it like a password."

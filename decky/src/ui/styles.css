@@ -1773,6 +1773,22 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
 :root[data-colorvision="deuteranopia"] body { filter: url(#cvd-deuteranopia); }
 :root[data-colorvision="tritanopia"] body { filter: url(#cvd-tritanopia); }
 
+/* Worklist #93: below the 900px ring layout, .felt-content is plain block flow and stacks in
+   DOM order — opponents, then a bid/bet/offer, then the hand — which puts the one thing a
+   bidding or betting turn actually needs pressed in the middle of a tall phone, well above
+   where a thumb holding it reaches. Off by default, since that centred middle is the right
+   read for two hands on the phone or any desktop. On, it turns the same stack into a flex
+   column and reorders it so the hand sits above the controls and the controls own the bottom
+   edge — the same reach zone the hand itself already lives in. */
+@media (max-width: 899px) {
+  :root[data-onehanded="on"] .felt-content {
+    display: flex;
+    flex-direction: column;
+  }
+  :root[data-onehanded="on"] .felt-content > .you { order: 1; }
+  :root[data-onehanded="on"] .felt-content > .center { order: 2; }
+}
+
 /* ============================================================
    THREE DIMENSIONS
    Cards are objects, not rectangles. Each one has thickness you can

@@ -129,6 +129,10 @@ export interface Settings {
       Only ever fires on a device with a Vibration API — most of that is iOS Safari, where the
       setting simply does nothing rather than failing. */
   haptics: boolean;
+  /** On a narrow phone, moves a bid, a bet or an offer below the hand instead of the visually
+      centred middle of the felt — closer to where a thumb holding the phone actually reaches.
+      Off by default: the centred middle is the right call for anyone not one-handing it. */
+  oneHandedMode: boolean;
   /** A few seconds to take back a misclick before the table moves on. 0 turns it off. */
   undoGraceMs: number;
   /** Optional clock. 0 is no clock at all, which is the default. */
@@ -180,6 +184,7 @@ export const defaultSettings: Settings = {
   soundVolume: 70,
   speak: false,
   haptics: false,
+  oneHandedMode: false,
   // Long enough to catch a misclick, short enough that nobody waits on it.
   undoGraceMs: 3000,
   turnSeconds: 0,
@@ -472,4 +477,5 @@ export function applySettings(s: Settings): void {
   root.setAttribute('data-legible', s.legibleText ? 'on' : 'off');
   root.style.setProperty('--text-scale', String(TEXT_SCALE[s.textSize]));
   root.setAttribute('data-colorvision', s.colorVisionSim);
+  root.setAttribute('data-onehanded', s.oneHandedMode ? 'on' : 'off');
 }

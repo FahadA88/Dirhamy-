@@ -16,6 +16,7 @@ import { useTurnAlert } from './useTurnAlert';
 import { useDismissable } from './useEscape';
 import { useCardFlights } from './cardFlight';
 import { useCardDrag } from './cardDrag';
+import { useGamepad } from './useGamepad';
 import { service, rememberSession, forgetSession, resumableSession } from '../server/local';
 import { Board, LocalTableClient, TableClient } from '../net/tableClient';
 import { Seat, MoveRecord } from '../server/matchService';
@@ -648,21 +649,24 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
   // makes a hand feel like a hand: arrows to run along it, Enter to play, and a cursor that
   // remembers where it was. The roving tabindex keeps the hand a single tab stop rather than
   // fifty-two, which is the difference between usable and exhausting.
+  // Shared with the gamepad hook below: moves the roving cursor to an index (wrapped into
+  // range) and moves real focus with it, so a screen reader announces the card it lands on
+  // whether the cursor got there from an arrow key or a D-pad.
+  function moveCursor(ids: string[], next: number) {
+    if (ids.length === 0) return;
+    const wrapped = ((next % ids.length) + ids.length) % ids.length;
+    setCursor(wrapped);
+    const el = document.querySelector<HTMLElement>(`[data-cardkey="${CSS.escape(ids[wrapped])}"]`);
+    el?.focus();
+  }
+
   function handKeys(e: React.KeyboardEvent, ids: string[], play: (id: string) => void) {
     if (ids.length === 0) return;
     const at = cursor === null ? -1 : Math.min(cursor, ids.length - 1);
-    const go = (i: number) => {
-      e.preventDefault();
-      const next = (i + ids.length) % ids.length;
-      setCursor(next);
-      // Move real focus too, so a screen reader announces the card the cursor lands on.
-      const el = document.querySelector<HTMLElement>(`[data-cardkey="${CSS.escape(ids[next])}"]`);
-      el?.focus();
-    };
-    if (e.key === 'ArrowRight') go(at + 1);
-    else if (e.key === 'ArrowLeft') go(at <= 0 ? ids.length - 1 : at - 1);
-    else if (e.key === 'Home') go(0);
-    else if (e.key === 'End') go(ids.length - 1);
+    if (e.key === 'ArrowRight') { e.preventDefault(); moveCursor(ids, at + 1); }
+    else if (e.key === 'ArrowLeft') { e.preventDefault(); moveCursor(ids, at <= 0 ? ids.length - 1 : at - 1); }
+    else if (e.key === 'Home') { e.preventDefault(); moveCursor(ids, 0); }
+    else if (e.key === 'End') { e.preventDefault(); moveCursor(ids, ids.length - 1); }
     else if (e.key === 'Enter' || e.key === ' ') {
       if (at >= 0) { e.preventDefault(); play(ids[at]); }
     }
@@ -862,6 +866,29 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
   );
 
   const hand = useMemo(() => sortHand(view.hand, def, settings.sort), [view.hand, def, settings.sort]);
+
+  // Worklist #94: the same cursor-and-Enter model full keyboard play already drives (see
+  // handKeys and moveCursor below), fed by a gamepad's D-pad or left stick and its bottom face
+  // button instead. Gated the same way drag is — Fish and Kent don't play a card by picking one
+  // off this list, so there is nothing here for a gamepad to move a cursor along either.
+  const gamepadIds = useMemo(
+    () => hand.filter((c) => playableCardIds.has(c.id)).map((c) => c.id),
+    [hand, playableCardIds],
+  );
+  useGamepad(
+    !isFish && !isKent,
+    (dir) => {
+      if (gamepadIds.length === 0) return;
+      const at = cursor === null ? -1 : Math.min(cursor, gamepadIds.length - 1);
+      moveCursor(gamepadIds, dir === 1 ? at + 1 : (at <= 0 ? gamepadIds.length - 1 : at - 1));
+    },
+    () => {
+      if (gamepadIds.length === 0) return;
+      const at = cursor === null ? -1 : Math.min(cursor, gamepadIds.length - 1);
+      if (at >= 0) clickCard(gamepadIds[at]);
+    },
+  );
+
   const top = view.zones.discard?.cards[0];
   const activeSuit = view.vars.activeSuit;
   const suitPickerOpen = !!view.pendingChoice && view.pendingChoice.player === me;
