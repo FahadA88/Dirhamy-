@@ -236,12 +236,15 @@ section('Attribute deck — every combination once, and one rule about all of th
   check('a board is dealt face up', (s.zones['set:board'] || []).length === 12);
   check('there is always something to find', legalMoves(s, 'A').some((m) => m.actionId === 'callSet'));
   check('nobody is waiting for a turn', actingPlayers(s).length === P.length);
+  check('the board count agrees there is one to find', (redact(s, 'A').setsAvailable ?? 0) > 0);
 
   const call = legalMoves(s, 'B').find((m) => m.actionId === 'callSet')!;
   s = applyMove(s, 'B', call);
   check('spotting one scores it', s.scores.B === 1);
   check('and the board is topped back up', (s.zones['set:board'] || []).length >= 12
     || (s.zones['set:deck'] || []).length === 0);
+  check('the board count reaches the redacted view and agrees with the legal moves again',
+    ((redact(s, 'A').setsAvailable ?? 0) > 0) === legalMoves(s, 'A').some((m) => m.actionId === 'callSet'));
 
   // A wrong call costs something, or there would be no reason not to guess constantly.
   const board = s.zones['set:board'] || [];

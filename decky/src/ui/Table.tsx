@@ -1541,6 +1541,11 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
             <div className="set-info">
               <span className="chip">{view.setDeckLeft ?? 0} left in the deck</span>
               <span className="chip">Pick {view.setSize ?? 3} that match</span>
+              {/* The count alone, not which ones — Set is notorious for a board that genuinely
+                  has none on it, and a stuck player deserves to know that's what's happening. */}
+              <span className="chip" title="How many valid trios are on the board right now">
+                {view.setsAvailable ?? 0} on the board
+              </span>
               <span className="chip mine">
                 You · {view.scores?.[me] ?? 0} {(view.scores?.[me] ?? 0) === 1 ? 'set' : 'sets'}
               </span>

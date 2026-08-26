@@ -779,6 +779,8 @@ export interface RedactedState {
   setBoard?: Card[];
   setDeckLeft?: number;
   setSize?: number;
+  /** How many valid trios are actually on the board right now — not which ones. */
+  setsAvailable?: number;
   // numeric (Bridge-style) auction
   highBid?: { player: string; level: number; strain: Strain } | null;
   /** True while a contract auction is still running. */

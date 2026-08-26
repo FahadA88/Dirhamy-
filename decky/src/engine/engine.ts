@@ -3828,6 +3828,9 @@ export function redact(state: MatchState, viewer: string): RedactedState {
     setBoard: state.definition.set ? (state.zones['set:board'] ?? []).map((c) => ({ ...c })) : undefined,
     setDeckLeft: state.definition.set ? (state.zones['set:deck'] ?? []).length : undefined,
     setSize: state.definition.set ? state.definition.set.size : undefined,
+    // The count alone, not which cards — a player still has to find them, but knows whether
+    // it's worth looking (Set is famous for a board with genuinely zero on it).
+    setsAvailable: state.definition.set ? findSets(state.zones['set:board'] ?? [], state.definition.set.size).length : undefined,
     // numeric (Bridge-style) auction
     highBid: state.definition.trick?.numericAuction ? state.highBid : undefined,
   };

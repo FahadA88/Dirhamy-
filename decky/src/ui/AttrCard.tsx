@@ -10,9 +10,18 @@ import { Card } from '../engine/types';
 // card's own attribute rather than a palette, so a deck defined with different colours draws
 // itself correctly without this file knowing about it.
 
+// Trio finding: "worth confirming shape alone always disambiguates the three colours for
+// red-green colourblind players" — it doesn't, since colour and shape are independent
+// attributes and two cards can differ only in colour. Checked empirically by running red,
+// green and violet through the same protanopia/deuteranopia feColorMatrix values App.tsx uses
+// for the colour-vision preview: the original green (#30a46c) put red-vs-green at 0.39-0.53
+// (of a max ~1.73 in normalised RGB) — roughly half its 0.81 distance under ordinary vision,
+// and no better separated from violet than from red. This teal-shifted green raises red-vs-
+// green to 0.53-0.70 under the same two filters, and green-vs-violet along with it, while also
+// reading slightly better against the card's own cream background (3.28:1 vs 2.75:1).
 const COLOURS: Record<string, string> = {
   red: '#e5484d',
-  green: '#30a46c',
+  green: '#059669',
   violet: '#8b5cf6',
   blue: '#3b82f6',
   amber: '#d6af5c',
