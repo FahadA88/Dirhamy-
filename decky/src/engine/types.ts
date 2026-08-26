@@ -306,6 +306,23 @@ export interface TrickConfig {
   // game has one auction shape or the other.
   numericAuction?: NumericAuctionConfig;
   bowers?: boolean;            // the trump jack, then the same-colour jack, outrank every trump
+  /**
+   * Every jack is a trump, whatever suit it is printed in, ranked clubs–spades–hearts–diamonds
+   * above all other trumps.
+   *
+   * This is the rule a Skat player would name first if asked what makes the game itself, and
+   * nothing here could express it: `bowers` promotes two jacks, this promotes all four and
+   * takes them out of their printed suits entirely — a jack of diamonds does not follow
+   * diamonds, it follows trump.
+   */
+  jacksAreTrumps?: boolean;
+  /**
+   * The auction winner plays alone against everybody else, rather than with a partner.
+   *
+   * Partnerships here are a fixed four-seat pairing, so a three-handed game where one player
+   * takes on the other two had no way to say who was on whose side.
+   */
+  soloDeclarer?: boolean;
   goAlone?: boolean;           // the maker may play the hand without their partner
   euchreScoring?: boolean;     // makers 1 / all five 2 / alone-all-five 4 / set 2 to the defenders
 
@@ -428,6 +445,14 @@ export interface NumericAuctionConfig {
   undertrickValue: number;
   /** A bonus for bidding and making the top level. 0 for none. */
   slamBonus?: number;
+  /**
+   * Score the contract on CARD POINTS taken rather than on tricks.
+   *
+   * Skat is not won by taking a number of tricks — it is won by taking 61 of the 120 points in
+   * the pack, which can be four fat tricks or eight thin ones. The points themselves already
+   * accumulate through penaltyPoints; this says to settle the contract against them.
+   */
+  makeOnCardPoints?: number;
   /** How many consecutive passes end the auction once somebody has bid. Usually all but one. */
   passesToClose?: number;
 }

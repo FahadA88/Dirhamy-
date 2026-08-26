@@ -214,6 +214,15 @@ export function createMatch(
       state.zones[solZones.stock].push(deck[k]);
       state.faceUp[deck[k].id] = false;
     }
+    // A game played onto the waste needs something there to play onto, or the opening position
+    // has no legal move at all and the first turn is always a draw.
+    if (cfg.wasteIsTarget) {
+      const seed = state.zones[solZones.stock].pop();
+      if (seed) {
+        state.faceUp[seed.id] = true;
+        state.zones[solZones.waste].push(seed);
+      }
+    }
 
     log(state, null, `${def.meta.name} dealt.`);
     return state;
@@ -1546,6 +1555,9 @@ export function suitOf(s: MatchState, card: Card): string {
     if (jr === 'trump' && t !== 'none') return t;
     return s.lead ?? (t !== 'none' ? t : card.suit);
   }
+  // Every jack belongs to trump, not to the suit on its face — so a jack of diamonds does not
+  // follow diamonds, and holding one does not stop you being void.
+  if (s.definition.trick!.jacksAreTrumps && card.rank === 'J') return t === 'none' ? 'J' : t;
   if (!s.definition.trick!.bowers || t === 'none') return card.suit;
   if (card.rank === 'J' && card.suit === SAME_COLOUR[t]) return t;
   return card.suit;
@@ -1557,6 +1569,10 @@ export function trickStrength(s: MatchState, card: Card): number {
   const cfg = s.definition.trick!;
   const t = trumpOf(s);
   if (card.rank === 'JOKER' && cfg.jokerRank && cfg.jokerRank !== 'low') return 5000;
+  // Clubs, spades, hearts, diamonds — the fixed order of the four top trumps.
+  if (cfg.jacksAreTrumps && card.rank === 'J') {
+    return 4000 + (({ C: 3, S: 2, H: 1, D: 0 } as Record<string, number>)[card.suit] ?? 0);
+  }
   if (cfg.bowers && t !== 'none' && card.rank === 'J') {
     if (card.suit === t) return 3000;
     if (card.suit === SAME_COLOUR[t]) return 2900;
@@ -1974,12 +1990,39 @@ function scoreContract(s: MatchState): void {
   }
   const declaring = teams.find((t) => t.includes(bid.player)) ?? [bid.player];
   const defending = teams.filter((t) => t !== declaring).flat();
-  const need = bid.level + cfg.book;
-  const took = declaring.reduce((a, p) => a + (s.tricksWon[p] ?? 0), 0);
-
   let declarerPts = 0;
   let defenderPts = 0;
   s.roundOutcome = null;
+
+  /*
+    Some games are not won by taking a number of TRICKS.
+
+    Skat's declarer needs 61 of the 120 points in the pack, which might be four fat tricks or
+    eight thin ones — the count of tricks says almost nothing about who won. Those points have
+    already been accumulating into `scores` through the same per-card table Hearts uses; this
+    settles the contract against them instead.
+  */
+  if (cfg.makeOnCardPoints) {
+    const target = cfg.makeOnCardPoints;
+    const got = declaring.reduce((a, p) => a + (s.scores[p] ?? 0), 0);
+    if (got >= target) {
+      declarerPts = bid.level;
+      log(s, null, `${short(bid.player)} took ${got} of the card points — made ${bid.level}.`);
+    } else {
+      // Going down costs the declarer what the bid was worth, twice over, which is the whole
+      // reason bidding high in Skat is a risk rather than free.
+      declarerPts = -2 * bid.level;
+      defenderPts = bid.level;
+      log(s, null, `${short(bid.player)} took only ${got} of ${target} — down ${-declarerPts}.`);
+    }
+    for (const p of declaring) s.scores[p] = declarerPts;
+    for (const p of defending) s.scores[p] = defenderPts;
+    s.winner = declarerPts >= defenderPts ? declaring[0] : (defending[0] ?? declaring[0]);
+    return;
+  }
+
+  const need = bid.level + cfg.book;
+  const took = declaring.reduce((a, p) => a + (s.tricksWon[p] ?? 0), 0);
   if (took >= need) {
     declarerPts = bid.level * cfg.trickValue + (took - need) * cfg.overtrickValue;
     if (cfg.slamBonus && bid.level === cfg.maxLevel) { declarerPts += cfg.slamBonus; s.roundOutcome = 'slam'; }
@@ -1994,6 +2037,12 @@ function scoreContract(s: MatchState): void {
 }
 
 export function trickTeams(s: MatchState): string[][] {
+  // One against the rest. Whoever won the auction is a side of one and everybody else is the
+  // other side — which is a partnership that only exists for the length of a hand.
+  if (s.definition.trick?.soloDeclarer) {
+    const declarer = s.highBid?.player ?? s.maker;
+    if (declarer) return [[declarer], s.players.filter((p) => p !== declarer)];
+  }
   if (s.definition.trick?.partnerships && s.players.length === 4) {
     return [[s.players[0], s.players[2]], [s.players[1], s.players[3]]];
   }

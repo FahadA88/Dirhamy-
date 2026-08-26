@@ -106,8 +106,40 @@ export function chooseMove(
     // The book comes from the definition, not from Bridge: a short deal may have none, in which
     // case the level IS the promise. Assuming six here made every bot pass on every hand.
     const book = state.definition.trick?.numericAuction?.book ?? 0;
-    const wantLevel = canTake - book;
+    const auction = state.definition.trick?.numericAuction;
     const pass = moves.find((m) => m.actionId === 'passBid')!;
+
+    /*
+      A level is not always a number of tricks.
+
+      Where the contract is settled on card points, the level is what the hand is WORTH — Skat
+      bids run 18 upwards — and comparing that to an estimate of six or seven tricks meant
+      nothing was ever affordable and every bot passed on every hand, forever. So no contract
+      was ever made and the match could not reach its target at all.
+
+      For those games, judge the hand by the point-carrying cards in it and bid that far up the
+      auction's own range instead.
+    */
+    if (auction?.makeOnCardPoints) {
+      const pts = state.definition.trick?.penaltyPoints ?? {};
+      const carried = hand.reduce((a, c) => a + (pts[c.rank] ?? 0) + (pts[c.suit + c.rank] ?? 0), 0);
+      // Jacks are worth little on their own but win tricks outright wherever they are trumps.
+      const jacks = state.definition.trick?.jacksAreTrumps ? hand.filter((c) => c.rank === 'J').length : 0;
+      const strength = carried + jacks * 8;
+      // A hand carrying about a third of the pack's points is worth opening on; one carrying
+      // half is worth pushing.
+      const share = Math.max(0, Math.min(1, (strength - 25) / 35));
+      if (share <= 0) return { move: pass, botSeed };
+      const span = auction.maxLevel - auction.minLevel;
+      const ceiling = auction.minLevel + Math.round(share * span);
+      const canBid = moves.filter((m) => m.actionId === 'contractBid' && (m.level ?? 0) <= ceiling);
+      if (canBid.length === 0) return { move: pass, botSeed };
+      // The highest affordable bid, in the suit the hand is longest in.
+      const inSuit = canBid.filter((m) => m.strain === best);
+      return { move: (inSuit.length ? inSuit : canBid).slice(-1)[0], botSeed };
+    }
+
+    const wantLevel = canTake - book;
     if (wantLevel < 1) return { move: pass, botSeed };
     // The strongest bid at or below what the hand is worth, preferring the long suit.
     const affordable = moves.filter((m) => m.actionId === 'contractBid' && (m.level ?? 9) <= wantLevel);

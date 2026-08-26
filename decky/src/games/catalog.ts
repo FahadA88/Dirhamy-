@@ -33,6 +33,7 @@ import { bridge } from './bridge';
 import { continental } from './continental';
 import { canfield } from './canfield';
 import { pinochle } from './pinochle';
+import { skat } from './skat';
 
 // The classics library. Each entry is a hand-authored game, expressed purely as data.
 export const catalog: GameDefinition[] = [
@@ -49,6 +50,9 @@ export const catalog: GameDefinition[] = [
   // Pinochle needed melds inside a trick game — two families' worth of scoring on one hand,
   // which nothing here could express before.
   pinochle,
+  // Skat needed all four jacks promoted out of their suits into trump, a declarer playing alone
+  // against the rest, and a contract settled on card points rather than tricks.
+  skat,
 ];
 
 export function getGame(id: string): GameDefinition | undefined {
