@@ -2,6 +2,18 @@ import { Move, RedactedState } from '../engine/types';
 import { MatchApi, TableEvent } from './protocol';
 import { MatchService, MoveRecord, Seat, TakebackRequest } from '../server/matchService';
 import { BotMode } from '../bots/randomBot';
+import { verifyReveal } from '../engine/fairness';
+
+/** Worklist #89/#90: what a player can already see about a deal's fairness, and — once the
+ *  match is over — the secret that lets them check it. commit/clientSeed/nonce are public from
+ *  the moment the match starts; revealed stays null until the match ends, the same point the
+ *  engine itself first allows the secret out (see MatchService.reveal). */
+export interface FairnessInfo {
+  commit: string;
+  clientSeed: string;
+  nonce: number;
+  revealed: { serverSeed: string; handSeeds: number[]; verified: boolean } | null;
+}
 
 // One shape of table, two places the referee can live.
 //
@@ -43,6 +55,8 @@ export interface TableClient {
   nextHand(): void;
   seats(): Seat[];
   end(): void;
+  /** null for an online table for now — the reveal round-trip isn't wired over the socket yet. */
+  fairness(): FairnessInfo | null;
   /** Fires whenever the cached position changes, so React can re-read. */
   onChange(cb: () => void): () => void;
 }
@@ -92,6 +106,16 @@ export class LocalTableClient implements TableClient {
   nextHand() { this.service.nextHand(this.matchId); this.changed(); }
   seats() { return this.service.seats(this.matchId); }
   end() { try { this.service.end(this.matchId); } catch { /* already gone */ } }
+
+  fairness(): FairnessInfo {
+    const summary = this.service.summaryOf(this.matchId);
+    let revealed: FairnessInfo['revealed'] = null;
+    if (summary.matchOver) {
+      const r = this.service.reveal(this.matchId);
+      revealed = { serverSeed: r.serverSeed, handSeeds: r.handSeeds, verified: verifyReveal(r, r.handSeeds).ok };
+    }
+    return { commit: summary.fair.commit, clientSeed: summary.fair.clientSeed, nonce: summary.fair.nonce, revealed };
+  }
 
   onChange(cb: () => void) { this.listeners.add(cb); return () => { this.listeners.delete(cb); }; }
   private changed() { for (const l of this.listeners) l(); }
@@ -239,6 +263,10 @@ export class RemoteTableClient implements TableClient {
     this.unsub = null;
     this.api.close();
   }
+
+  // Not wired over the socket yet — MatchApi has no summary/reveal round-trip. Returning null
+  // here rather than guessing is the honest answer; the UI hides the fairness panel for it.
+  fairness(): FairnessInfo | null { return null; }
 
   onChange(cb: () => void) { this.listeners.add(cb); return () => { this.listeners.delete(cb); }; }
   private changed() { for (const l of this.listeners) l(); }

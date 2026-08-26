@@ -509,6 +509,32 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
     setShowHistory(true);
   }
 
+  /** Worklist #90: "seed plus move list replays a match exactly. There is no file, no import,
+   *  no way to send somebody a game." serverSeed/handSeeds are only ever included once the
+   *  engine itself has revealed them (see MatchService.reveal) — an in-progress match exports
+   *  everything except the one thing the fairness scheme deliberately still keeps secret. */
+  function exportMatch() {
+    const fair = clientRef.current.fairness();
+    const payload = {
+      decky: 'match-export', version: 1,
+      exportedAt: new Date().toISOString(),
+      gameId: def.meta.id,
+      gameName: def.meta.name,
+      seats: clientRef.current.seats(),
+      fair: fair ?? null,
+      moves: clientRef.current.history(),
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `decky-match-${def.meta.id}-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
   function askTakeback() {
     // requestTakeback answers null both for "done, nobody's permission needed" and for
     // "there was nothing to take back", so on a table where no move has been made yet this
@@ -2088,6 +2114,12 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
                 );
               })()}
               <div className="final-actions">
+                {/* Worklist #89/#90: the server seed is revealed exactly here — the match just
+                    ended — and nowhere else, but this modal has no backdrop dismiss and Rematch
+                    starts a new match, taking the table underneath (and the History button on
+                    it) with it. Without this, the reveal a player could actually now check would
+                    be reachable for a match that no longer exists. */}
+                <button className="ghost" onClick={openHistory}>History</button>
                 <button className="primary" onClick={rematch}>
                   {plan ? 'Rematch — same table' : 'Play again'}
                 </button>
@@ -2187,7 +2219,41 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
                 </li>
               ))}
             </ol>
-            <button className="primary" onClick={() => { setShowHistory(false); setReplayAt(null); }}>Close</button>
+            {/* Worklist #89: "every deal publishes a hash before it is dealt and reveals the
+                seed after. Nothing in the interface shows either." The hash and the player's
+                own contribution are public from the moment the match starts; the seed itself
+                only once the match is over, at the same point the engine allows it out. */}
+            {(() => {
+              const fair = clientRef.current.fairness();
+              if (!fair) return null;
+              return (
+                <div className="fairness">
+                  <h4>How this deal was fixed</h4>
+                  <dl className="fairness-dl">
+                    <dt>Commit</dt><dd className="mono">{fair.commit}</dd>
+                    <dt>Your seed</dt><dd className="mono">{fair.clientSeed}</dd>
+                    {fair.revealed ? (
+                      <>
+                        <dt>Server seed</dt><dd className="mono">{fair.revealed.serverSeed}</dd>
+                        <dt>Check</dt>
+                        <dd>{fair.revealed.verified
+                          ? '✓ Every hand matches the commit.'
+                          : '✕ Something does not match — this should never happen.'}</dd>
+                      </>
+                    ) : (
+                      <>
+                        <dt>Server seed</dt>
+                        <dd className="muted">Revealed once the match ends.</dd>
+                      </>
+                    )}
+                  </dl>
+                </div>
+              );
+            })()}
+            <div className="history-actions">
+              <button className="ghost" onClick={exportMatch}>Export match ↓</button>
+              <button className="primary" onClick={() => { setShowHistory(false); setReplayAt(null); }}>Close</button>
+            </div>
           </div>
         </div>
       )}
