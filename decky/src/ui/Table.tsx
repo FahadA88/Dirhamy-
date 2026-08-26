@@ -1916,7 +1916,11 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
                 <span className="cb-ring" />
                 <span className="cb-mark">{iWon ? '★' : '☆'}</span>
               </span>
-              <span className="cb-kicker">{view.matchTarget != null ? 'Match over' : 'Game over'}</span>
+              {/* General sweep: "every family's big moment currently resolves into the same
+                  generic match-over modal" — Pit's only way to end IS its one big moment
+                  (cornering the market), so it gets a kicker that says so instead of the
+                  generic "Game over" every other single-hand family also falls back to. */}
+              <span className="cb-kicker">{isPit ? '📐 Cornered the market' : view.matchTarget != null ? 'Match over' : 'Game over'}</span>
               {(() => {
                 const title = iWon ? (isKent ? 'Your pair wins' : 'You win')
                   : isKent ? `${teamOf(view.matchWinner ?? '') ?? 'The other pair'} wins`
