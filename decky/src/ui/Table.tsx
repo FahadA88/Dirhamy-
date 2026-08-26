@@ -386,6 +386,20 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
     : discardMoves.length > 0 ? 'dealerDiscard'
     : view.mode === 'trick' ? 'playToTrick' : view.mode === 'climb' ? 'climbPlay' : isRummy ? 'rummyDiscard' : 'playCard';
 
+  // Worklist #54: a climb turn can arrive with nothing that beats the pile, and the table used
+  // to just sit there until the Pass button was noticed. climbPass being the only legal move IS
+  // "nothing to do" here, not a choice to weigh, so it plays itself — the same reasoning that
+  // already explains a forced opening lead instead of making it be found.
+  useEffect(() => {
+    if (!isClimb || view.phase !== 'playing') return;
+    if (myLegal.length !== 1 || myLegal[0].actionId !== 'climbPass') return;
+    const timer = setTimeout(() => {
+      const res = clientRef.current.submit(me, { actionId: 'climbPass' });
+      if (res.ok) setBoard(clientRef.current.read(me));
+    }, 550);
+    return () => clearTimeout(timer);
+  }, [isClimb, view.phase, myLegal, me]);
+
   // Bot loop, paced by the user's bot-speed setting. Bots move inside the service — the client
   // asks it to advance one seat and gets back its own view, so a bot's hand never crosses the
   // boundary just to be played. A simultaneous pass can leave several bots waiting at once;
