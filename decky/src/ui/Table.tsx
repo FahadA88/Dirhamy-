@@ -151,6 +151,10 @@ function highlightOf(view: RedactedState, me: string, def: GameDefinition): { ke
     const trades = view.tradesCompleted?.[me];
     if (typeof trades === 'number' && trades > 0) return { key: 'pit-trades', label: 'Trades made', value: trades };
   }
+  if (view.mode === 'war') {
+    const wars = view.warsCount;
+    if (typeof wars === 'number' && wars > 0) return { key: 'wars-fought', label: 'Wars fought', value: wars };
+  }
   if (view.mode === 'kent') {
     // Letters live per pair, not per player — a seat's own team is the even/odd half of the
     // seating order, the same rule kentTeamOf uses server-side (partners sit opposite).
@@ -1713,6 +1717,7 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
         ) : isWar ? (
           <div className="war-controls">
             <span className="war-pile">Your pile · <b key={myPile} className="war-pile-n">{myPile}</b> cards</span>
+            {(view.warsCount ?? 0) > 0 && <span className="war-pile">{view.warsCount} war{view.warsCount === 1 ? '' : 's'} fought</span>}
             {canFlip && <button className="primary" onClick={() => submit({ actionId: 'warFlip' })}>⚔ Flip</button>}
           </div>
         ) : (

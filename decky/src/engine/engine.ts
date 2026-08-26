@@ -68,6 +68,7 @@ export function createMatch(
     trickPlays: [],
     lastTrick: null,
     lastBattle: null,
+    warsCount: 0,
     shotMoon: null,
     roundOutcome: null,
     tricksWon: Object.fromEntries(players.map((p) => [p, 0])),
@@ -594,6 +595,7 @@ function cloneState(state: MatchState): MatchState {
       ? { winner: state.lastTrick.winner, plays: state.lastTrick.plays.map((t) => ({ ...t })) }
       : null,
     lastBattle: state.lastBattle ? state.lastBattle.map((b) => ({ card: { ...b.card } })) : null,
+    warsCount: state.warsCount,
     shotMoon: state.shotMoon ?? null,
     roundOutcome: state.roundOutcome ?? null,
     finished: state.finished.slice(),
@@ -2822,6 +2824,7 @@ function applyWarMove(s: MatchState, playerId: string, move: Move): MatchState {
       break;
     }
     // tie → war: 3 face-down each, then flip again
+    s.warsCount += 1;
     log(s, null, `War! ${ca.rank} ties ${cb.rank}.`);
     for (let k = 0; k < 3; k++) { const x = handA.shift(); const y = handB.shift(); if (x) pot.push(x); if (y) pot.push(y); }
     if (handA.length === 0 || handB.length === 0) {
@@ -3719,6 +3722,7 @@ export function redact(state: MatchState, viewer: string): RedactedState {
       : state.definition.bluff ? 'bluff' : state.definition.reflex ? 'reflex' : state.definition.poker ? 'poker' : state.definition.pit ? 'pit' : state.definition.kent ? 'kent' : state.definition.set ? 'set' : 'shedding',
     ...(state.definition.solitaire ? solitaireView(state) : {}),
     battle: state.definition.war ? (state.lastBattle ?? []).map((b) => b.card) : undefined,
+    warsCount: state.definition.war ? state.warsCount : undefined,
     shotMoon: state.definition.trick?.shootTheMoon ? (state.shotMoon ?? null) : undefined,
     roundOutcome: (state.definition.rummy?.knock !== undefined || state.definition.trick?.numericAuction)
       ? (state.roundOutcome ?? null) : undefined,

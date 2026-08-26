@@ -539,6 +539,8 @@ export interface MatchState {
    * being animated by id, gave the flying-card layer two candidate homes for one card.
    */
   lastBattle?: { card: Card }[] | null;
+  /** War: how many ties have gone to a war (three down, flip again) so far this game. */
+  warsCount: number;
   /** Who swept every penalty point this hand, if anyone — cleared each time scoring runs. */
   shotMoon?: string | null;
   /** How a hand just ended, for the table to name it as more than a score delta — gin rummy's
@@ -700,6 +702,7 @@ export interface RedactedState {
   meldMoves?: { cards: string[]; label: string }[];
   deadwood?: number;       // gin: what this viewer's unmatched cards are currently worth
   battle?: Card[];
+  warsCount?: number;
   /** Who swept every penalty point this hand, if the game plays that way and anyone did. */
   shotMoon?: string | null;
   /** How a hand just ended — gin rummy's three endings, or a bid contract made as a slam. */

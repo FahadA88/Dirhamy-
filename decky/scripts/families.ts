@@ -6,6 +6,7 @@
 // documents (single betting round in poker, no side pots, suits stand in for pit commodities).
 
 import { bluff } from '../src/games/bluff';
+import { war } from '../src/games/war';
 import { slapjack } from '../src/games/slapjack';
 import { showdownPoker } from '../src/games/showdownPoker';
 import { pit } from '../src/games/pit';
@@ -67,6 +68,23 @@ section('Bluff — claim, challenge, reveal (Bluff)');
     (t.zones['hand:B'] || []).length === 2);
   check('a wrongful challenge tallies neither a catch nor a correct call',
     t.bluffCaught['A'] === 0 && t.bluffCaught['B'] === 0 && t.bluffCalled['A'] === 0 && t.bluffCalled['B'] === 0);
+}
+
+// ---------- War: a tie counts as a war fought ----------
+section('War — a tied flip is tallied as a war (War)');
+{
+  const P = ['A', 'B'];
+  let s: MatchState = createMatch(war, P, 1);
+  // A's top card ties B's — three down each, then a fifth flip that resolves it (Ace beats
+  // the low card B has waiting underneath its own stakes).
+  s.zones['hand:A'] = ['K', '2', '3', '4', 'A'].map((r, i) => card(`a${i}`, r, 'S'));
+  s.zones['hand:B'] = ['K', '5', '6', '7', '3'].map((r, i) => card(`b${i}`, r, 'H'));
+  check('a war has not happened yet', s.warsCount === 0);
+
+  s = applyMove(s, 'A', { actionId: 'warFlip' });
+  check('the tie was fought as a war', s.warsCount === 1);
+  check('the resolving flip actually happened', (s.zones['hand:A'] || []).length !== 5);
+  check('the tally reaches the redacted view', redact(s, 'A').warsCount === 1);
 }
 
 // ---------- Reflex: a slap wins the pile, and a stalled flip skips ----------
