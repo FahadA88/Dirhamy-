@@ -32,7 +32,10 @@ export const yukon: GameDefinition = {
   scoring: { mode: 'lowestPoints', winner: 'lowestTotal', cardPoints: {}, target: null },
   solitaire: {
     decks: 1, columns: 7, deal: 'triangle', faceUp: 'top',
-    build: 'alt-color', moveRun: 'built', empty: 'king',
+    build: 'alt-color',
+    // The move the game is named for: lift any face-up card with the whole pile on top of it,
+    // however badly ordered, and drop the lot where the bottom card fits.
+    moveRun: 'any', empty: 'king',
     freeCells: 0, foundations: 4, foundationMode: 'place',
     stock: 'none', stockTurn: 0, redeals: 0,
   },

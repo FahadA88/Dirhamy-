@@ -281,6 +281,19 @@ export interface TrickConfig {
    */
   jokerRank?: 'low' | 'high' | 'trump';
   bidding?: boolean;           // players bid tricks before play (Spades); overrides scoreBy with bid scoring
+  /**
+   * Combinations worth points for simply HOLDING them, scored once as the hand is dealt and
+   * before a card is played.
+   *
+   * The two halves of Pinochle, Bezique and Sixty-Six are a trick game and a melding game
+   * played with the same cards, and Decky's families are one or the other — so a game where a
+   * queen and a jack in your hand are worth forty points before you play them could not be
+   * described at all.
+   *
+   * `cards` names the combination the same way everything else here names a card: suit then
+   * rank. A hand scores a meld once per complete copy it holds.
+   */
+  melds?: { name: string; cards: string[]; points: number }[];
   partnerships?: boolean;      // 4 players in 2 teams (seats 1&3 vs 2&4)
 
   // Euchre-family rules. With `auction`, trump is not fixed by the definition — it is named
@@ -308,19 +321,38 @@ export interface TrickConfig {
 // you build down, foundations you build up, optional free cells, and a stock. The engine
 // synthesises all of those zones from this config, so a definition never lists them by hand.
 
-export type BuildRule = 'alt-color' | 'same-suit' | 'any-suit' | 'down-any';
+export type BuildRule =
+  | 'alt-color' | 'same-suit' | 'any-suit' | 'down-any'
+  /**
+   * One rank either way, suit irrelevant — Golf's whole rule. Every other build rule here is a
+   * descent, so a game where a 7 accepts both a 6 and an 8 could not be described at all.
+   */
+  | 'up-or-down';
 export type EmptyRule = 'any' | 'king' | 'none';
 
 export interface SolitaireConfig {
   decks: number;               // Spider uses two
   columns: number;
   deal: 'triangle' | 'even';   // Klondike's 1,2,3… staircase vs an even split
+  /**
+   * Cards per column, when neither shape fits.
+   *
+   * 'even' divides the whole pack between the columns, which is right for FreeCell and wrong
+   * for any game that deals a small tableau and keeps the rest as stock — Canfield puts one
+   * card in each of four columns and the other thirty-four in the stock. Overrides `deal`.
+   */
+  dealCount?: number;
   faceUp: 'top' | 'all';       // Klondike/Spider show only the top of each column; FreeCell shows all
 
   // Stacking a card onto a tableau column.
   build: BuildRule;            // alt-color (Klondike/FreeCell) | down-any (Spider: rank only)
   // Lifting more than one card at a time.
-  moveRun: 'single' | 'built' | 'same-suit';
+  /**
+   * 'any' lifts a face-up card together with everything sitting on it, in whatever order it
+   * happens to be — Yukon's defining move, and the reason Yukon is winnable at all. The others
+   * require the cards above to already form a proper run.
+   */
+  moveRun: 'single' | 'built' | 'same-suit' | 'any';
   empty: EmptyRule;            // what may be dropped into an empty column
 
   freeCells: number;
@@ -331,6 +363,31 @@ export interface SolitaireConfig {
   stock: 'none' | 'waste' | 'deal-row';
   stockTurn: number;           // cards flipped to the waste at a time
   redeals: number;             // -1 = unlimited
+
+  /**
+   * Which rank a foundation starts from.
+   *
+   * 'ace' is what every patience here assumed: build A,2,3…K and stop. Canfield turns one card
+   * up at the start and THAT rank becomes the base for all four, so a game might run 7,8,9…K
+   * then wrap round through A,2 and finish on the six. The wrap is the whole difficulty — you
+   * are no longer waiting for aces, you are waiting for one specific rank.
+   */
+  foundationStart?: 'ace' | 'dealt';
+  /**
+   * The waste pile is somewhere to play TO, not only from.
+   *
+   * Golf is built entirely on this: there are no foundations to speak of, and the whole game is
+   * feeding tableau cards onto one growing waste pile whose top card sets what may follow. The
+   * board here has always treated the waste as a source and never a destination, which turned
+   * Golf inside out — the engine offered to move the waste card onto the tableau instead.
+   */
+  wasteIsTarget?: boolean;
+  /**
+   * A face-up pile whose top card is playable, refilled from itself rather than dealt out.
+   * Canfield's thirteen-card reserve is the other half of what makes it Canfield: a stack you
+   * can see and mostly cannot reach.
+   */
+  reserve?: number;
 }
 
 // A trump-naming auction (Euchre). Round 1 offers the turned-up card's suit; round 2 lets each
@@ -720,6 +777,8 @@ export interface MatchState {
   brokenSuitPlayed: boolean;             // Hearts: has the broken suit been discarded off-suit yet
   faceUp: Record<string, boolean>;       // solitaire: which cards are turned face up
   redealsLeft: number;                   // solitaire: stock passes remaining (-1 = unlimited)
+  /** Patience: the rank foundations build from, when they do not build from aces. */
+  foundationBase: string | null;
   moveCount: number;                     // solitaire: moves made, for scoring/stats
   // bluff: the most recent claim, open to challenge until superseded by the next one.
   pendingClaim: { player: string; count: number; claimedRank: string; cardIds: string[] } | null;
@@ -823,6 +882,9 @@ export interface RedactedState {
   stockCount?: number;
   wasteCards?: Card[];
   redealsLeft?: number;
+  /** Patience: the reserve pile, top card last, and the rank foundations build from. */
+  reserve?: Card[];
+  foundationBase?: string | null;
   moveCount?: number;
   solMoves?: Move[];
   rummyPhase?: 'draw' | 'play';

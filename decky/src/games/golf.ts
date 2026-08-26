@@ -33,8 +33,12 @@ export const golf: GameDefinition = {
     decks: 1, columns: 7, deal: 'even', faceUp: 'all',
     // Rank-only building, one card at a time, and nothing may be put into an empty column —
     // which together is exactly the shape of Golf.
-    build: 'down-any', moveRun: 'single', empty: 'none',
+    build: 'up-or-down', moveRun: 'single', empty: 'none',
+    // The waste is where cards GO in this game, and clearing the columns is the win. Both are
+    // the opposite of every other patience here.
+    wasteIsTarget: true,
     freeCells: 0, foundations: 1, foundationMode: 'place',
     stock: 'waste', stockTurn: 1, redeals: 0,
+    dealCount: 5,
   },
 };

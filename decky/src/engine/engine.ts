@@ -99,6 +99,7 @@ export function createMatch(
     stopRules: false,
     ruleDepth: 0,
     handEndFired: false,
+    foundationBase: null,
     scores: Object.fromEntries(players.map((p) => [p, 0])),
     phase: 'playing',
     winner: null,
@@ -150,6 +151,7 @@ export function createMatch(
     for (let i = 0; i < cfg.freeCells; i++) state.zones[solZones.free(i)] = [];
     state.zones[solZones.stock] = [];
     state.zones[solZones.waste] = [];
+    if (cfg.reserve) state.zones[solZones.reserve] = [];
     state.redealsLeft = cfg.redeals;
 
     const { result, rngState } = seededShuffle(buildDeck(def), state.rngState);
@@ -158,11 +160,17 @@ export function createMatch(
 
     // Deal: Klondike's staircase, or an even spread across the columns.
     const counts: number[] = [];
-    if (cfg.deal === 'triangle') {
+    // Whatever the reserve and a turned-up foundation card have already taken is not available
+    // to the tableau — an even split that ignores them deals the whole pack and leaves the
+    // last columns empty.
+    const spare = deck.length - (cfg.reserve ?? 0) - (cfg.foundationStart === 'dealt' ? 1 : 0);
+    if (cfg.dealCount !== undefined) {
+      for (let i = 0; i < cfg.columns; i++) counts.push(cfg.dealCount);
+    } else if (cfg.deal === 'triangle') {
       for (let i = 0; i < cfg.columns; i++) counts.push(i + 1);
     } else {
-      const per = Math.floor(deck.length / cfg.columns);
-      const extra = deck.length % cfg.columns;
+      const per = Math.floor(spare / cfg.columns);
+      const extra = spare % cfg.columns;
       for (let i = 0; i < cfg.columns; i++) counts.push(per + (i < extra ? 1 : 0));
     }
     // Spider deals 54 of 104, not the whole pack.
@@ -172,6 +180,29 @@ export function createMatch(
     }
 
     let k = 0;
+    // Canfield's reserve comes off the top before anything else, face up but stacked, so only
+    // its top card is ever in play.
+    if (cfg.reserve) {
+      for (let n = 0; n < cfg.reserve && k < deck.length; n++, k++) {
+        state.zones[solZones.reserve].push(deck[k]);
+        state.faceUp[deck[k].id] = true;
+      }
+    }
+    /*
+      The base rank, for a game that does not build from aces.
+
+      One card decides it for the whole deal: it goes straight to the first foundation and every
+      other foundation then starts from that same rank and wraps round the top of the order back
+      to the bottom. Chosen here rather than on the first play so that the board a player is
+      looking at already tells them what they are collecting.
+    */
+    if (cfg.foundationStart === 'dealt' && k < deck.length) {
+      const base = deck[k];
+      state.zones[solZones.found(0)].push(base);
+      state.faceUp[base.id] = true;
+      state.foundationBase = base.rank;
+      k++;
+    }
     for (let i = 0; i < cfg.columns; i++) {
       for (let n = 0; n < counts[i] && k < deck.length; n++, k++) {
         const card = deck[k];
@@ -339,6 +370,7 @@ export function createMatch(
     log(state, null, `Corner ${pitCorner(state)} of one suit to win.`);
     pitCheckWin(state);
   }
+  scoreMelds(state);
   fireRules(state, 'handStart', { playerId: state.players[state.turnIndex] });
   return state;
 }
@@ -1452,6 +1484,42 @@ export function nextHand(state: MatchState, seed: number): MatchState {
   });
 }
 
+/**
+ * Points for combinations a player was dealt, awarded before anything is played.
+ *
+ * Counted by consuming cards: a hand holding two of every card in a meld scores it twice, and a
+ * card already spent on one copy cannot be counted again for the next. Awarded through the same
+ * `bonus` channel author-written rules use, so it folds into the hand score wherever that is
+ * finally worked out rather than needing its own path through every family's scorer.
+ */
+function scoreMelds(s: MatchState): void {
+  const melds = s.definition.trick?.melds;
+  if (!melds || melds.length === 0) return;
+  for (const p of s.players) {
+    const hand = s.zones[`hand:${p}`] || [];
+    for (const meld of melds) {
+      const pool = hand.map((c) => `${c.suit}${c.rank}`);
+      let copies = 0;
+      // Keep taking whole copies out of the pool until one cannot be completed.
+      for (;;) {
+        const taking: number[] = [];
+        for (const want of meld.cards) {
+          const at = pool.findIndex((k, i) => k === want && !taking.includes(i));
+          if (at < 0) { taking.length = 0; break; }
+          taking.push(at);
+        }
+        if (taking.length !== meld.cards.length) break;
+        for (const i of taking.sort((a, b) => b - a)) pool.splice(i, 1);
+        copies++;
+      }
+      if (copies > 0) {
+        s.bonus[p] = (s.bonus[p] ?? 0) + meld.points * copies;
+        log(s, null, `${short(p)} melds ${meld.name}${copies > 1 ? ` ×${copies}` : ''} for ${meld.points * copies}.`);
+      }
+    }
+  }
+}
+
 // ---------- trick-taking family ----------
 
 // Trump is normally fixed by the definition, but an auction game names it per hand. Both kinds
@@ -2305,6 +2373,7 @@ export const solZones = {
   free: (i: number) => `free${i}`,
   stock: 'stock',
   waste: 'waste',
+  reserve: 'reserve',
 };
 
 function solRankIndex(s: MatchState, rank: string): number {
@@ -2316,7 +2385,18 @@ function isRed(c: Card): boolean { return c.suit === 'H' || c.suit === 'D'; }
 // May `card` be stacked directly onto `onto` in a tableau column?
 function solCanStack(s: MatchState, card: Card, onto: Card): boolean {
   const cfg = s.definition.solitaire!;
-  if (solRankIndex(s, card.rank) !== solRankIndex(s, onto.rank) - 1) return false;
+  const len = s.definition.deck.rankOrder.length;
+  // A game whose foundations wrap has a tableau that wraps too — a king goes on an ace, because
+  // in Canfield the sequence is a circle rather than a line.
+  // Golf accepts a card one rank either side, which no descending rule can express.
+  if (cfg.build === 'up-or-down') {
+    const d = Math.abs(solRankIndex(s, card.rank) - solRankIndex(s, onto.rank));
+    return d === 1;
+  }
+  const below = cfg.foundationStart === 'dealt'
+    ? (solRankIndex(s, onto.rank) - 1 + len) % len
+    : solRankIndex(s, onto.rank) - 1;
+  if (solRankIndex(s, card.rank) !== below) return false;
   switch (cfg.build) {
     case 'alt-color': return isRed(card) !== isRed(onto);
     case 'same-suit': return card.suit === onto.suit;
@@ -2330,6 +2410,9 @@ function solRunOk(s: MatchState, col: Card[], from: number): boolean {
   const cfg = s.definition.solitaire!;
   if (from >= col.length - 1) return true;      // a single card is always a run of one
   if (cfg.moveRun === 'single') return false;
+  // Yukon: whatever is on top comes along, ordered or not. Everything must be face up, or you
+  // would be moving cards you cannot see.
+  if (cfg.moveRun === 'any') return col.slice(from).every((c) => s.faceUp[c.id]);
   for (let i = from; i < col.length - 1; i++) {
     const a = col[i], b = col[i + 1];
     if (solRankIndex(s, b.rank) !== solRankIndex(s, a.rank) - 1) return false;
@@ -2367,9 +2450,20 @@ function solCanDropOnColumn(s: MatchState, card: Card, colId: string): boolean {
 function solCanDropOnFoundation(s: MatchState, card: Card, fId: string): boolean {
   if (s.definition.solitaire!.foundationMode !== 'place') return false;
   const f = s.zones[fId] || [];
-  if (f.length === 0) return solRankIndex(s, card.rank) === 0;   // aces start a foundation
+  const order = s.definition.deck.rankOrder;
+  // With a dealt base the sequence wraps: …K, A, 2… so "one higher" is modular, and an empty
+  // foundation wants the base rank rather than an ace.
+  const wraps = s.definition.solitaire!.foundationStart === 'dealt';
+  if (f.length === 0) {
+    const want = wraps && s.foundationBase ? order.indexOf(s.foundationBase as never) : 0;
+    return solRankIndex(s, card.rank) === want;
+  }
   const top = f[f.length - 1];
-  return card.suit === top.suit && solRankIndex(s, card.rank) === solRankIndex(s, top.rank) + 1;
+  if (card.suit !== top.suit) return false;
+  const next = wraps
+    ? (solRankIndex(s, top.rank) + 1) % order.length
+    : solRankIndex(s, top.rank) + 1;
+  return solRankIndex(s, card.rank) === next;
 }
 
 // Spider: a complete king-to-ace run of one suit sitting on a column leaves the board.
@@ -2429,6 +2523,13 @@ function solitaireLegalMoves(state: MatchState): Move[] {
     const top = w[w.length - 1];
     if (top) sources.push({ id: top.id, card: top, run: [top], from: solZones.waste });
   }
+  // The reserve offers exactly one card — its top — which is what makes it a reserve rather
+  // than a thirteenth column. Everything under it waits.
+  if (cfg.reserve) {
+    const r = state.zones[solZones.reserve] || [];
+    const top = r[r.length - 1];
+    if (top) sources.push({ id: top.id, card: top, run: [top], from: solZones.reserve });
+  }
 
   for (const src of sources) {
     for (const colId of cols) {
@@ -2439,6 +2540,14 @@ function solitaireLegalMoves(state: MatchState): Move[] {
       if (empty && src.from.startsWith('tab') && (state.zones[src.from] || []).length === src.run.length) continue;
       if (solCanDropOnColumn(state, src.card, colId)) {
         moves.push({ actionId: 'solMove', cardId: src.id, from: src.from, to: colId });
+      }
+    }
+    // Golf: a single card may go onto the waste when it fits the card showing there.
+    if (cfg.wasteIsTarget && src.run.length === 1 && src.from !== solZones.waste) {
+      const w = state.zones[solZones.waste] || [];
+      const top = w[w.length - 1];
+      if (top && solCanStack(state, src.card, top)) {
+        moves.push({ actionId: 'solMove', cardId: src.id, from: src.from, to: solZones.waste });
       }
     }
     if (src.run.length === 1) {
@@ -2551,6 +2660,8 @@ function solitaireView(s: MatchState): Partial<RedactedState> {
     moveCapacity: cfg.freeCells > 0 ? solMoveCapacity(s, false) : undefined,
     stockCount: (s.zones[solZones.stock] || []).length,
     wasteCards: (s.zones[solZones.waste] || []).slice(-3),
+    reserve: cfg.reserve ? (s.zones[solZones.reserve] || []).slice() : undefined,
+    foundationBase: cfg.foundationStart === 'dealt' ? s.foundationBase : undefined,
     redealsLeft: s.redealsLeft,
     moveCount: s.moveCount,
     solMoves: s.phase === 'playing' ? solitaireLegalMoves(s) : [],
@@ -2560,6 +2671,23 @@ function solitaireView(s: MatchState): Partial<RedactedState> {
 function checkSolitaireEnd(s: MatchState): void {
   const cfg = s.definition.solitaire!;
   const len = s.definition.deck.rankOrder.length;
+  /*
+    A game that plays onto the waste is won by emptying the board, not by filling foundations.
+    Golf has nowhere to build up to — the cards go onto one pile and the question is only
+    whether you clear the columns before the stock runs out — so counting foundation cards
+    would mean it could never be won at all.
+  */
+  if (cfg.wasteIsTarget) {
+    const cleared = Array.from({ length: cfg.columns }, (_, i) => s.zones[solZones.tab(i)] || [])
+      .every((col) => col.length === 0);
+    if (cleared) {
+      s.phase = 'roundOver';
+      s.winner = s.players[0];
+      s.scores[s.players[0]] = s.moveCount;
+      log(s, null, `Cleared the board in ${s.moveCount} moves.`);
+    }
+    return;
+  }
   const need = cfg.foundations * len;
   let placed = 0;
   for (let i = 0; i < cfg.foundations; i++) placed += (s.zones[solZones.found(i)] || []).length;

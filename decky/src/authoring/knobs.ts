@@ -2,7 +2,7 @@
 // set of KNOBS; buildDefinition() compiles those knobs into a full GameDefinition the engine
 // can run. This is what the visual editor edits and what the AI co-pilot writes to.
 
-import { Effect, GameDefinition, Predicate, Rank, Strain, Suit } from '../engine/types';
+import { BuildRule, Effect, GameDefinition, Predicate, Rank, SolitaireConfig, Strain, Suit } from '../engine/types';
 import { RestrictionDraft, RuleDraft, compileRestrictions, compileRules } from './ruleKit';
 import { CURRENT_SCHEMA } from '../engine/migrate';
 
@@ -108,8 +108,8 @@ export interface Knobs {
   solColumns: number;
   solDeal: 'triangle' | 'even';
   solFaceUp: 'top' | 'all';
-  solBuild: 'alt-color' | 'same-suit' | 'any-suit' | 'down-any';
-  solMoveRun: 'single' | 'built' | 'same-suit';
+  solBuild: BuildRule;
+  solMoveRun: SolitaireConfig['moveRun'];
   solEmpty: 'any' | 'king' | 'none';
   solFreeCells: number;
   solFoundations: number;

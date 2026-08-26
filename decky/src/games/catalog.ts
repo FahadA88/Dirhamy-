@@ -29,6 +29,10 @@ import { ratscrew } from './ratscrew';
 import { canasta } from './canasta';
 import { yukon } from './yukon';
 import { golf } from './golf';
+import { bridge } from './bridge';
+import { continental } from './continental';
+import { canfield } from './canfield';
+import { pinochle } from './pinochle';
 
 // The classics library. Each entry is a hand-authored game, expressed purely as data.
 export const catalog: GameDefinition[] = [
@@ -39,6 +43,12 @@ export const catalog: GameDefinition[] = [
   // that changes with the table (Oh Hell), individually priced cards (Black Maria), wild melds
   // (Canasta), and three more boards from the same patience config.
   fiveHundred, ohHell, blackMaria, bigTwo, ratscrew, canasta, yukon, golf,
+  // Bridge and Continental Rummy the engine could already express; Canfield needed two new
+  // patience rules — foundations that build from a dealt rank, and a reserve.
+  bridge, continental, canfield,
+  // Pinochle needed melds inside a trick game — two families' worth of scoring on one hand,
+  // which nothing here could express before.
+  pinochle,
 ];
 
 export function getGame(id: string): GameDefinition | undefined {
