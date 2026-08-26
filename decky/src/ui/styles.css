@@ -4190,6 +4190,14 @@ header h1 {
 /* ---- what you do once it is over ---- */
 .final-actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
 
+/* Worklist #59: a short, honest look back — not a verdict, just where the advisor's own pick
+   landed on a different card. Sits between the podium and the rematch button, so it reads as
+   part of the same moment rather than a separate report to go find later. */
+.analysis { margin: 4px 0 16px; text-align: left; }
+.analysis h4 { margin: 0 0 4px; font-size: 13px; text-align: center; }
+.analysis .an-note { margin: 0 0 8px; font-size: 12.5px; text-align: center; }
+.analysis .an-list { margin: 0; max-height: 30vh; }
+
 /* ---- the keyboard's place in the hand ---- */
 /* Focus has to be visible on a card, or arrowing along the hand is invisible. */
 .card-btn:focus-visible {

@@ -51,6 +51,11 @@ export interface MoveRecord {
   move: Move;
   at: number;
   text: string;               // the log line this move produced, for a readable history
+  /** Worklist #59: what the built-in advisor — the same one behind Hint and the bots — would
+   *  have played instead, kept only when there was a real choice to make, the seat is a real
+   *  person on this device, and the advisor's own pick landed somewhere different. Not a claim
+   *  that the advisor was right; just where the two disagreed, for a post-game look back. */
+  advisorMove?: Move;
 }
 
 export interface MatchSummary {
@@ -257,12 +262,35 @@ export class MatchService {
       return { ok: false, reason: explainIllegal(rec.state, playerId, move, allowed), view: redact(rec.state, playerId) };
     }
 
+    const advisorMove = this.adviseIfWorthNoting(rec, playerId, match, allowed);
     this.remember(rec);
     const before = rec.state.log.length;
     rec.state = applyMove(rec.state, playerId, match);
-    this.recordMove(rec, playerId, match, before);
+    this.recordMove(rec, playerId, match, before, advisorMove);
     this.store.set(matchId, rec);
     return { ok: true, view: redact(rec.state, playerId) };
+  }
+
+  /** Worklist #59: computed against the state right before the move is applied, using the same
+   *  advisor Hint already calls — so this costs nothing new to trust, only a second call to it.
+   *  Skipped whenever there was nothing to disagree about (one legal move), the seat isn't a
+   *  real person on this device (a bot's move can't disagree with itself; a remote human's
+   *  disagreement is theirs to see on their own device), or the advisor itself has nothing to
+   *  say. Never lets analysis stand in the way of the move it's attached to. */
+  private adviseIfWorthNoting(rec: MatchRecord, playerId: string, actual: Move, allowed: Move[]): Move | undefined {
+    if (allowed.length <= 1) return undefined;
+    // Patience has its own advisor (chooseSolitaireMove, see hint() above) and its own
+    // round-over screen with nothing that reads advisorMove — nothing here would ever reach a
+    // player, so there's no reason to run the wrong bot against solitaire state at all.
+    if (rec.definition.solitaire) return undefined;
+    const seat = rec.seats.find((s) => s.id === playerId);
+    if (!seat || seat.kind !== 'local') return undefined;
+    try {
+      const suggestion = chooseMove(rec.state, playerId, rec.botSeed, 'smart').move;
+      return suggestion && !sameMove(suggestion, actual) ? suggestion : undefined;
+    } catch {
+      return undefined;
+    }
   }
 
   /** The move history, as sentences. Safe to show anyone — it is the public record of the hand. */
@@ -566,7 +594,7 @@ export class MatchService {
     while (rec.history.length > limit) rec.history.shift();
   }
 
-  private recordMove(rec: MatchRecord, seat: string, move: Move, logLenBefore: number): void {
+  private recordMove(rec: MatchRecord, seat: string, move: Move, logLenBefore: number, advisorMove?: Move): void {
     const added = rec.state.log.slice(logLenBefore);
     rec.moves.push({
       n: rec.moves.length + 1,
@@ -574,6 +602,7 @@ export class MatchService {
       move,
       at: Date.now(),
       text: added.length > 0 ? added.map((l) => l.text).join(' ') : describeMove(move),
+      advisorMove,
     });
     if (rec.moves.length > 500) rec.moves.shift();
   }

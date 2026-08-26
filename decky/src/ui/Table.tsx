@@ -1,6 +1,6 @@
 import { MutableRefObject, useEffect, useMemo, useRef, useState } from 'react';
 import { Card, GameDefinition, Move, RedactedState } from '../engine/types';
-import { SUIT_SYMBOLS } from '../engine/deck';
+import { SUIT_SYMBOLS, buildDeck } from '../engine/deck';
 import { CardFace } from './Card';
 import { AttrCard, describeAttrs } from './AttrCard';
 import { TableDressing, TableRail } from './TableDressing';
@@ -866,6 +866,29 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
   );
 
   const hand = useMemo(() => sortHand(view.hand, def, settings.sort), [view.hand, def, settings.sort]);
+
+  // Worklist #59: naming a card from a MoveRecord logged earlier in the match, once it may no
+  // longer be in view.hand at all. The definition's own deck is a pure function of def, so a
+  // lookup built from it names any card the match ever dealt, not just the ones still in play.
+  const deckById = useMemo(() => new Map(buildDeck(def).map((c) => [c.id, c])), [def]);
+  function labelCard(id: string): string {
+    const c = deckById.get(id);
+    if (!c) return id;
+    return c.rank === 'JOKER' ? 'Joker' : `${c.rank}${SUIT_SYMBOLS[c.suit] ?? ''}`;
+  }
+  // Only these action ids put real card ids in cardId/cards — pitOffer, for one, reuses `cards`
+  // to hold a stringified quantity ("1", "2", "3"), which labelCard would otherwise happily
+  // "look up" and print back verbatim as a card name that doesn't exist.
+  const CARD_MOVE_ACTIONS = new Set([
+    'playCard', 'playToTrick', 'climbPlay', 'climbBomb', 'rummyDiscard', 'dealerDiscard', 'layOff', 'meld', 'bluffClaim',
+  ]);
+  function labelMove(m: Move): string {
+    if (CARD_MOVE_ACTIONS.has(m.actionId)) {
+      if (m.cardId) return labelCard(m.cardId);
+      if (m.cards && m.cards.length > 0) return m.cards.map(labelCard).join(' ');
+    }
+    return describeHint(m, nameOf);
+  }
 
   // Worklist #94: the same cursor-and-Enter model full keyboard play already drives (see
   // handKeys and moveCursor below), fed by a gamepad's D-pad or left stick and its bottom face
@@ -2000,6 +2023,40 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
                   </li>
                 ))}
               </ol>
+              {/* Worklist #59: a finished match is a complete record of every decision and the
+                  same advisor that already drives Hint and the bots — nothing looked back and
+                  said anything about it until now. Not a verdict on any one move; just where a
+                  choice existed and the advisor's own pick landed somewhere else. */}
+              {(() => {
+                // Two different pitAccept offers, say, can read identically once described in
+                // words — "Take that trade" either way — which would show the same line twice
+                // and look like a typo rather than a disagreement. Filtered here rather than
+                // where advisorMove is first captured, since only the rendered text can say
+                // whether two moves actually read as different.
+                const disagreements = clientRef.current.history()
+                  .filter((h) => h.seat === me && h.advisorMove)
+                  .filter((h) => labelMove(h.move) !== labelMove(h.advisorMove!));
+                if (disagreements.length === 0) return null;
+                return (
+                  <div className="analysis">
+                    <h4>Worth a second look</h4>
+                    <p className="an-note muted">
+                      {disagreements.length} of your move{disagreements.length === 1 ? '' : 's'} this match, the advisor
+                      behind Hint would have played differently.
+                    </p>
+                    <ul className="movelist an-list">
+                      {disagreements.slice(-5).map((h) => (
+                        <li key={h.n}>
+                          <span className="ml-n">{h.n}</span>
+                          <span className="ml-text">
+                            You played {labelMove(h.move)} · advisor would play {labelMove(h.advisorMove!)}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                );
+              })()}
               <div className="final-actions">
                 <button className="primary" onClick={rematch}>
                   {plan ? 'Rematch — same table' : 'Play again'}
