@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { catalog } from '../games/catalog';
+import { klondike } from '../games/klondike';
 import { Table } from './Table';
 import { SolitaireTable } from './SolitaireTable';
 import { ErrorBoundary } from './ErrorBoundary';
@@ -13,6 +14,7 @@ import { BrowseView } from './BrowseView';
 import { OnlineTable, OnlineSession } from './OnlineTable';
 import { hostInfo } from '../net/host';
 import { recordPlay } from '../library/library';
+import { dailyStreak, resultFor, todayKey } from '../social/daily';
 
 
 // The nearest seat count this game can actually be dealt in. A partnership game seats in pairs,
@@ -55,6 +57,8 @@ export function PlayView() {
   const [inProgress, setInProgress] = useState<OpenGame[]>([]);
   // Which table to pick back up, when one was chosen from the list.
   const [resumeId, setResumeId] = useState<string | null>(null);
+  // Today's Deal: the same Klondike seed for everyone playing today (see social/daily.ts).
+  const [dailyMode, setDailyMode] = useState(false);
 
   useEffect(() => { void hostInfo().then((h) => setHostUp(h.up)).finally(() => setHostChecked(true)); }, []);
 
@@ -101,9 +105,9 @@ export function PlayView() {
         <div className="crumbs">
           <button className="ghost" onClick={() => {
             session?.client.end();
-            setSession(null); setGame(null); setPlan(null); setPractice(false); setResumeId(null);
+            setSession(null); setGame(null); setPlan(null); setPractice(false); setResumeId(null); setDailyMode(false);
           }}>← All games</button>
-          <span className="crumb-title">{game.meta.name}</span>
+          <span className="crumb-title">{dailyMode ? "Today's Deal" : game.meta.name}</span>
           {practice && <span className="practice-badge" title="Nothing here is recorded">Practice</span>}
           {session && (
             <span className="table-code" title="Anyone with this code can join">
@@ -129,7 +133,7 @@ export function PlayView() {
         </div>
         <ErrorBoundary label={game.meta.name}>
           {game.solitaire
-            ? <SolitaireTable def={game} />
+            ? <SolitaireTable def={game} daily={dailyMode} />
             : <Table
                 def={game}
                 seats={session ? session.seats.length : seats}
@@ -145,8 +149,34 @@ export function PlayView() {
     );
   }
 
+  const todaysDaily = resultFor(todayKey());
+  const streak = dailyStreak();
+
   return (
     <div className="library">
+      {/* Worklist #78: "the single highest-value thing on this list for bringing anybody back
+          tomorrow." One seeded Klondike deal, the same for everyone playing today (see
+          social/daily.ts for what "ranked" honestly means without a server behind it). */}
+      <div className="daily glass" role="status">
+        <div className="daily-info">
+          <span className="daily-mark" aria-hidden="true">📅</span>
+          <div>
+            <b>Today's Deal</b>
+            <p className="muted">
+              {todaysDaily
+                ? todaysDaily.won ? `Solved in ${todaysDaily.moves} moves.` : 'Not today — back tomorrow for a new one.'
+                : 'One Klondike deal, the same for everyone playing today.'}
+              {streak > 1 && ` ${streak} days running.`}
+            </p>
+          </div>
+        </div>
+        {!todaysDaily && (
+          <button className="primary sm" onClick={() => { setDailyMode(true); setGame(klondike); }}>
+            Play →
+          </button>
+        )}
+      </div>
+
       {resumable && inProgress.length <= 1 && (
         <div className="resume glass" role="status">
           <span>You have an unfinished game of <b>{resumable.name}</b>.</span>

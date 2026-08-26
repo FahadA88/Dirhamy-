@@ -7,6 +7,7 @@ import { Confetti } from './Confetti';
 import { useSettings } from '../settings/SettingsContext';
 import { playSound } from './sound';
 import { service } from '../server/local';
+import { dailyStreak, recordDaily, todayKey } from '../social/daily';
 
 const ME = 'P1';
 
@@ -17,13 +18,16 @@ const ME = 'P1';
 // Like the multiplayer table, this holds a match id and a redacted view. Face-down cards stay
 // face down on the service's side of the line: undo and hint are service calls, not local
 // replays of a state this component was trusted with.
-export function SolitaireTable({ def }: { def: GameDefinition }) {
+export function SolitaireTable({ def, daily = false }: { def: GameDefinition; daily?: boolean }) {
   const { settings } = useSettings();
-  const [board, setBoard] = useState<{ matchId: string; view: RedactedState }>(() => boot(def));
+  const [board, setBoard] = useState<{ matchId: string; view: RedactedState }>(() => boot(def, daily));
   const [dealing, setDealing] = useState(false);
   const [pick, setPick] = useState<{ zone: string; cardId: string } | null>(null);
   const [hint, setHint] = useState<Move | null>(null);
   const [canUndo, setCanUndo] = useState(false);
+  // Records today's result exactly once, the moment this specific match ends — not on every
+  // re-render while roundOver stays true, and not on a later reload of the same finished match.
+  const recordedDaily = useRef(false);
 
   const { matchId, view } = board;
   const gameId = def.meta.id;
@@ -34,6 +38,12 @@ export function SolitaireTable({ def }: { def: GameDefinition }) {
     newDeal();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gameId]);
+
+  useEffect(() => {
+    if (!daily || recordedDaily.current || view.phase !== 'roundOver') return;
+    recordedDaily.current = true;
+    recordDaily({ date: todayKey(), won: !!view.winner, moves: view.moveCount ?? 0 });
+  }, [daily, view.phase, view.winner, view.moveCount]);
 
   const moves = view.solMoves ?? [];
   const cfg = def.solitaire!;
@@ -65,7 +75,8 @@ export function SolitaireTable({ def }: { def: GameDefinition }) {
     setHint(null);
     setCanUndo(false);
     try { service.end(matchId); } catch { /* already gone */ }
-    setBoard(boot(def));
+    recordedDaily.current = false;
+    setBoard(boot(def, daily));
   }
 
   function showHint() {
@@ -133,7 +144,11 @@ export function SolitaireTable({ def }: { def: GameDefinition }) {
               <div className="sol-actions">
                 <button className="ghost sm" onClick={undo} disabled={!canUndo}>Undo</button>
                 <button className="ghost sm" onClick={showHint} disabled={moves.length === 0}>Hint</button>
-                <button className="ghost sm" onClick={newDeal}>New deal</button>
+                {/* Today's Deal is one deal, the same for everyone playing today — a "new deal"
+                    button here would just be a way to quietly stop playing it. */}
+                {daily
+                  ? <span className="sol-stat" title="Today's Deal is the same for everyone">📅 Today's Deal</span>
+                  : <button className="ghost sm" onClick={newDeal}>New deal</button>}
               </div>
             </div>
 
@@ -222,16 +237,28 @@ export function SolitaireTable({ def }: { def: GameDefinition }) {
           {view.winner && <Confetti pieces={64} spread="rain" />}
           <div className={`modal-box celebrate ${view.winner ? 'won' : ''}`}>
             {view.winner && <span className="cb-crown" aria-hidden="true">★</span>}
-            <span className="cb-kicker">{view.winner ? `${view.moveCount} moves` : 'Stuck'}</span>
+            <span className="cb-kicker">
+              {daily ? "Today's Deal" : view.winner ? `${view.moveCount} moves` : 'Stuck'}
+            </span>
             <h3>{view.winner ? 'Solved' : 'No moves left'}</h3>
             <p className="scores">
-              <span>{view.winner
-                ? 'Every card is home.'
-                : 'Blocked. Undo, or take a fresh deal.'}</span>
+              {daily ? (
+                <span>
+                  {view.winner ? `Solved in ${view.moveCount} moves. ` : 'Not today. '}
+                  {dailyStreak() > 1 && `${dailyStreak()} days running.`}
+                </span>
+              ) : (
+                <span>{view.winner
+                  ? 'Every card is home.'
+                  : 'Blocked. Undo, or take a fresh deal.'}</span>
+              )}
             </p>
             <div className="sol-end-actions">
               {!view.winner && <button className="ghost" onClick={undo} disabled={!canUndo}>Undo</button>}
-              <button className="primary" onClick={newDeal}>New deal</button>
+              {/* Today's Deal offers no replacement deal — see the sol-actions bar above for why —
+                  so undoing back into it is the only way to keep going; there is nothing to press
+                  once you are actually done, the same as the daily deal it is modelled on. */}
+              {!daily && <button className="primary" onClick={newDeal}>New deal</button>}
             </div>
           </div>
         </div>
@@ -247,7 +274,14 @@ export function SolitaireTable({ def }: { def: GameDefinition }) {
   );
 }
 
-function boot(def: GameDefinition): { matchId: string; view: RedactedState } {
-  const m = service.create(def, def.meta.id, [ME]);
+function boot(def: GameDefinition, daily: boolean): { matchId: string; view: RedactedState } {
+  // Today's Deal fixes BOTH seeds that feed deriveSeed() (fairness.ts) to strings built from
+  // today's UTC date — the same commit-reveal shuffle math every match already uses, just with
+  // its two random inputs replaced by public, reproducible ones. Anyone on Earth calling this
+  // on the same UTC day gets byte-for-byte the same handSeed, and so the same shuffle.
+  const key = todayKey();
+  const m = daily
+    ? service.create(def, `daily-${def.meta.id}-${key}`, [ME], `daily-client-${key}`, `daily-server-${key}`)
+    : service.create(def, def.meta.id, [ME]);
   return { matchId: m.matchId, view: service.view(m.matchId, ME) };
 }

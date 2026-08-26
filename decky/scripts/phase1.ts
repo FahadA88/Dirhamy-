@@ -305,5 +305,69 @@ section('A table between hands stays on the resume list');
   delete (globalThis as { localStorage?: unknown }).localStorage;
 }
 
+section("Today's Deal — the same shuffle for everyone on the same day (worklist #78)");
+{
+  // The whole promise is "the same for everybody" — proven here by calling create() twice,
+  // exactly as two different players' browsers would, and checking the resulting deals are
+  // identical down to the card, not just that both calls succeeded.
+  const svcA = new MatchService();
+  const svcB = new MatchService();
+  const key = '2026-01-15'; // a fixed stand-in date; the feature derives this from Date.now()
+  const mA = svcA.create(klondike, `daily-classic-klondike-${key}`, ['P1'], `daily-client-${key}`, `daily-server-${key}`);
+  const mB = svcB.create(klondike, `daily-classic-klondike-${key}`, ['P1'], `daily-client-${key}`, `daily-server-${key}`);
+  const tableauA = svcA.view(mA.matchId, 'P1').tableau;
+  const tableauB = svcB.view(mB.matchId, 'P1').tableau;
+  check('two independent services deal the same board for the same day',
+    JSON.stringify(tableauA) === JSON.stringify(tableauB));
+
+  // And a different day is not the same deal — otherwise "today's" would be doing nothing.
+  const key2 = '2026-01-16';
+  const mC = svcA.create(klondike, `daily-classic-klondike-${key2}`, ['P1'], `daily-client-${key2}`, `daily-server-${key2}`);
+  const tableauC = svcA.view(mC.matchId, 'P1').tableau;
+  check('a different day deals a different board', JSON.stringify(tableauA) !== JSON.stringify(tableauC));
+}
+
+section("Today's Deal — recording a result stays honest about what it can promise");
+{
+  const mem = new Map<string, string>();
+  (globalThis as { localStorage?: unknown }).localStorage = {
+    getItem: (k: string) => mem.get(k) ?? null,
+    setItem: (k: string, v: string) => { mem.set(k, v); },
+    removeItem: (k: string) => { mem.delete(k); },
+    key: (i: number) => Array.from(mem.keys())[i] ?? null,
+    get length() { return mem.size; },
+  };
+
+  const { recordDaily, resultFor, dailyStreak, todayKey } = await import('../src/social/daily');
+  check('no result before anything is recorded', resultFor(todayKey()) === null);
+
+  recordDaily({ date: '2026-01-14', won: true, moves: 90 });
+  recordDaily({ date: '2026-01-15', won: true, moves: 80 });
+  check('a win is recorded honestly', resultFor('2026-01-15')?.won === true && resultFor('2026-01-15')?.moves === 80);
+
+  // Replaying the same day (a saved match reloaded, say) must not let a second attempt quietly
+  // overwrite the first result — the daily deal is one attempt, not best-of-however-many.
+  recordDaily({ date: '2026-01-15', won: false, moves: 5 });
+  check('a second result for a day already recorded does not overwrite the first',
+    resultFor('2026-01-15')?.won === true && resultFor('2026-01-15')?.moves === 80);
+
+  recordDaily({ date: '2026-01-16', won: false, moves: 12 });
+  check('a loss is recorded as a loss', resultFor('2026-01-16')?.won === false);
+
+  // The streak counts backward from today, so it has to be tested against real relative dates
+  // rather than the fixed stand-in ones above.
+  const today = new Date();
+  const yesterday = new Date(today); yesterday.setUTCDate(today.getUTCDate() - 1);
+  const twoAgo = new Date(today); twoAgo.setUTCDate(today.getUTCDate() - 2);
+  recordDaily({ date: todayKey(yesterday), won: true, moves: 40 });
+  recordDaily({ date: todayKey(twoAgo), won: true, moves: 50 });
+  check("yesterday and the day before, both won, is a streak of 2 before today's deal is played",
+    dailyStreak() === 2);
+  recordDaily({ date: todayKey(today), won: true, moves: 30 });
+  check("winning today's deal too extends the streak to 3", dailyStreak() === 3);
+
+  delete (globalThis as { localStorage?: unknown }).localStorage;
+}
+
 console.log(failed ? '\nPHASE 1: FAILED' : '\nPHASE 1: all acceptance checks passed');
 process.exit(failed ? 1 : 0);
