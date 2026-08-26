@@ -19,7 +19,17 @@ import { MatchState } from '../engine/types';
 const PREFIX = 'decky.match.';
 const KEEP = 4;   // how many matches to retain before evicting the oldest
 
+// Worklist #100: the two checks below (a definition, a player list, a numeric turnIndex) caught
+// a save from before those fields existed, but they only ever caught the specific shapes that
+// had already broken something once. A rename, a field that changed meaning without changing
+// shape, an enum that gained a value the reader does not expect — none of that trips a
+// structural check, and each one is a real engine change this app has actually made. A stamp
+// bumped on every change that touches MatchState's shape catches all of them the same way,
+// on purpose, rather than one incident at a time.
+const SCHEMA_VERSION = 1;
+
 type Stored = Omit<MatchRecord, 'state' | 'history'> & {
+  schemaVersion: number;
   state: Omit<MatchState, 'definition'> & { definition?: undefined };
 };
 
@@ -51,6 +61,7 @@ export class LocalMatchStore implements MatchStore {
       const raw = localStorage.getItem(PREFIX + id);
       if (!raw) return undefined;
       const s = JSON.parse(raw) as Stored;
+      if (s?.schemaVersion !== SCHEMA_VERSION) return undefined;   // an older or newer build wrote this
       if (!s?.definition || !s.state?.players?.length || typeof s.state.turnIndex !== 'number') {
         return undefined;   // a save from an older build; bail rather than half-load
       }
@@ -70,7 +81,7 @@ export class LocalMatchStore implements MatchStore {
       void history;
       const { definition, ...stateWithoutDefinition } = whole;
       void definition;
-      const payload: Stored = { ...rest, state: stateWithoutDefinition as Stored['state'] };
+      const payload: Stored = { ...rest, schemaVersion: SCHEMA_VERSION, state: stateWithoutDefinition as Stored['state'] };
       localStorage.setItem(PREFIX + id, JSON.stringify(payload));
       this.evict(id);
     } catch {
