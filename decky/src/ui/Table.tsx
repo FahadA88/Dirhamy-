@@ -10,6 +10,7 @@ import { Confetti } from './Confetti';
 import { useSettings } from '../settings/SettingsContext';
 import { BOT_SPEED_MS, botNameFor } from '../settings/settings';
 import { playSound } from './sound';
+import { haptic } from './haptics';
 import { speak, stopSpeaking, spokenCard } from './speech';
 import { useTurnAlert } from './useTurnAlert';
 import { useDismissable } from './useEscape';
@@ -386,20 +387,6 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
     : discardMoves.length > 0 ? 'dealerDiscard'
     : view.mode === 'trick' ? 'playToTrick' : view.mode === 'climb' ? 'climbPlay' : isRummy ? 'rummyDiscard' : 'playCard';
 
-  // Worklist #54: a climb turn can arrive with nothing that beats the pile, and the table used
-  // to just sit there until the Pass button was noticed. climbPass being the only legal move IS
-  // "nothing to do" here, not a choice to weigh, so it plays itself — the same reasoning that
-  // already explains a forced opening lead instead of making it be found.
-  useEffect(() => {
-    if (!isClimb || view.phase !== 'playing') return;
-    if (myLegal.length !== 1 || myLegal[0].actionId !== 'climbPass') return;
-    const timer = setTimeout(() => {
-      const res = clientRef.current.submit(me, { actionId: 'climbPass' });
-      if (res.ok) setBoard(clientRef.current.read(me));
-    }, 550);
-    return () => clearTimeout(timer);
-  }, [isClimb, view.phase, myLegal, me]);
-
   // Bot loop, paced by the user's bot-speed setting. Bots move inside the service — the client
   // asks it to advance one seat and gets back its own view, so a bot's hand never crosses the
   // boundary just to be played. A simultaneous pass can leave several bots waiting at once;
@@ -620,6 +607,18 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
   // Mark the tab when somebody is waiting on you and looking somewhere else.
   useTurnAlert(view.phase === 'playing' && !!view.isYourTurn);
 
+  // Worklist #96: a short buzz for your turn starting — a phone in a pocket can feel this where
+  // a tab-title flash goes unseen. Pit, Kent and Set have no turn order, so "you could always
+  // act" is never the same event as "your turn began"; excluded for the same reason
+  // autoPlayForced excludes them below.
+  const prevYourTurn = useRef(view.isYourTurn);
+  useEffect(() => {
+    if (!isPit && !isKent && !isSet && view.phase === 'playing' && view.isYourTurn && !prevYourTurn.current) {
+      haptic('turn', settings.haptics);
+    }
+    prevYourTurn.current = view.isYourTurn;
+  }, [view.isYourTurn, view.phase, isPit, isKent, isSet, settings.haptics]);
+
   // An online table changes because somebody else moved, not because we did. The client tells
   // us the cached position moved; we re-read it for our own seat and render.
   useEffect(() => {
@@ -708,7 +707,10 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
     if (!view.tricksWon) return;
     const total = Object.values(view.tricksWon).reduce((a, n) => a + n, 0);
     const prev = prevTrickCount.current;
-    if (prev && prev.hand === view.handNumber && total > prev.total) playSound('trick', settings);
+    if (prev && prev.hand === view.handNumber && total > prev.total) {
+      playSound('trick', settings);
+      haptic('trick', settings.haptics);
+    }
     prevTrickCount.current = { hand: view.handNumber, total };
   }, [view.tricksWon, view.handNumber, settings]);
 
@@ -786,6 +788,7 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
       // The rules said no. Say why, instead of letting the tap disappear.
       setToast({ text: res.reason ?? 'That move is not legal here.', tone: 'bad' });
       playSound('ui', settings);
+      haptic('refusal', settings.haptics);
       setSelected(null);
       return;
     }

@@ -1,11 +1,16 @@
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { PlayView } from './PlayView';
-import { CreateView } from './CreateView';
 import { ProfileView } from './ProfileView';
 import { Backdrop } from './Backdrop';
 import { SettingsPanel } from './SettingsPanel';
 import { SiteNav, navStyle } from './SiteNav';
 import { FirstRun } from './FirstRun';
+
+// Worklist #98: opening the shelf used to download the whole builder — the rule kit, the
+// knob catalogue, the AI copilot prompts and templates — to draw a grid of cards that has
+// nothing to do with any of it. Create is one tab of three and most sessions never open it,
+// so it is its own chunk now, fetched only by the click that actually needs it.
+const CreateView = lazy(() => import('./CreateView').then((m) => ({ default: m.CreateView })));
 
 type View = 'play' | 'create' | 'profile';
 
@@ -56,7 +61,8 @@ export function App() {
       <SiteNav style={nav} view={view} onView={setView} onSettings={() => setSettingsOpen(true)} />
       <main>
         {view === 'play' ? <PlayView />
-          : view === 'create' ? <CreateView />
+          : view === 'create'
+            ? <Suspense fallback={<div className="view-loading muted">Loading the builder…</div>}><CreateView /></Suspense>
           : <ProfileView onPlay={() => setView('play')} />}
       </main>
       <SettingsPanel open={settingsOpen} onClose={() => setSettingsOpen(false)} />

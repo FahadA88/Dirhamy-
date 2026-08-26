@@ -125,6 +125,10 @@ export interface Settings {
   soundVolume: number;
   /** Read the table out loud through the browser's own voice. Off unless asked for. */
   speak: boolean;
+  /** A short buzz for your turn starting, a move being refused, and a trick or a win landing.
+      Only ever fires on a device with a Vibration API — most of that is iOS Safari, where the
+      setting simply does nothing rather than failing. */
+  haptics: boolean;
   /** A few seconds to take back a misclick before the table moves on. 0 turns it off. */
   undoGraceMs: number;
   /** Optional clock. 0 is no clock at all, which is the default. */
@@ -175,6 +179,7 @@ export const defaultSettings: Settings = {
   uiSounds: false,
   soundVolume: 70,
   speak: false,
+  haptics: false,
   // Long enough to catch a misclick, short enough that nobody waits on it.
   undoGraceMs: 3000,
   turnSeconds: 0,

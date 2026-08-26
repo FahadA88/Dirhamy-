@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { catalog } from '../games/catalog';
 import { klondike } from '../games/klondike';
 import { Table } from './Table';
@@ -11,10 +11,15 @@ import { SeatSetup } from './SeatSetup';
 import { GameDefinition } from '../engine/types';
 import { useSettings } from '../settings/SettingsContext';
 import { BrowseView } from './BrowseView';
-import { OnlineTable, OnlineSession } from './OnlineTable';
+import type { OnlineSession } from './OnlineTable';
 import { hostInfo } from '../net/host';
 import { recordPlay } from '../library/library';
 import { dailyStreak, resultFor, todayKey } from '../social/daily';
+
+// Worklist #98, continued: the websocket client, the remote-table protocol and the online
+// lobby only matter to the fraction of sessions that ever click "Play with people" — most
+// solo and pass-and-play games never touch any of it. Deferred the same way Create is.
+const OnlineTable = lazy(() => import('./OnlineTable').then((m) => ({ default: m.OnlineTable })));
 
 
 // The nearest seat count this game can actually be dealt in. A partnership game seats in pairs,
@@ -76,11 +81,13 @@ export function PlayView() {
 
   if (onlineFor && !session) {
     return (
-      <OnlineTable
-        def={onlineFor}
-        onCancel={() => setOnlineFor(null)}
-        onStart={(s) => { setSession(s); setGame(onlineFor); setOnlineFor(null); }}
-      />
+      <Suspense fallback={<div className="view-loading muted">Connecting…</div>}>
+        <OnlineTable
+          def={onlineFor}
+          onCancel={() => setOnlineFor(null)}
+          onStart={(s) => { setSession(s); setGame(onlineFor); setOnlineFor(null); }}
+        />
+      </Suspense>
     );
   }
 

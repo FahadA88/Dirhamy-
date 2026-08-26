@@ -226,6 +226,11 @@ h1 { letter-spacing: 0.06em; font-weight: 900; }
 /* ---------------- layout ---------------- */
 .app { max-width: 1080px; margin: 0 auto; padding: 20px 16px 60px; position: relative; z-index: 1; }
 
+/* Worklist #98: Create and the online lobby are their own JS chunk now, fetched on the click
+   that opens them rather than on every visit to the shelf — this is the gap while that fetch
+   is in flight, usually too brief to notice on anything but a cold cache. */
+.view-loading { padding: 60px 0; text-align: center; font-size: 14px; }
+
 header { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 8px; }
 .brand { display: flex; align-items: center; gap: 14px; }
 /* A solid mark, not a spinning card — it reads at any size and never lands edge-on. */

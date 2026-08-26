@@ -453,6 +453,9 @@ function MotionSection({ s, set }: { s: Settings; set: Setter }) {
           <b>{s.soundVolume}</b>
         </div>
       </Row>
+      <Row label="Haptics" hint="A short buzz for your turn starting, a move being refused, and taking a trick. Only does anything on a device with a vibration motor and a browser that exposes it — Android Chrome and Firefox, not iOS Safari." keywords="vibrate buzz haptic feedback phone mobile">
+        <Toggle on={s.haptics} onChange={(v) => set('haptics', v)} label="Haptics" />
+      </Row>
       <Row label="Moving background" keywords="background ambient 3d">
         <Toggle on={s.ambient3d} onChange={(v) => set('ambient3d', v)} label="Moving background" />
       </Row>
