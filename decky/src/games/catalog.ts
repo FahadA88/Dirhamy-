@@ -21,9 +21,25 @@ import { pit } from './pit';
 import { contractWhist } from './contract';
 import { trio } from './trio';
 import { kent } from './kent';
+import { fiveHundred } from './fiveHundred';
+import { ohHell } from './ohHell';
+import { blackMaria } from './blackMaria';
+import { bigTwo } from './bigTwo';
+import { ratscrew } from './ratscrew';
+import { canasta } from './canasta';
+import { yukon } from './yukon';
+import { golf } from './golf';
 
 // The classics library. Each entry is a hand-authored game, expressed purely as data.
-export const catalog: GameDefinition[] = [crazyEights, switchGame, spadesLite, hearts, euchre, president, goFish, rummy, ginRummy, war, tradeWinds, undertow, klondike, freecell, spider, bluff, slapjack, showdownPoker, pit, contractWhist, trio, kent];
+export const catalog: GameDefinition[] = [
+  crazyEights, switchGame, spadesLite, hearts, euchre, president, goFish, rummy, ginRummy, war,
+  tradeWinds, undertow, klondike, freecell, spider, bluff, slapjack, showdownPoker, pit,
+  contractWhist, trio, kent,
+  // Added once the engine could express them: a joker that wins tricks (Five Hundred), a deal
+  // that changes with the table (Oh Hell), individually priced cards (Black Maria), wild melds
+  // (Canasta), and three more boards from the same patience config.
+  fiveHundred, ohHell, blackMaria, bigTwo, ratscrew, canasta, yukon, golf,
+];
 
 export function getGame(id: string): GameDefinition | undefined {
   return catalog.find((g) => g.meta.id === id);

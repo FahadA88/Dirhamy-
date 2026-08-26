@@ -1,4 +1,4 @@
-import { CustomRule, Effect, Predicate, Rank, RuleHook, Suit } from '../engine/types';
+import { CustomRule, Effect, PlayRestriction, Predicate, Rank, RuleHook, RuleValue, Suit } from '../engine/types';
 
 // The palette the rule builder puts in front of an author.
 //
@@ -65,9 +65,39 @@ const OPS: { value: string; label: string }[] = [
   { value: '>', label: 'is more than' }, { value: '<', label: 'is less than' },
 ];
 
+const SCOPE: { value: string; label: string }[] = [
+  { value: 'table', label: 'the whole table' },
+  { value: '$me', label: 'this player alone' },
+  { value: '$next', label: 'the next player' },
+  { value: '$prev', label: 'the previous player' },
+];
+
+const LASTS: { value: string; label: string }[] = [
+  { value: 'hand', label: 'this hand' },
+  { value: 'match', label: 'the whole match' },
+];
+
+/** A scope choice, as the `per` field the engine reads (absent means the shared bag). */
+function scopeOf(v: ParamValue): { per?: '$me' | '$next' | '$prev' } {
+  const s = String(v);
+  return s === 'table' ? {} : { per: s as '$me' | '$next' | '$prev' };
+}
+
 const asWho = (v: ParamValue) => String(v) as '$me' | '$next' | '$prev' | '$all' | '$others';
 const asOp = (v: ParamValue) => String(v) as '==' | '!=' | '>' | '>=' | '<' | '<=';
 const n = (v: ParamValue) => Number(v) || 0;
+/**
+ * A text parameter with a fallback, for params added after drafts were already saved.
+ *
+ * `String(undefined)` is the five-letter string "undefined", which is truthy — so the obvious
+ * `String(p.x) || 'draw'` silently compiled a pile name of "undefined" for every draft written
+ * before the parameter existed. Caught by the Chaos deck template, whose draw rule predates
+ * the `from` field.
+ */
+const str = (v: ParamValue | undefined, fallback: string) => {
+  const out = v === undefined || v === null ? '' : String(v).trim();
+  return out && out !== 'undefined' ? out : fallback;
+};
 
 // ---------- when ----------
 
@@ -79,6 +109,12 @@ export const HOOKS: { value: RuleHook; label: string; hint: string }[] = [
   { value: 'cardDrawn', label: 'A player draws', hint: 'Fires on a draw rather than a play.' },
   { value: 'trickWon', label: 'A trick is won', hint: 'Trick-taking games only.' },
   { value: 'drawPileEmpty', label: 'The draw pile empties', hint: 'Good for endgame rules.' },
+  { value: 'trickLed', label: 'A trick is led', hint: 'The FIRST card of a trick, rather than every card in it.' },
+  { value: 'playerOut', label: 'A player goes out', hint: 'Their last card has left their hand.' },
+  { value: 'handEnd', label: 'The hand ends', hint: 'After the scores are in, before the next deal.' },
+  { value: 'matchEnd', label: 'The match is decided', hint: 'Once, at the very end of everything.' },
+  { value: 'meldLaid', label: 'A meld goes down', hint: 'Rummy games only.' },
+  { value: 'bidMade', label: 'A player bids', hint: 'Any game with an auction.' },
 ];
 
 // ---------- conditions ----------
@@ -168,7 +204,7 @@ export const CONDITIONS: ConditionSpec[] = [
       { key: 'op', kind: 'select', label: 'Comparison', options: OPS, def: '<=' },
       { key: 'value', kind: 'number', label: 'Cards', min: 0, max: 108, def: 0 },
     ],
-    build: (p) => ({ cmp: { left: { count: String(p.zone) }, op: asOp(p.op), right: { lit: n(p.value) } } }),
+    build: (p) => ({ cmp: { left: { count: str(p.zone, 'draw') }, op: asOp(p.op), right: { lit: n(p.value) } } }),
   },
   {
     id: 'varIs', label: 'A game variable is…', advanced: true,
@@ -177,8 +213,27 @@ export const CONDITIONS: ConditionSpec[] = [
       { key: 'var', kind: 'text', label: 'Variable', placeholder: 'streak', def: 'streak' },
       { key: 'op', kind: 'select', label: 'Comparison', options: OPS, def: '>=' },
       { key: 'value', kind: 'text', label: 'Value', placeholder: '3', def: '3' },
+      // Without this the condition always read the shared bag, so a rule that counted
+      // something per player and a rule that tested it were looking at different variables —
+      // the test silently never fired.
+      { key: 'scope', kind: 'select', label: 'Whose', options: SCOPE, def: 'table' },
     ],
-    build: (p) => ({ cmp: { left: { stateVar: String(p.var) }, op: asOp(p.op), right: { lit: String(p.value) } } }),
+    build: (p) => ({
+      cmp: {
+        left: { stateVar: str(p.var, 'counter'), ...scopeOf(p.scope) },
+        op: asOp(p.op), right: { lit: String(p.value) },
+      },
+    }),
+  },
+  {
+    id: 'listHas', label: 'A remembered list contains…', advanced: true,
+    hint: 'Pairs with "remember a card in a list".',
+    params: [
+      { key: 'var', kind: 'text', label: 'List', placeholder: 'seen', def: 'seen' },
+      { key: 'value', kind: 'text', label: 'Contains', placeholder: 'H', def: 'H' },
+      { key: 'scope', kind: 'select', label: 'Whose list', options: SCOPE, def: 'table' },
+    ],
+    build: (p) => ({ listHas: { var: str(p.var, 'seen'), value: { lit: str(p.value, '') }, ...scopeOf(p.scope) } }),
   },
   {
     id: 'exactCard', label: 'The card is exactly…',
@@ -197,7 +252,7 @@ export const CONDITIONS: ConditionSpec[] = [
     id: 'cardIsTagged', label: 'The card is tagged…',
     hint: 'Wild, skip, reverse — whichever named sets this game defines.',
     params: [{ key: 'tag', kind: 'text', label: 'Tag', placeholder: 'wild', def: 'wild' }],
-    build: (p) => ({ cardHasTag: String(p.tag) }),
+    build: (p) => ({ cardHasTag: str(p.tag, 'wild') }),
   },
   {
     id: 'cardValue', label: "The card's rank value…",
@@ -231,7 +286,7 @@ export const CONDITIONS: ConditionSpec[] = [
     id: 'canDo', label: 'They have a legal…', advanced: true,
     hint: 'Names an action id — "playCard", "drawCard". True when that move is available to them.',
     params: [{ key: 'action', kind: 'text', label: 'Action', placeholder: 'playCard', def: 'playCard' }],
-    build: (p) => ({ existsLegal: String(p.action) }),
+    build: (p) => ({ existsLegal: str(p.action, 'playCard') }),
   },
 ];
 
@@ -242,13 +297,35 @@ export const EFFECTS: EffectSpec[] = [
     id: 'addScore', label: 'Give points', params: [
       { key: 'who', kind: 'select', label: 'To', options: WHO, def: '$me' },
       { key: 'amount', kind: 'number', label: 'Points', min: -100, max: 100, def: 5 },
+      {
+        key: 'times', kind: 'select', label: 'Multiplied by', def: 'flat',
+        options: [
+          { value: 'flat', label: 'nothing — a flat amount' },
+          { value: 'cardValue', label: "the card's rank value" },
+          { value: 'tricks', label: 'their tricks won' },
+          { value: 'handSize', label: 'the cards in their hand' },
+          { value: 'handNumber', label: 'the hand number' },
+        ],
+      },
     ],
-    build: (p) => ({ op: 'addScore', player: asWho(p.who), amount: { lit: n(p.amount) } }),
+    // The engine has always taken a full RuleValue here; the builder only ever wrote a literal,
+    // so "score the card's own value" or "score two per trick" needed hand-edited JSON.
+    build: (p) => {
+      const flat = { lit: n(p.amount) };
+      const per: Record<string, RuleValue> = {
+        cardValue: { cardProp: 'value' },
+        tricks: { tricksWon: asWho(p.who) },
+        handSize: { count: '$hand' },
+        handNumber: { handNumber: true },
+      };
+      const mult = per[String(p.times)];
+      return { op: 'addScore', player: asWho(p.who), amount: mult ? { mul: [flat, mult] } : flat };
+    },
   },
   {
     id: 'announce', label: 'Say something', hint: 'Writes a line into the game log.',
     params: [{ key: 'text', kind: 'text', label: 'Message', placeholder: 'Bonus!', def: 'Bonus!' }],
-    build: (p) => ({ op: 'announce', text: String(p.text) }),
+    build: (p) => ({ op: 'announce', text: str(p.text, '') }),
   },
   { id: 'extraTurn', label: 'Play again', params: [], build: () => ({ op: 'extraTurn' }) },
   { id: 'skipNext', label: 'Skip the next player', params: [], build: () => ({ op: 'skipNext' }) },
@@ -257,8 +334,11 @@ export const EFFECTS: EffectSpec[] = [
     id: 'draw', label: 'Make someone draw', params: [
       { key: 'who', kind: 'select', label: 'Who', options: WHO, def: '$next' },
       { key: 'count', kind: 'number', label: 'Cards', min: 1, max: 10, def: 2 },
+      // Hard-coded to 'draw' before this, which silently did nothing in any game whose stock
+      // is named something else — Gin's is 'stock', Go Fish's is 'ocean'.
+      { key: 'from', kind: 'text', label: 'From pile', placeholder: 'draw', def: 'draw' },
     ],
-    build: (p) => ({ op: 'drawTo', player: asWho(p.who), from: 'draw', count: { lit: n(p.count) } }),
+    build: (p) => ({ op: 'drawTo', player: asWho(p.who), from: str(p.from, 'draw'), count: { lit: n(p.count) } }),
   },
   {
     id: 'swap', label: 'Swap hands', hint: 'A classic chaos card.', params: [
@@ -287,16 +367,59 @@ export const EFFECTS: EffectSpec[] = [
     params: [
       { key: 'var', kind: 'text', label: 'Variable', placeholder: 'streak', def: 'streak' },
       { key: 'value', kind: 'number', label: 'Set to', min: -99, max: 99, def: 1 },
+      { key: 'scope', kind: 'select', label: 'Belongs to', options: SCOPE, def: 'table' },
+      { key: 'keep', kind: 'select', label: 'Lasts', options: LASTS, def: 'hand' },
     ],
-    build: (p) => ({ op: 'setVarNum', var: String(p.var), value: { lit: n(p.value) } }),
+    build: (p) => ({
+      op: 'setVarNum', var: str(p.var, 'counter'), value: { lit: n(p.value) },
+      ...scopeOf(p.scope), ...(p.keep === 'match' ? { keep: true } : {}),
+    }),
   },
   {
     id: 'bump', label: 'Add to a remembered number', advanced: true,
     params: [
       { key: 'var', kind: 'text', label: 'Variable', placeholder: 'streak', def: 'streak' },
       { key: 'by', kind: 'number', label: 'Add', min: -20, max: 20, def: 1 },
+      { key: 'scope', kind: 'select', label: 'Belongs to', options: SCOPE, def: 'table' },
+      { key: 'keep', kind: 'select', label: 'Lasts', options: LASTS, def: 'hand' },
     ],
-    build: (p) => ({ op: 'setVarNum', var: String(p.var), value: { add: [{ stateVar: String(p.var) }, { lit: n(p.by) }] } }),
+    build: (p) => {
+      const sc = scopeOf(p.scope);
+      return {
+        op: 'setVarNum', var: str(p.var, 'counter'),
+        value: { add: [{ stateVar: str(p.var, 'counter'), ...sc }, { lit: n(p.by) }] },
+        ...sc, ...(p.keep === 'match' ? { keep: true } : {}),
+      };
+    },
+  },
+  {
+    id: 'rememberCard', label: 'Remember a card in a list', advanced: true,
+    hint: 'Builds up a list you can test with "a list contains…" — which suits have been led, which ranks have gone.',
+    params: [
+      { key: 'var', kind: 'text', label: 'List', placeholder: 'seen', def: 'seen' },
+      {
+        key: 'what', kind: 'select', label: 'Remember its', def: 'rank',
+        options: [{ value: 'rank', label: 'rank' }, { value: 'suit', label: 'suit' }, { value: 'color', label: 'colour' }],
+      },
+      { key: 'scope', kind: 'select', label: 'Belongs to', options: SCOPE, def: 'table' },
+      { key: 'keep', kind: 'select', label: 'Lasts', options: LASTS, def: 'hand' },
+    ],
+    build: (p) => ({
+      op: 'appendVar', var: str(p.var, 'seen'), unique: true,
+      value: { cardProp: String(p.what) as 'rank' | 'suit' | 'color' },
+      ...scopeOf(p.scope), ...(p.keep === 'match' ? { keep: true } : {}),
+    }),
+  },
+  {
+    id: 'runRule', label: 'Run another rule', advanced: true,
+    hint: "Names a rule by its id — the payout rule, the penalty rule — so several twists can share one piece of logic.",
+    params: [{ key: 'rule', kind: 'text', label: 'Rule id', placeholder: 'rule2', def: 'rule2' }],
+    build: (p) => ({ op: 'runRule', rule: str(p.rule, '') }),
+  },
+  {
+    id: 'stopRules', label: 'Stop here — skip the rules below', advanced: true,
+    hint: 'Everything after this rule sits out this event. How you write "this case is handled".',
+    params: [], build: () => ({ op: 'stopRules' }),
   },
   {
     id: 'moveMany', label: 'Move cards between piles', advanced: true, params: [
@@ -304,21 +427,109 @@ export const EFFECTS: EffectSpec[] = [
       { key: 'to', kind: 'text', label: 'To', placeholder: 'draw', def: 'draw' },
       { key: 'count', kind: 'number', label: 'How many', min: 1, max: 52, def: 1 },
     ],
-    build: (p) => ({ op: 'moveMany', from: String(p.from), to: String(p.to), count: { lit: n(p.count) } }),
+    build: (p) => ({ op: 'moveMany', from: str(p.from, 'discard'), to: str(p.to, 'draw'), count: { lit: n(p.count) } }),
+  },
+  // The rest of what the engine can already do. Every one of these ops has been in runEffects
+  // since it was written; none of them had a way in from the builder.
+  {
+    id: 'chooseSuit', label: 'Ask them to name a suit',
+    hint: 'What a wild card does — the player picks, and the pile follows their choice.',
+    params: [{ key: 'var', kind: 'text', label: 'Remember it as', placeholder: 'activeSuit', def: 'activeSuit' }],
+    build: (p) => ({ op: 'chooseSuit', setState: str(p.var, 'activeSuit') }),
+  },
+  {
+    id: 'passCards', label: 'Everyone passes a card at once', params: [
+      { key: 'direction', kind: 'select', label: 'Direction', def: 'left', options: [{ value: 'left', label: 'to the left' }, { value: 'right', label: 'to the right' }] },
+    ],
+    build: (p) => ({ op: 'passCards', direction: String(p.direction) as 'left' | 'right' }),
+  },
+  {
+    id: 'forceDraw', label: 'Force a draw they cannot refuse', advanced: true,
+    hint: 'Unlike "make someone draw", this cannot be dodged by a counter-play.',
+    params: [
+      { key: 'target', kind: 'select', label: 'Who', def: 'next', options: [{ value: 'next', label: 'the next player' }, { value: 'all', label: 'everyone' }, { value: 'others', label: 'everyone else' }] },
+      { key: 'from', kind: 'text', label: 'From pile', placeholder: 'draw', def: 'draw' },
+      { key: 'count', kind: 'number', label: 'Cards', min: 1, max: 10, def: 2 },
+    ],
+    build: (p) => ({ op: 'forceDraw', target: String(p.target) as never, from: str(p.from, 'draw'), count: n(p.count) }),
+  },
+  {
+    id: 'drawUntilPlayable', label: 'Draw until they can play', advanced: true,
+    params: [{ key: 'from', kind: 'text', label: 'From pile', placeholder: 'draw', def: 'draw' }],
+    build: (p) => ({ op: 'drawUntilPlayable', from: str(p.from, 'draw') }),
+  },
+  {
+    id: 'reshuffle', label: 'Reshuffle the discards back in', advanced: true, params: [
+      { key: 'zone', kind: 'text', label: 'Into pile', placeholder: 'draw', def: 'draw' },
+    ],
+    build: (p) => ({ op: 'reshuffleDiscardInto', zone: str(p.zone, 'draw'), keepTop: true }),
+  },
+  {
+    id: 'skipTo', label: 'Hand the turn straight to…', advanced: true,
+    hint: 'Sets whose turn it is rather than stepping one seat along.',
+    params: [{
+      key: 'who', kind: 'select', label: 'Whose turn', def: 'next',
+      options: [{ value: 'next', label: 'the next player' }, { value: 'prev', label: 'the previous player' }],
+    }],
+    build: (p) => ({ op: 'skipTo', player: String(p.who) as 'next' | 'prev' }),
+  },
+  {
+    id: 'moveCard', label: 'Move the played card somewhere else', advanced: true,
+    hint: 'Sends it to a pile other than the one it would normally go to.',
+    params: [{ key: 'to', kind: 'text', label: 'To pile', placeholder: 'discard', def: 'discard' }],
+    build: (p) => ({ op: 'move', card: '$target', to: str(p.to, 'discard') }),
+  },
+  {
+    id: 'setFlag', label: 'Remember some text', advanced: true,
+    hint: 'Like "remember a number", but for a word — a phase name, a suit, a player.',
+    params: [
+      { key: 'var', kind: 'text', label: 'Variable', placeholder: 'phase', def: 'phase' },
+      { key: 'value', kind: 'text', label: 'Set to', placeholder: 'endgame', def: 'endgame' },
+    ],
+    build: (p) => ({ op: 'setState', var: str(p.var, 'flag'), value: str(p.value, '') }),
   },
 ];
 
 // ---------- the draft an author edits ----------
 
+/** One clause of a rule's condition. Several of them combine with all/any. */
+export interface CondNode {
+  condId: string;
+  params: Record<string, ParamValue>;
+  /** Inverts this clause alone — "the card is NOT a heart". */
+  negate?: boolean;
+}
+
 export interface RuleDraft {
   id: string;
   name: string;
   when: RuleHook;
+  /**
+   * The condition, as one or more clauses joined by `condJoin`.
+   *
+   * A draft used to hold exactly one condition, which is why "the card is a queen AND a spade"
+   * was unexpressible in the builder even though the engine's `all` predicate has always
+   * understood it. `condId`/`condParams` are the old single-clause shape and are still read
+   * when `conds` is missing, so drafts saved before this keep working.
+   */
+  conds?: CondNode[];
+  condJoin?: 'all' | 'any';
   condId: string;
   condParams: Record<string, ParamValue>;
-  effects: { specId: string; params: Record<string, ParamValue> }[];
+  /**
+   * What the rule does. `onlyIf` gates one action on its own condition, compiling to the
+   * engine's `if` op — which has existed in runEffects the whole time with no way to reach it,
+   * so a rule could not branch: it did all of its actions or none of them.
+   */
+  effects: { specId: string; params: Record<string, ParamValue>; onlyIf?: CondNode }[];
   enabled: boolean;
   note?: string;
+}
+
+/** A draft's clauses, whichever shape it was saved in. */
+export function condNodesOf(draft: RuleDraft): CondNode[] {
+  if (draft.conds && draft.conds.length > 0) return draft.conds;
+  return [{ condId: draft.condId, params: draft.condParams }];
 }
 
 export function defaultsFor(params: ParamSpec[]): Record<string, ParamValue> {
@@ -348,23 +559,197 @@ export function newRuleDraft(seq: number): RuleDraft {
   };
 }
 
+/** One clause, built and inverted if it says so. */
+function buildNode(node: CondNode): Predicate {
+  const built = findCondition(node.condId).build(node.params);
+  return node.negate ? { not: built } : built;
+}
+
+/** Every clause of a draft, folded into the one Predicate the engine evaluates. */
+export function compileCondition(draft: RuleDraft): Predicate {
+  const parts = condNodesOf(draft).map(buildNode);
+  if (parts.length === 0) return { always: true };
+  if (parts.length === 1) return parts[0];
+  return draft.condJoin === 'any' ? { any: parts } : { all: parts };
+}
+
 /** Compile an author's draft into the data the engine runs. */
 export function compileRule(draft: RuleDraft): CustomRule {
-  const cond = findCondition(draft.condId);
   const then = draft.effects
-    .map((e) => findEffect(e.specId)?.build(e.params))
+    .map((e): Effect | undefined => {
+      const built = findEffect(e.specId)?.build(e.params);
+      if (!built || !e.onlyIf) return built;
+      return { op: 'if', cond: buildNode(e.onlyIf), then: [built] };
+    })
     .filter((e): e is Effect => !!e);
   return {
     id: draft.id,
     name: draft.name,
     when: draft.when,
-    if: cond.build(draft.condParams),
+    if: compileCondition(draft),
     then,
     note: draft.note,
     enabled: draft.enabled,
+    // Kept so the builder can re-open what it wrote. Ignored by the engine entirely.
+    draft,
   };
 }
 
 export function compileRules(drafts: RuleDraft[]): CustomRule[] {
   return drafts.filter((d) => d.effects.length > 0).map(compileRule);
+}
+
+// ---------- patterns worth starting from ----------
+
+/**
+ * Two or three rules that only mean something together.
+ *
+ * The linking machinery — a counter one rule writes and another reads, a rule that calls
+ * another, a rule that stops the ones below it — all works, and all of it is invisible until
+ * somebody has seen it done once. These are that once: each drops in a set of real, editable
+ * rules that already reference each other correctly.
+ */
+export interface RulePattern {
+  id: string;
+  name: string;
+  blurb: string;
+  build: (seq: number) => RuleDraft[];
+}
+
+const draft = (o: Partial<RuleDraft> & { id: string; name: string }): RuleDraft => ({
+  when: 'cardPlayed', condId: 'always', condParams: {},
+  conds: [{ condId: 'always', params: {} }], effects: [], enabled: true, ...o,
+});
+
+export const PATTERNS: RulePattern[] = [
+  {
+    id: 'streak',
+    name: 'A streak that pays off',
+    blurb: 'Counts each player\'s hearts, and pays out the moment somebody reaches three.',
+    build: (n) => [
+      draft({
+        id: `p${n}count`, name: 'Count hearts',
+        conds: [{ condId: 'suitIs', params: { suit: 'H' } }],
+        effects: [{ specId: 'bump', params: { var: 'hearts', by: 1, scope: '$me', keep: 'hand' } }],
+        note: 'Each player has their own count, because the counter belongs to them and not the table.',
+      }),
+      draft({
+        id: `p${n}pay`, name: 'Three hearts pays',
+        conds: [{ condId: 'varIs', params: { var: 'hearts', op: '>=', value: '3', scope: '$me' } }],
+        effects: [
+          { specId: 'addScore', params: { who: '$me', amount: 5, times: 'flat' } },
+          { specId: 'remember', params: { var: 'hearts', value: 0, scope: '$me', keep: 'hand' } },
+        ],
+        note: 'Resets the count so the same three do not pay twice.',
+      }),
+    ],
+  },
+  {
+    id: 'special-case',
+    name: 'A special case, then the general rule',
+    blurb: 'Handles one card differently and stops, so the rule below it never sees that card.',
+    build: (n) => [
+      draft({
+        id: `p${n}special`, name: 'The queen of spades is different',
+        conds: [{ condId: 'exactCard', params: { card: 'SQ' } }],
+        effects: [
+          { specId: 'addScore', params: { who: '$me', amount: 13, times: 'flat' } },
+          { specId: 'stopRules', params: {} },
+        ],
+        note: 'Stopping here is what keeps the general rule below from firing as well.',
+      }),
+      draft({
+        id: `p${n}general`, name: 'Every other spade',
+        conds: [{ condId: 'suitIs', params: { suit: 'S' } }],
+        effects: [{ specId: 'addScore', params: { who: '$me', amount: 1, times: 'flat' } }],
+      }),
+    ],
+  },
+  {
+    id: 'shared-payout',
+    name: 'Two rules sharing one payout',
+    blurb: 'Two different triggers both call the same scoring rule, so the payout is written once.',
+    build: (n) => [
+      draft({
+        id: `p${n}a`, name: 'An ace triggers it',
+        conds: [{ condId: 'rankIs', params: { rank: 'A' } }],
+        effects: [{ specId: 'runRule', params: { rule: `p${n}payout` } }],
+      }),
+      draft({
+        id: `p${n}b`, name: 'So does going nearly out',
+        when: 'turnEnd',
+        conds: [{ condId: 'handSize', params: { op: '<=', value: 1 } }],
+        effects: [{ specId: 'runRule', params: { rule: `p${n}payout` } }],
+      }),
+      draft({
+        id: `p${n}payout`, name: 'The payout itself',
+        conds: [{ condId: 'always', params: {} }],
+        effects: [
+          { specId: 'addScore', params: { who: '$me', amount: 3, times: 'flat' } },
+          { specId: 'announce', params: { text: 'Bonus!' } },
+        ],
+        note: 'Change the payout here and both triggers above follow.',
+      }),
+    ],
+  },
+  {
+    id: 'memory',
+    name: 'Remembering what has been played',
+    blurb: 'Builds a list of the suits seen this hand, and reacts once every one of them has shown up.',
+    build: (n) => [
+      draft({
+        id: `p${n}see`, name: 'Note the suit',
+        effects: [{ specId: 'rememberCard', params: { var: 'suitsSeen', what: 'suit', scope: 'table', keep: 'hand' } }],
+      }),
+      draft({
+        id: `p${n}all`, name: 'All four have appeared',
+        condJoin: 'all',
+        conds: [
+          { condId: 'listHas', params: { var: 'suitsSeen', value: 'C', scope: 'table' } },
+          { condId: 'listHas', params: { var: 'suitsSeen', value: 'D', scope: 'table' } },
+          { condId: 'listHas', params: { var: 'suitsSeen', value: 'H', scope: 'table' } },
+          { condId: 'listHas', params: { var: 'suitsSeen', value: 'S', scope: 'table' } },
+        ],
+        effects: [{ specId: 'announce', params: { text: 'Every suit has been played.' } }],
+      }),
+    ],
+  },
+];
+
+// ---------- plays a game forbids ----------
+
+/**
+ * A restriction is a rule with no `then`: it says which cards may not be played and nothing
+ * else. Same clause composer, same conditions, so an author who can write "when a heart is
+ * played, score a point" can write "a heart may not be led" with the parts they already know.
+ */
+export interface RestrictionDraft {
+  id: string;
+  name: string;
+  conds: CondNode[];
+  condJoin?: 'all' | 'any';
+  note?: string;
+  enabled: boolean;
+}
+
+export function newRestrictionDraft(seq: number): RestrictionDraft {
+  const cond = CONDITIONS[1];
+  return {
+    id: `no${seq}`,
+    name: `Restriction ${seq}`,
+    conds: [{ condId: cond.id, params: defaultsFor(cond.params) }],
+    enabled: true,
+  };
+}
+
+export function compileRestriction(draft: RestrictionDraft): PlayRestriction {
+  const parts = draft.conds.map(buildNode);
+  const cond: Predicate = parts.length === 0 ? { not: { always: true } }
+    : parts.length === 1 ? parts[0]
+    : draft.condJoin === 'any' ? { any: parts } : { all: parts };
+  return { id: draft.id, name: draft.name, if: cond, note: draft.note, enabled: draft.enabled, draft };
+}
+
+export function compileRestrictions(drafts: RestrictionDraft[]): PlayRestriction[] {
+  return drafts.filter((d) => d.conds.length > 0).map(compileRestriction);
 }

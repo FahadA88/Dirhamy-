@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import {
-  CONDITIONS, EFFECTS, HOOKS, ParamSpec, ParamValue, RuleDraft,
-  compileRule, defaultsFor, findCondition, findEffect, newRuleDraft,
+  CONDITIONS, CondNode, EFFECTS, HOOKS, ParamSpec, ParamValue, RestrictionDraft, RuleDraft,
+  compileRestriction, compileRule, condNodesOf, defaultsFor, findCondition, findEffect,
+  newRestrictionDraft, newRuleDraft, PATTERNS,
 } from '../authoring/ruleKit';
-import { explainRule } from '../authoring/explain';
+import { explainPredicate, explainRule } from '../authoring/explain';
 
 // The near-programmable layer, as a screen.
 //
@@ -32,6 +33,11 @@ export function RuleBuilder({ rules, onChange }: {
   function remove(id: string) {
     onChange(rules.filter((r) => r.id !== id));
     if (openId === id) setOpenId(null);
+  }
+  function setEffect(rule: RuleDraft, ei: number, patch: Partial<RuleDraft['effects'][number]>) {
+    const effects = rule.effects.slice();
+    effects[ei] = { ...effects[ei], ...patch };
+    update(rule.id, { effects });
   }
   function move(id: string, dir: -1 | 1) {
     // Order matters: rules fire top to bottom, and one that ends the hand stops the rest.
@@ -67,6 +73,24 @@ export function RuleBuilder({ rules, onChange }: {
         </div>
       )}
 
+      {/* Rules that reference each other are the hard part to discover: a counter one rule
+          writes and another reads is invisible until you have seen it done once. */}
+      <details className="rb-patterns">
+        <summary>Start from a pattern</summary>
+        <div className="rb-pattern-list">
+          {PATTERNS.map((pat) => (
+            <button key={pat.id} className="rb-pattern" onClick={() => {
+              const made = pat.build(rules.length + 1);
+              onChange([...rules, ...made]);
+              setOpenId(made[0].id);
+            }}>
+              <b>{pat.name}</b>
+              <em>{pat.blurb}</em>
+            </button>
+          ))}
+        </div>
+      </details>
+
       <ol className="rb-list">
         {rules.map((rule, i) => {
           const open = openId === rule.id;
@@ -101,23 +125,67 @@ export function RuleBuilder({ rules, onChange }: {
                   </div>
                   <p className="rb-hint">{HOOKS.find((h) => h.value === rule.when)?.hint}</p>
 
-                  <div className="rb-clause">
-                    <span className="rb-kw">If</span>
-                    <select value={rule.condId} onChange={(e) => {
-                      const spec = findCondition(e.target.value);
-                      update(rule.id, { condId: spec.id, condParams: defaultsFor(spec.params) });
-                    }}>
-                      {CONDITIONS.filter((c) => showAdvanced || !c.advanced).map((c) => (
-                        <option key={c.id} value={c.id}>{c.label}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <Params
-                    specs={findCondition(rule.condId).params}
-                    values={rule.condParams}
-                    onChange={(k, v) => update(rule.id, { condParams: { ...rule.condParams, [k]: v } })}
-                  />
-                  {findCondition(rule.condId).hint && <p className="rb-hint">{findCondition(rule.condId).hint}</p>}
+                  {/* A rule used to hold exactly one condition, so "a queen AND a spade" —
+                      which the engine's `all` predicate has always understood — could not be
+                      said here at all. Clauses are a list now, joined by all/any, each one
+                      invertible on its own. */}
+                  {(() => {
+                    const nodes = condNodesOf(rule);
+                    const setNodes = (next: CondNode[]) => update(rule.id, {
+                      conds: next,
+                      condId: next[0]?.condId ?? rule.condId,
+                      condParams: next[0]?.params ?? rule.condParams,
+                    });
+                    return (
+                      <>
+                        <div className="rb-clause">
+                          <span className="rb-kw">If</span>
+                          {nodes.length > 1 && (
+                            <div className="rb-join">
+                              <button className={rule.condJoin !== 'any' ? 'on' : ''}
+                                onClick={() => update(rule.id, { condJoin: 'all' })}>all of these</button>
+                              <button className={rule.condJoin === 'any' ? 'on' : ''}
+                                onClick={() => update(rule.id, { condJoin: 'any' })}>any of these</button>
+                            </div>
+                          )}
+                        </div>
+                        {nodes.map((node, ci) => {
+                          const spec = findCondition(node.condId);
+                          return (
+                            <div key={ci} className="rb-cond">
+                              <div className="rb-cond-head">
+                                <button className={`chip neg ${node.negate ? 'on' : ''}`}
+                                  aria-pressed={!!node.negate}
+                                  title={node.negate ? 'Inverted — click to un-invert' : 'Invert this clause'}
+                                  onClick={() => setNodes(nodes.map((x, k) => (k === ci ? { ...x, negate: !x.negate } : x)))}>
+                                  not
+                                </button>
+                                <select value={node.condId} onChange={(e) => {
+                                  const next = findCondition(e.target.value);
+                                  setNodes(nodes.map((x, k) => (k === ci ? { ...x, condId: next.id, params: defaultsFor(next.params) } : x)));
+                                }}>
+                                  {CONDITIONS.filter((c) => showAdvanced || !c.advanced || c.id === node.condId).map((c) => (
+                                    <option key={c.id} value={c.id}>{c.label}</option>
+                                  ))}
+                                </select>
+                                {nodes.length > 1 && (
+                                  <button className="icon-btn danger" title="Remove this clause"
+                                    onClick={() => setNodes(nodes.filter((_, k) => k !== ci))}>✕</button>
+                                )}
+                              </div>
+                              <Params specs={spec.params} values={node.params}
+                                onChange={(k, v) => setNodes(nodes.map((x, j) => (j === ci ? { ...x, params: { ...x.params, [k]: v } } : x)))} />
+                              {spec.hint && <p className="rb-hint">{spec.hint}</p>}
+                            </div>
+                          );
+                        })}
+                        <button className="chip" onClick={() => {
+                          const first = CONDITIONS[1];
+                          setNodes([...nodes, { condId: first.id, params: defaultsFor(first.params) }]);
+                        }}>+ And only if…</button>
+                      </>
+                    );
+                  })()}
 
                   <div className="rb-clause"><span className="rb-kw">Then</span></div>
                   {rule.effects.map((eff, ei) => {
@@ -148,6 +216,40 @@ export function RuleBuilder({ rules, onChange }: {
                           }}
                         />
                         {spec?.hint && <p className="rb-hint">{spec.hint}</p>}
+                        {/* One action, its own condition. A rule used to be all-or-nothing —
+                            every action fired or none did — so "score five, and if they are
+                            also out of hearts, skip them" needed two rules with duplicated
+                            conditions. This compiles to the engine's `if` op. */}
+                        {eff.onlyIf ? (
+                          <div className="rb-onlyif">
+                            <div className="rb-cond-head">
+                              <span className="rb-kw sm">but only if</span>
+                              <button className={`chip neg ${eff.onlyIf.negate ? 'on' : ''}`}
+                                aria-pressed={!!eff.onlyIf.negate}
+                                title={eff.onlyIf.negate ? 'Inverted — click to un-invert' : 'Invert this clause'}
+                                onClick={() => setEffect(rule, ei, { onlyIf: { ...eff.onlyIf!, negate: !eff.onlyIf!.negate } })}>
+                                not
+                              </button>
+                              <select value={eff.onlyIf.condId} onChange={(e) => {
+                                const next = findCondition(e.target.value);
+                                setEffect(rule, ei, { onlyIf: { condId: next.id, params: defaultsFor(next.params), negate: eff.onlyIf?.negate } });
+                              }}>
+                                {CONDITIONS.filter((c) => showAdvanced || !c.advanced || c.id === eff.onlyIf!.condId).map((c) => (
+                                  <option key={c.id} value={c.id}>{c.label}</option>
+                                ))}
+                              </select>
+                              <button className="icon-btn danger" title="Always do this"
+                                onClick={() => setEffect(rule, ei, { onlyIf: undefined })}>✕</button>
+                            </div>
+                            <Params specs={findCondition(eff.onlyIf.condId).params} values={eff.onlyIf.params}
+                              onChange={(k, v) => setEffect(rule, ei, { onlyIf: { ...eff.onlyIf!, params: { ...eff.onlyIf!.params, [k]: v } } })} />
+                          </div>
+                        ) : (
+                          <button className="chip subtle" onClick={() => {
+                            const first = CONDITIONS[1];
+                            setEffect(rule, ei, { onlyIf: { condId: first.id, params: defaultsFor(first.params) } });
+                          }}>+ but only if…</button>
+                        )}
                       </div>
                     );
                   })}
@@ -173,6 +275,138 @@ export function RuleBuilder({ rules, onChange }: {
       </ol>
 
       {rules.length > 0 && <button className="ghost sm" onClick={add}>+ Add another rule</button>}
+    </div>
+  );
+}
+
+/**
+ * Plays the game forbids.
+ *
+ * A twist reacts to a move; a restriction stops one. They are separated because they are
+ * different questions — "what happens when you play a heart" and "may you play a heart at all"
+ * — and because a rule that could do both would be a rule nobody could read back in a sentence.
+ */
+export function RestrictionBuilder({ restrictions, onChange }: {
+  restrictions: RestrictionDraft[];
+  onChange: (next: RestrictionDraft[]) => void;
+}) {
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+
+  const update = (id: string, patch: Partial<RestrictionDraft>) =>
+    onChange(restrictions.map((r) => (r.id === id ? { ...r, ...patch } : r)));
+
+  return (
+    <div className="rulebuilder">
+      <div className="rb-head">
+        <div>
+          <h3>Forbidden plays</h3>
+          <p className="rb-sub">
+            Cards that may not be played, and when. If a rule here would leave someone with no
+            legal move at all, it steps aside for that turn — a stuck game is worse than a rule
+            that occasionally does not apply.
+          </p>
+        </div>
+        <label className="rb-adv">
+          <input type="checkbox" checked={showAdvanced} onChange={(e) => setShowAdvanced(e.target.checked)} />
+          <span>Show advanced</span>
+        </label>
+      </div>
+
+      {restrictions.length === 0 && (
+        <div className="rb-empty">
+          <div className="rb-empty-mark">⃠</div>
+          <p>Nothing is forbidden beyond what the family already forbids.</p>
+          <button className="primary sm" onClick={() => {
+            const d = newRestrictionDraft(1);
+            onChange([d]); setOpenId(d.id);
+          }}>Forbid a play</button>
+        </div>
+      )}
+
+      <ol className="rb-list">
+        {restrictions.map((r) => {
+          const open = openId === r.id;
+          return (
+            <li key={r.id} className={`rb-item ${open ? 'open' : ''} ${r.enabled ? '' : 'off'}`}>
+              <div className="rb-row">
+                <span className="rb-index">⃠</span>
+                <button className="rb-title" onClick={() => setOpenId(open ? null : r.id)}>
+                  <b>{r.name}</b>
+                  <span className="rb-sentence">You may not play a card when {explainPredicate(compileRestriction(r).if)}.</span>
+                </button>
+                <div className="rb-tools">
+                  <button className={`icon-btn ${r.enabled ? 'on' : ''}`} title={r.enabled ? 'Turn this off' : 'Turn this on'}
+                    onClick={() => update(r.id, { enabled: !r.enabled })}>{r.enabled ? '●' : '○'}</button>
+                  <button className="icon-btn danger" title="Delete"
+                    onClick={() => { onChange(restrictions.filter((x) => x.id !== r.id)); if (open) setOpenId(null); }}>✕</button>
+                </div>
+              </div>
+              {open && (
+                <div className="rb-body">
+                  <label className="field"><span>Name it</span>
+                    <input value={r.name} onChange={(e) => update(r.id, { name: e.target.value })} /></label>
+                  <div className="rb-clause">
+                    <span className="rb-kw">Not if</span>
+                    {r.conds.length > 1 && (
+                      <div className="rb-join">
+                        <button className={r.condJoin !== 'any' ? 'on' : ''} onClick={() => update(r.id, { condJoin: 'all' })}>all of these</button>
+                        <button className={r.condJoin === 'any' ? 'on' : ''} onClick={() => update(r.id, { condJoin: 'any' })}>any of these</button>
+                      </div>
+                    )}
+                  </div>
+                  {r.conds.map((node, ci) => {
+                    const spec = findCondition(node.condId);
+                    const setConds = (next: CondNode[]) => update(r.id, { conds: next });
+                    return (
+                      <div key={ci} className="rb-cond">
+                        <div className="rb-cond-head">
+                          <button className={`chip neg ${node.negate ? 'on' : ''}`} aria-pressed={!!node.negate}
+                            title={node.negate ? 'Inverted — click to un-invert' : 'Invert this clause'}
+                            onClick={() => setConds(r.conds.map((x, k) => (k === ci ? { ...x, negate: !x.negate } : x)))}>not</button>
+                          <select value={node.condId} onChange={(e) => {
+                            const next = findCondition(e.target.value);
+                            setConds(r.conds.map((x, k) => (k === ci ? { ...x, condId: next.id, params: defaultsFor(next.params) } : x)));
+                          }}>
+                            {CONDITIONS.filter((c) => showAdvanced || !c.advanced || c.id === node.condId).map((c) => (
+                              <option key={c.id} value={c.id}>{c.label}</option>
+                            ))}
+                          </select>
+                          {r.conds.length > 1 && (
+                            <button className="icon-btn danger" title="Remove this clause"
+                              onClick={() => setConds(r.conds.filter((_, k) => k !== ci))}>✕</button>
+                          )}
+                        </div>
+                        <Params specs={spec.params} values={node.params}
+                          onChange={(k, v) => setConds(r.conds.map((x, j) => (j === ci ? { ...x, params: { ...x.params, [k]: v } } : x)))} />
+                        {spec.hint && <p className="rb-hint">{spec.hint}</p>}
+                      </div>
+                    );
+                  })}
+                  <button className="chip" onClick={() => {
+                    const first = CONDITIONS[1];
+                    update(r.id, { conds: [...r.conds, { condId: first.id, params: defaultsFor(first.params) }] });
+                  }}>+ And only if…</button>
+                  <label className="field"><span>Note for players (optional)</span>
+                    <input value={r.note ?? ''} placeholder="Why this is forbidden"
+                      onChange={(e) => update(r.id, { note: e.target.value })} /></label>
+                  <div className="rb-readback">
+                    <span className="rb-readback-label">In plain English</span>
+                    <p>You may not play a card when {explainPredicate(compileRestriction(r).if)}.</p>
+                  </div>
+                </div>
+              )}
+            </li>
+          );
+        })}
+      </ol>
+
+      {restrictions.length > 0 && (
+        <button className="ghost sm" onClick={() => {
+          const d = newRestrictionDraft(restrictions.length + 1);
+          onChange([...restrictions, d]); setOpenId(d.id);
+        }}>+ Forbid another play</button>
+      )}
     </div>
   );
 }
@@ -203,6 +437,30 @@ function Params({ specs, values, onChange }: {
               <input type="number" value={Number(v)} min={p.min} max={p.max} step={p.step ?? 1}
                 onChange={(e) => onChange(p.key, parseInt(e.target.value || '0', 10))} />
             </label>
+          );
+        }
+        if (p.kind === 'card') {
+          // Two dropdowns rather than 52 buttons: the parameter is one card, and a rule reads
+          // as a sentence, so "Q" then "♠" sits in the line rather than opening a grid over it.
+          const key = String(v);
+          const suit = key.slice(0, 1);
+          const rank = key.slice(1) || 'Q';
+          return (
+            <div key={p.key} className="field cardparam"><span>{p.label}</span>
+              <div className="cardparam-row">
+                <select value={rank} onChange={(e) => onChange(p.key, `${suit}${e.target.value}`)}>
+                  {['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'].map((r) => (
+                    <option key={r} value={r}>{r}</option>
+                  ))}
+                </select>
+                <select value={suit} onChange={(e) => onChange(p.key, `${e.target.value}${rank}`)}>
+                  <option value="S">♠ spades</option>
+                  <option value="H">♥ hearts</option>
+                  <option value="D">♦ diamonds</option>
+                  <option value="C">♣ clubs</option>
+                </select>
+              </div>
+            </div>
           );
         }
         return (

@@ -18,6 +18,12 @@ const HOOK_WORDS: Record<RuleHook, string> = {
   cardDrawn: 'When a player draws',
   trickWon: 'When a trick is won',
   drawPileEmpty: 'When the draw pile runs out',
+  trickLed: 'When a trick is led',
+  handEnd: 'When the hand ends',
+  matchEnd: 'When the match is decided',
+  meldLaid: 'When a meld goes down',
+  bidMade: 'When a player bids',
+  playerOut: 'When a player goes out',
 };
 
 const WHO: Record<string, string> = {
@@ -42,10 +48,10 @@ export function suitWord(s: string): string {
 export function explainValue(v: RuleValue): string {
   if (!v || typeof v !== 'object') return 'something';
   if ('lit' in v) return typeof v.lit === 'string' && SUIT_WORDS[v.lit] ? suitWord(v.lit) : String(v.lit);
-  if ('stateVar' in v) return `the ${spaced(v.stateVar)}`;
+  if ('stateVar' in v) return `${v.per ? `${WHO[v.per] ?? v.per}'s ` : 'the '}${spaced(v.stateVar)}`;
   if ('count' in v) return v.count === '$hand' ? 'the number of cards in their hand' : `the number of cards in ${spaced(v.count)}`;
   if ('cardProp' in v) {
-    return v.cardProp === 'value' ? "the card's rank order" : `the card's ${v.cardProp}`;
+    return v.cardProp === 'value' ? "the card's value" : `the card's ${v.cardProp}`;
   }
   if ('score' in v) return `${WHO[v.score] ?? v.score}'s points this hand`;
   if ('matchScore' in v) return `${WHO[v.matchScore] ?? v.matchScore}'s match score`;
@@ -60,13 +66,29 @@ export function explainValue(v: RuleValue): string {
   return 'something';
 }
 
+/** A suit clause plus a rank clause, in either order, is a single card. */
+function oneNamedCard(parts: Predicate[]): string | null {
+  if (parts.length !== 2) return null;
+  const suit = parts.find((x) => 'suitIn' in x && x.suitIn.length === 1) as { suitIn: string[] } | undefined;
+  const rank = parts.find((x) => 'rankIn' in x && x.rankIn.length === 1) as { rankIn: string[] } | undefined;
+  if (!suit || !rank) return null;
+  // rankWord carries its own article ("a Queen"), which reads wrong after "the".
+  return `${bareRank(rank.rankIn[0])} of ${suitWord(suit.suitIn[0])}`;
+}
+
 // ---------- conditions ----------
 
 export function explainPredicate(p: Predicate | undefined): string {
   if (!p) return 'always';
   if ('always' in p) return 'always';
   if ('any' in p) return p.any.map(explainPredicate).join(' or ');
-  if ('all' in p) return p.all.map(explainPredicate).join(' and ');
+  if ('all' in p) {
+    // "a spade AND a queen" is how the builder has to SAY one card, but not how anybody reads
+    // one. Spotting that exact pair back out lets the sentence name the card instead.
+    const named = oneNamedCard(p.all);
+    if (named) return `the card is the ${named}`;
+    return p.all.map(explainPredicate).join(' and ');
+  }
   if ('not' in p) return `it is not the case that ${explainPredicate(p.not)}`;
   if ('cardHasTag' in p) return `the card is ${aOrAn(p.cardHasTag)} card`;
   if ('existsLegal' in p) return `the player could legally ${spaced(p.existsLegal)}`;
@@ -74,6 +96,7 @@ export function explainPredicate(p: Predicate | undefined): string {
   if ('suitIn' in p) return `the card is ${listOf(p.suitIn.map(suitWord))}`;
   if ('colorIs' in p) return `the card is ${p.colorIs}`;
   if ('isFirstTurn' in p) return 'it is the first play of the hand';
+  if ('listHas' in p) return `${spaced(p.listHas.var)} already contains ${explainValue(p.listHas.value)}`;
   if ('handHas' in p) return explainHandQuery(p.handHas);
   if ('cmp' in p) return `${explainValue(p.cmp.left)} ${OPS[p.cmp.op] ?? p.cmp.op} ${explainValue(p.cmp.right)}`;
   if ('matches' in p) {
@@ -116,7 +139,11 @@ export function explainEffect(e: Effect): string {
     case 'drawUntilPlayable': return 'draw until a playable card turns up';
     case 'passCards': return `everyone passes a card ${e.direction}`;
     case 'addScore': return `give ${WHO[e.player] ?? e.player} ${explainValue(e.amount)} point${isOne(e.amount) ? '' : 's'}`;
-    case 'setVarNum': return `set ${spaced(e.var)} to ${explainValue(e.value)}`;
+    case 'setVarNum': {
+      const whose = e.per ? ` (${WHO[e.per] ?? e.per}'s own)` : '';
+      const lasts = e.keep ? ', kept for the whole match' : '';
+      return `set ${spaced(e.var)}${whose} to ${explainValue(e.value)}${lasts}`;
+    }
     case 'announce': return `announce “${e.text}”`;
     case 'endHand':
       return e.winner === undefined ? 'end the hand'
@@ -128,6 +155,9 @@ export function explainEffect(e: Effect): string {
     case 'drawTo': return `${WHO[e.player] ?? e.player} draws ${explainValue(e.count)}`;
     case 'revealHand': return `${WHO[e.player] ?? e.player} reveals their hand`;
     case 'skipTo': return `play passes straight to the ${e.player} player`;
+    case 'stopRules': return 'stop — no rule below this one runs';
+    case 'runRule': return `also run the rule called ${e.rule}`;
+    case 'appendVar': return `add ${explainValue(e.value)} to the ${spaced(e.var)} list`;
     default: return 'do something';
   }
 }
@@ -228,6 +258,10 @@ function listOf(items: string[]): string {
 }
 function rankWord(r: string): string {
   return { A: 'an Ace', J: 'a Jack', Q: 'a Queen', K: 'a King' }[r] ?? `a ${r}`;
+}
+/** The rank on its own, for sentences that supply their own article. */
+function bareRank(r: string): string {
+  return { A: 'Ace', J: 'Jack', Q: 'Queen', K: 'King', JOKER: 'Joker' }[r] ?? r;
 }
 function isOne(v: RuleValue): boolean { return 'lit' in v && v.lit === 1; }
 

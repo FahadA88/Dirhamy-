@@ -114,6 +114,34 @@ export interface GameDefinition {
   // Author-written conditional rules, layered on top of whichever family this game is.
   // Present on custom games; the classics don't need any.
   rules?: CustomRule[];
+  /**
+   * Plays this game forbids, over and above whatever its family already forbids.
+   *
+   * Every CustomRule hook is reactive — it fires after a move and responds to it — so before
+   * these, an author could punish a play but never prevent one. A restriction is checked while
+   * the legal moves are being worked out, with the candidate card in hand.
+   *
+   * Never allowed to leave a player with nothing to do: if every move a player has would be
+   * forbidden, the restrictions are skipped for that turn. A rule that occasionally does not
+   * apply is much better than a game that cannot continue.
+   */
+  playRestrictions?: PlayRestriction[];
+}
+
+export interface PlayRestriction {
+  id: string;
+  name: string;
+  /** True for a card means that card may NOT be played. */
+  if: Predicate;
+  note?: string;
+  enabled?: boolean;
+  /**
+   * The builder ingredients this was assembled from, carried along so the editor can re-open
+   * it. The engine never reads this — a Predicate tree is not recoverable back into the
+   * choices that produced it, and without somewhere to keep them a trip through the JSON
+   * editor silently deleted an author's work.
+   */
+  draft?: unknown;
 }
 
 export interface WarConfig {
@@ -420,7 +448,13 @@ export type Predicate =
   | { suitIn: Suit[] }             // ...one of these suits
   | { colorIs: 'red' | 'black' }
   | { handHas: HandQuery }         // does the acting player's hand contain N of something
-  | { isFirstTurn: true };         // nobody has played a card yet this hand
+  | { isFirstTurn: true }
+  /**
+   * Membership in a list a rule has been building up with `appendVar` — which suits have been
+   * led, which ranks have gone. Its own predicate rather than a string comparison, because the
+   * value arithmetic is numeric and a list is not a number.
+   */
+  | { listHas: { var: string; per?: PlayerRef; value: RuleValue } };         // nobody has played a card yet this hand
 
 /** Two values and an operator. The workhorse of author-written conditions. */
 export interface Comparison {
@@ -443,7 +477,7 @@ export interface HandQuery {
  */
 export type RuleValue =
   | { lit: number | string }
-  | { stateVar: string }                       // a game variable, e.g. activeSuit
+  | { stateVar: string; per?: PlayerRef }      // a game variable, e.g. activeSuit; `per` reads one player's own
   | { count: string }                          // cards in a zone; '$hand' = the actor's hand
   | { cardProp: 'rank' | 'suit' | 'color' | 'value' }   // of the card in play
   | { score: PlayerRef }                       // that player's points THIS hand
@@ -472,7 +506,7 @@ export interface MatchPredicate {
 
 export type Effect =
   | { op: 'move'; card?: '$target'; from?: string; to: string; count?: number }
-  | { op: 'setState'; var: string; value: string } // value may be "$target.suit"/"$target.rank" or literal
+  | { op: 'setState'; var: string; value: string; per?: PlayerRef; keep?: boolean } // value may be "$target.suit"/"$target.rank" or literal
   | { op: 'if'; cond: Predicate; then: Effect[]; else?: Effect[] }
   | { op: 'chooseSuit'; setState: string }          // pauses for the current player to pick a suit
   | { op: 'reverseOrder' }
@@ -484,14 +518,37 @@ export type Effect =
   | { op: 'passCards'; direction: 'left' | 'right' } // every player passes one hand card to a neighbor, simultaneously
   // ----- near-programmable additions (Phase 2) -----
   | { op: 'addScore'; player: PlayerRef; amount: RuleValue }
-  | { op: 'setVarNum'; var: string; value: RuleValue }
+  | {
+      op: 'setVarNum'; var: string; value: RuleValue;
+      /**
+       * Whose counter this is. Vars are one flat bag by default, which is fine for "how many
+       * hearts have fallen" and useless for "how many hearts EACH player has taken" — with no
+       * scope the second player's write clobbers the first's. `per` keys the var by player.
+       */
+      per?: PlayerRef;
+      /**
+       * Survive into the next hand. Vars are cleared on every deal, so a streak counter reset
+       * itself exactly when it became interesting.
+       */
+      keep?: boolean;
+    }
   | { op: 'announce'; text: string }              // a line in the game log, in the author's words
   | { op: 'endHand'; winner?: PlayerRef | 'highestScore' | 'lowestScore' }
   | { op: 'swapHands'; withPlayer: 'next' | 'prev' }
   | { op: 'moveMany'; from: string; to: string; count: RuleValue }
   | { op: 'drawTo'; player: PlayerRef; from: string; count: RuleValue }
   | { op: 'revealHand'; player: PlayerRef }
-  | { op: 'skipTo'; player: 'next' | 'prev' };
+  | { op: 'skipTo'; player: 'next' | 'prev' }
+  /**
+   * Linking rules to one another. Before these, the only way one rule could affect another was
+   * a shared global string bag plus top-to-bottom ordering — which made "count this, and when
+   * the count reaches three do that" possible but "and then stop" or "and also run the payout
+   * rule" not.
+   */
+  | { op: 'stopRules' }
+  | { op: 'runRule'; rule: string }
+  /** Appends to a delimited list held in one variable, so a rule can remember a SET. */
+  | { op: 'appendVar'; var: string; value: RuleValue; per?: PlayerRef; unique?: boolean };
 
 export interface TriggerDef {
   on: 'drawPileEmpty' | 'cardPlayed';
@@ -515,6 +572,11 @@ export interface CustomRule {
   then: Effect[];
   note?: string;                    // the author's own explanation, surfaced in the rules panel
   enabled?: boolean;                // default true; lets an author park a rule without deleting it
+  /**
+   * The builder ingredients this was assembled from. See PlayRestriction.draft — same reason,
+   * same contract: the engine never reads it, and without it the JSON editor is a shredder.
+   */
+  draft?: unknown;
 }
 
 export type RuleHook =
@@ -524,7 +586,16 @@ export type RuleHook =
   | 'cardPlayed'     // a card left a hand for a shared zone
   | 'cardDrawn'
   | 'trickWon'       // trick-taking only
-  | 'drawPileEmpty';
+  | 'drawPileEmpty'
+  // Moments the engine has always had but never announced. Every one of these was a place a
+  // rule obviously wanted to sit — "double the points on the last hand", "the player who leads
+  // a heart pays for it", "whoever melds first gets a bonus" — with nothing to attach it to.
+  | 'trickLed'       // trick-taking: the first card of a trick has been played
+  | 'handEnd'        // the hand's scores are in, before the next deal
+  | 'matchEnd'       // the whole match is decided
+  | 'meldLaid'       // rummy: a set or run went down on the table
+  | 'bidMade'        // any auction: a player has named their bid
+  | 'playerOut';     // a player emptied their hand
 
 export interface EndConditionDef {
   id: string;
@@ -607,6 +678,18 @@ export interface MatchState {
   climbBombDeclined: Record<string, boolean>; // who has passed on interrupting THIS pile state
   booksWon: Record<string, number>; // fishing: completed books per player
   vars: Record<string, string>;
+  /**
+   * Var names an author asked to survive the deal. Everything in `vars` is wiped when a hand
+   * starts; these entries are copied forward instead, so a rule can count something across a
+   * whole match rather than only across one hand.
+   */
+  keepVars: string[];
+  /** Set by the stopRules effect; read and cleared by fireRules. Never persisted. */
+  stopRules: boolean;
+  /** How deep one rule calling another currently is, so a cycle stops rather than hangs. */
+  ruleDepth: number;
+  /** Whether the handEnd/matchEnd hooks have already fired for this hand. */
+  handEndFired: boolean;
   scores: Record<string, number>;   // THIS HAND's points, set when the hand ends
   // Points handed out by author-written rules DURING the hand. Kept separately because each
   // family computes state.scores from scratch when the hand ends; this is folded in afterwards

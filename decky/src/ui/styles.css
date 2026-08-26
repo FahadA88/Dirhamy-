@@ -1000,6 +1000,32 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
 .cv-row > span:first-child { min-width: 72px; }
 .cv-row input { width: 72px; }
 .cv-unit { color: var(--muted); font-size: 12px; flex: 1; }
+.seatdeal { display: flex; flex-direction: column; gap: 6px; margin: 8px 0; }
+.sd-row { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.sd-row > span:first-child { min-width: 76px; }
+.sd-row input { width: 64px; }
+.sd-note { color: var(--muted); font-size: 11px; }
+.sd-note.bad { color: #c0392b; font-weight: 600; }
+.warn-text { color: #c0392b; }
+.propedit { display: flex; flex-direction: column; gap: 6px; margin: 8px 0; }
+.pe-row { display: flex; gap: 6px; align-items: center; }
+.pe-name { width: 90px; flex: none; }
+.pe-vals { flex: 1 1 auto; min-width: 0; }
+.pe-foot { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.rankorder { display: flex; flex-wrap: wrap; gap: 4px; margin: 8px 0; }
+.ro-item { display: inline-flex; align-items: center; gap: 1px; padding: 2px 3px; border-radius: 8px; border: 1px solid var(--panel-brd); background: rgba(255,255,255,0.6); font-size: 12px; }
+.ro-item b { min-width: 20px; text-align: center; color: var(--ink); }
+.ro-arrow { border: 0; background: none; cursor: pointer; font: inherit; font-size: 13px; line-height: 1; padding: 2px 3px; color: var(--muted); }
+.ro-arrow:hover:not(:disabled) { color: var(--green); }
+.ro-arrow:disabled { opacity: 0.25; cursor: default; }
+.pe-face { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); flex: none; }
+.rb-patterns { margin: 10px 0; }
+.rb-patterns > summary { cursor: pointer; font-size: 13px; font-weight: 600; color: var(--ink); padding: 6px 0; }
+.rb-pattern-list { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+.rb-pattern { display: flex; flex-direction: column; gap: 3px; text-align: left; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--panel-brd); background: rgba(0,0,0,0.03); cursor: pointer; font: inherit; color: var(--ink); transition: 0.12s; }
+.rb-pattern:hover { border-color: var(--green); }
+.rb-pattern b { font-size: 13px; }
+.rb-pattern em { font-size: 12px; font-style: normal; color: var(--muted); }
 
 .seg { display: flex; gap: 5px; }
 .seg button { flex: 1; padding: 9px; cursor: pointer; font: inherit; font-size: 13px; background: transparent; color: var(--muted); border: 1px solid var(--panel-brd); border-radius: var(--r-pill); transition: 0.15s; }
@@ -1301,6 +1327,23 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
 .rb-clause select { flex: 1 1 auto; }
 .rb-hint { margin: 2px 0 0 54px; font-size: 11px; color: var(--muted); line-height: 1.4; }
 .rb-params { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin: 8px 0 0 54px; }
+/* Several condition clauses per rule, joined by all/any. */
+.rb-join { display: flex; gap: 4px; margin-left: auto; }
+.rb-join button { padding: 4px 10px; border-radius: var(--r-pill); border: 1px solid var(--panel-brd); background: transparent; color: var(--muted); cursor: pointer; font: inherit; font-size: 12px; }
+.rb-join button.on { background: var(--seg-on-bg); color: var(--seg-on-ink); border-color: var(--seg-on-bg); font-weight: 600; }
+.rb-cond { margin: 6px 0 0 54px; padding: 10px 12px; border-radius: 10px; background: rgba(0, 0, 0, 0.03); }
+.rb-cond .rb-params { margin-left: 0; }
+.rb-cond-head { display: flex; gap: 8px; align-items: center; }
+.rb-cond-head select { flex: 1 1 auto; }
+.chip.neg { min-width: 44px; font-size: 11px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; opacity: 0.45; }
+.chip.neg:hover { opacity: 0.8; }
+.chip.neg.on { background: #b0413e; color: #fff; border-color: transparent; opacity: 1; }
+.chip.subtle { opacity: 0.75; font-size: 12px; }
+.rb-onlyif { margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--panel-brd); }
+.rb-kw.sm { width: auto; font-size: 11px; padding: 2px 8px; }
+.cardparam-row { display: flex; gap: 6px; }
+.cardparam-row select { flex: 1 1 0; }
+
 .rb-effect { margin: 8px 0 0 54px; padding: 10px 12px; border-radius: 10px; background: rgba(0, 0, 0, 0.03); }
 .rb-effect .rb-params { margin-left: 0; }
 .rb-effect-head { display: flex; gap: 8px; align-items: center; }
@@ -1372,7 +1415,7 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
 @media (max-width: 900px) {
   .steprail-text em { display: none; }
   .steprail-item { min-width: 84px; }
-  .rb-params, .rb-effect, .rb-hint { margin-left: 0; }
+  .rb-params, .rb-effect, .rb-cond, .rb-hint { margin-left: 0; }
   .rb-kw { width: auto; }
 }
 

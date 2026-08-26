@@ -3,17 +3,19 @@
 // can run. This is what the visual editor edits and what the AI co-pilot writes to.
 
 import { Effect, GameDefinition, Predicate, Rank, Strain, Suit } from '../engine/types';
-import { RuleDraft, compileRules } from './ruleKit';
+import { RestrictionDraft, RuleDraft, compileRestrictions, compileRules } from './ruleKit';
 import { CURRENT_SCHEMA } from '../engine/migrate';
 
 export const RANKS_13: Rank[] = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
 
 export interface Knobs {
   family: 'shedding' | 'trick' | 'climb' | 'fish' | 'rummy' | 'war' | 'solitaire'
-    | 'bluff' | 'reflex' | 'poker' | 'pit';
+    | 'bluff' | 'reflex' | 'poker' | 'pit' | 'kent' | 'set';
   // Author-written conditional rules. Kept as drafts (ingredient ids + parameters) so the
   // builder can re-open them; compiled into definition.rules on every build.
   customRules: RuleDraft[];
+  /** Plays this game forbids. Same ingredients as a twist, with no "then". */
+  restrictions: RestrictionDraft[];
   name: string;
   description: string;
   minPlayers: number;
@@ -25,6 +27,11 @@ export interface Knobs {
   trickScoreBy: 'mostTricks' | 'fewestTricks' | 'penalty';
   trickBidding: boolean;
   trickPartnerships: boolean;
+  /**
+   * Seats this game can only be dealt in multiples of. A partnership game cannot seat five, so
+   * it says 2 here and the seat picker offers 4 and 6 rather than 4, 5 and 6.
+   */
+  seatStep: number;
   bustEnabled: boolean;   // match ends instantly if a player/team's score drops this low
   bustScore: number;      // stored positive; the actual threshold is -bustScore
   heartsValue: number;       // penalty per heart (penalty scoring)
@@ -47,8 +54,10 @@ export interface Knobs {
   bowers: boolean;           // trump jack, then the same-colour jack, top the trump suit
   goAlone: boolean;          // the maker may cut their partner out of the hand
   shootTheMoon: boolean;     // sweeping every penalty point scores you 0 and everyone else the pot
-  brokenSuitLead: boolean;   // the penalty suit may not be LED until it has been broken
-  forceOpeningLead: boolean; // the 2♣ holder leads it, and no points may fall on the first trick
+  brokenSuitLead: boolean;   // a suit may not be LED until it has been broken
+  brokenSuit: Suit;          // which one. Hearts by default; the engine never cared which.
+  forceOpeningLead: boolean; // one named card leads trick 1, and no points may fall on it
+  openingLeadCard: string;   // which card, by suit+rank key. 2♣ is the Hearts convention.
   handPassCount: number;     // cards exchanged before each hand (0 = no exchange)
   // climbing
   climbTwosHigh: boolean; // President order: 3 low … 2 high (else Ace high)
@@ -68,7 +77,9 @@ export interface Knobs {
   rummyUndercutBonus: number; // extra to the defender who matches or beats the knocker
   // war
   warRoundCap: number;
-  // bluff — no extra knobs; claims may name any rank in the deck.
+  // bluff
+  /** Ranks a claim may name. Empty = any rank in the deck. */
+  bluffClaimRanks: Rank[];
   // reflex
   reflexSlapRanks: Rank[];
   reflexSlapMatch: boolean;
@@ -79,8 +90,20 @@ export interface Knobs {
   pokerSmallBlind: number;
   pokerBigBlind: number;
   pokerMinRaise: number;
+  pokerHands: number;      // hands in a sitting; chips carry between them
   // pit
   pitCornerSize: number;
+  // kent — a partnership signalling game with no turn order
+  kentHandSize: number;
+  kentPoolSize: number;
+  kentTellPlies: number;   // how long a tell stays up, in moves (the engine has no clock)
+  kentLetters: string;     // spell this and the pair is out
+  // set — the one family whose deck is properties rather than ranks and suits
+  setProperties: { name: string; values: string[] }[];
+  setSize: number;
+  setBoardSize: number;
+  setScore: number;
+  setPenalty: number;
   // solitaire — the board is described, not drawn: these are the dials the engine reads.
   solColumns: number;
   solDeal: 'triangle' | 'even';
@@ -95,14 +118,36 @@ export interface Knobs {
   solStockTurn: number;
   solRedeals: number;        // -1 = unlimited
   solDecks: number;
+  /**
+   * Piles the author names themselves, on top of whatever their family already deals with.
+   *
+   * Every builder hard-codes its own zone list, so a twist could READ any pile by name and an
+   * author had no way to make one exist. A named pile is somewhere to put cards aside — a
+   * kitty, a widow, a penalty pile — reachable from "move cards between piles" and "a pile
+   * has…".
+   */
+  extraPiles: { id: string; faceUp: boolean }[];
   // deck
   handSize: number;
+  /**
+   * Deal size at each seat count, for games where "thirteen each" only works at four. Empty
+   * means handSize applies whatever the table size.
+   */
+  handSizeBySeats: Record<string, number>;
   deckCount: number;
   excludeRanks: Rank[];
   /** Individual cards struck out of the pack, by suit+rank key ("SQ", "H10"). */
   excludeCards: string[];
   /** Individual cards that are wild, alongside whole ranks in wildRanks. */
   wildCards: string[];
+  /**
+   * Which rank beats which, low to high.
+   *
+   * Every builder pinned this to ace-high and left it there, so "in this game the seven is the
+   * highest card" was unsayable — even though the engine reads the order straight out of the
+   * deck and has never cared what is in it. Empty means the ordinary order.
+   */
+  rankOrder: Rank[];
   includeJokers: boolean;
   jokerCount: number;
   /** What a joker does in a trick. Ignored by every other family. */
@@ -154,6 +199,7 @@ const defaultPoints: Record<string, number> = {
 export const defaultKnobs: Knobs = {
   family: 'shedding',
   customRules: [],
+  restrictions: [],
   name: 'My Card Game',
   description: '',
   minPlayers: 2,
@@ -164,6 +210,7 @@ export const defaultKnobs: Knobs = {
   trickScoreBy: 'mostTricks',
   trickBidding: false,
   trickPartnerships: false,
+  seatStep: 1,
   bustEnabled: false,
   bustScore: 200,
   heartsValue: 1,
@@ -177,7 +224,9 @@ export const defaultKnobs: Knobs = {
   goAlone: false,
   shootTheMoon: false,
   brokenSuitLead: false,
+  brokenSuit: 'H',
   forceOpeningLead: false,
+  openingLeadCard: 'C2',
   handPassCount: 0,
   climbTwosHigh: true,
   climbCombos: false,
@@ -193,6 +242,7 @@ export const defaultKnobs: Knobs = {
   rummyGinBonus: 25,
   rummyUndercutBonus: 25,
   warRoundCap: 800,
+  bluffClaimRanks: [],
   reflexSlapRanks: ['J'],
   reflexSlapMatch: false,
   pokerHandSize: 5,
@@ -201,7 +251,21 @@ export const defaultKnobs: Knobs = {
   pokerSmallBlind: 5,
   pokerBigBlind: 10,
   pokerMinRaise: 10,
+  pokerHands: 6,
   pitCornerSize: 7,
+  kentHandSize: 4,
+  kentPoolSize: 4,
+  kentTellPlies: 3,
+  kentLetters: 'KENT',
+  setProperties: [
+    { name: 'colour', values: ['red', 'green', 'violet'] },
+    { name: 'shape', values: ['oval', 'diamond', 'squiggle'] },
+    { name: 'count', values: ['1', '2', '3'] },
+  ],
+  setSize: 3,
+  setBoardSize: 12,
+  setScore: 1,
+  setPenalty: 1,
   solColumns: 7,
   solDeal: 'triangle',
   solFaceUp: 'top',
@@ -215,11 +279,14 @@ export const defaultKnobs: Knobs = {
   solStockTurn: 3,
   solRedeals: -1,
   solDecks: 1,
+  extraPiles: [],
   handSize: 5,
+  handSizeBySeats: {},
   deckCount: 1,
   excludeRanks: [],
   excludeCards: [],
   wildCards: [],
+  rankOrder: [],
   includeJokers: false,
   jokerCount: 2,
   jokerRank: 'low',
@@ -249,12 +316,34 @@ export const defaultKnobs: Knobs = {
   unpricedScoreRankValue: false,
 };
 
+/** Author-named piles, as zone definitions the engine will create and the rules can reach. */
+function extraZones(knobs: Knobs, taken: Set<string>): GameDefinition['zones'] {
+  return knobs.extraPiles
+    .map((p) => p.id.trim().replace(/[^a-zA-Z0-9_-]/g, ''))
+    .filter((id, i, all) => id && !taken.has(id) && all.indexOf(id) === i)
+    .map((id, i) => ({
+      id,
+      type: 'pile' as const,
+      ordered: true,
+      faceDown: !knobs.extraPiles[i]?.faceUp,
+      visibility: (knobs.extraPiles[i]?.faceUp ? 'all' : 'none') as 'all' | 'none',
+      shared: true,
+    }));
+}
+
 export function buildDefinition(knobs: Knobs, id = 'draft'): GameDefinition {
-  const def = buildFamilyDefinition(knobs, id);
+  const base = buildFamilyDefinition(knobs, id);
+  const extra = extraZones(knobs, new Set(base.zones.map((z) => z.id)));
+  const def = extra.length ? { ...base, zones: [...base.zones, ...extra] } : base;
   // The near-programmable layer rides on top of whichever family this is, so a custom rule
   // works the same in a trick-taking game as in a shedding one.
   const rules = compileRules(knobs.customRules ?? []);
-  return rules.length > 0 ? { ...def, rules } : def;
+  const playRestrictions = compileRestrictions(knobs.restrictions ?? []);
+  return {
+    ...def,
+    ...(rules.length > 0 ? { rules } : {}),
+    ...(playRestrictions.length > 0 ? { playRestrictions } : {}),
+  };
 }
 
 /**
@@ -280,8 +369,30 @@ function deckOf(
     deckCount: clampInt(knobs.deckCount, 1, opts.maxDecks ?? 3),
     excludeRanks: knobs.excludeRanks,
     ...(knobs.excludeCards.length ? { excludeCards: [...knobs.excludeCards] } : {}),
-    rankOrder: opts.rankOrder ?? RANKS_13,
+    // An author's own order wins, then whatever the family insists on, then the ordinary one.
+    // Ranks they removed from the deck are dropped so the order never names a card that is
+    // not in the pack.
+    rankOrder: knobs.rankOrder.length
+      ? knobs.rankOrder.filter((r) => !knobs.excludeRanks.includes(r))
+      : (opts.rankOrder ?? RANKS_13),
     tags: opts.tags ?? {},
+  };
+}
+
+/**
+ * The deal step, with a per-seat-count table when the author gave one.
+ *
+ * "Thirteen each" only works at four players; at three it deals 39 of 52 and leaves a stub, and
+ * at five it cannot be dealt at all. countByPlayers has been in the schema since the beginning
+ * and no builder ever emitted it.
+ */
+function dealStep(knobs: Knobs, from: string, to: string) {
+  const table = Object.entries(knobs.handSizeBySeats)
+    .filter(([seats, n]) => Number(seats) > 0 && Number(n) > 0)
+    .map(([seats, n]) => [Number(seats), Math.round(n)] as const);
+  return {
+    op: 'deal' as const, from, to, countPerPlayer: knobs.handSize,
+    ...(table.length ? { countByPlayers: Object.fromEntries(table) } : {}),
   };
 }
 
@@ -307,6 +418,8 @@ function buildFamilyDefinition(knobs: Knobs, id: string): GameDefinition {
   if (knobs.family === 'reflex') return buildReflexDefinition(knobs, id);
   if (knobs.family === 'poker') return buildPokerDefinition(knobs, id);
   if (knobs.family === 'pit') return buildPitDefinition(knobs, id);
+  if (knobs.family === 'kent') return buildKentDefinition(knobs, id);
+  if (knobs.family === 'set') return buildSetDefinition(knobs, id);
   return buildSheddingDefinition(knobs, id);
 }
 
@@ -379,7 +492,7 @@ function buildRummyDefinition(knobs: Knobs, id: string): GameDefinition {
       { id: 'melds', type: 'pile', ordered: true, faceDown: false, visibility: 'all', shared: true },
       { id: 'hand', type: 'hand', ordered: false, faceDown: true, visibility: 'owner', perPlayer: true },
     ],
-    setup: [{ op: 'shuffle', zone: 'draw' }, { op: 'deal', from: 'draw', to: 'hand', countPerPlayer: knobs.handSize }, { op: 'move', from: 'draw', to: 'discard', count: 1 }],
+    setup: [{ op: 'shuffle', zone: 'draw' }, dealStep(knobs, 'draw', 'hand'), { op: 'move', from: 'draw', to: 'discard', count: 1 }],
     turnFlow: { order: 'clockwise', startPlayer: 'first', actionsPerTurn: { min: 1, max: 1 } },
     actions: [], triggers: [],
     endConditions: [{ id: 'handEmpty', when: { zoneCount: { zone: 'hand', of: 'anyPlayer', eq: 0 } }, result: 'roundOver' }],
@@ -436,7 +549,7 @@ function buildBluffDefinition(knobs: Knobs, id: string): GameDefinition {
     turnFlow: { order: 'clockwise', startPlayer: 'first', actionsPerTurn: { min: 1, max: 1 } },
     actions: [], triggers: [], endConditions: [],
     scoring: { mode: 'lowestPoints', winner: 'highestTotal', cardPoints: {}, target: null },
-    bluff: {},
+    bluff: knobs.bluffClaimRanks.length ? { claimableRanks: [...knobs.bluffClaimRanks] } : {},
   };
 }
 
@@ -488,6 +601,7 @@ function buildPokerDefinition(knobs: Knobs, id: string): GameDefinition {
       smallBlind: Math.max(0, knobs.pokerSmallBlind),
       bigBlind: Math.max(0, knobs.pokerBigBlind),
       minRaise: Math.max(1, knobs.pokerMinRaise),
+      hands: clampInt(knobs.pokerHands, 1, 20),
     },
   };
 }
@@ -514,6 +628,66 @@ function buildPitDefinition(knobs: Knobs, id: string): GameDefinition {
   };
 }
 
+// Kent: a partnership game with no turn order at all. Partners sit opposite, so the seats have
+// to come in pairs — the seat step is not optional here the way it is elsewhere.
+function buildKentDefinition(knobs: Knobs, id: string): GameDefinition {
+  const hand = clampInt(knobs.kentHandSize, 3, 5);
+  return {
+    schemaVersion: CURRENT_SCHEMA,
+    meta: {
+      id, name: knobs.name,
+      description: knobs.description
+        || `${hand} cards each and ${clampInt(knobs.kentPoolSize, 3, 6)} face up in the middle. No turns — swap with the table whenever you like. Get ${hand} of a kind and a tell goes up at your seat; your partner has to call it before an opponent does. ${knobs.kentLetters.split('').join('-')} and that pair is out.`,
+      players: { min: 4, max: clampInt(Math.max(4, knobs.maxPlayers), 4, 6), step: 2 },
+      family: 'kent',
+    },
+    deck: deckOf(knobs, { maxDecks: 1, noJokers: true }),
+    zones: [
+      { id: 'draw', type: 'pile', ordered: true, faceDown: true, visibility: 'none', shared: true },
+      { id: 'discard', type: 'pile', ordered: true, faceDown: false, visibility: 'top-public', shared: true },
+      { id: 'hand', type: 'hand', ordered: false, faceDown: true, visibility: 'owner', perPlayer: true },
+    ],
+    setup: [{ op: 'shuffle', zone: 'draw' }, { op: 'deal', from: 'draw', to: 'hand', countPerPlayer: hand }],
+    turnFlow: { order: 'clockwise', startPlayer: 'first', actionsPerTurn: { min: 1, max: 1 } },
+    actions: [], triggers: [], endConditions: [],
+    scoring: { mode: 'lowestPoints', winner: 'highestTotal', cardPoints: {}, target: null },
+    kent: {
+      handSize: hand,
+      poolSize: clampInt(knobs.kentPoolSize, 3, 6),
+      tellPlies: clampInt(knobs.kentTellPlies, 1, 8),
+      letters: (knobs.kentLetters || 'KENT').toUpperCase().slice(0, 8),
+    },
+  };
+}
+
+// The one family whose deck is not a pack of cards: every combination of the author's own
+// properties, once each. Three colours × three shapes × three counts is twenty-seven.
+function buildSetDefinition(knobs: Knobs, id: string): GameDefinition {
+  const props = knobs.setProperties.filter((p) => p.name.trim() && p.values.length >= 2);
+  const deckSize = props.reduce((n, p) => n * p.values.length, 1);
+  return {
+    schemaVersion: CURRENT_SCHEMA,
+    meta: {
+      id, name: knobs.name,
+      description: knobs.description
+        || `${deckSize} cards, each a unique combination of ${props.map((p) => p.name).join(', ')}. Find ${knobs.setSize} where every property is all the same or all different. No turns — whoever sees it first takes it, and a wrong call costs you.`,
+      players: { min: 1, max: clampInt(knobs.maxPlayers, 1, 6) },
+      family: 'set',
+    },
+    deck: { base: 'attributes', attributes: props, includeJokers: false, rankOrder: [], tags: {} },
+    zones: [], setup: [],
+    turnFlow: { order: 'clockwise', startPlayer: 'first', actionsPerTurn: { min: 1, max: 1 } },
+    actions: [], triggers: [], endConditions: [],
+    scoring: { mode: 'lowestPoints', winner: 'highestTotal', cardPoints: {}, target: null },
+    set: {
+      size: clampInt(knobs.setSize, 2, 4),
+      boardSize: clampInt(knobs.setBoardSize, 6, 21),
+      score: clampInt(knobs.setScore, 1, 10),
+      penalty: clampInt(knobs.setPenalty, 0, 10),
+    },
+  };
+}
+
 function buildFishDefinition(knobs: Knobs, id: string): GameDefinition {
   return {
     schemaVersion: CURRENT_SCHEMA,
@@ -527,7 +701,7 @@ function buildFishDefinition(knobs: Knobs, id: string): GameDefinition {
       { id: 'ocean', type: 'pile', ordered: true, faceDown: true, visibility: 'none', shared: true },
       { id: 'hand', type: 'hand', ordered: false, faceDown: true, visibility: 'owner', perPlayer: true },
     ],
-    setup: [{ op: 'shuffle', zone: 'ocean' }, { op: 'deal', from: 'ocean', to: 'hand', countPerPlayer: knobs.handSize }],
+    setup: [{ op: 'shuffle', zone: 'ocean' }, dealStep(knobs, 'ocean', 'hand')],
     turnFlow: { order: 'clockwise', startPlayer: 'first', actionsPerTurn: { min: 1, max: 1 } },
     actions: [],
     triggers: [],
@@ -569,7 +743,10 @@ function buildTrickDefinition(knobs: Knobs, id: string): GameDefinition {
     schemaVersion: CURRENT_SCHEMA,
     meta: {
       id, name: knobs.name, description: knobs.description || autoTrickDescription(knobs),
-      players: { min: clampInt(knobs.minPlayers, 2, 8), max: clampInt(knobs.maxPlayers, knobs.minPlayers, 8) },
+      players: {
+        min: clampInt(knobs.minPlayers, 2, 8), max: clampInt(knobs.maxPlayers, knobs.minPlayers, 8),
+        ...(knobs.seatStep > 1 ? { step: clampInt(knobs.seatStep, 1, 4) } : {}),
+      },
       family: 'trick-taking',
     },
     deck: deckOf(knobs, { maxDecks: 2 }),
@@ -584,7 +761,7 @@ function buildTrickDefinition(knobs: Knobs, id: string): GameDefinition {
     ],
     setup: [
       { op: 'shuffle', zone: 'draw' },
-      { op: 'deal', from: 'draw', to: 'hand', countPerPlayer: knobs.handSize },
+      dealStep(knobs, 'draw', 'hand'),
       ...(knobs.trumpAuction ? [{ op: 'move' as const, from: 'draw', to: 'kitty', count: 1 }] : []),
     ],
     turnFlow: { order: knobs.direction, startPlayer: 'first', actionsPerTurn: { min: 1, max: 1 } },
@@ -631,8 +808,8 @@ function buildTrickDefinition(knobs: Knobs, id: string): GameDefinition {
       euchreScoring: knobs.trumpAuction && knobs.trickPartnerships ? true : undefined,
       // Hearts rules only make sense alongside penalty scoring.
       shootTheMoon: knobs.trickScoreBy === 'penalty' && knobs.shootTheMoon ? true : undefined,
-      brokenSuit: knobs.trickScoreBy === 'penalty' && knobs.brokenSuitLead ? 'H' : undefined,
-      leadCard: knobs.forceOpeningLead ? 'C2' : undefined,
+      brokenSuit: knobs.trickScoreBy === 'penalty' && knobs.brokenSuitLead ? knobs.brokenSuit : undefined,
+      leadCard: knobs.forceOpeningLead ? (knobs.openingLeadCard || 'C2') : undefined,
       // Only worth writing when there are jokers to rank, and only when it changes anything.
       jokerRank: knobs.includeJokers && knobs.jokerRank !== 'low' ? knobs.jokerRank : undefined,
       noPenaltyFirstTrick: knobs.trickScoreBy === 'penalty' && knobs.forceOpeningLead ? true : undefined,
@@ -708,7 +885,7 @@ function buildSheddingDefinition(knobs: Knobs, id: string): GameDefinition {
     ],
     setup: [
       { op: 'shuffle', zone: 'draw' },
-      { op: 'deal', from: 'draw', to: 'hand', countPerPlayer: knobs.handSize },
+      dealStep(knobs, 'draw', 'hand'),
       { op: 'move', from: 'draw', to: 'discard', count: 1 },
     ],
     turnFlow: { order: knobs.direction, startPlayer: 'first', actionsPerTurn: { min: 1, max: 1 } },
@@ -753,16 +930,25 @@ export function knobsFromDefinition(def: GameDefinition): Knobs {
 
   return {
     family: def.solitaire ? 'solitaire' : def.war ? 'war' : def.rummy ? 'rummy' : def.fish ? 'fish' : def.climb ? 'climb' : def.trick ? 'trick'
-      : def.bluff ? 'bluff' : def.reflex ? 'reflex' : def.poker ? 'poker' : def.pit ? 'pit' : 'shedding',
-    // Compiled rules can't be turned back into the ingredients they were assembled from, so
-    // importing a definition starts the rule list empty rather than pretending otherwise.
-    customRules: [],
+      : def.bluff ? 'bluff' : def.reflex ? 'reflex' : def.poker ? 'poker' : def.pit ? 'pit'
+      : def.kent ? 'kent' : def.set ? 'set' : 'shedding',
+    /*
+      Twists and restrictions survive a round trip now.
+
+      A compiled rule is a Predicate/Effect tree; the ingredients that produced it are not
+      recoverable from it, so importing a definition used to start the list empty — meaning a
+      trip through the JSON editor silently DELETED every twist an author had written. Each
+      compiled rule now carries its own draft alongside it, so what comes back is what went in.
+    */
+    customRules: (def.rules ?? []).map((r) => r.draft as RuleDraft | undefined).filter((d): d is RuleDraft => !!d),
+    restrictions: (def.playRestrictions ?? []).map((r) => r.draft as RestrictionDraft | undefined).filter((d): d is RestrictionDraft => !!d),
     trump: def.trick?.trump ?? 'S',
     mustFollowSuit: def.trick?.mustFollowSuit ?? true,
     aceHigh: def.trick?.aceHigh ?? def.war?.aceHigh ?? true,
     trickScoreBy: def.trick?.scoreBy ?? 'mostTricks',
     trickBidding: !!def.trick?.bidding,
     trickPartnerships: !!def.trick?.partnerships,
+    seatStep: def.meta.players.step ?? 1,
     bustEnabled: def.scoring.bust != null,
     bustScore: def.scoring.bust != null ? Math.abs(def.scoring.bust) : 200,
     heartsValue: (def.trick?.penaltyPoints?.H as number) ?? 1,
@@ -778,7 +964,9 @@ export function knobsFromDefinition(def: GameDefinition): Knobs {
     goAlone: !!def.trick?.goAlone,
     shootTheMoon: !!def.trick?.shootTheMoon,
     brokenSuitLead: !!def.trick?.brokenSuit,
+    brokenSuit: def.trick?.brokenSuit ?? 'H',
     forceOpeningLead: !!def.trick?.leadCard,
+    openingLeadCard: def.trick?.leadCard ?? 'C2',
     handPassCount: def.handPass?.count ?? 0,
     bookSize: def.fish?.bookSize ?? 4,
     solColumns: def.solitaire?.columns ?? 7,
@@ -811,11 +999,19 @@ export function knobsFromDefinition(def: GameDefinition): Knobs {
     description: def.meta.description,
     minPlayers: def.meta.players.min,
     maxPlayers: def.meta.players.max,
+    extraPiles: def.zones
+      .filter((z) => z.shared && z.type === 'pile'
+        && !['draw', 'discard', 'melds', 'ocean', 'center', 'pile', 'battle', 'kitty', 'stock'].includes(z.id))
+      .map((z) => ({ id: z.id, faceUp: !z.faceDown })),
     handSize: deal?.countPerPlayer ?? 5,
+    handSizeBySeats: (def.setup.find((x) => x.op === 'deal') as { countByPlayers?: Record<string, number> } | undefined)?.countByPlayers ?? {},
     deckCount: def.deck.deckCount ?? 1,
     excludeRanks: def.deck.excludeRanks ?? [],
     excludeCards: def.deck.excludeCards ?? [],
     wildCards: def.deck.tags.wild?.cards ?? [],
+    // Only worth carrying back when it actually differs from the ordinary order; otherwise the
+    // editor would show a custom order for every game that never asked for one.
+    rankOrder: def.deck.rankOrder.join(',') === RANKS_13.join(',') ? [] : [...def.deck.rankOrder],
     includeJokers: def.deck.includeJokers,
     jokerCount: def.deck.jokerCount ?? 2,
     jokerRank: def.trick?.jokerRank ?? 'low',
@@ -854,7 +1050,18 @@ export function knobsFromDefinition(def: GameDefinition): Knobs {
     pokerSmallBlind: def.poker?.smallBlind ?? 5,
     pokerBigBlind: def.poker?.bigBlind ?? 10,
     pokerMinRaise: def.poker?.minRaise ?? 10,
+    pokerHands: def.poker?.hands ?? 1,
+    bluffClaimRanks: def.bluff?.claimableRanks ?? [],
     pitCornerSize: def.pit?.cornerSize ?? 7,
+    kentHandSize: def.kent?.handSize ?? 4,
+    kentPoolSize: def.kent?.poolSize ?? 4,
+    kentTellPlies: def.kent?.tellPlies ?? 3,
+    kentLetters: def.kent?.letters ?? 'KENT',
+    setProperties: def.deck.attributes ?? defaultKnobs.setProperties,
+    setSize: def.set?.size ?? 3,
+    setBoardSize: def.set?.boardSize ?? 12,
+    setScore: def.set?.score ?? 1,
+    setPenalty: def.set?.penalty ?? 1,
   };
 }
 

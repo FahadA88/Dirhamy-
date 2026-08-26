@@ -19,7 +19,16 @@ export interface ValidationResult {
   status: 'green' | 'amber' | 'red';
 }
 
-const HOOKS_ALL: RuleHook[] = ['handStart', 'turnStart', 'turnEnd', 'cardPlayed', 'cardDrawn', 'trickWon', 'drawPileEmpty'];
+const HOOKS_ALL: RuleHook[] = [
+  'handStart', 'turnStart', 'turnEnd', 'cardPlayed', 'cardDrawn', 'trickWon', 'drawPileEmpty',
+  'trickLed', 'handEnd', 'matchEnd', 'meldLaid', 'bidMade', 'playerOut',
+];
+
+/**
+ * Variables the engine writes itself. An author's counter sharing one of these names does not
+ * fail — it quietly fights the engine for the same slot, which is worse.
+ */
+const ENGINE_VARS = new Set(['activeSuit']);
 
 export function validate(def: GameDefinition): ValidationResult {
   const issues: Issue[] = [];
@@ -186,6 +195,19 @@ export function validate(def: GameDefinition): ValidationResult {
   // --- author-written rules (the near-programmable layer) ---
   // These come from the builder, so the checks are phrased as things an author can act on.
   const ruleIds = new Set<string>();
+  const ruleCalls: { rule: string; target: string }[] = [];
+  const warnedVars = new Set<string>();
+  function collectRuleCalls(rule: CustomRule, e: Effect): void {
+    if (e.op === 'runRule') ruleCalls.push({ rule: rule.name, target: e.rule });
+    if (e.op === 'if') { for (const x of [...e.then, ...(e.else ?? [])]) collectRuleCalls(rule, x); }
+    // Same pass catches a counter that would fight the engine for its slot.
+    const named = (e.op === 'setVarNum' || e.op === 'setState' || e.op === 'appendVar') ? e.var
+      : e.op === 'chooseSuit' ? e.setState : null;
+    if (named && ENGINE_VARS.has(named) && !warnedVars.has(named)) {
+      warnedVars.add(named);
+      warn('rule.var.reserved', `"${rule.name}" writes to "${named}", which the engine uses itself — pick another name unless you mean to override it.`);
+    }
+  }
   for (const rule of def.rules ?? []) {
     if (ruleIds.has(rule.id)) err('rule.duplicate', `Two rules share the id "${rule.id}".`);
     ruleIds.add(rule.id);
@@ -199,14 +221,48 @@ export function validate(def: GameDefinition): ValidationResult {
     if (!HOOKS_ALL.includes(rule.when)) {
       err('rule.hook', `"${rule.name}" fires on "${rule.when}", which is not a thing that happens.`);
     }
-    if (rule.when === 'trickWon' && !isTrick) {
+    if ((rule.when === 'trickWon' || rule.when === 'trickLed') && !isTrick) {
       warn('rule.hook.unreachable', `"${rule.name}" waits for a trick, but this game has no tricks — it will never fire.`);
+    }
+    if (rule.when === 'meldLaid' && !isRummy) {
+      warn('rule.hook.unreachable', `"${rule.name}" waits for a meld, but nothing melds in this game.`);
+    }
+    if (rule.when === 'bidMade' && !def.trick?.bidding && !def.trick?.auction && !def.trick?.numericAuction) {
+      warn('rule.hook.unreachable', `"${rule.name}" waits for a bid, but this game has no auction.`);
+    }
+    if (rule.when === 'matchEnd' && def.scoring.target == null) {
+      warn('rule.hook.unreachable', `"${rule.name}" waits for the match to be decided, but this game is a single hand — the hand ending IS the match ending.`);
     }
     if ((rule.when === 'cardDrawn' || rule.when === 'drawPileEmpty') && isSolitaire) {
       warn('rule.hook.unreachable', `"${rule.name}" will never fire in a patience game.`);
     }
+    // A rule that calls another has to name one that exists. Checked after the whole list is
+    // read, since it may legitimately point forwards.
+    for (const eff of rule.then) collectRuleCalls(rule, eff);
     if (rule.if) checkPredicate(rule.if, `rule "${rule.name}"`);
     for (const eff of rule.then) checkRuleEffect(rule, eff);
+
+    /*
+      The one authoring trap that produces a game nobody can finish.
+
+      A rule that hands cards to a player every time a card is played puts them back faster
+      than anyone can shed them, so a shedding game runs forever. It is easy to write by
+      accident — "everyone draws two whenever a card is played" sounds like a fun twist — and
+      the only symptom is a simulation that never terminates, which reads as a bug in the
+      engine rather than a bug in the rule.
+    */
+    const unconditional = !rule.if || 'always' in rule.if;
+    const everyPlay = rule.when === 'cardPlayed' || rule.when === 'turnEnd' || rule.when === 'turnStart';
+    const handsOutCards = rule.then.some((e) => e.op === 'drawTo' || e.op === 'forceDraw'
+      || e.op === 'drawUntilPlayable' || e.op === 'moveMany');
+    if (unconditional && everyPlay && handsOutCards && !isSpecial) {
+      warn('rule.neverending', `"${rule.name}" gives out cards on every turn with no condition — players will gain cards faster than they can shed them and the hand may never end. Add an "if" to it.`);
+    }
+  }
+  for (const { rule, target } of ruleCalls) {
+    if (!ruleIds.has(target)) {
+      err('rule.call', `"${rule}" runs a rule called "${target}", but there is no rule with that id.`);
+    }
   }
 
   function checkRuleEffect(rule: CustomRule, e: Effect): void {

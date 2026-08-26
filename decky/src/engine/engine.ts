@@ -51,6 +51,9 @@ export function createMatch(
     chips?: Record<string, number>;
     /** Kent only: the letters each pair has already spelt. */
     kentLetters?: Record<string, number>;
+    /** Author-written counters that asked to survive the deal, and their names. */
+    vars?: Record<string, string>;
+    keepVars?: string[];
   },
 ): MatchState {
   const state: MatchState = {
@@ -91,7 +94,11 @@ export function createMatch(
     climbTopRank: null,
     climbBombDeclined: {},
     booksWon: Object.fromEntries(players.map((p) => [p, 0])),
-    vars: {},
+    vars: { ...(carry?.vars ?? {}) },
+    keepVars: carry?.keepVars ? [...carry.keepVars] : [],
+    stopRules: false,
+    ruleDepth: 0,
+    handEndFired: false,
     scores: Object.fromEntries(players.map((p) => [p, 0])),
     phase: 'playing',
     winner: null,
@@ -382,6 +389,11 @@ function evalPredicate(state: MatchState, p: Predicate, ctx: Ctx): boolean {
   if ('suitIn' in p) return !!ctx.targetCard && p.suitIn.includes(ctx.targetCard.suit);
   if ('colorIs' in p) return !!ctx.targetCard && cardColor(ctx.targetCard) === p.colorIs;
   if ('handHas' in p) return handMatches(state, p.handHas, ctx.playerId);
+  if ('listHas' in p) {
+    const q = p.listHas;
+    const held = (state.vars[varKey(state, q.var, q.per, ctx)] ?? '').split(',').filter(Boolean);
+    return held.includes(String(evalValue(state, q.value, ctx)));
+  }
   if ('isFirstTurn' in p) return state.ply === 0;
   return false;
 }
@@ -418,7 +430,7 @@ function num(v: number | string): number {
 function evalValue(state: MatchState, v: RuleValue, ctx: Ctx): number | string {
   const def = state.definition;
   if ('lit' in v) return v.lit;
-  if ('stateVar' in v) return state.vars[v.stateVar] ?? '';
+  if ('stateVar' in v) return state.vars[varKey(state, v.stateVar, v.per, ctx)] ?? '';
   if ('count' in v) {
     const key = v.count === '$hand' ? `hand:${ctx.playerId}` : zoneKey(def, v.count, ctx.playerId);
     return (state.zones[key] || []).length;
@@ -527,7 +539,39 @@ function stripExistsLegal(p: Predicate): Predicate {
   return p;
 }
 
+/**
+ * Cards an author's own rules forbid, filtered out of whatever the family offered.
+ *
+ * This is the one place a custom rule gets to say NO. Every other hook is reactive — it fires
+ * after a move and reacts to it — which meant "you may not lead a heart" or "the queen of
+ * spades may not be played on the first trick" were unsayable: the rule could punish the play
+ * but not prevent it.
+ *
+ * The family always wins a disagreement. A restriction may never be the last word if honouring
+ * it would leave a player with nothing legal to do, because a player with no legal move is a
+ * stuck game, and a stuck game is worse than a rule that occasionally does not apply.
+ */
+function applyRestrictions(state: MatchState, playerId: string, moves: Move[]): Move[] {
+  const rules = state.definition.playRestrictions;
+  if (!rules || rules.length === 0 || moves.length === 0) return moves;
+  const byId = new Map<string, Card>();
+  for (const c of state.zones[`hand:${playerId}`] || []) byId.set(c.id, c);
+
+  const kept = moves.filter((m) => {
+    if (!m.cardId) return true;              // a restriction is about a card, not a bid or a pass
+    const card = byId.get(m.cardId);
+    if (!card) return true;
+    const ctx: Ctx = { playerId, targetCard: card };
+    return !rules.some((r) => r.enabled !== false && evalPredicate(state, r.if, ctx));
+  });
+  return kept.length > 0 ? kept : moves;
+}
+
 export function legalMoves(state: MatchState, playerId: string): Move[] {
+  return applyRestrictions(state, playerId, familyLegalMoves(state, playerId));
+}
+
+function familyLegalMoves(state: MatchState, playerId: string): Move[] {
   if (state.phase !== 'playing') return [];
 
   // A simultaneous pass overrides whose turn it is, in every family — each player who hasn't
@@ -658,7 +702,8 @@ function runEffects(state: MatchState, effects: Effect[], ctx: Ctx & { playedCar
         break;
       }
       case 'setState': {
-        state.vars[e.var] = resolveValue(e.value, ctx);
+        state.vars[varKey(state, e.var, e.per, ctx)] = resolveValue(e.value, ctx);
+        if (e.keep) rememberVar(state, e.var);
         break;
       }
       case 'if': {
@@ -726,7 +771,34 @@ function runEffects(state: MatchState, effects: Effect[], ctx: Ctx & { playedCar
         break;
       }
       case 'setVarNum': {
-        state.vars[e.var] = String(evalValue(state, e.value, ctx));
+        state.vars[varKey(state, e.var, e.per, ctx)] = String(evalValue(state, e.value, ctx));
+        if (e.keep) rememberVar(state, e.var);
+        break;
+      }
+      case 'appendVar': {
+        // A counter remembers how many; this remembers which. Held as a comma-delimited list
+        // because vars are strings, and read back by the "a list contains" condition.
+        const key = varKey(state, e.var, e.per, ctx);
+        const item = String(evalValue(state, e.value, ctx));
+        const cur = state.vars[key] ? state.vars[key].split(',').filter(Boolean) : [];
+        if (!e.unique || !cur.includes(item)) cur.push(item);
+        state.vars[key] = cur.join(',');
+        break;
+      }
+      case 'stopRules': {
+        state.stopRules = true;
+        break;
+      }
+      case 'runRule': {
+        // One rule calling another. Guarded against a cycle rather than trusted not to have
+        // one — an author can absolutely write two rules that call each other.
+        const target = (state.definition.rules ?? []).find((r) => r.id === e.rule);
+        if (!target || target.enabled === false) break;
+        if (state.ruleDepth >= 8) { log(state, null, 'A rule called too many others and was stopped.'); break; }
+        if (target.if && !evalPredicate(state, target.if, ctx)) break;
+        state.ruleDepth += 1;
+        runEffects(state, target.then, ctx);
+        state.ruleDepth -= 1;
         break;
       }
       case 'announce': {
@@ -1004,18 +1076,47 @@ function advanceTurn(s: MatchState): void {
  */
 function afterFamilyMove(s: MatchState, playerId: string, handBefore: Card[]): MatchState {
   s.ply += 1;
-  if (!s.definition.rules?.length || s.phase !== 'playing') return s;
+  if (!s.definition.rules?.length) return s;
 
   const after = new Set((s.zones[`hand:${playerId}`] || []).map((c) => c.id));
   const played = handBefore.find((c) => !after.has(c.id));
   const ctx: Ctx = { playerId, targetCard: played };
 
+  // The hand ending is a moment rules obviously want — "double the last hand", "pay out the
+  // pool" — and it used to be the one moment they were guaranteed to miss, because this
+  // wrapper returned early the instant the phase stopped being 'playing'. These two fire on
+  // the way out instead, and deliberately after the family has finished scoring.
+  if (s.phase !== 'playing') {
+    fireHandEnd(s, playerId);
+    return s;
+  }
+
+  // Somebody going out is likewise a moment, and one only this wrapper can see: it knows what
+  // the hand held before the move and what it holds now.
+  const wentOut = handBefore.length > 0 && after.size === 0;
+
   if (played) fireRules(s, 'cardPlayed', ctx);
-  if (s.phase !== 'playing') return s;
+  if (s.phase !== 'playing') { fireHandEnd(s, playerId); return s; }
+  if (wentOut) fireRules(s, 'playerOut', ctx);
+  if (s.phase !== 'playing') { fireHandEnd(s, playerId); return s; }
   fireRules(s, 'turnEnd', ctx);
-  if (s.phase !== 'playing') return s;
+  if (s.phase !== 'playing') { fireHandEnd(s, playerId); return s; }
   fireRules(s, 'turnStart', { playerId: s.players[s.turnIndex] });
   return s;
+}
+
+/**
+ * The end-of-hand hooks, fired once however the hand finished.
+ *
+ * Guarded by a flag rather than by where it is called from, because a hand can end down any of
+ * eighteen paths in this file and every one of them would otherwise need to remember.
+ */
+function fireHandEnd(s: MatchState, playerId: string): void {
+  if (!s.definition.rules?.length || s.handEndFired) return;
+  s.handEndFired = true;
+  const ctx: Ctx = { playerId };
+  fireRules(s, 'handEnd', ctx);
+  if (isMatchOver(s)) fireRules(s, 'matchEnd', ctx);
 }
 
 // ---------- author-written rules ----------
@@ -1023,9 +1124,30 @@ function afterFamilyMove(s: MatchState, playerId: string, handBefore: Card[]): M
 // The hooks a CustomRule can attach to. These fire the same way for a game somebody built this
 // morning as for Hearts: same engine, same order, same clone-then-mutate discipline.
 
+/**
+ * Where one variable actually lives.
+ *
+ * Unscoped, it is a single entry in a flat bag shared by the whole table — right for "have
+ * hearts been broken", wrong for anything each player owns, because the next player's write
+ * lands on the same key. `per` moves it under a player.
+ */
+function varKey(state: MatchState, name: string, per: PlayerRef | undefined, ctx: Ctx): string {
+  if (!per) return name;
+  const who = refToPlayers(state, per, ctx.playerId);
+  // "everyone" has no single owner, so it falls back to the shared bag rather than silently
+  // writing to whichever seat happened to come back first.
+  return who.length === 1 ? `${who[0]}:${name}` : name;
+}
+
+/** Note that a var should survive the deal. Recorded on state so nextHand can carry it. */
+function rememberVar(state: MatchState, name: string): void {
+  if (!state.keepVars.includes(name)) state.keepVars.push(name);
+}
+
 function fireRules(state: MatchState, hook: RuleHook, ctx: Ctx & { playedCard?: Card }): void {
   const rules = state.definition.rules;
   if (!rules || rules.length === 0) return;
+  state.stopRules = false;
   for (const rule of rules) {
     if (rule.enabled === false) continue;
     if (rule.when !== hook) continue;
@@ -1037,6 +1159,9 @@ function fireRules(state: MatchState, hook: RuleHook, ctx: Ctx & { playedCard?: 
     runEffects(state, rule.then, ctx);
     // A rule that ended the hand stops the rest — nothing should run after the scores are in.
     if (state.phase !== 'playing') return;
+    // …and one that said so explicitly stops the rest too, which is how an author writes
+    // "this case is handled, don't fall through to the general rule below".
+    if (state.stopRules) { state.stopRules = false; return; }
   }
 }
 
@@ -1319,6 +1444,11 @@ export function nextHand(state: MatchState, seed: number): MatchState {
     // is the stack you sit down with for the next one.
     chips: state.definition.poker ? { ...state.chips } : undefined,
     kentLetters: state.definition.kent ? { ...state.kentLetters } : undefined,
+    // Author counters that asked to survive the deal. Everything else in vars is deliberately
+    // wiped: a hand starts clean unless a rule said otherwise.
+    keepVars: state.keepVars.slice(),
+    vars: Object.fromEntries(state.keepVars
+      .flatMap((name) => Object.entries(state.vars).filter(([k]) => k === name || k.endsWith(`:${name}`)))),
   });
 }
 
@@ -1472,6 +1602,7 @@ function applyTrickMove(s: MatchState, playerId: string, move: Move): MatchState
     if (!bidMoves.some((m) => m.actionId === move.actionId && m.choice === move.choice)) return s;
     s.bids[playerId] = parseInt(move.choice!, 10);
     log(s, playerId, `${short(playerId)} bids ${move.choice}${move.choice === '0' ? ' (nil)' : ''}.`);
+    fireRules(s, 'bidMade', { playerId });
     if (Object.keys(s.bids).length >= s.players.length) { s.bidding = false; s.turnIndex = 0; }
     else s.turnIndex = ((s.turnIndex + s.direction) % s.players.length + s.players.length) % s.players.length;
     return s;
@@ -1487,7 +1618,8 @@ function applyTrickMove(s: MatchState, playerId: string, move: Move): MatchState
   hand.splice(idx, 1);
   const trickZone = s.definition.zones.find((z) => z.type === 'trick')!;
   s.zones[trickZone.id].push(card);
-  if (s.trickPlays.length === 0) { s.lead = suitOf(s, card) as MatchState['lead']; s.lastTrick = null; }
+  const leadingThis = s.trickPlays.length === 0;
+  if (leadingThis) { s.lead = suitOf(s, card) as MatchState['lead']; s.lastTrick = null; }
   const brk = s.definition.trick!.brokenSuit;
   if (brk && card.suit === brk && !s.brokenSuitPlayed) {
     s.brokenSuitPlayed = true;
@@ -1495,6 +1627,9 @@ function applyTrickMove(s: MatchState, playerId: string, move: Move): MatchState
   }
   s.trickPlays.push({ player: playerId, card });
   log(s, playerId, `${short(playerId)} played ${cardLabel(card)}.`);
+  // Leading a trick is its own decision, distinct from following one — "you may not lead a
+  // heart", "leading the ace pays a bonus". It had no hook until now.
+  if (leadingThis) fireRules(s, 'trickLed', { playerId, targetCard: card });
 
   if (s.trickPlays.length < activeSeats(s).length) {
     s.turnIndex = nextIndex(s);
@@ -2850,6 +2985,7 @@ function applyRummyMove(s: MatchState, playerId: string, move: Move): MatchState
     s.rummyMeldSizes.push(melded.length);
     s.stallCount = 0;
     log(s, playerId, `${short(playerId)} melds ${melded.map(cardLabel).join(' ')}.`);
+    fireRules(s, 'meldLaid', { playerId, targetCard: melded[0] });
     if (s.zones[`hand:${playerId}`].length === 0) endRummyRound(s, playerId);
     return s;
   }
@@ -2918,7 +3054,23 @@ function endRummyRound(s: MatchState, winner: string | null): void {
     for (const p of s.players) { const n = (s.zones[`hand:${p}`] || []).length; if (n < bestN) { bestN = n; best = p; } }
     winner = best;
   }
-  for (const p of s.players) s.scores[p] = (s.zones[`hand:${p}`] || []).length; // fewer left = better
+  /*
+    What a hand of cards is worth at the end of a round.
+
+    A bare count of cards is the right answer for a game that never said otherwise — it is what
+    Rummy has always used, and it is why Rummy plays to 30 rather than 100. But a game that
+    supplies a points table means it: Canasta's jokers are worth fifty apiece and its deuces
+    twenty, which is the whole reason they are both wonderful to meld and painful to be caught
+    holding. That table used to be read by nothing at all, so such a game scored a flat card
+    count and its target was unreachable.
+  */
+  const priced = Object.keys(s.definition.scoring.cardPoints ?? {}).length > 0;
+  for (const p of s.players) {
+    const hand = s.zones[`hand:${p}`] || [];
+    s.scores[p] = priced
+      ? hand.reduce((total, c) => total + cardPoints(s.definition.scoring, c), 0)
+      : hand.length;   // fewer left = better
+  }
   s.winner = winner;
   log(s, null, `Round over — ${short(winner)} goes out.`);
   finalizeMatchProgress(s);
@@ -3842,7 +3994,15 @@ export function redact(state: MatchState, viewer: string): RedactedState {
     direction: state.direction,
     zones,
     hand: (state.zones[`hand:${viewer}`] || []).slice(),
-    vars: { ...state.vars },
+    // Shared vars are table talk — "hearts are broken" is something everyone can see. A var
+    // scoped to a player is that player's own, and handing every seat's private counters to
+    // every client would leak whatever an author put in them.
+    vars: Object.fromEntries(Object.entries(state.vars).filter(([k]) => {
+      const sep = k.indexOf(':');
+      if (sep < 0) return true;
+      const owner = k.slice(0, sep);
+      return !state.players.includes(owner) || owner === viewer;
+    })),
     phase: state.phase,
     winner: state.winner,
     isYourTurn:

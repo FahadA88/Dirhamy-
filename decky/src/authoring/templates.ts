@@ -27,6 +27,15 @@ function rule(
   return { id, name, when, condId, condParams, effects, enabled: true, note };
 }
 
+/*
+  Templates deliberately carry NO description.
+
+  Each used to hold a one-line blurb, which then followed the knobs around: switch a shedding
+  template to the trick family and the game went on telling players to "match the top card by
+  suit or rank". The auto-generated description is written from the knobs, so it is always
+  about the game you actually have — and the card in the picker shows the tagline below, not
+  this, so nothing on screen lost a word.
+*/
 export const TEMPLATES: Template[] = [
   {
     id: 'blank-shedding',
@@ -38,7 +47,6 @@ export const TEMPLATES: Template[] = [
       ...defaultKnobs,
       family: 'shedding',
       name: 'My Matching Game',
-      description: 'Match the top card by suit or rank. Empty your hand to win.',
       customRules: [],
     },
   },
@@ -52,7 +60,6 @@ export const TEMPLATES: Template[] = [
       ...defaultKnobs,
       family: 'trick',
       name: 'My Trick Game',
-      description: 'Follow the suit that was led. The highest card — or the highest trump — takes the trick.',
       trump: 'S',
       mustFollowSuit: true,
       aceHigh: true,
@@ -75,7 +82,6 @@ export const TEMPLATES: Template[] = [
       ...defaultKnobs,
       family: 'rummy',
       name: 'My Rummy Game',
-      description: 'Draw a card, lay down sets and runs, then discard. First player out wins.',
       rummySetMin: 3,
       rummyRunMin: 3,
       rummyKnock: false,
@@ -93,7 +99,6 @@ export const TEMPLATES: Template[] = [
       ...defaultKnobs,
       family: 'trick',
       name: 'My Showdown Game',
-      description: 'Five cards each. Play them out; the strongest cards score. No wagering.',
       trump: 'none',
       mustFollowSuit: false,
       aceHigh: true,
@@ -118,7 +123,6 @@ export const TEMPLATES: Template[] = [
       ...defaultKnobs,
       family: 'climb',
       name: 'My Climbing Game',
-      description: 'Play higher than the last card, or pass. When everyone passes, the pile clears.',
       climbCombos: true,
       climbBombSize: 4,
       climbTwosHigh: true,
@@ -135,7 +139,6 @@ export const TEMPLATES: Template[] = [
       ...defaultKnobs,
       family: 'solitaire',
       name: 'My Patience',
-      description: 'Build the tableau down and the foundations up.',
       solColumns: 7,
       solDeal: 'triangle',
       solBuild: 'alt-color',
@@ -154,7 +157,6 @@ export const TEMPLATES: Template[] = [
       ...defaultKnobs,
       family: 'shedding',
       name: 'Chaos',
-      description: 'A matching game where the cards fight back. Every twist below is a rule you can edit.',
       customRules: [
         rule('c1', 'Queens swap', 'cardPlayed', 'rankIs', { rank: 'Q' },
           [{ specId: 'swap', params: { with: 'next' } }, { specId: 'announce', params: { text: 'Queen — hands swap!' } }]),

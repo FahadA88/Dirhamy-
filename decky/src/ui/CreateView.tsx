@@ -10,17 +10,17 @@ import { catalog } from '../games/catalog';
 import { GameDefinition, Rank, Suit } from '../engine/types';
 import { Table } from './Table';
 import { SolitaireTable } from './SolitaireTable';
-import { RuleBuilder } from './RuleBuilder';
+import { RestrictionBuilder, RuleBuilder } from './RuleBuilder';
 import { MiniTable } from './MiniTable';
 import { TEMPLATES } from '../authoring/templates';
-import { RuleDraft } from '../authoring/ruleKit';
+import { RestrictionDraft, RuleDraft } from '../authoring/ruleKit';
 import { explainGame } from '../authoring/explain';
 import { publish, complexityOf, playtimeOf, kindLabel } from '../library/library';
 import { checkName, checkText } from '../social/safety';
 import { useSettings } from '../settings/SettingsContext';
 import { DescribeGame } from './DescribeGame';
 
-type RankArrayKey = 'wildRanks' | 'skipRanks' | 'reverseRanks' | 'drawRanks' | 'extraTurnRanks' | 'wildDrawRanks' | 'excludeRanks' | 'passRanks';
+type RankArrayKey = 'wildRanks' | 'skipRanks' | 'reverseRanks' | 'drawRanks' | 'extraTurnRanks' | 'wildDrawRanks' | 'excludeRanks' | 'passRanks' | 'reflexSlapRanks' | 'bluffClaimRanks';
 
 // The builder is a guided flow, not a wall of dials: pick a starting point, shape the game,
 // write your own twists, prove it works, publish it. Every step keeps the live preview on
@@ -56,7 +56,22 @@ export function CreateView({ onPlay }: { onPlay?: (def: GameDefinition) => void 
   const validation = useMemo(() => validate(def), [def]);
 
   function set<K extends keyof Knobs>(key: K, value: Knobs[K]) {
-    setKnobs((k) => ({ ...k, [key]: value }));
+    setKnobs((k) => {
+      const next = { ...k, [key]: value };
+      /*
+        Switching family used to leave the old family's description behind, so a spotting game
+        went on telling players to "match the top card by suit or rank" — the templates each
+        carry an explicit description, and nothing ever cleared it.
+
+        Only a description the previous family generated for itself is dropped. Something the
+        author actually wrote stays, because they meant it.
+      */
+      if (key === 'family' && k.description) {
+        const auto = buildDefinition({ ...k, description: '' }, 'probe').meta.description;
+        if (k.description.trim() === auto.trim()) next.description = '';
+      }
+      return next;
+    });
     setOverride(null); setReport(null);
   }
   function toggleRank(key: RankArrayKey, r: Rank) {
@@ -69,6 +84,10 @@ export function CreateView({ onPlay }: { onPlay?: (def: GameDefinition) => void 
   function startFromTemplate(k: Knobs) { startFrom({ ...k }); setStep('design'); }
   function setRules(next: RuleDraft[]) {
     setKnobs((k) => ({ ...k, customRules: next }));
+    setOverride(null); setReport(null); setPublished(null);
+  }
+  function setRestrictions(next: RestrictionDraft[]) {
+    setKnobs((k) => ({ ...k, restrictions: next }));
     setOverride(null); setReport(null); setPublished(null);
   }
   function doPublish() {
@@ -173,6 +192,8 @@ export function CreateView({ onPlay }: { onPlay?: (def: GameDefinition) => void 
         <div className="editor-grid">
           <div className="panel glass">
             <RuleBuilder rules={knobs.customRules ?? []} onChange={setRules} />
+            <hr />
+            <RestrictionBuilder restrictions={knobs.restrictions ?? []} onChange={setRestrictions} />
           </div>
           <div className="panel glass">
             <div className="panel-head">
@@ -299,6 +320,15 @@ export function CreateView({ onPlay }: { onPlay?: (def: GameDefinition) => void 
               <button className={knobs.family === 'rummy' ? 'on' : ''} onClick={() => set('family', 'rummy')}>Rummy</button>
               <button className={knobs.family === 'war' ? 'on' : ''} onClick={() => set('family', 'war')}>War</button>
               <button className={knobs.family === 'solitaire' ? 'on' : ''} onClick={() => set('family', 'solitaire')}>Solitaire</button>
+              {/* Four families the compiler has always been able to build and the picker never
+                  offered — every one of them shipped as a classic on the shelf while being
+                  unbuildable here. */}
+              <button className={knobs.family === 'bluff' ? 'on' : ''} onClick={() => set('family', 'bluff')}>Bluffing</button>
+              <button className={knobs.family === 'reflex' ? 'on' : ''} onClick={() => set('family', 'reflex')}>Reflex</button>
+              <button className={knobs.family === 'poker' ? 'on' : ''} onClick={() => set('family', 'poker')}>Betting</button>
+              <button className={knobs.family === 'pit' ? 'on' : ''} onClick={() => set('family', 'pit')}>Trading</button>
+              <button className={knobs.family === 'kent' ? 'on' : ''} onClick={() => set('family', 'kent')}>Signalling</button>
+              <button className={knobs.family === 'set' ? 'on' : ''} onClick={() => set('family', 'set')}>Spotting</button>
             </div>
           </div>
 
@@ -309,12 +339,24 @@ export function CreateView({ onPlay }: { onPlay?: (def: GameDefinition) => void 
             {knobs.family === 'solitaire' ? (
               <span className="mini-label">Patience is played alone — no seat count to set.</span>
             ) : (
-              <div className="two">
-                <label className="field"><span>Min players: <b>{knobs.minPlayers}</b></span>
-                  <input type="range" min={2} max={8} value={knobs.minPlayers} onChange={(e) => set('minPlayers', +e.target.value)} /></label>
-                <label className="field"><span>Max players: <b>{knobs.maxPlayers}</b></span>
-                  <input type="range" min={knobs.minPlayers} max={8} value={knobs.maxPlayers} onChange={(e) => set('maxPlayers', +e.target.value)} /></label>
-              </div>
+              <>
+                <div className="two">
+                  <label className="field"><span>Min players: <b>{knobs.minPlayers}</b></span>
+                    <input type="range" min={2} max={8} value={knobs.minPlayers} onChange={(e) => set('minPlayers', +e.target.value)} /></label>
+                  <label className="field"><span>Max players: <b>{knobs.maxPlayers}</b></span>
+                    <input type="range" min={knobs.minPlayers} max={8} value={knobs.maxPlayers} onChange={(e) => set('maxPlayers', +e.target.value)} /></label>
+                </div>
+                {/* A partnership game cannot seat five — somebody has no partner. The schema has
+                    always had a seat step; nothing ever set it. */}
+                <div className="field"><span>Seats go up in</span>
+                  <Seg options={[[1, 'Ones'], [2, 'Twos (partnerships)'], [3, 'Threes']]}
+                    value={knobs.seatStep} onChange={(v) => set('seatStep', v)} /></div>
+                {knobs.seatStep > 1 && (
+                  <span className="mini-label">
+                    Playable at {seatsAllowed(knobs).join(', ') || 'no seat count — widen the range'} players.
+                  </span>
+                )}
+              </>
             )}
           </Section>
 
@@ -322,7 +364,14 @@ export function CreateView({ onPlay }: { onPlay?: (def: GameDefinition) => void 
               the shedding-only block, which is why a two-deck Rummy or a jokers-in-trumps game
               could not be built here at all — the engine ran both, the panel just never asked. */}
           <Section title="The deck" defaultOpen>
-            {knobs.family === 'solitaire' ? (
+            {knobs.family === 'set' ? (
+              // A spotting game's deck is its properties, not a pack: ranks, suits and jokers
+              // mean nothing there, so offering the controls would be offering a lie.
+              <span className="mini-label">
+                This family builds its deck from properties instead of ranks and suits — see “Spotting rules” below.
+                It holds <b>{buildDeck(def).length}</b> cards.
+              </span>
+            ) : knobs.family === 'solitaire' ? (
               <span className="mini-label">Patience deals a fixed board, so its deck count lives in “The board” above and jokers have no foundation to go to.</span>
             ) : (
               <>
@@ -357,19 +406,52 @@ export function CreateView({ onPlay }: { onPlay?: (def: GameDefinition) => void 
                 )}
               </>
             )}
-            <div className="mini-label">Remove whole ranks (short deck)</div>
-            <RankGrid ranks={RANKS_13} selected={knobs.excludeRanks} onToggle={(r) => toggleRank('excludeRanks', r)} />
-            <CardPicker
-              label="Remove individual cards"
-              hint="Struck out of every copy of the pack. Ranks already removed above are greyed out."
-              selected={knobs.excludeCards}
-              dimmed={knobs.excludeRanks}
-              onToggle={(key) => set('excludeCards', knobs.excludeCards.includes(key)
-                ? knobs.excludeCards.filter((c) => c !== key)
-                : [...knobs.excludeCards, key])}
-            />
-            <div className="deck-count-note">
-              This deck holds <b>{buildDeck(def).length}</b> cards.
+            {knobs.family !== 'set' && <>
+              <div className="mini-label">Remove whole ranks (short deck)</div>
+              <RankGrid ranks={RANKS_13} selected={knobs.excludeRanks} onToggle={(r) => toggleRank('excludeRanks', r)} />
+              <CardPicker
+                label="Remove individual cards"
+                hint="Struck out of every copy of the pack. Ranks already removed above are greyed out."
+                selected={knobs.excludeCards}
+                dimmed={knobs.excludeRanks}
+                onToggle={(key) => set('excludeCards', knobs.excludeCards.includes(key)
+                  ? knobs.excludeCards.filter((c) => c !== key)
+                  : [...knobs.excludeCards, key])}
+              />
+              <div className="deck-count-note">
+                This deck holds <b>{buildDeck(def).length}</b> cards.
+              </div>
+              <RankOrder order={knobs.rankOrder} excluded={knobs.excludeRanks}
+                onChange={(v) => set('rankOrder', v)} />
+            </>}
+          </Section>
+
+          {/* A twist could always READ any pile by name; nothing could make one exist, because
+              every family hard-codes its own zone list. */}
+          <Section title="Extra piles">
+            <span className="mini-label">Somewhere to put cards aside — a kitty, a widow, a penalty pile. Twists can move cards in and out of these by name.</span>
+            <div className="propedit">
+              {knobs.extraPiles.map((pile, i) => (
+                <div key={i} className="pe-row">
+                  <input className="pe-vals" value={pile.id} placeholder="kitty"
+                    onChange={(e) => set('extraPiles', knobs.extraPiles.map((x, k) => (k === i ? { ...x, id: e.target.value } : x)))} />
+                  <label className="pe-face">
+                    <Switch on={pile.faceUp} onChange={(v) => set('extraPiles', knobs.extraPiles.map((x, k) => (k === i ? { ...x, faceUp: v } : x)))} />
+                    <span>face up</span>
+                  </label>
+                  <button className="icon-btn danger" title="Remove this pile"
+                    onClick={() => set('extraPiles', knobs.extraPiles.filter((_, k) => k !== i))}>✕</button>
+                </div>
+              ))}
+              <div className="pe-foot">
+                <button className="chip" disabled={knobs.extraPiles.length >= 4}
+                  onClick={() => set('extraPiles', [...knobs.extraPiles, { id: `pile${knobs.extraPiles.length + 1}`, faceUp: false }])}>
+                  + Add a pile
+                </button>
+                {knobs.extraPiles.length > 0 && (
+                  <span className="mini-label">Reachable in Twists as {knobs.extraPiles.map((p) => `“${p.id}”`).join(', ')}.</span>
+                )}
+              </div>
             </div>
           </Section>
 
@@ -379,6 +461,7 @@ export function CreateView({ onPlay }: { onPlay?: (def: GameDefinition) => void 
                 <label className="field"><span>Cards dealt each: <b>{knobs.handSize}</b></span>
                   <input type="range" min={1} max={13} value={knobs.handSize} onChange={(e) => set('handSize', +e.target.value)} /></label>
                 <span className="mini-label">Tip: cards × players must fit the deck — {buildDeck(def).length} cards here, so {Math.floor(buildDeck(def).length / Math.max(2, knobs.maxPlayers))} each at {knobs.maxPlayers} players.</span>
+                <SeatDeal knobs={knobs} deckSize={buildDeck(def).length} onChange={(v) => set('handSizeBySeats', v)} />
               </Section>
               <Section title="Trick rules" defaultOpen>
                 <label className="field"><span>Trump suit (beats all others)</span>
@@ -405,9 +488,29 @@ export function CreateView({ onPlay }: { onPlay?: (def: GameDefinition) => void 
                   </>
                 )}
               </Section>
-              <Section title="Trump auction">
-                <label className="field row"><Switch on={knobs.trumpAuction} onChange={(v) => set('trumpAuction', v)} />
-                  <span>Name trump each hand instead of fixing it — a card is turned up, and players order it up or pass</span></label>
+              {/* The contract auction has been in the engine, the knobs and the table for as
+                  long as Contract Whist has been on the shelf. It had no controls here at all,
+                  so the only way to build a Bridge-shaped game was to hand-edit JSON. */}
+              <Section title="Auction">
+                <div className="field"><span>How trump is decided</span>
+                  <Seg options={[['fixed', 'Fixed by the game'], ['turnup', 'Turn a card up'], ['contract', 'Bid a level and a suit']] as ['fixed' | 'turnup' | 'contract', string][]}
+                    value={knobs.contractAuction ? 'contract' : knobs.trumpAuction ? 'turnup' : 'fixed'}
+                    onChange={(v) => {
+                      set('trumpAuction', v === 'turnup');
+                      set('contractAuction', v === 'contract');
+                    }} /></div>
+                {knobs.contractAuction && <>
+                  <span className="mini-label">Each bid must beat the last on level first, then on strain — clubs, diamonds, hearts, spades, no-trump. Three passes settle it, and the winning side has promised that many tricks.</span>
+                  <label className="field"><span>Highest level biddable: <b>{knobs.contractMaxLevel}</b></span>
+                    <input type="range" min={1} max={7} value={knobs.contractMaxLevel} onChange={(e) => set('contractMaxLevel', +e.target.value)} /></label>
+                  <label className="field"><span>Tricks the level sits on top of: <b>{knobs.contractBook}</b></span>
+                    <input type="range" min={0} max={6} value={knobs.contractBook} onChange={(e) => set('contractBook', +e.target.value)} /></label>
+                  <span className="mini-label">
+                    {knobs.contractBook === 6
+                      ? 'Bridge’s book: a bid of 3 promises 9 tricks.'
+                      : `A bid of 3 promises ${3 + knobs.contractBook} tricks.`}
+                  </span>
+                </>}
                 {knobs.trumpAuction && <>
                   <label className="field row"><Switch on={knobs.bowers} onChange={(v) => set('bowers', v)} />
                     <span>Bowers — trump's jack is highest, and the other jack of the same colour becomes trump just under it</span></label>
@@ -441,10 +544,41 @@ export function CreateView({ onPlay }: { onPlay?: (def: GameDefinition) => void 
                   <label className="field row"><Switch on={knobs.shootTheMoon} onChange={(v) => set('shootTheMoon', v)} />
                     <span>Shooting the moon — take every penalty point and you score 0 while everyone else takes the lot</span></label>
                   <label className="field row"><Switch on={knobs.brokenSuitLead} onChange={(v) => set('brokenSuitLead', v)} />
-                    <span>Hearts must be broken before they can be led</span></label>
+                    <span>A suit must be broken before it can be led</span></label>
+                  {/* Hard-coded to hearts before this, though the engine never cared which. */}
+                  {knobs.brokenSuitLead && (
+                    <label className="field"><span>Which suit</span>
+                      <select value={knobs.brokenSuit} onChange={(e) => set('brokenSuit', e.target.value as Suit)}>
+                        <option value="H">♥ Hearts</option>
+                        <option value="S">♠ Spades</option>
+                        <option value="D">♦ Diamonds</option>
+                        <option value="C">♣ Clubs</option>
+                      </select></label>
+                  )}
                 </>}
                 <label className="field row"><Switch on={knobs.forceOpeningLead} onChange={(v) => set('forceOpeningLead', v)} />
-                  <span>The 2♣ holder leads the first trick{knobs.trickScoreBy === 'penalty' ? ', and no points may fall on it' : ''}</span></label>
+                  <span>One named card must lead the first trick{knobs.trickScoreBy === 'penalty' ? ', and no points may fall on it' : ''}</span></label>
+                {/* Also hard-coded — to the 2♣, which is Hearts' convention and nobody else's. */}
+                {knobs.forceOpeningLead && (
+                  <div className="field"><span>Which card leads</span>
+                    <div className="cardparam-row">
+                      <select value={knobs.openingLeadCard.slice(1) || '2'}
+                        onChange={(e) => set('openingLeadCard', `${knobs.openingLeadCard.slice(0, 1)}${e.target.value}`)}>
+                        {RANKS_13.map((r) => <option key={r} value={r}>{r}</option>)}
+                      </select>
+                      <select value={knobs.openingLeadCard.slice(0, 1) || 'C'}
+                        onChange={(e) => set('openingLeadCard', `${e.target.value}${knobs.openingLeadCard.slice(1)}`)}>
+                        <option value="C">♣ clubs</option>
+                        <option value="D">♦ diamonds</option>
+                        <option value="H">♥ hearts</option>
+                        <option value="S">♠ spades</option>
+                      </select>
+                    </div>
+                    {!buildDeck(def).some((c) => `${c.suit}${c.rank}` === knobs.openingLeadCard) && (
+                      <span className="mini-label warn-text">That card is not in this deck, so nobody can be made to lead it.</span>
+                    )}
+                  </div>
+                )}
               </Section>
               <Section title="Passing">
                 <div className="field"><span>Cards exchanged before each hand</span>
@@ -566,6 +700,95 @@ export function CreateView({ onPlay }: { onPlay?: (def: GameDefinition) => void 
                 <div className="field"><span>Passes through the stock</span>
                   <Seg options={[[-1, 'Unlimited'], [0, 'One'], [2, 'Three']]} value={knobs.solRedeals} onChange={(v) => set('solRedeals', v)} /></div>
               </>}
+            </Section>
+          )}
+
+          {knobs.family === 'kent' && (
+            <Section title="Signalling rules" defaultOpen>
+              <span className="mini-label">Partners sit opposite, so seats come in pairs. No turns — anyone may swap with the middle whenever they like.</span>
+              <label className="field"><span>Cards each: <b>{knobs.kentHandSize}</b></span>
+                <input type="range" min={3} max={5} value={knobs.kentHandSize} onChange={(e) => set('kentHandSize', +e.target.value)} /></label>
+              <label className="field"><span>Cards face up in the middle: <b>{knobs.kentPoolSize}</b></span>
+                <input type="range" min={3} max={6} value={knobs.kentPoolSize} onChange={(e) => set('kentPoolSize', +e.target.value)} /></label>
+              <label className="field"><span>A tell stays up for: <b>{knobs.kentTellPlies}</b> moves</span>
+                <input type="range" min={1} max={8} value={knobs.kentTellPlies} onChange={(e) => set('kentTellPlies', +e.target.value)} /></label>
+              <span className="mini-label">Counted in moves, not seconds — the engine has no clock, so that a game can always be replayed from its seed.</span>
+              <label className="field"><span>Word to spell before a pair is out</span>
+                <input value={knobs.kentLetters} maxLength={8}
+                  onChange={(e) => set('kentLetters', e.target.value.replace(/[^a-zA-Z]/g, '').toUpperCase())} /></label>
+              <span className="mini-label">{knobs.kentLetters.length || 4} letters: {(knobs.kentLetters || 'KENT').split('').join('-')}.</span>
+            </Section>
+          )}
+
+          {knobs.family === 'set' && (
+            <Section title="Spotting rules" defaultOpen>
+              <span className="mini-label">Not a pack of cards — every combination of the properties below, once each. All the same or all different, never two-and-one.</span>
+              <PropertyEditor props={knobs.setProperties} onChange={(v) => set('setProperties', v)} />
+              <div className="field"><span>Cards in a combination</span>
+                <Seg options={[[2, 'Two'], [3, 'Three'], [4, 'Four']]} value={knobs.setSize} onChange={(v) => set('setSize', v)} /></div>
+              <label className="field"><span>Cards face up at once: <b>{knobs.setBoardSize}</b></span>
+                <input type="range" min={6} max={21} value={knobs.setBoardSize} onChange={(e) => set('setBoardSize', +e.target.value)} /></label>
+              <div className="two">
+                <NumField label="Points for spotting one" value={knobs.setScore} onChange={(v) => set('setScore', v)} />
+                <NumField label="Points lost for a wrong call" value={knobs.setPenalty} onChange={(v) => set('setPenalty', v)} />
+              </div>
+              {knobs.setPenalty === 0 && (
+                <span className="mini-label warn-text">With no penalty, calling every combination at random is a winning strategy.</span>
+              )}
+            </Section>
+          )}
+
+          {knobs.family === 'bluff' && (
+            <Section title="Bluffing rules" defaultOpen>
+              <span className="mini-label">Play cards face down claiming a rank — true or not. Anyone may call it; whoever is wrong takes the pile. First to empty their hand wins.</span>
+              <div className="mini-label">Ranks a claim may name (none selected = any rank)</div>
+              <RankGrid ranks={RANKS_13} selected={knobs.bluffClaimRanks} onToggle={(r) => toggleRank('bluffClaimRanks', r)} />
+              <span className="mini-label">Narrowing this is what turns Cheat into a tighter game — claims can only walk up and down a short ladder.</span>
+            </Section>
+          )}
+
+          {knobs.family === 'reflex' && (
+            <Section title="Reflex rules" defaultOpen>
+              <span className="mini-label">Everyone flips onto a shared pile. When the trigger shows, first hand on the pile takes it.</span>
+              <div className="mini-label">Slap when the top card is…</div>
+              <RankGrid ranks={RANKS_13} selected={knobs.reflexSlapRanks} onToggle={(r) => toggleRank('reflexSlapRanks', r)} />
+              <label className="field row"><Switch on={knobs.reflexSlapMatch} onChange={(v) => set('reflexSlapMatch', v)} />
+                <span>…or whenever the top two cards match rank (Snap)</span></label>
+              {knobs.reflexSlapRanks.length === 0 && !knobs.reflexSlapMatch && (
+                <span className="mini-label warn-text">Nothing triggers a slap, so nobody can ever take the pile. Pick a rank or turn on matching.</span>
+              )}
+            </Section>
+          )}
+
+          {knobs.family === 'poker' && (
+            <Section title="Betting rules" defaultOpen>
+              <span className="mini-label">A fixed deal, one round of betting, then a showdown. No streets, no draw, no side pots.</span>
+              <div className="field"><span>Cards each</span>
+                <Seg options={[[3, '3'], [5, '5'], [7, '7']]} value={knobs.pokerHandSize} onChange={(v) => set('pokerHandSize', v)} /></div>
+              <label className="field"><span>Hands in a sitting: <b>{knobs.pokerHands}</b></span>
+                <input type="range" min={1} max={20} value={knobs.pokerHands} onChange={(e) => set('pokerHands', +e.target.value)} /></label>
+              <span className="mini-label">{knobs.pokerHands === 1
+                ? 'One hand and out — you post a blind, call once, and it is over with everyone still holding chips.'
+                : `Chips carry between hands; biggest stack after ${knobs.pokerHands} wins, or it ends early if someone busts.`}</span>
+              <div className="two">
+                <NumField label="Starting chips" value={knobs.pokerStartingChips} onChange={(v) => set('pokerStartingChips', v)} />
+                <NumField label="Ante" value={knobs.pokerAnte} onChange={(v) => set('pokerAnte', v)} />
+              </div>
+              <div className="two">
+                <NumField label="Small blind" value={knobs.pokerSmallBlind} onChange={(v) => set('pokerSmallBlind', v)} />
+                <NumField label="Big blind" value={knobs.pokerBigBlind} onChange={(v) => set('pokerBigBlind', v)} />
+              </div>
+              <NumField label="Minimum raise" value={knobs.pokerMinRaise} onChange={(v) => set('pokerMinRaise', v)} />
+              <span className="mini-label">Play money only — no cash, no purchases, nothing to cash out.</span>
+            </Section>
+          )}
+
+          {knobs.family === 'pit' && (
+            <Section title="Trading rules" defaultOpen>
+              <span className="mini-label">No turns at all. Offer a number of one suit, accept anyone else's offer, and corner a suit to win.</span>
+              <label className="field"><span>Cards that corner a suit: <b>{knobs.pitCornerSize}</b></span>
+                <input type="range" min={4} max={13} value={knobs.pitCornerSize} onChange={(e) => set('pitCornerSize', +e.target.value)} /></label>
+              <span className="mini-label">At a table too crowded to hold that many, a whole hand of one suit wins instead.</span>
             </Section>
           )}
 
@@ -836,6 +1059,160 @@ function Section({ title, children, defaultOpen = false }: { title: string; chil
       {open && <div className="sec-body">{children}</div>}
     </div>
   );
+}
+
+/**
+ * Which rank beats which.
+ *
+ * The engine reads the order out of the deck and has never cared what is in it — but every
+ * builder pinned it to ace-high, so a game where the seven is the highest card, or where the
+ * two beats the ace, was hand-edited JSON or nothing. Ranks move one place at a time rather
+ * than by dragging, because this is a list of thirteen things that is read far more often than
+ * it is changed, and arrows work on a phone.
+ */
+function RankOrder({ order, excluded, onChange }:
+  { order: Rank[]; excluded: Rank[]; onChange: (v: Rank[]) => void }) {
+  const [open, setOpen] = useState(order.length > 0);
+  const live = (order.length ? order : RANKS_13).filter((r) => !excluded.includes(r));
+  const move = (i: number, dir: -1 | 1) => {
+    const j = i + dir;
+    if (j < 0 || j >= live.length) return;
+    const next = live.slice();
+    [next[i], next[j]] = [next[j], next[i]];
+    onChange(next);
+  };
+  const custom = order.length > 0;
+  return (
+    <div className="cardpicker">
+      <button className="cp-head" onClick={() => setOpen(!open)}>
+        <span className="sec-caret">{open ? '▾' : '▸'}</span> Which rank beats which
+        {custom && <span className="cp-count">custom</span>}
+      </button>
+      {open && (
+        <>
+          <span className="mini-label">Lowest on the left. Trick-taking, climbing and comparison games all read this.</span>
+          <div className="rankorder">
+            {live.map((r, i) => (
+              <span key={r} className="ro-item">
+                <button className="ro-arrow" disabled={i === 0} aria-label={`Move ${r} lower`}
+                  onClick={() => move(i, -1)}>‹</button>
+                <b>{rankLabel(r)}</b>
+                <button className="ro-arrow" disabled={i === live.length - 1} aria-label={`Move ${r} higher`}
+                  onClick={() => move(i, 1)}>›</button>
+              </span>
+            ))}
+          </div>
+          <div className="pe-foot">
+            <button className="chip" onClick={() => onChange(
+              (['3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A', '2'] as Rank[]).filter((r) => !excluded.includes(r)),
+            )}>Twos high (President)</button>
+            <button className="chip" onClick={() => onChange(
+              (['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'] as Rank[]).filter((r) => !excluded.includes(r)),
+            )}>Ace low</button>
+            {custom && <button className="chip" onClick={() => onChange([])}>Reset to normal</button>}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+/**
+ * The properties a Set-style deck is built from.
+ *
+ * Every combination becomes one card, so three properties of three values each is twenty-seven
+ * and adding a fourth makes eighty-one. The count is shown live because that is the number
+ * that decides whether the game is a five-minute puzzle or an evening.
+ */
+function PropertyEditor({ props, onChange }:
+  { props: { name: string; values: string[] }[]; onChange: (v: { name: string; values: string[] }[]) => void }) {
+  const size = props.reduce((n, p) => n * Math.max(1, p.values.length), 1);
+  const setAt = (i: number, patch: Partial<{ name: string; values: string[] }>) =>
+    onChange(props.map((p, k) => (k === i ? { ...p, ...patch } : p)));
+  return (
+    <div className="propedit">
+      {props.map((p, i) => (
+        <div key={i} className="pe-row">
+          <input className="pe-name" value={p.name} placeholder="colour"
+            onChange={(e) => setAt(i, { name: e.target.value })} />
+          <input className="pe-vals" value={p.values.join(', ')} placeholder="red, green, violet"
+            onChange={(e) => setAt(i, { values: e.target.value.split(',').map((v) => v.trim()).filter(Boolean) })} />
+          <button className="icon-btn danger" title="Remove this property"
+            onClick={() => onChange(props.filter((_, k) => k !== i))}>✕</button>
+        </div>
+      ))}
+      <div className="pe-foot">
+        <button className="chip" disabled={props.length >= 4}
+          onClick={() => onChange([...props, { name: '', values: [] }])}>+ Add a property</button>
+        <span className="mini-label">{size} cards in the deck</span>
+      </div>
+      {props.some((p) => p.values.length < 2) && (
+        <span className="mini-label warn-text">Every property needs at least two values.</span>
+      )}
+      {props.some((p) => p.values.length !== props[0].values.length) && (
+        <span className="mini-label warn-text">Properties with different numbers of values make “all different” impossible for some of them.</span>
+      )}
+    </div>
+  );
+}
+
+/**
+ * A different deal at each table size.
+ *
+ * "Thirteen each" is a four-player statement. At three it leaves a stub, at five it cannot be
+ * dealt at all, and a game whose whole point is that every card goes out has to say so
+ * differently at every seat count. countByPlayers has been in the schema from the start with
+ * nothing ever writing to it.
+ */
+function SeatDeal({ knobs, deckSize, onChange }:
+  { knobs: Knobs; deckSize: number; onChange: (v: Record<string, number>) => void }) {
+  const [open, setOpen] = useState(Object.keys(knobs.handSizeBySeats).length > 0);
+  const seats = seatsAllowed(knobs);
+  return (
+    <div className="cardpicker">
+      <button className="cp-head" onClick={() => setOpen(!open)}>
+        <span className="sec-caret">{open ? '▾' : '▸'}</span> Deal a different number at each table size
+        {Object.keys(knobs.handSizeBySeats).length > 0 && <span className="cp-count">{Object.keys(knobs.handSizeBySeats).length}</span>}
+      </button>
+      {open && (
+        <>
+          <span className="mini-label">Blank means the number above. Whole-deck deals need cards ÷ players to come out even.</span>
+          <div className="seatdeal">
+            {seats.map((n) => {
+              const even = Math.floor(deckSize / n);
+              const v = knobs.handSizeBySeats[String(n)];
+              return (
+                <label key={n} className="sd-row">
+                  <span>{n} players</span>
+                  <input type="number" min={0} max={deckSize} value={v ?? ''} placeholder={String(knobs.handSize)}
+                    onChange={(e) => {
+                      const next = { ...knobs.handSizeBySeats };
+                      const parsed = parseInt(e.target.value || '0', 10);
+                      if (!parsed) delete next[String(n)]; else next[String(n)] = parsed;
+                      onChange(next);
+                    }} />
+                  <button className="chip subtle" onClick={() => onChange({ ...knobs.handSizeBySeats, [String(n)]: even })}
+                    title={`Deal the whole deck: ${even} each`}>all {even}</button>
+                  <span className={`sd-note ${(v ?? knobs.handSize) * n > deckSize ? 'bad' : ''}`}>
+                    {(v ?? knobs.handSize) * n > deckSize
+                      ? `needs ${(v ?? knobs.handSize) * n} of ${deckSize}`
+                      : `${deckSize - (v ?? knobs.handSize) * n} left over`}
+                  </span>
+                </label>
+              );
+            })}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+/** The seat counts a step actually permits between min and max. */
+function seatsAllowed(k: Knobs): number[] {
+  const out: number[] = [];
+  for (let n = k.minPlayers; n <= k.maxPlayers; n += Math.max(1, k.seatStep)) out.push(n);
+  return out;
 }
 
 /** How many copies of the pack a family can honestly shuffle together. */

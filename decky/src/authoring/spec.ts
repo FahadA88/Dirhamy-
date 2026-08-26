@@ -35,23 +35,29 @@ const BY_FAMILY: Record<Knobs['family'], (keyof Knobs)[]> = {
     'trickPartnerships', 'bustEnabled', 'bustScore', 'heartsValue', 'queenSpadesValue',
     'trumpAuction', 'bowers', 'goAlone', 'shootTheMoon', 'brokenSuitLead', 'forceOpeningLead',
     'contractAuction', 'contractMaxLevel', 'contractBook',
+    'jokerRank', 'penaltyCards', 'seatStep', 'handSizeBySeats',
     'handPassCount'],
   climb: ['handSize', 'climbTwosHigh', 'climbCombos', 'climbBombSize', 'direction'],
   fish: ['handSize', 'bookSize'],
   rummy: ['handSize', 'rummySetMin', 'rummyRunMin', 'rummyKnock', 'rummyKnockAt', 'rummyLayOff',
+    'rummyWilds', 'rummyMaxWilds', 'rummyGinBonus', 'rummyUndercutBonus', 'wildRanks',
     'perRankPoints'],
   war: ['warRoundCap'],
-  bluff: [],
+  bluff: ['bluffClaimRanks'],
   reflex: ['reflexSlapRanks', 'reflexSlapMatch'],
-  poker: ['pokerHandSize', 'pokerStartingChips', 'pokerAnte', 'pokerSmallBlind', 'pokerBigBlind', 'pokerMinRaise'],
+  poker: ['pokerHandSize', 'pokerStartingChips', 'pokerAnte', 'pokerSmallBlind', 'pokerBigBlind',
+    'pokerMinRaise', 'pokerHands'],
   pit: ['pitCornerSize'],
+  kent: ['kentHandSize', 'kentPoolSize', 'kentTellPlies', 'kentLetters'],
+  set: ['setProperties', 'setSize', 'setBoardSize', 'setScore', 'setPenalty'],
   solitaire: ['solColumns', 'solDeal', 'solFaceUp', 'solBuild', 'solMoveRun', 'solEmpty',
     'solFreeCells', 'solFoundations', 'solAutoRuns', 'solStock', 'solStockTurn', 'solRedeals',
     'solDecks'],
 };
 
 const ALWAYS: (keyof Knobs)[] = ['name', 'description', 'minPlayers', 'maxPlayers',
-  'deckCount', 'excludeRanks', 'includeJokers', 'matchPlay', 'pointTarget'];
+  'deckCount', 'excludeRanks', 'excludeCards', 'includeJokers', 'jokerCount', 'wildCards',
+  'cardValues', 'unpricedScoreRankValue', 'matchPlay', 'pointTarget'];
 
 function knobLine(k: keyof Knobs): string {
   const v = defaultKnobs[k];

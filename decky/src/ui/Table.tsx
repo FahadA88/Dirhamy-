@@ -180,6 +180,11 @@ function highlightOf(view: RedactedState, me: string, def: GameDefinition): { ke
   return null;
 }
 
+/** Piles the standard layout already draws somewhere of its own. */
+const STANDARD_PILES = new Set([
+  'draw', 'discard', 'melds', 'ocean', 'center', 'pile', 'battle', 'kitty', 'stock', 'trick',
+]);
+
 export function Table({ def, seats = 3, plan, practice = false, client: injected, mySeat, resumeMatchId }: {
   def: GameDefinition;
   seats?: number;
@@ -989,6 +994,11 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
   );
 
   const top = view.zones.discard?.cards[0];
+  // Shared piles this game's author added that the standard layout knows nothing about.
+  const extraPiles = useMemo(
+    () => Object.entries(view.zones).filter(([id, z]) => z.count > 0 && !STANDARD_PILES.has(id) && !id.startsWith('hand:')),
+    [view.zones],
+  );
   const activeSuit = view.vars.activeSuit;
   const suitPickerOpen = !!view.pendingChoice && view.pendingChoice.player === me;
   // ---------- overlays ----------
@@ -1571,6 +1581,17 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
                  : <div className="card big empty" />}
             <div className="pile-label">Discard{activeSuit ? ` · suit ${SUIT_SYMBOLS[activeSuit] ?? activeSuit}` : ''}</div>
           </div>
+          {/* Piles the game's author named. A pile the table never draws is cards disappearing
+              as far as anyone playing is concerned, so each one gets a slot — its top card if
+              the author made it face up, a back and a count if not. */}
+          {extraPiles.map(([id, z]) => (
+            <div key={id} className="pile" data-slot="extra">
+              {z.cards[0] ? <div key={z.cards[0].id} className="landed"><CardFace card={z.cards[0]} /></div>
+                : z.count > 0 ? <div className={`${backCls} big`} />
+                : <div className="card big empty" />}
+              <div className="pile-label">{id} · {z.count}</div>
+            </div>
+          ))}
         </div>
       )}
 
