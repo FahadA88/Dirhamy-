@@ -24,21 +24,30 @@ export function buildDeck(def: GameDefinition): Card[] {
 
   const copies = Math.max(1, def.deck.deckCount ?? 1);
   const excluded = new Set(def.deck.excludeRanks ?? []);
+  // Individual cards struck out of the pack, by the same suit+rank key the rest of the engine
+  // uses to name one card. Removing a rank takes all four; this takes exactly the one.
+  const excludedCards = new Set(def.deck.excludeCards ?? []);
+  const jokers = def.deck.includeJokers ? Math.max(0, Math.round(def.deck.jokerCount ?? 2)) : 0;
   const cards: Card[] = [];
   for (let c = 0; c < copies; c++) {
     const sfx = c === 0 ? '' : `#${c}`;
     for (const suit of SUITS) {
       for (const rank of RANKS) {
         if (excluded.has(rank)) continue;
+        if (excludedCards.has(`${suit}${rank}`)) continue;
         cards.push({ id: `${suit}${rank}${sfx}`, rank, suit });
       }
     }
-    if (def.deck.includeJokers) {
-      cards.push({ id: `JOKER1${sfx}`, rank: 'JOKER', suit: 'JOKER' });
-      cards.push({ id: `JOKER2${sfx}`, rank: 'JOKER', suit: 'JOKER' });
+    for (let j = 0; j < jokers; j++) {
+      cards.push({ id: `JOKER${j + 1}${sfx}`, rank: 'JOKER', suit: 'JOKER' });
     }
   }
   return cards;
+}
+
+/** The suit+rank key that names one card across the engine: "SQ", "H10", "C2". */
+export function cardKey(card: Card): string {
+  return `${card.suit}${card.rank}`;
 }
 
 // Red (hearts/diamonds) vs black (clubs/spades); jokers are their own colorless class.
@@ -48,11 +57,13 @@ export function cardColor(card: Card): 'red' | 'black' | 'none' {
   return 'none';
 }
 
-// Which tags apply to a card, per the definition's deck.tags.
+// Which tags apply to a card, per the definition's deck.tags. A tag can name whole ranks
+// ("every 8 is wild") or individual cards ("only the queen of spades"); either match counts.
 export function cardTags(def: GameDefinition, card: Card): string[] {
   const tags: string[] = [];
+  const key = cardKey(card);
   for (const [tag, spec] of Object.entries(def.deck.tags)) {
-    if (spec.ranks.includes(card.rank)) tags.push(tag);
+    if (spec.ranks.includes(card.rank) || spec.cards?.includes(key)) tags.push(tag);
   }
   return tags;
 }

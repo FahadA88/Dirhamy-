@@ -5,6 +5,7 @@
 // Returns structured issues. `errors` block publishing; `warnings` are advisory.
 
 import { CustomRule, Effect, GameDefinition, Predicate, RuleHook } from './types';
+import { buildDeck } from './deck';
 
 export interface Issue {
   level: 'error' | 'warning';
@@ -87,9 +88,10 @@ export function validate(def: GameDefinition): ValidationResult {
   }
 
   // --- deck size vs deal ---
-  const copies = Math.max(1, def.deck.deckCount ?? 1);
-  const excluded = (def.deck.excludeRanks ?? []).length;
-  const deckSize = ((13 - excluded) * 4 + (def.deck.includeJokers ? 2 : 0)) * copies;
+  // Counted by building the deck rather than by arithmetic on the knobs. The sum here used to
+  // assume four suits, thirteen ranks and exactly two jokers, all of which an author can now
+  // change — and a validator that disagrees with the dealer is worse than no validator.
+  const deckSize = buildDeck(def).length;
   const dealt = def.setup
     .filter((s) => s.op === 'deal')
     .reduce((n, s: any) => n + (s.countByPlayers?.[def.meta.players.max] ?? s.countPerPlayer) * def.meta.players.max, 0);
@@ -171,8 +173,9 @@ export function validate(def: GameDefinition): ValidationResult {
     const c = def.solitaire!;
     if (c.columns < 1) err('sol.columns', 'A patience needs at least one tableau column.');
     if (c.foundations < 1) err('sol.foundations', 'A patience needs somewhere for finished cards to go.');
-    const size = ((13 - (def.deck.excludeRanks ?? []).length) * 4) * Math.max(1, def.deck.deckCount ?? 1);
-    if (c.foundations * (13 - (def.deck.excludeRanks ?? []).length) > size) {
+    const size = deckSize;
+    const perFoundation = 13 - (def.deck.excludeRanks ?? []).length;
+    if (c.foundations * perFoundation > size) {
       err('sol.unwinnable', `${c.foundations} foundations cannot be filled from a ${size}-card deck.`);
     }
     if (c.foundationMode === 'auto-run' && c.moveRun === 'single') {

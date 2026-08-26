@@ -15,7 +15,9 @@ export type ParamValue = string | number;
 export type ParamSpec =
   | { key: string; kind: 'number'; label: string; min?: number; max?: number; step?: number; def: number }
   | { key: string; kind: 'select'; label: string; options: { value: string; label: string }[]; def: string }
-  | { key: string; kind: 'text'; label: string; placeholder?: string; def: string };
+  | { key: string; kind: 'text'; label: string; placeholder?: string; def: string }
+  // One card out of the pack, held as the suit+rank key the engine uses everywhere else ("SQ").
+  | { key: string; kind: 'card'; label: string; def: string };
 
 export interface ConditionSpec {
   id: string;
@@ -40,11 +42,14 @@ export interface EffectSpec {
 const SUITS: { value: string; label: string }[] = [
   { value: 'C', label: '♣ Clubs' }, { value: 'D', label: '♦ Diamonds' },
   { value: 'H', label: '♥ Hearts' }, { value: 'S', label: '♠ Spades' },
+  // A joker's suit is its own class, and a deck can now hold as many as an author wants.
+  // Leaving it off this list meant a game could deal jokers that no twist could ever mention.
+  { value: 'JOKER', label: '★ Joker' },
 ];
 
 const RANKS: { value: string; label: string }[] =
-  ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K']
-    .map((r) => ({ value: r, label: { A: 'Ace', J: 'Jack', Q: 'Queen', K: 'King' }[r] ?? r }));
+  ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'JOKER']
+    .map((r) => ({ value: r, label: { A: 'Ace', J: 'Jack', Q: 'Queen', K: 'King', JOKER: 'Joker' }[r] ?? r }));
 
 const WHO: { value: string; label: string }[] = [
   { value: '$me', label: 'the player' },
@@ -174,6 +179,59 @@ export const CONDITIONS: ConditionSpec[] = [
       { key: 'value', kind: 'text', label: 'Value', placeholder: '3', def: '3' },
     ],
     build: (p) => ({ cmp: { left: { stateVar: String(p.var) }, op: asOp(p.op), right: { lit: String(p.value) } } }),
+  },
+  {
+    id: 'exactCard', label: 'The card is exactly…',
+    hint: 'One card out of the whole pack — the queen of spades, not every queen.',
+    params: [{ key: 'card', kind: 'card', label: 'Card', def: 'SQ' }],
+    build: (p) => {
+      const key = String(p.card);
+      const suit = key.slice(0, 1) as Suit;
+      const rank = key.slice(1) as Rank;
+      // Two clauses rather than one, because "this card" is a suit AND a rank — the engine has
+      // always been able to say that, and the builder never could.
+      return { all: [{ suitIn: [suit] }, { rankIn: [rank] }] };
+    },
+  },
+  {
+    id: 'cardIsTagged', label: 'The card is tagged…',
+    hint: 'Wild, skip, reverse — whichever named sets this game defines.',
+    params: [{ key: 'tag', kind: 'text', label: 'Tag', placeholder: 'wild', def: 'wild' }],
+    build: (p) => ({ cardHasTag: String(p.tag) }),
+  },
+  {
+    id: 'cardValue', label: "The card's rank value…",
+    hint: 'Its position in the rank order, so "at least 11" catches jacks and up.',
+    params: [
+      { key: 'op', kind: 'select', label: 'Comparison', options: OPS, def: '>=' },
+      { key: 'value', kind: 'number', label: 'Value', min: 0, max: 14, def: 11 },
+    ],
+    build: (p) => ({ cmp: { left: { cardProp: 'value' }, op: asOp(p.op), right: { lit: n(p.value) } } }),
+  },
+  {
+    id: 'matchScore', label: 'Their match score…', advanced: true,
+    hint: 'The running total across hands, not this hand alone.',
+    params: [
+      { key: 'who', kind: 'select', label: 'Whose', options: WHO.slice(0, 3), def: '$me' },
+      { key: 'op', kind: 'select', label: 'Comparison', options: OPS, def: '>=' },
+      { key: 'value', kind: 'number', label: 'Points', min: -500, max: 500, def: 50 },
+    ],
+    build: (p) => ({ cmp: { left: { matchScore: asWho(p.who) }, op: asOp(p.op), right: { lit: n(p.value) } } }),
+  },
+  {
+    id: 'playerCount', label: 'The number of players…', advanced: true,
+    hint: 'Lets one game behave differently at three seats than at six.',
+    params: [
+      { key: 'op', kind: 'select', label: 'Comparison', options: OPS, def: '>=' },
+      { key: 'value', kind: 'number', label: 'Players', min: 1, max: 8, def: 4 },
+    ],
+    build: (p) => ({ cmp: { left: { playerCount: true }, op: asOp(p.op), right: { lit: n(p.value) } } }),
+  },
+  {
+    id: 'canDo', label: 'They have a legal…', advanced: true,
+    hint: 'Names an action id — "playCard", "drawCard". True when that move is available to them.',
+    params: [{ key: 'action', kind: 'text', label: 'Action', placeholder: 'playCard', def: 'playCard' }],
+    build: (p) => ({ existsLegal: String(p.action) }),
   },
 ];
 

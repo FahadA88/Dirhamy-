@@ -1125,14 +1125,28 @@ function computeWinner(state: MatchState, winnerHint?: string): string {
   return s.winner === 'firstOut' && winnerHint ? winnerHint : best;
 }
 
+/**
+ * What one card is worth when a hand is scored.
+ *
+ * Read most-specific-first: the exact card ("SQ"), then its suit ("H"), then its rank ("Q"),
+ * then whatever `default` says. Rank was the only one of those the scorer used to look at,
+ * which meant "hearts are worth a point each" and "the queen of spades is worth thirteen" —
+ * both of which the TRICK scorer had understood for as long as it has existed — were
+ * inexpressible the moment a game counted points in hand instead of in tricks.
+ */
 function cardPoints(s: ScoringDef, card: Card): number {
   const cp = s.cardPoints || {};
-  const byRank = cp[card.rank];
-  if (byRank === 'rankValue') return rankValue(card.rank);
-  if (typeof byRank === 'number') return byRank;
-  if (cp.default === 'rankValue') return rankValue(card.rank);
-  if (typeof cp.default === 'number') return cp.default;
-  return 0;
+  const resolve = (v: number | 'rankValue' | undefined): number | null => {
+    if (v === 'rankValue') return rankValue(card.rank);
+    return typeof v === 'number' ? v : null;
+  };
+  const exact = resolve(cp[card.suit + card.rank]);
+  if (exact !== null) return exact;
+  const bySuit = resolve(cp[card.suit]);
+  if (bySuit !== null) return bySuit;
+  const byRank = resolve(cp[card.rank]);
+  if (byRank !== null) return byRank;
+  return resolve(cp.default) ?? 0;
 }
 
 function rankValue(rank: string): number {
@@ -1325,15 +1339,26 @@ const SAME_COLOUR: Record<string, string> = { C: 'S', S: 'C', H: 'D', D: 'H' };
 // resolving the trick. Every suit comparison in this family goes through here.
 export function suitOf(s: MatchState, card: Card): string {
   const t = trumpOf(s);
+  // A ranking joker has no printed suit worth honouring: it follows whatever was led, so it is
+  // always legal to play and always counts as following suit. Leading one names trump as the
+  // suit (or, with no trump, leaves the led suit as JOKER — which nobody else holds, so the
+  // rest of the table plays what it likes).
+  const jr = s.definition.trick!.jokerRank;
+  if (card.rank === 'JOKER' && jr && jr !== 'low') {
+    if (jr === 'trump' && t !== 'none') return t;
+    return s.lead ?? (t !== 'none' ? t : card.suit);
+  }
   if (!s.definition.trick!.bowers || t === 'none') return card.suit;
   if (card.rank === 'J' && card.suit === SAME_COLOUR[t]) return t;
   return card.suit;
 }
 
-// Rank within a trick: right bower tops, then left bower, then the rest of the rank order.
+// Rank within a trick: a ranking joker tops everything, then the right bower, then the left,
+// then the rest of the rank order.
 export function trickStrength(s: MatchState, card: Card): number {
   const cfg = s.definition.trick!;
   const t = trumpOf(s);
+  if (card.rank === 'JOKER' && cfg.jokerRank && cfg.jokerRank !== 'low') return 5000;
   if (cfg.bowers && t !== 'none' && card.rank === 'J') {
     if (card.suit === t) return 3000;
     if (card.suit === SAME_COLOUR[t]) return 2900;
@@ -2429,21 +2454,48 @@ function rummyZones(def: MatchState['definition']) {
 }
 
 // Every set (same rank) and run (consecutive same suit) currently layable from a hand.
+/**
+ * How many wild cards one meld may absorb, and whether wilds are in play at all.
+ *
+ * A meld made entirely of wilds is not a meld, so the search always requires at least one
+ * natural card. Two is the ceiling: past that the arrangement search grows faster than the
+ * game gets more interesting.
+ */
+function wildRule(state: MatchState): { on: boolean; max: number } {
+  const cfg = state.definition.rummy!;
+  if (!cfg.wilds) return { on: false, max: 0 };
+  return { on: true, max: Math.max(1, Math.min(2, Math.round(cfg.maxWildsPerMeld ?? 1))) };
+}
+
+function isWildCard(state: MatchState, card: Card): boolean {
+  return cardTags(state.definition, card).includes('wild');
+}
+
 function findMelds(state: MatchState, hand: Card[]): { cards: string[]; label: string }[] {
   const cfg = state.definition.rummy!;
   const order = state.definition.deck.rankOrder;
   const out: { cards: string[]; label: string }[] = [];
+  const wild = wildRule(state);
+  // Wilds are never counted as naturals: three jokers are three fillers, not a set of jokers.
+  const wilds = wild.on ? hand.filter((c) => isWildCard(state, c)) : [];
+  const natural = wild.on ? hand.filter((c) => !isWildCard(state, c)) : hand;
+  const wildLabel = (n: number) => (n > 0 ? `+${n}★` : '');
 
-  // sets: 3+ of a rank
+  // sets: 3+ of a rank, with wilds standing in for what's missing
   const byRank: Record<string, Card[]> = {};
-  for (const c of hand) (byRank[c.rank] ??= []).push(c);
+  for (const c of natural) (byRank[c.rank] ??= []).push(c);
   for (const [rank, cs] of Object.entries(byRank)) {
-    if (cs.length >= cfg.setMin) out.push({ cards: cs.map((c) => c.id), label: `${cs.length}×${rank}` });
+    if (cs.length >= cfg.setMin) { out.push({ cards: cs.map((c) => c.id), label: `${cs.length}×${rank}` }); continue; }
+    const need = cfg.setMin - cs.length;
+    if (wild.on && cs.length >= 1 && need <= Math.min(wild.max, wilds.length)) {
+      const fill = wilds.slice(0, need);
+      out.push({ cards: [...cs, ...fill].map((c) => c.id), label: `${cfg.setMin}×${rank}${wildLabel(need)}` });
+    }
   }
 
-  // runs: consecutive same-suit sequences
+  // runs: consecutive same-suit sequences, wilds filling single gaps
   for (const suit of ['C', 'D', 'H', 'S']) {
-    const cs = hand.filter((c) => c.suit === suit).sort((a, b) => order.indexOf(a.rank as never) - order.indexOf(b.rank as never));
+    const cs = natural.filter((c) => c.suit === suit).sort((a, b) => order.indexOf(a.rank as never) - order.indexOf(b.rank as never));
     let i = 0;
     while (i < cs.length) {
       let j = i + 1;
@@ -2451,6 +2503,42 @@ function findMelds(state: MatchState, hand: Card[]): { cards: string[]; label: s
       const run = cs.slice(i, j);
       if (run.length >= cfg.runMin) out.push({ cards: run.map((c) => c.id), label: `${run[0].rank}–${run[run.length - 1].rank}${suitSym(suit)}` });
       i = j > i + 1 ? j : i + 1;
+    }
+    if (wild.on && wilds.length > 0 && cs.length > 0) {
+      for (const m of wildRuns(state, cs, wilds, suit)) out.push(m);
+    }
+  }
+  // Two different spans can want the same cards — 5,6,[gap] and [gap],5,6 are one meld to a
+  // player, and offering it twice would put the same button on the table twice.
+  const seen = new Set<string>();
+  return out.filter((m) => {
+    const key = m.cards.slice().sort().join(',');
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+/** Runs in one suit that need wilds to be whole. Spans are tried longest-first. */
+function wildRuns(state: MatchState, suited: Card[], wilds: Card[], suit: string):
+  { cards: string[]; label: string }[] {
+  const cfg = state.definition.rummy!;
+  const order = state.definition.deck.rankOrder;
+  const { max } = wildRule(state);
+  const budget = Math.min(max, wilds.length);
+  const at = new Map<number, Card>();
+  for (const c of suited) at.set(order.indexOf(c.rank as never), c);
+  const out: { cards: string[]; label: string }[] = [];
+
+  for (let a = 0; a < order.length; a++) {
+    for (let b = order.length - 1; b - a + 1 >= cfg.runMin; b--) {
+      let have = 0;
+      let gaps = 0;
+      for (let k = a; k <= b; k++) (at.has(k) ? have++ : gaps++);
+      if (gaps === 0 || gaps > budget || have === 0) continue;
+      const cards = [...Array.from({ length: b - a + 1 }, (_, k) => at.get(a + k)).filter((c): c is Card => !!c),
+        ...wilds.slice(0, gaps)];
+      out.push({ cards: cards.map((c) => c.id), label: `${order[a]}–${order[b]}${suitSym(suit)}+${gaps}★` });
     }
   }
   return out;
@@ -2469,9 +2557,27 @@ function meldMasks(state: MatchState, hand: Card[]): number[] {
   const cfg = state.definition.rummy!;
   const order = state.definition.deck.rankOrder;
   const masks: number[] = [];
+  const wild = wildRule(state);
+  const isW = (i: number) => wild.on && isWildCard(state, hand[i]);
+
+  /**
+   * Every way to pick up to `max` wilds out of the hand, as masks. The arrangement search needs
+   * these enumerated rather than "the first N wilds": two melds each wanting a filler must be
+   * able to take a different one, or the search would wrongly rule the pair out as overlapping.
+   */
+  const wildIdx = hand.map((_, i) => i).filter(isW);
+  const wildSubsets: { mask: number; size: number }[] = [{ mask: 0, size: 0 }];
+  for (let sub = 1; sub < 1 << wildIdx.length; sub++) {
+    let m = 0;
+    let cnt = 0;
+    for (let b = 0; b < wildIdx.length; b++) if (sub & (1 << b)) { m |= 1 << wildIdx[b]; cnt++; }
+    if (cnt <= wild.max) wildSubsets.push({ mask: m, size: cnt });
+  }
+  const fillers = (need: number) => wildSubsets.filter((w) => w.size === need);
 
   const byRank = new Map<string, number[]>();
   hand.forEach((c, i) => {
+    if (isW(i)) return;   // a wild is a filler, never a natural member of its own rank
     const list = byRank.get(c.rank) ?? [];
     list.push(i);
     byRank.set(c.rank, list);
@@ -2481,12 +2587,14 @@ function meldMasks(state: MatchState, hand: Card[]): number[] {
       let count = 0;
       let mask = 0;
       for (let b = 0; b < idxs.length; b++) if (sub & (1 << b)) { mask |= 1 << idxs[b]; count++; }
-      if (count >= cfg.setMin) masks.push(mask);
+      if (count >= cfg.setMin) { masks.push(mask); continue; }
+      if (!wild.on) continue;
+      for (const w of fillers(cfg.setMin - count)) masks.push(mask | w.mask);
     }
   }
 
   for (const suit of ['C', 'D', 'H', 'S']) {
-    const cs = hand.map((c, i) => ({ c, i })).filter((x) => x.c.suit === suit)
+    const cs = hand.map((c, i) => ({ c, i })).filter((x) => x.c.suit === suit && !isW(x.i))
       .sort((a, b) => order.indexOf(a.c.rank as never) - order.indexOf(b.c.rank as never));
     for (let i = 0; i < cs.length; i++) {
       let mask = 1 << cs[i].i;
@@ -2494,6 +2602,22 @@ function meldMasks(state: MatchState, hand: Card[]): number[] {
         if (order.indexOf(cs[j].c.rank as never) !== order.indexOf(cs[j - 1].c.rank as never) + 1) break;
         mask |= 1 << cs[j].i;
         if (j - i + 1 >= cfg.runMin) masks.push(mask);
+      }
+    }
+    if (!wild.on || wildIdx.length === 0 || cs.length === 0) continue;
+    // Gapped runs: every span of the rank order this suit partly covers, with wilds for the rest.
+    const at = new Map<number, number>();
+    for (const x of cs) at.set(order.indexOf(x.c.rank as never), x.i);
+    for (let a = 0; a < order.length; a++) {
+      for (let b = a + cfg.runMin - 1; b < order.length; b++) {
+        let mask = 0;
+        let gaps = 0;
+        for (let k = a; k <= b; k++) {
+          const idx = at.get(k);
+          if (idx === undefined) gaps++; else mask |= 1 << idx;
+        }
+        if (gaps === 0 || gaps > wild.max || mask === 0) continue;
+        for (const w of fillers(gaps)) masks.push(mask | w.mask);
       }
     }
   }
@@ -2548,13 +2672,22 @@ function extendsMeld(state: MatchState, meld: Card[], card: Card): boolean {
   const cfg = state.definition.rummy!;
   const order = state.definition.deck.rankOrder;
   if (meld.length === 0) return false;
-  const isSet = meld.every((c) => c.rank === meld[0].rank);
-  if (isSet) return card.rank === meld[0].rank && meld.length + 1 <= 4;
-  if (!meld.every((c) => c.suit === meld[0].suit) || card.suit !== meld[0].suit) return false;
-  const idx = meld.map((c) => order.indexOf(c.rank as never)).sort((a, b) => a - b);
+  const wild = wildRule(state);
+  // Wilds already sitting in the meld are placeholders — they say nothing about its shape, and
+  // a fresh wild can extend anything that still has room for one.
+  const core = wild.on ? meld.filter((c) => !isWildCard(state, c)) : meld;
+  if (core.length === 0) return false;
+  if (wild.on && isWildCard(state, card)) return meld.length - core.length < wild.max;
+  const isSet = core.every((c) => c.rank === core[0].rank);
+  if (isSet) return card.rank === core[0].rank && meld.length + 1 <= 4;
+  if (!core.every((c) => c.suit === core[0].suit) || card.suit !== core[0].suit) return false;
+  const idx = core.map((c) => order.indexOf(c.rank as never)).sort((a, b) => a - b);
   const ci = order.indexOf(card.rank as never);
   void cfg;
-  return ci === idx[0] - 1 || ci === idx[idx.length - 1] + 1;
+  // A wild inside the run stretches the span it occupies, so the ends move out by that many.
+  const pad = meld.length - core.length;
+  return ci >= idx[0] - 1 - pad && ci <= idx[idx.length - 1] + 1 + pad
+    && (ci === idx[0] - 1 || ci === idx[idx.length - 1] + 1 || !idx.includes(ci));
 }
 
 // After a knock, the defender's spare cards may be absorbed into the knocker's melds, cutting

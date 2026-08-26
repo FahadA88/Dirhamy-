@@ -4,6 +4,7 @@ import {
 } from '../authoring/knobs';
 import { offlineTranslator, ProposedChange, Question, TranslateResult } from '../authoring/copilot';
 import { validate } from '../engine/validator';
+import { buildDeck } from '../engine/deck';
 import { simulate, SimReport } from '../engine/simulator';
 import { catalog } from '../games/catalog';
 import { GameDefinition, Rank, Suit } from '../engine/types';
@@ -317,12 +318,67 @@ export function CreateView({ onPlay }: { onPlay?: (def: GameDefinition) => void 
             )}
           </Section>
 
+          {/* The deck belongs to every game, not just the shedding ones. It used to live inside
+              the shedding-only block, which is why a two-deck Rummy or a jokers-in-trumps game
+              could not be built here at all — the engine ran both, the panel just never asked. */}
+          <Section title="The deck" defaultOpen>
+            {knobs.family === 'solitaire' ? (
+              <span className="mini-label">Patience deals a fixed board, so its deck count lives in “The board” above and jokers have no foundation to go to.</span>
+            ) : (
+              <>
+                <div className="field"><span>Number of decks</span>
+                  <Seg options={([[1, 'One'], [2, 'Two'], [3, 'Three']] as [number, string][]).slice(0, maxDecksFor(knobs.family))}
+                    value={Math.min(knobs.deckCount, maxDecksFor(knobs.family))} onChange={(v) => set('deckCount', v)} /></div>
+                {maxDecksFor(knobs.family) === 1 && (
+                  <span className="mini-label">{knobs.family === 'war'
+                    ? 'War splits one pack between two players — a second deck has nowhere to go.'
+                    : 'Poker hand ranks stop meaning anything once a card can appear twice.'}</span>
+                )}
+                <label className="field row"><Switch on={knobs.includeJokers} onChange={(v) => set('includeJokers', v)} /><span>Include jokers</span></label>
+                {knobs.includeJokers && (
+                  <>
+                    <label className="field"><span>Jokers per deck: <b>{knobs.jokerCount}</b></span>
+                      <input type="range" min={1} max={8} value={knobs.jokerCount} onChange={(e) => set('jokerCount', +e.target.value)} /></label>
+                    {knobs.family === 'trick' && (
+                      <div className="field"><span>A joker in a trick is…</span>
+                        <Seg options={[['low', 'The weakest card'], ['high', 'Top of the led suit'], ['trump', 'The highest trump']] as ['low' | 'high' | 'trump', string][]}
+                          value={knobs.jokerRank} onChange={(v) => set('jokerRank', v)} />
+                        <span className="mini-label">{knobs.jokerRank === 'low'
+                          ? 'It can never take a trick — useful only as something to score or dodge.'
+                          : knobs.jokerRank === 'high'
+                            ? 'It always counts as following suit, and only trump beats it.'
+                            : 'It beats everything. Leading one names trump as the suit led.'}</span>
+                      </div>
+                    )}
+                    {knobs.family !== 'trick' && knobs.family !== 'shedding' && (
+                      <span className="mini-label">Jokers deal out like any other card here. Give them a job in Twists, or tag them as wild under Wild cards in a shedding game.</span>
+                    )}
+                  </>
+                )}
+              </>
+            )}
+            <div className="mini-label">Remove whole ranks (short deck)</div>
+            <RankGrid ranks={RANKS_13} selected={knobs.excludeRanks} onToggle={(r) => toggleRank('excludeRanks', r)} />
+            <CardPicker
+              label="Remove individual cards"
+              hint="Struck out of every copy of the pack. Ranks already removed above are greyed out."
+              selected={knobs.excludeCards}
+              dimmed={knobs.excludeRanks}
+              onToggle={(key) => set('excludeCards', knobs.excludeCards.includes(key)
+                ? knobs.excludeCards.filter((c) => c !== key)
+                : [...knobs.excludeCards, key])}
+            />
+            <div className="deck-count-note">
+              This deck holds <b>{buildDeck(def).length}</b> cards.
+            </div>
+          </Section>
+
           {knobs.family === 'trick' && (
             <>
               <Section title="Deal" defaultOpen>
                 <label className="field"><span>Cards dealt each: <b>{knobs.handSize}</b></span>
                   <input type="range" min={1} max={13} value={knobs.handSize} onChange={(e) => set('handSize', +e.target.value)} /></label>
-                <span className="mini-label">Tip: cards × players must fit the 52-card deck (e.g. 13 each for 4 players).</span>
+                <span className="mini-label">Tip: cards × players must fit the deck — {buildDeck(def).length} cards here, so {Math.floor(buildDeck(def).length / Math.max(2, knobs.maxPlayers))} each at {knobs.maxPlayers} players.</span>
               </Section>
               <Section title="Trick rules" defaultOpen>
                 <label className="field"><span>Trump suit (beats all others)</span>
@@ -372,10 +428,13 @@ export function CreateView({ onPlay }: { onPlay?: (def: GameDefinition) => void 
                     <button className={knobs.trickScoreBy === 'penalty' ? 'on' : ''} onClick={() => set('trickScoreBy', 'penalty')}>Avoid penalty cards</button>
                   </div></div>
                 {knobs.trickScoreBy === 'penalty' && (
-                  <div className="two">
-                    <NumField label="Points per heart" value={knobs.heartsValue} onChange={(v) => set('heartsValue', v)} />
-                    <NumField label="Queen of spades" value={knobs.queenSpadesValue} onChange={(v) => set('queenSpadesValue', v)} />
-                  </div>
+                  <>
+                    <div className="two">
+                      <NumField label="Points per heart" value={knobs.heartsValue} onChange={(v) => set('heartsValue', v)} />
+                      <NumField label="Queen of spades" value={knobs.queenSpadesValue} onChange={(v) => set('queenSpadesValue', v)} />
+                    </div>
+                    <CardValues values={knobs.penaltyCards} onChange={(v) => set('penaltyCards', v)} unit="penalty" />
+                  </>
                 )}
                 {knobs.trickScoreBy === 'penalty' && <>
                   <span className="mini-label">Lowest penalty total wins (this is how Hearts works).</span>
@@ -419,11 +478,34 @@ export function CreateView({ onPlay }: { onPlay?: (def: GameDefinition) => void 
               <label className="field row"><Switch on={knobs.rummyKnock} onChange={(v) => set('rummyKnock', v)} />
                 <span>Knocking (Gin) — melds stay hidden in hand and you end the hand by knocking</span></label>
               {knobs.rummyKnock && (
-                <label className="field"><span>Knock when your unmatched cards total <b>{knobs.rummyKnockAt}</b> or less</span>
-                  <input type="range" min={0} max={20} value={knobs.rummyKnockAt} onChange={(e) => set('rummyKnockAt', +e.target.value)} /></label>
+                <>
+                  <label className="field"><span>Knock when your unmatched cards total <b>{knobs.rummyKnockAt}</b> or less</span>
+                    <input type="range" min={0} max={20} value={knobs.rummyKnockAt} onChange={(e) => set('rummyKnockAt', +e.target.value)} /></label>
+                  <div className="two">
+                    <NumField label="Gin bonus (no deadwood)" value={knobs.rummyGinBonus} onChange={(v) => set('rummyGinBonus', v)} />
+                    <NumField label="Undercut bonus" value={knobs.rummyUndercutBonus} onChange={(v) => set('rummyUndercutBonus', v)} />
+                  </div>
+                </>
               )}
               <label className="field row"><Switch on={knobs.rummyLayOff} onChange={(v) => set('rummyLayOff', v)} />
                 <span>Lay-off — spare cards can extend a meld already on the table</span></label>
+              <label className="field row"><Switch on={knobs.rummyWilds} onChange={(v) => set('rummyWilds', v)} />
+                <span>Wild cards fill gaps in sets and runs (Canasta, Kalooki)</span></label>
+              {knobs.rummyWilds && (
+                <>
+                  <div className="field"><span>Wilds allowed in one meld</span>
+                    <Seg options={[[1, 'One'], [2, 'Two']]} value={knobs.rummyMaxWilds} onChange={(v) => set('rummyMaxWilds', v)} /></div>
+                  <div className="mini-label">Which cards are wild</div>
+                  <RankGrid selected={knobs.wildRanks} onToggle={(r) => toggleRank('wildRanks', r)} />
+                  <CardPicker label="…or name individual wild cards" selected={knobs.wildCards}
+                    onToggle={(key) => set('wildCards', knobs.wildCards.includes(key)
+                      ? knobs.wildCards.filter((c) => c !== key) : [...knobs.wildCards, key])} />
+                  {!knobs.wildRanks.length && !knobs.wildCards.length && (
+                    <span className="mini-label">Nothing is wild yet, so this changes nothing — pick a rank or a card above.</span>
+                  )}
+                  <span className="mini-label">A meld always needs at least one real card: a pile of wilds is not a set.</span>
+                </>
+              )}
               <span className="mini-label">
                 {knobs.rummyKnock
                   ? 'Score the gap between the two players’ unmatched cards. No deadwood at all is gin (+25); fail to beat your opponent and they undercut you (+25).'
@@ -510,18 +592,13 @@ export function CreateView({ onPlay }: { onPlay?: (def: GameDefinition) => void 
           )}
 
           {knobs.family === 'shedding' && <>
-          <Section title="Deal & deck" defaultOpen>
+          <Section title="Deal & drawing" defaultOpen>
             <label className="field"><span>Cards dealt each: <b>{knobs.handSize}</b></span>
               <input type="range" min={1} max={13} value={knobs.handSize} onChange={(e) => set('handSize', +e.target.value)} /></label>
-            <div className="field"><span>Number of decks</span>
-              <Seg options={[[1, 'One'], [2, 'Two'], [3, 'Three']]} value={knobs.deckCount} onChange={(v) => set('deckCount', v)} /></div>
-            <label className="field row"><Switch on={knobs.includeJokers} onChange={(v) => set('includeJokers', v)} /><span>Include 2 jokers per deck</span></label>
             <label className="field row"><Switch on={knobs.canAlwaysDraw} onChange={(v) => set('canAlwaysDraw', v)} /><span>Draw anytime {knobs.canAlwaysDraw ? '' : '(only when you can’t play)'}</span></label>
             {!knobs.canAlwaysDraw && (
               <label className="field row"><Switch on={knobs.drawUntilCanPlay} onChange={(v) => set('drawUntilCanPlay', v)} /><span>Keep drawing until you can play</span></label>
             )}
-            <div className="mini-label">Remove ranks from the deck (short deck)</div>
-            <RankGrid ranks={RANKS_13} selected={knobs.excludeRanks} onToggle={(r) => toggleRank('excludeRanks', r)} />
           </Section>
 
           <Section title="Matching rules" defaultOpen>
@@ -534,6 +611,11 @@ export function CreateView({ onPlay }: { onPlay?: (def: GameDefinition) => void 
           <Section title="Wild cards">
             <span className="mini-label">Playable anytime → then name a suit</span>
             <RankGrid selected={knobs.wildRanks} onToggle={(r) => toggleRank('wildRanks', r)} />
+            <CardPicker label="…or name individual wild cards"
+              hint="One card, not the whole rank — the queen of spades wild, her three sisters ordinary."
+              selected={knobs.wildCards}
+              onToggle={(key) => set('wildCards', knobs.wildCards.includes(key)
+                ? knobs.wildCards.filter((c) => c !== key) : [...knobs.wildCards, key])} />
           </Section>
 
           <Section title="Action cards">
@@ -598,6 +680,9 @@ export function CreateView({ onPlay }: { onPlay?: (def: GameDefinition) => void 
               <label className="pt-cell"><span>Jok</span>
                 <input type="number" value={knobs.jokerPoints} onChange={(e) => set('jokerPoints', parseInt(e.target.value || '0', 10))} /></label>
             </div>
+            <CardValues values={knobs.cardValues} onChange={(v) => set('cardValues', v)} />
+            <label className="field row"><Switch on={knobs.unpricedScoreRankValue} onChange={(v) => set('unpricedScoreRankValue', v)} />
+              <span>Anything left unpriced scores its own pip value (ace 1, faces 10)</span></label>
           </Section>
           </>}
 
@@ -749,6 +834,138 @@ function Section({ title, children, defaultOpen = false }: { title: string; chil
     <div className={`sec ${open ? 'open' : ''}`}>
       <button className="sec-head" onClick={() => setOpen(!open)}><span className="sec-caret">{open ? '▾' : '▸'}</span> {title}</button>
       {open && <div className="sec-body">{children}</div>}
+    </div>
+  );
+}
+
+/** How many copies of the pack a family can honestly shuffle together. */
+function maxDecksFor(family: Knobs['family']): number {
+  if (family === 'war' || family === 'poker') return 1;
+  if (family === 'shedding') return 3;
+  return 2;
+}
+
+const PICKER_SUITS: { suit: Suit; symbol: string; red: boolean }[] = [
+  { suit: 'S', symbol: '♠', red: false },
+  { suit: 'H', symbol: '♥', red: true },
+  { suit: 'D', symbol: '♦', red: true },
+  { suit: 'C', symbol: '♣', red: false },
+];
+
+/**
+ * The whole pack, one button per card.
+ *
+ * Every card-level control in the builder used to be rank-level: "remove the twos" was
+ * expressible, "remove the two of clubs" was not, even though the engine has always keyed
+ * individual cards as suit+rank. This is that key, made clickable — the same grid serves
+ * removing cards, marking them wild, and pricing them.
+ */
+function CardPicker({ label, hint, selected, onToggle, dimmed = [], accent }:
+  { label: string; hint?: string; selected: string[]; onToggle: (key: string) => void; dimmed?: Rank[]; accent?: string }) {
+  const [open, setOpen] = useState(false);
+  const dim = new Set(dimmed);
+  return (
+    <div className="cardpicker">
+      <button className="cp-head" onClick={() => setOpen(!open)}>
+        <span className="sec-caret">{open ? '▾' : '▸'}</span> {label}
+        {selected.length > 0 && <span className="cp-count">{selected.length}</span>}
+      </button>
+      {open && (
+        <>
+          {hint && <span className="mini-label">{hint}</span>}
+          <div className="cp-grid">
+            {PICKER_SUITS.map(({ suit, symbol, red }) => (
+              <div key={suit} className="cp-row">
+                <span className={`cp-suit ${red ? 'red' : ''}`}>{symbol}</span>
+                {RANKS_13.map((r) => {
+                  const key = `${suit}${r}`;
+                  const gone = dim.has(r);
+                  return (
+                    <button key={key} type="button"
+                      className={`cp-card ${selected.includes(key) ? 'on' : ''} ${gone ? 'gone' : ''}`}
+                      style={selected.includes(key) && accent ? { background: accent, borderColor: accent } : undefined}
+                      aria-pressed={selected.includes(key)}
+                      aria-label={`${r} of ${({ S: 'spades', H: 'hearts', D: 'diamonds', C: 'clubs' } as Record<string, string>)[suit]}`}
+                      title={gone ? 'This whole rank is already out of the deck' : undefined}
+                      onClick={() => onToggle(key)}>{r}</button>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+          {selected.length > 0 && (
+            <button className="chip" onClick={() => selected.slice().forEach(onToggle)}>Clear all {selected.length}</button>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+/**
+ * A price list for cards.
+ *
+ * The engine has always been able to say "the jack of diamonds is worth ten" — its scorers read
+ * a suit key, a rank key and a suit+rank key. The builder only ever wrote two of those, both
+ * hard-coded, so every game where one particular card matters had to be hand-edited as JSON.
+ * This is the same grid as the picker, with a number attached to whatever you tap.
+ */
+function CardValues({ values, onChange, unit = 'points' }:
+  { values: Record<string, number>; onChange: (next: Record<string, number>) => void; unit?: string }) {
+  const [open, setOpen] = useState(false);
+  const entries = Object.entries(values);
+  const setKey = (key: string, v: number | null) => {
+    const next = { ...values };
+    if (v === null) delete next[key]; else next[key] = v;
+    onChange(next);
+  };
+  const label = (k: string) => {
+    if (k.length > 1 && PICKER_SUITS.some((s) => s.suit === k[0])) {
+      return `${k.slice(1)}${PICKER_SUITS.find((s) => s.suit === k[0])!.symbol}`;
+    }
+    const suit = PICKER_SUITS.find((s) => s.suit === k);
+    return suit ? `every ${suit.symbol}` : `every ${k}`;
+  };
+  return (
+    <div className="cardpicker">
+      <button className="cp-head" onClick={() => setOpen(!open)}>
+        <span className="sec-caret">{open ? '▾' : '▸'}</span> Price individual cards
+        {entries.length > 0 && <span className="cp-count">{entries.length}</span>}
+      </button>
+      {open && (
+        <>
+          <span className="mini-label">Tap a card to give it its own value. A card's own price beats a whole-suit price, which beats a whole-rank one.</span>
+          <div className="cp-grid">
+            {PICKER_SUITS.map(({ suit, symbol, red }) => (
+              <div key={suit} className="cp-row">
+                <button type="button" className={`cp-suit as-btn ${red ? 'red' : ''} ${values[suit] !== undefined ? 'on' : ''}`}
+                  title={`Price every ${suit === 'S' ? 'spade' : suit === 'H' ? 'heart' : suit === 'D' ? 'diamond' : 'club'}`}
+                  onClick={() => setKey(suit, values[suit] === undefined ? 1 : null)}>{symbol}</button>
+                {RANKS_13.map((r) => {
+                  const key = `${suit}${r}`;
+                  const on = values[key] !== undefined;
+                  return (
+                    <button key={key} type="button" className={`cp-card ${on ? 'on' : ''}`} aria-pressed={on}
+                      onClick={() => setKey(key, on ? null : 1)}>{on ? values[key] : r}</button>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+          {entries.length > 0 && (
+            <div className="cv-list">
+              {entries.map(([k, v]) => (
+                <label key={k} className="cv-row">
+                  <span>{label(k)}</span>
+                  <input type="number" value={v} onChange={(e) => setKey(k, parseInt(e.target.value || '0', 10))} />
+                  <span className="cv-unit">{unit}</span>
+                  <button className="chip" onClick={() => setKey(k, null)} aria-label={`Remove ${label(k)}`}>×</button>
+                </label>
+              ))}
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }

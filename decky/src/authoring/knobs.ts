@@ -29,6 +29,12 @@ export interface Knobs {
   bustScore: number;      // stored positive; the actual threshold is -bustScore
   heartsValue: number;       // penalty per heart (penalty scoring)
   queenSpadesValue: number;  // penalty for the Queen of Spades (penalty scoring)
+  /**
+   * Penalties for anything else, keyed the way the engine names cards: a suit ("D"), a rank
+   * ("K"), or one card ("DJ" — the jack of diamonds). Merged over the two presets above, so a
+   * value written here wins.
+   */
+  penaltyCards: Record<string, number>;
   trumpAuction: boolean;     // trump is named per hand rather than fixed by the definition
   /**
    * A Bridge-style contract auction: bid a level and a suit together, each bid beating the last,
@@ -56,6 +62,10 @@ export interface Knobs {
   rummyKnock: boolean;      // gin-style: melds stay hidden and you end the hand by knocking
   rummyKnockAt: number;     // most deadwood you may knock with
   rummyLayOff: boolean;     // spare cards may extend melds already on the table
+  rummyWilds: boolean;      // cards tagged wild stand in for whatever a meld is short of
+  rummyMaxWilds: number;    // how many wilds one meld may absorb (1 or 2)
+  rummyGinBonus: number;    // extra for knocking with no deadwood at all
+  rummyUndercutBonus: number; // extra to the defender who matches or beats the knocker
   // war
   warRoundCap: number;
   // bluff — no extra knobs; claims may name any rank in the deck.
@@ -89,7 +99,14 @@ export interface Knobs {
   handSize: number;
   deckCount: number;
   excludeRanks: Rank[];
+  /** Individual cards struck out of the pack, by suit+rank key ("SQ", "H10"). */
+  excludeCards: string[];
+  /** Individual cards that are wild, alongside whole ranks in wildRanks. */
+  wildCards: string[];
   includeJokers: boolean;
+  jokerCount: number;
+  /** What a joker does in a trick. Ignored by every other family. */
+  jokerRank: 'low' | 'high' | 'trump';
   // matching
   matchSuit: boolean;
   matchRank: boolean;
@@ -119,6 +136,13 @@ export interface Knobs {
   // scoring
   perRankPoints: Record<string, number>;
   jokerPoints: number;
+  /**
+   * Hand-scoring values for anything a whole-rank price cannot say: a suit ("D"), or one card
+   * ("DJ"). Merged over perRankPoints, so a value here wins.
+   */
+  cardValues: Record<string, number>;
+  /** Cards nobody priced score their own pip value instead of nothing. */
+  unpricedScoreRankValue: boolean;
 }
 
 export const RANK_CHOICES: Rank[] = [...RANKS_13, 'JOKER'];
@@ -144,6 +168,7 @@ export const defaultKnobs: Knobs = {
   bustScore: 200,
   heartsValue: 1,
   queenSpadesValue: 13,
+  penaltyCards: {},
   trumpAuction: false,
   contractAuction: false,
   contractMaxLevel: 7,
@@ -163,6 +188,10 @@ export const defaultKnobs: Knobs = {
   rummyKnock: false,
   rummyKnockAt: 10,
   rummyLayOff: true,
+  rummyWilds: false,
+  rummyMaxWilds: 1,
+  rummyGinBonus: 25,
+  rummyUndercutBonus: 25,
   warRoundCap: 800,
   reflexSlapRanks: ['J'],
   reflexSlapMatch: false,
@@ -189,7 +218,11 @@ export const defaultKnobs: Knobs = {
   handSize: 5,
   deckCount: 1,
   excludeRanks: [],
+  excludeCards: [],
+  wildCards: [],
   includeJokers: false,
+  jokerCount: 2,
+  jokerRank: 'low',
   matchSuit: true,
   matchRank: true,
   matchColor: false,
@@ -212,6 +245,8 @@ export const defaultKnobs: Knobs = {
   pointTarget: 100,
   perRankPoints: { ...defaultPoints },
   jokerPoints: 50,
+  cardValues: {},
+  unpricedScoreRankValue: false,
 };
 
 export function buildDefinition(knobs: Knobs, id = 'draft'): GameDefinition {
@@ -220,6 +255,45 @@ export function buildDefinition(knobs: Knobs, id = 'draft'): GameDefinition {
   // works the same in a trick-taking game as in a shedding one.
   const rules = compileRules(knobs.customRules ?? []);
   return rules.length > 0 ? { ...def, rules } : def;
+}
+
+/**
+ * One deck, built the same way for every family.
+ *
+ * It used to be that only the shedding builder read the deck knobs; the other ten hard-coded
+ * `includeJokers: false, deckCount: 1` and quietly dropped whatever the author had set. Which
+ * meant a two-deck Rummy or a jokers-in-trumps game was unbuildable for reasons that had
+ * nothing to do with the engine — it could run both perfectly well.
+ *
+ * `maxDecks` is the one honest per-family limit: War splits the pack between two players and
+ * Patience lays a fixed board, so both cap where their own shape stops making sense.
+ */
+function deckOf(
+  knobs: Knobs,
+  opts: { maxDecks?: number; rankOrder?: Rank[]; tags?: GameDefinition['deck']['tags']; noJokers?: boolean } = {},
+): GameDefinition['deck'] {
+  const jokers = !opts.noJokers && knobs.includeJokers;
+  return {
+    base: 'standard54',
+    includeJokers: jokers,
+    ...(jokers ? { jokerCount: clampInt(knobs.jokerCount, 1, 8) } : {}),
+    deckCount: clampInt(knobs.deckCount, 1, opts.maxDecks ?? 3),
+    excludeRanks: knobs.excludeRanks,
+    ...(knobs.excludeCards.length ? { excludeCards: [...knobs.excludeCards] } : {}),
+    rankOrder: opts.rankOrder ?? RANKS_13,
+    tags: opts.tags ?? {},
+  };
+}
+
+/** Whether the author has named anything at all as wild. */
+function hasWilds(knobs: Knobs): boolean {
+  return knobs.wildRanks.length > 0 || knobs.wildCards.length > 0;
+}
+
+/** The 'wild' tag, built the same way wherever a family wants one. */
+function wildTags(knobs: Knobs): GameDefinition['deck']['tags'] {
+  if (!hasWilds(knobs)) return {};
+  return { wild: { ranks: dedup(knobs.wildRanks), ...(knobs.wildCards.length ? { cards: [...knobs.wildCards] } : {}) } };
 }
 
 function buildFamilyDefinition(knobs: Knobs, id: string): GameDefinition {
@@ -247,8 +321,10 @@ function buildSolitaireDefinition(knobs: Knobs, id: string): GameDefinition {
       family: 'solitaire',
     },
     deck: {
-      base: 'standard54', includeJokers: false, deckCount: clampInt(knobs.solDecks, 1, 2),
-      excludeRanks: knobs.excludeRanks, rankOrder: RANKS_13, tags: {},
+      ...deckOf(knobs, { noJokers: true }),
+      // Patience deals a fixed board from a known pack, so its deck count is the board's, not
+      // the deck panel's — and a joker has no foundation to go to.
+      deckCount: clampInt(knobs.solDecks, 1, 2),
     },
     zones: [], setup: [],
     turnFlow: { order: 'clockwise', startPlayer: 'first', actionsPerTurn: { min: 1, max: 1 } },
@@ -296,7 +372,7 @@ function buildRummyDefinition(knobs: Knobs, id: string): GameDefinition {
       players: { min: clampInt(knobs.minPlayers, 2, 4), max: clampInt(knobs.maxPlayers, knobs.minPlayers, 4) },
       family: 'rummy',
     },
-    deck: { base: 'standard54', includeJokers: false, deckCount: 1, excludeRanks: knobs.excludeRanks, rankOrder: RANKS_13, tags: {} },
+    deck: deckOf(knobs, { maxDecks: 2, tags: wildTags(knobs) }),
     zones: [
       { id: 'draw', type: 'pile', ordered: true, faceDown: true, visibility: 'none', shared: true },
       { id: 'discard', type: 'pile', ordered: true, faceDown: false, visibility: 'top-public', shared: true },
@@ -311,9 +387,11 @@ function buildRummyDefinition(knobs: Knobs, id: string): GameDefinition {
     rummy: {
       setMin: clampInt(knobs.rummySetMin, 2, 4), runMin: clampInt(knobs.rummyRunMin, 2, 5),
       knock: knobs.rummyKnock ? clampInt(knobs.rummyKnockAt, 0, 30) : undefined,
-      ginBonus: knobs.rummyKnock ? 25 : undefined,
-      undercutBonus: knobs.rummyKnock ? 25 : undefined,
+      ginBonus: knobs.rummyKnock ? clampInt(knobs.rummyGinBonus, 0, 200) : undefined,
+      undercutBonus: knobs.rummyKnock ? clampInt(knobs.rummyUndercutBonus, 0, 200) : undefined,
       layOff: knobs.rummyLayOff || undefined,
+      wilds: knobs.rummyWilds && hasWilds(knobs) ? true : undefined,
+      maxWildsPerMeld: knobs.rummyWilds ? clampInt(knobs.rummyMaxWilds, 1, 2) : undefined,
     },
   };
 }
@@ -325,7 +403,7 @@ function buildWarDefinition(knobs: Knobs, id: string): GameDefinition {
       id, name: knobs.name, description: knobs.description || 'A comparison game. Split the deck; each flip the higher card takes both, ties trigger a war. Take every card to win.',
       players: { min: 2, max: 2 }, family: 'comparison',
     },
-    deck: { base: 'standard54', includeJokers: false, deckCount: 1, excludeRanks: knobs.excludeRanks, rankOrder: RANKS_13, tags: {} },
+    deck: deckOf(knobs, { maxDecks: 1 }),
     zones: [
       { id: 'draw', type: 'pile', ordered: true, faceDown: true, visibility: 'none', shared: true },
       { id: 'battle', type: 'pile', ordered: true, faceDown: false, visibility: 'all', shared: true },
@@ -349,7 +427,7 @@ function buildBluffDefinition(knobs: Knobs, id: string): GameDefinition {
       players: { min: clampInt(knobs.minPlayers, 2, 6), max: clampInt(knobs.maxPlayers, knobs.minPlayers, 6) },
       family: 'bluff',
     },
-    deck: { base: 'standard54', includeJokers: false, deckCount: 1, excludeRanks: knobs.excludeRanks, rankOrder: RANKS_13, tags: {} },
+    deck: deckOf(knobs, { maxDecks: 2 }),
     zones: [
       { id: 'center', type: 'pile', ordered: true, faceDown: true, visibility: 'none', shared: true },
       { id: 'hand', type: 'hand', ordered: false, faceDown: true, visibility: 'owner', perPlayer: true },
@@ -371,7 +449,7 @@ function buildReflexDefinition(knobs: Knobs, id: string): GameDefinition {
       players: { min: clampInt(knobs.minPlayers, 2, 6), max: clampInt(knobs.maxPlayers, knobs.minPlayers, 6) },
       family: 'reflex',
     },
-    deck: { base: 'standard54', includeJokers: false, deckCount: 1, excludeRanks: knobs.excludeRanks, rankOrder: RANKS_13, tags: {} },
+    deck: deckOf(knobs, { maxDecks: 2 }),
     zones: [
       { id: 'draw', type: 'pile', ordered: true, faceDown: true, visibility: 'none', shared: true },
       { id: 'pile', type: 'pile', ordered: true, faceDown: false, visibility: 'all', shared: true },
@@ -394,7 +472,7 @@ function buildPokerDefinition(knobs: Knobs, id: string): GameDefinition {
       players: { min: clampInt(knobs.minPlayers, 2, 8), max: clampInt(knobs.maxPlayers, knobs.minPlayers, 8) },
       family: 'poker',
     },
-    deck: { base: 'standard54', includeJokers: false, deckCount: 1, excludeRanks: knobs.excludeRanks, rankOrder: RANKS_13, tags: {} },
+    deck: deckOf(knobs, { maxDecks: 1 }),
     zones: [
       { id: 'draw', type: 'pile', ordered: true, faceDown: true, visibility: 'none', shared: true },
       { id: 'hand', type: 'hand', ordered: false, faceDown: true, visibility: 'owner', perPlayer: true },
@@ -423,7 +501,7 @@ function buildPitDefinition(knobs: Knobs, id: string): GameDefinition {
       players: { min: clampInt(knobs.minPlayers, 3, 8), max: clampInt(knobs.maxPlayers, knobs.minPlayers, 8) },
       family: 'pit',
     },
-    deck: { base: 'standard54', includeJokers: false, deckCount: 1, excludeRanks: knobs.excludeRanks, rankOrder: RANKS_13, tags: {} },
+    deck: deckOf(knobs, { maxDecks: 2 }),
     zones: [
       { id: 'draw', type: 'pile', ordered: true, faceDown: true, visibility: 'none', shared: true },
       { id: 'hand', type: 'hand', ordered: false, faceDown: true, visibility: 'owner', perPlayer: true },
@@ -444,7 +522,7 @@ function buildFishDefinition(knobs: Knobs, id: string): GameDefinition {
       players: { min: clampInt(knobs.minPlayers, 2, 6), max: clampInt(knobs.maxPlayers, knobs.minPlayers, 6) },
       family: 'fishing',
     },
-    deck: { base: 'standard54', includeJokers: false, deckCount: 1, excludeRanks: knobs.excludeRanks, rankOrder: RANKS_13, tags: {} },
+    deck: deckOf(knobs, { maxDecks: 2 }),
     zones: [
       { id: 'ocean', type: 'pile', ordered: true, faceDown: true, visibility: 'none', shared: true },
       { id: 'hand', type: 'hand', ordered: false, faceDown: true, visibility: 'owner', perPlayer: true },
@@ -470,7 +548,7 @@ function buildClimbDefinition(knobs: Knobs, id: string): GameDefinition {
       players: { min: clampInt(knobs.minPlayers, 2, 8), max: clampInt(knobs.maxPlayers, knobs.minPlayers, 8) },
       family: 'climbing',
     },
-    deck: { base: 'standard54', includeJokers: false, deckCount: 1, excludeRanks: knobs.excludeRanks, rankOrder: RANKS_13, tags: {} },
+    deck: deckOf(knobs, { maxDecks: 2 }),
     zones: [
       { id: 'draw', type: 'pile', ordered: true, faceDown: true, visibility: 'none', shared: true },
       { id: 'discard', type: 'pile', ordered: true, faceDown: false, visibility: 'top-public', shared: true },
@@ -494,7 +572,7 @@ function buildTrickDefinition(knobs: Knobs, id: string): GameDefinition {
       players: { min: clampInt(knobs.minPlayers, 2, 8), max: clampInt(knobs.maxPlayers, knobs.minPlayers, 8) },
       family: 'trick-taking',
     },
-    deck: { base: 'standard54', includeJokers: knobs.includeJokers, deckCount: 1, excludeRanks: knobs.excludeRanks, rankOrder: RANKS_13, tags: {} },
+    deck: deckOf(knobs, { maxDecks: 2 }),
     zones: [
       { id: 'draw', type: 'pile', ordered: true, faceDown: true, visibility: 'none', shared: true },
       // The auction needs somewhere to turn a card up from.
@@ -525,7 +603,12 @@ function buildTrickDefinition(knobs: Knobs, id: string): GameDefinition {
       trump: knobs.trump, mustFollowSuit: knobs.mustFollowSuit, aceHigh: knobs.aceHigh,
       scoreBy: knobs.trickScoreBy,
       penaltyPoints: knobs.trickScoreBy === 'penalty'
-        ? { ...(knobs.heartsValue ? { H: knobs.heartsValue } : {}), ...(knobs.queenSpadesValue ? { SQ: knobs.queenSpadesValue } : {}) }
+        ? {
+            ...(knobs.heartsValue ? { H: knobs.heartsValue } : {}),
+            ...(knobs.queenSpadesValue ? { SQ: knobs.queenSpadesValue } : {}),
+            // Anything the author priced by hand overrides the two presets.
+            ...Object.fromEntries(Object.entries(knobs.penaltyCards).filter(([, v]) => v !== 0)),
+          }
         : undefined,
       bidding: knobs.trickBidding || undefined,
       partnerships: knobs.trickPartnerships || undefined,
@@ -550,6 +633,8 @@ function buildTrickDefinition(knobs: Knobs, id: string): GameDefinition {
       shootTheMoon: knobs.trickScoreBy === 'penalty' && knobs.shootTheMoon ? true : undefined,
       brokenSuit: knobs.trickScoreBy === 'penalty' && knobs.brokenSuitLead ? 'H' : undefined,
       leadCard: knobs.forceOpeningLead ? 'C2' : undefined,
+      // Only worth writing when there are jokers to rank, and only when it changes anything.
+      jokerRank: knobs.includeJokers && knobs.jokerRank !== 'low' ? knobs.jokerRank : undefined,
       noPenaltyFirstTrick: knobs.trickScoreBy === 'penalty' && knobs.forceOpeningLead ? true : undefined,
     },
     handPass: knobs.handPassCount > 0
@@ -562,7 +647,7 @@ function buildSheddingDefinition(knobs: Knobs, id: string): GameDefinition {
   const wildAll = dedup([...knobs.wildRanks, ...knobs.wildDrawRanks]);
 
   const tags: GameDefinition['deck']['tags'] = {};
-  if (wildAll.length) tags.wild = { ranks: wildAll };
+  if (wildAll.length || knobs.wildCards.length) tags.wild = { ranks: wildAll, ...(knobs.wildCards.length ? { cards: [...knobs.wildCards] } : {}) };
   if (knobs.skipRanks.length) tags.skip = { ranks: knobs.skipRanks };
   if (knobs.reverseRanks.length) tags.reverse = { ranks: knobs.reverseRanks };
   if (knobs.drawRanks.length) tags.drawTwo = { ranks: knobs.drawRanks };
@@ -587,7 +672,7 @@ function buildSheddingDefinition(knobs: Knobs, id: string): GameDefinition {
   if (knobs.matchSuit) matchClauses.push({ matches: { cardProp: 'suit', equalsStateOrTopOf: ['activeSuit', 'discard'] } });
   if (knobs.matchRank) matchClauses.push({ matches: { cardProp: 'rank', equalsTopOf: 'discard' } });
   if (knobs.matchColor) matchClauses.push({ matches: { cardProp: 'color', equalsTopOf: 'discard' } });
-  if (wildAll.length) matchClauses.push({ cardHasTag: 'wild' });
+  if (wildAll.length || knobs.wildCards.length) matchClauses.push({ cardHasTag: 'wild' });
   // Never leave the play with zero ways to match (that would be unplayable): fall back to rank.
   if (matchClauses.length === 0) matchClauses.push({ matches: { cardProp: 'rank', equalsTopOf: 'discard' } });
 
@@ -595,7 +680,7 @@ function buildSheddingDefinition(knobs: Knobs, id: string): GameDefinition {
     { op: 'move', card: '$target', to: 'discard' },
     { op: 'setState', var: 'activeSuit', value: '$target.suit' },
   ];
-  if (wildAll.length) playEffects.push({ op: 'if', cond: { cardHasTag: 'wild' }, then: [{ op: 'chooseSuit', setState: 'activeSuit' }] });
+  if (wildAll.length || knobs.wildCards.length) playEffects.push({ op: 'if', cond: { cardHasTag: 'wild' }, then: [{ op: 'chooseSuit', setState: 'activeSuit' }] });
 
   const drawEffects: Effect[] = knobs.drawUntilCanPlay && !knobs.canAlwaysDraw
     ? [{ op: 'drawUntilPlayable', from: 'draw' }]
@@ -604,6 +689,9 @@ function buildSheddingDefinition(knobs: Knobs, id: string): GameDefinition {
 
   const cardPoints: Record<string, number | 'rankValue'> = { JOKER: knobs.jokerPoints };
   for (const r of RANKS_13) cardPoints[r] = knobs.perRankPoints[r] ?? 0;
+  // Suits and single cards override the per-rank prices; `default` catches whatever is left.
+  for (const [k, v] of Object.entries(knobs.cardValues)) cardPoints[k] = v;
+  if (knobs.unpricedScoreRankValue) cardPoints.default = 'rankValue';
 
   return {
     schemaVersion: CURRENT_SCHEMA,
@@ -612,14 +700,7 @@ function buildSheddingDefinition(knobs: Knobs, id: string): GameDefinition {
       players: { min: clampInt(knobs.minPlayers, 2, 8), max: clampInt(knobs.maxPlayers, knobs.minPlayers, 8) },
       family: 'shedding-matching',
     },
-    deck: {
-      base: 'standard54',
-      includeJokers: knobs.includeJokers,
-      deckCount: clampInt(knobs.deckCount, 1, 3),
-      excludeRanks: knobs.excludeRanks,
-      rankOrder: RANKS_13,
-      tags,
-    },
+    deck: deckOf(knobs, { tags }),
     zones: [
       { id: 'draw', type: 'pile', ordered: true, faceDown: true, visibility: 'none', shared: true },
       { id: 'discard', type: 'pile', ordered: true, faceDown: false, visibility: 'top-public', shared: true },
@@ -686,6 +767,9 @@ export function knobsFromDefinition(def: GameDefinition): Knobs {
     bustScore: def.scoring.bust != null ? Math.abs(def.scoring.bust) : 200,
     heartsValue: (def.trick?.penaltyPoints?.H as number) ?? 1,
     queenSpadesValue: (def.trick?.penaltyPoints?.SQ as number) ?? 13,
+    penaltyCards: Object.fromEntries(
+      Object.entries(def.trick?.penaltyPoints ?? {}).filter(([k]) => k !== 'H' && k !== 'SQ'),
+    ),
     trumpAuction: !!def.trick?.auction,
     contractAuction: !!def.trick?.numericAuction,
     contractMaxLevel: def.trick?.numericAuction?.maxLevel ?? 7,
@@ -713,6 +797,10 @@ export function knobsFromDefinition(def: GameDefinition): Knobs {
     rummyKnock: def.rummy?.knock !== undefined,
     rummyKnockAt: def.rummy?.knock ?? 10,
     rummyLayOff: !!def.rummy?.layOff,
+    rummyWilds: !!def.rummy?.wilds,
+    rummyMaxWilds: def.rummy?.maxWildsPerMeld ?? 1,
+    rummyGinBonus: def.rummy?.ginBonus ?? 25,
+    rummyUndercutBonus: def.rummy?.undercutBonus ?? 25,
     rummySetMin: def.rummy?.setMin ?? 3,
     rummyRunMin: def.rummy?.runMin ?? 3,
     warRoundCap: def.war?.roundCap ?? 800,
@@ -726,7 +814,11 @@ export function knobsFromDefinition(def: GameDefinition): Knobs {
     handSize: deal?.countPerPlayer ?? 5,
     deckCount: def.deck.deckCount ?? 1,
     excludeRanks: def.deck.excludeRanks ?? [],
+    excludeCards: def.deck.excludeCards ?? [],
+    wildCards: def.deck.tags.wild?.cards ?? [],
     includeJokers: def.deck.includeJokers,
+    jokerCount: def.deck.jokerCount ?? 2,
+    jokerRank: def.trick?.jokerRank ?? 'low',
     matchSuit: hasMatch('suit'),
     matchRank: hasMatch('rank'),
     matchColor: hasMatch('color'),
@@ -749,6 +841,11 @@ export function knobsFromDefinition(def: GameDefinition): Knobs {
     pointTarget: typeof def.scoring.target === 'number' ? def.scoring.target : 100,
     perRankPoints: perRank,
     jokerPoints: typeof cp.JOKER === 'number' ? (cp.JOKER as number) : 50,
+    cardValues: Object.fromEntries(
+      Object.entries(cp).filter(([k, v]) => typeof v === 'number' && k !== 'JOKER' && k !== 'default'
+        && !RANKS_13.includes(k as Rank)),
+    ) as Record<string, number>,
+    unpricedScoreRankValue: cp.default === 'rankValue',
     reflexSlapRanks: def.reflex?.slapRanks ?? ['J'],
     reflexSlapMatch: def.reflex?.slapMatch ?? false,
     pokerHandSize: def.poker?.handSize ?? 5,

@@ -51,10 +51,23 @@ export interface GameDefinition {
     /** Required for base 'attributes'. Order matters only for display. */
     attributes?: { name: string; values: string[] }[];
     includeJokers: boolean;
+    /** Jokers added per copy of the deck when includeJokers is on. Default 2. */
+    jokerCount?: number;
     deckCount?: number;        // how many copies of the deck are shuffled together (default 1)
     excludeRanks?: Rank[];     // ranks removed from the deck entirely (short-deck games)
+    /**
+     * Individual cards removed from the deck, keyed suit-then-rank the same way penaltyPoints
+     * names one card: "SQ" is the queen of spades, "H10" the ten of hearts. Applies to every
+     * copy when deckCount > 1 — a card excluded from the pack is excluded from all of it.
+     */
+    excludeCards?: string[];
     rankOrder: Rank[];
-    tags: Record<string, { ranks: Rank[] }>; // named card sets, e.g. wild -> ["8"]
+    /**
+     * Named card sets. `ranks` catches a whole rank at once ("every 8 is wild"); `cards` names
+     * individual cards by the same suit+rank key as excludeCards ("only the queen of spades").
+     * A card carries the tag if either list matches it.
+     */
+    tags: Record<string, { ranks: Rank[]; cards?: string[] }>;
   };
   zones: ZoneDef[];
   setup: SetupStep[];
@@ -194,6 +207,18 @@ export interface RummyConfig {
   ginBonus?: number;       // extra for knocking with no deadwood at all
   undercutBonus?: number;  // extra to the defender when their deadwood matches or beats the knocker's
   layOff?: boolean;        // the defender's spare cards may extend the knocker's melds before scoring
+
+  /**
+   * Cards tagged 'wild' in the deck stand in for any card a meld is short of — Canasta's
+   * deuces and jokers, Kalooki's jokers.
+   *
+   * Off by default, and deliberately so: finding the best arrangement of a hand becomes a much
+   * larger search once every gap has a filler, and every game that does not want wilds should
+   * not pay for the ones it does not have. `maxWildsPerMeld` keeps the search bounded and the
+   * game honest — a meld of nothing but wilds is not a meld.
+   */
+  wilds?: boolean;
+  maxWildsPerMeld?: number; // default 1, capped at 2
 }
 
 export interface ClimbConfig {
@@ -214,6 +239,19 @@ export interface TrickConfig {
   aceHigh: boolean;            // Ace is the strongest rank (else lowest)
   scoreBy: 'mostTricks' | 'fewestTricks' | 'penalty';
   penaltyPoints?: Record<string, number>; // card rank/suit → points (Hearts-style), for scoreBy: 'penalty'
+  /**
+   * What a joker does in a trick, when the deck has any.
+   *
+   * 'low' is what happens if nothing says otherwise: the joker is not in rankOrder, so it is
+   * the weakest card in the pack and can never take a trick — fine for a game that only wants
+   * jokers as scoring junk, useless for one that wants them to matter.
+   *
+   * 'high' makes the joker the top card of whatever suit was led — it always counts as
+   * following suit, and only trump beats it. 'trump' makes it the top trump, so it beats
+   * everything. Leading a joker in either mode sets the led suit to trump (or, with no trump,
+   * to a suit nobody holds, which leaves the rest of the table free to play anything).
+   */
+  jokerRank?: 'low' | 'high' | 'trump';
   bidding?: boolean;           // players bid tricks before play (Spades); overrides scoreBy with bid scoring
   partnerships?: boolean;      // 4 players in 2 teams (seats 1&3 vs 2&4)
 
