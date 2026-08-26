@@ -697,6 +697,26 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
     prevTrickCount.current = { hand: view.handNumber, total };
   }, [view.tricksWon, view.handNumber, settings]);
 
+  // Pit has no turns, so a trade can land at any moment — a market chime for the whole table,
+  // not just whoever clicked accept. One hand per match here, so unlike tricksWon there is no
+  // hand-number reset to guard against.
+  const prevTrades = useRef<number | null>(null);
+  useEffect(() => {
+    if (!view.tradesCompleted) return;
+    const total = Object.values(view.tradesCompleted).reduce((a, n) => a + n, 0);
+    if (prevTrades.current !== null && total > prevTrades.current) playSound('trade', settings);
+    prevTrades.current = total;
+  }, [view.tradesCompleted, settings]);
+
+  // A war is the one moment in War with any drama to it — worth its own sound rather than
+  // sounding exactly like every other flip.
+  const prevWars = useRef<number | null>(null);
+  useEffect(() => {
+    if (view.warsCount === undefined) return;
+    if (prevWars.current !== null && view.warsCount > prevWars.current) playSound('war', settings);
+    prevWars.current = view.warsCount;
+  }, [view.warsCount, settings]);
+
   // Win sound, and the result that feeds the leaderboards.
   const prevPhase = useRef(view.phase);
   useEffect(() => {

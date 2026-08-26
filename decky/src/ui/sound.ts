@@ -10,18 +10,24 @@ function ac(): AudioContext | null {
   } catch { return null; }
 }
 
-type Kind = 'play' | 'draw' | 'win' | 'ui' | 'trick' | 'slap' | 'shuffle';
+type Kind = 'play' | 'draw' | 'win' | 'ui' | 'trick' | 'slap' | 'shuffle' | 'trade' | 'war';
 
 // 'ui' is the interface talking — a selection, a refusal. Everything else is a card doing
 // something. Two categories, so a player who wants to hear cards land without every click
 // chirping back at them can have exactly that.
-const CARD_KINDS: Kind[] = ['play', 'draw', 'win', 'trick', 'slap', 'shuffle'];
+const CARD_KINDS: Kind[] = ['play', 'draw', 'win', 'trick', 'slap', 'shuffle', 'trade', 'war'];
 
 const NOTES: Record<Kind, number[]> = {
   play: [523], draw: [330], ui: [440], win: [523, 659, 784],
   // A trick swept up: two quick notes falling, distinct from win's climbing three so a
   // trick landing and a hand ending don't read as the same event.
   trick: [659, 494],
+  // A deal closing: two notes rising a fourth, brisk rather than triumphant — Pit's trades
+  // happen constantly, so this has to read as "done" without competing with win's fanfare.
+  trade: [392, 523],
+  // A tie escalating into a war: three low notes climbing, register kept well under win's
+  // bright triad so a standoff and an actual victory never sound like the same thing.
+  war: [196, 233, 277],
   // Percussive rather than musical — see the shorter envelope below. One low thud, the way a
   // hand actually lands on a pile.
   slap: [140],
