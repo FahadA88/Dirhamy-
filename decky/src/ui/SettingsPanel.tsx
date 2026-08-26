@@ -4,6 +4,7 @@ import { useDismissable } from './useEscape';
 import { resetFirstRun } from './FirstRun';
 import { pullSafety, pushSafety, syncCode, useSyncCode } from '../social/safety';
 import { hostInfo } from '../net/host';
+import { ENGINE_CHANGELOG } from '../engine/changelog';
 import {
   ACCENTS, AVATARS, AccentId, BACKS, CardBack, CardFace, CustomBack, CustomFelt, FACES, FELTS,
   MAX_BACK_IMAGE, MyLook, Settings, TableFelt, THEME_PACKS,
@@ -557,6 +558,17 @@ function AboutSection() {
           Nothing here is played for money, and nothing ever will be. Chips, pots and bids in
           the poker-family games are scorekeeping, not currency.
         </p>
+      </Row>
+      <Row label="What's changed" wide keywords="about changelog rules updates history version">
+        <p className="about-p">
+          Rules are data, and data changes. A new game, a rules fix or a scoring change lands
+          here — not every visual tweak, just the ones that change how a game actually plays.
+        </p>
+        <ul className="changelog">
+          {ENGINE_CHANGELOG.map((c, i) => (
+            <li key={i}><span className="cl-date mono">{c.date}</span><span>{c.summary}</span></li>
+          ))}
+        </ul>
       </Row>
     </>
   );

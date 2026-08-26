@@ -1603,6 +1603,17 @@ function resolveTrick(s: MatchState, trickZoneId: string): void {
   for (const play of s.trickPlays) if (value(play.card) > value(winner.card)) winner = play;
   s.tricksWon[winner.player] = (s.tricksWon[winner.player] ?? 0) + 1;
 
+  // Worklist #65: "the engine knows why a trick went the way it did — who was void, what was
+  // trump, what beat what. Replay throws all of it away and shows a list." trickValueOf's own
+  // category (2 = trump, 1 = the suit led, 0 = a discard) already IS that reason; the ordinary
+  // case — highest card of the suit led wins — needs no comment, so only the two genuinely
+  // informative outcomes get one: the trick was taken by trump, or nobody at the table could
+  // even follow the suit that was led.
+  const winCategory = Math.floor(value(winner.card) / 10000);
+  const trickReason = winCategory === 2 ? ' — won it with trump'
+    : winCategory === 0 ? ' — nobody could follow suit'
+    : '';
+
   // Hearts-style penalty points travel to the trick winner.
   if (cfg.scoreBy === 'penalty' && cfg.penaltyPoints) {
     let pts = 0;
@@ -1620,7 +1631,7 @@ function resolveTrick(s: MatchState, trickZoneId: string): void {
   s.trickPlays = [];
   s.lead = null;
   s.turnIndex = s.players.indexOf(winner.player); // winner leads the next trick
-  log(s, null, `${short(winner.player)} takes the trick (${s.tricksWon[winner.player]}).`);
+  log(s, null, `${short(winner.player)} takes the trick (${s.tricksWon[winner.player]})${trickReason}.`);
   s.ply += 1;
   fireRules(s, 'trickWon', { playerId: winner.player, targetCard: winner.card });
 
