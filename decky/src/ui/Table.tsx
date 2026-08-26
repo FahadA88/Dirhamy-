@@ -90,7 +90,10 @@ function describeHint(m: Move, nameOf: (id: string) => string): string {
     case 'callSet': return 'Call that set.';
     case 'setPass': return 'Nothing there — pass.';
     case 'choosePass': return 'Pick a card to pass.';
-    case 'resolveChoice': return `Choose ${m.choice ?? 'a suit'}.`;
+    // Always a suit code (the engine only ever builds resolveChoice for a wild-card suit
+    // pick) — spelled out as a symbol rather than the raw letter, the same as every other
+    // suit shown at the table.
+    case 'resolveChoice': return `Choose ${m.choice ? (SUIT_SYMBOLS[m.choice] ?? m.choice) : 'a suit'}.`;
     case 'solDraw': case 'solDeal': return 'Turn the stock.';
     case 'solRedeal': return 'Go through the stock again.';
     case 'kentSwap': return 'Trade one of yours for one on the table.';
@@ -828,7 +831,21 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
     if (move.actionId === 'bluffClaim' || move.actionId === 'bluffChallenge') playSound('play', settings);
     if (move.actionId === 'reflexSlap') playSound('slap', settings);
     if (move.actionId === 'reflexFlip') playSound('play', settings);
-    setToast(null);
+    // Worklist #62: "the advisor that drives the hint and the bots could mark the moves it
+    // would not have made. In practice mode that is free coaching, and it is not wired up."
+    // matchService already computes this on every move a real person makes (see #59) — practice
+    // mode is the one place it is worth surfacing immediately rather than saving for the end,
+    // since a practice result was never going anywhere but the moment itself.
+    if (practice) {
+      const last = clientRef.current.history().slice(-1)[0];
+      if (last && last.seat === me && last.advisorMove && labelMove(last.move) !== labelMove(last.advisorMove)) {
+        setToast({ text: `Coach: the advisor would have played ${labelMove(last.advisorMove)} instead.`, tone: 'info' });
+      } else {
+        setToast(null);
+      }
+    } else {
+      setToast(null);
+    }
     setSelected(null);
     setAskRank(null);
     setBluffSelected([]);
