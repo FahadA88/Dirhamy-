@@ -14,6 +14,7 @@ import { speak, stopSpeaking, spokenCard } from './speech';
 import { useTurnAlert } from './useTurnAlert';
 import { useDismissable } from './useEscape';
 import { useCardFlights } from './cardFlight';
+import { useCardDrag } from './cardDrag';
 import { service, rememberSession, forgetSession, resumableSession } from '../server/local';
 import { Board, LocalTableClient, TableClient } from '../net/tableClient';
 import { Seat, MoveRecord } from '../server/matchService';
@@ -817,6 +818,7 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
   }, [toast]);
 
   function clickCard(id: string) {
+    if (wasDrag()) return; // the tail end of a drag firing its own synthetic click
     if (!playableCardIds.has(id)) return;
     if (isFish) { const c = view.hand.find((x) => x.id === id); if (c) setAskRank(c.rank); playSound('ui', settings); return; }
     // Kent has nowhere to play a card TO: a card leaves your hand only by being traded for one
@@ -826,6 +828,21 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
     if (playActionId === 'climbPlay') { submit({ actionId: 'climbPlay', cards: [id] }); return; }
     submit({ actionId: playActionId, cardId: id });
   }
+
+  // Worklist #53: a card can also be played by dragging it toward the table, not only by
+  // tapping it. Disabled for Fish (a tap there picks a rank to ask for, not a card to play) and
+  // Kent (a tap picks a card to trade for one on the table — there is nowhere "up" to drag it
+  // to). Confirms the exact move a tap on the same card would have — deliberately skipping the
+  // confirmPlays double-tap setting, since finishing a drag already took a deliberate motion a
+  // misclick could never produce by accident.
+  const { ghost: dragGhost, startDrag, wasDrag } = useCardDrag(
+    !isFish && !isKent,
+    (id) => {
+      if (!playableCardIds.has(id)) return;
+      if (playActionId === 'climbPlay') { submit({ actionId: 'climbPlay', cards: [id] }); return; }
+      submit({ actionId: playActionId, cardId: id });
+    },
+  );
 
   const hand = useMemo(() => sortHand(view.hand, def, settings.sort), [view.hand, def, settings.sort]);
   const top = view.zones.discard?.cards[0];
@@ -1790,10 +1807,11 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
                 style={{ '--i': i, '--n': hand.length } as React.CSSProperties}
                 tabIndex={playable ? (isCursor ? 0 : -1) : -1}
                 aria-label={cardLabel(c, playable, staged ? 'picked to pass' : undefined)}
-                className={`card-btn ${playable ? 'playable' : 'dim'} ${staged ? 'staged' : ''} ${hint === c.id ? 'hinted' : ''} ${(isFish ? c.rank === askRank : selected === c.id) ? 'selected' : ''}`}
+                className={`card-btn ${playable ? 'playable' : 'dim'} ${staged ? 'staged' : ''} ${hint === c.id ? 'hinted' : ''} ${(isFish ? c.rank === askRank : selected === c.id) ? 'selected' : ''} ${dragGhost?.cardId === c.id ? 'drag-source' : ''}`}
                 disabled={!playable}
                 onFocus={() => { if (idx >= 0) setCursor(idx); }}
                 onClick={() => clickCard(c.id)}
+                onPointerDown={playable ? (e) => startDrag(e, c.id) : undefined}
                 title={staged ? 'Picked to pass' : playable ? (isFish ? 'Pick this rank to ask for' : view.needsPassChoice ? 'Give this card away' : settings.confirmPlays && selected !== c.id ? 'Click to select' : 'Play this card') : capitalize(dimReason(c))}
               >
                 <CardFace card={c} />
@@ -1954,6 +1972,19 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
           the hook, so nothing ever hands React a child it did not create. Inside .table, which
           isolates, so a card in flight covers the felt and never a dialog over it. */}
       <div className="flight-layer" aria-hidden="true" />
+      {/* The card actually following the pointer while a drag is in progress — see cardDrag.ts.
+          Fixed to the viewport, not the felt, since it tracks clientX/clientY. */}
+      {dragGhost && (
+        <div
+          className="drag-ghost"
+          aria-hidden="true"
+          style={{
+            left: dragGhost.x, top: dragGhost.y,
+            width: dragGhost.width, height: dragGhost.height,
+          } as React.CSSProperties}
+          dangerouslySetInnerHTML={{ __html: dragGhost.html }}
+        />
+      )}
     </div>
 
       {handoff && (
