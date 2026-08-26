@@ -4617,9 +4617,22 @@ button.primary.lg { padding: 13px 28px; font-size: 15.5px; border-radius: 999px;
 .dg-card.no b { background: var(--red, #e5484d); }
 .dg-card.no .card { opacity: 0.5; }
 
+/* Worklist #61: a choice is a real button now, not a label — reset to plain, then let it pick
+   up .dg-card's own layout and only add back what a button needs (a pointer, a focus ring). */
+.dg-choice {
+  background: none; border: 1px solid transparent; border-radius: 8px; padding: 4px;
+  font: inherit; color: inherit; cursor: pointer; transition: border-color 140ms, transform 140ms;
+}
+.dg-choice:hover:not([aria-pressed="true"]) { border-color: var(--panel-brd); transform: translateY(-2px); }
+.dg-choice:focus-visible { outline: 2px solid var(--emerald); outline-offset: 2px; }
+.dg-choice[aria-pressed="true"] { cursor: default; }
+
 .dg-panel figcaption {
   margin-block-start: 7px; text-align: center; font-size: 12.5px; line-height: 1.45; color: var(--muted);
 }
+.dg-verdict.yes { color: var(--lime, #4ade80); font-weight: 600; }
+.dg-verdict.no { color: var(--red, #e5484d); font-weight: 600; }
+.dg-again { display: block; margin: 8px auto 0; }
 
 @media (max-width: 560px) {
   .dg-card { inline-size: 66px; }

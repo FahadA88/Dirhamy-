@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Card, GameDefinition } from '../engine/types';
 import { CardFace } from './Card';
 
@@ -179,41 +180,76 @@ function suitWord(s: string): string {
   return ({ C: 'clubs', D: 'diamonds', H: 'hearts', S: 'spades' } as Record<string, string>)[s] ?? s;
 }
 
+/*
+  Worklist #61: "Rules are read, never played... None has a scripted three-card position you can
+  actually play, which is how anybody has ever learnt a trick game." The panel below already had
+  everything a real teaching moment needs — a scripted position and, per card, whether it is
+  legal and why — it just showed the answer before anyone had made a choice. Now it asks first: a
+  choice is a real button, the verdict stays hidden until one is tapped, and only the card tapped
+  is marked right there — same as a real trick, where you find out what you played before you see
+  what everyone else did.
+*/
+function DiagramPanel({ p }: { p: Panel }) {
+  const [picked, setPicked] = useState<number | null>(null);
+  const answer = picked !== null ? p.choices?.[picked] : undefined;
+
+  return (
+    <figure className="dg-panel">
+      <div className="dg-row">
+        <div className="dg-board">
+          {p.board.map((b, j) => (
+            <span key={j} className="dg-card">
+              <CardFace card={b.card} />
+              {b.label && <em>{b.label}</em>}
+            </span>
+          ))}
+        </div>
+        {p.choices && (
+          <>
+            <span className="dg-arrow" aria-hidden="true">↓</span>
+            <div className="dg-choices">
+              {p.choices.map((ch, j) => {
+                const isPicked = picked === j;
+                return (
+                  <button
+                    key={j}
+                    type="button"
+                    className={`dg-card dg-choice ${isPicked ? (ch.ok ? 'yes' : 'no') : ''}`}
+                    aria-label={`Play ${ch.card.rank} of ${ch.card.suit}`}
+                    aria-pressed={isPicked}
+                    onClick={() => setPicked(j)}
+                  >
+                    <CardFace card={ch.card} />
+                    {isPicked && <b aria-hidden="true">{ch.ok ? '✓' : '✕'}</b>}
+                  </button>
+                );
+              })}
+            </div>
+          </>
+        )}
+      </div>
+      <figcaption>
+        {p.caption}
+        {answer && (
+          <span className={`dg-verdict ${answer.ok ? 'yes' : 'no'}`}>
+            {' '}{answer.ok ? 'Right' : 'Not quite'} — {answer.why}.
+          </span>
+        )}
+      </figcaption>
+      {picked !== null && (
+        <button type="button" className="ghost sm dg-again" onClick={() => setPicked(null)}>Try again</button>
+      )}
+    </figure>
+  );
+}
+
 export function GameDiagram({ def }: { def: GameDefinition }) {
   const panels = panelsFor(def);
   if (panels.length === 0) return null;
 
   return (
     <div className="diagram">
-      {panels.map((p, i) => (
-        <figure key={i} className="dg-panel">
-          <div className="dg-row">
-            <div className="dg-board">
-              {p.board.map((b, j) => (
-                <span key={j} className="dg-card">
-                  <CardFace card={b.card} />
-                  {b.label && <em>{b.label}</em>}
-                </span>
-              ))}
-            </div>
-            {p.choices && (
-              <>
-                <span className="dg-arrow" aria-hidden="true">↓</span>
-                <div className="dg-choices">
-                  {p.choices.map((ch, j) => (
-                    <span key={j} className={`dg-card ${ch.ok ? 'yes' : 'no'}`}>
-                      <CardFace card={ch.card} />
-                      <b aria-hidden="true">{ch.ok ? '✓' : '✕'}</b>
-                      <em>{ch.why}</em>
-                    </span>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
-          <figcaption>{p.caption}</figcaption>
-        </figure>
-      ))}
+      {panels.map((p, i) => <DiagramPanel key={i} p={p} />)}
     </div>
   );
 }
