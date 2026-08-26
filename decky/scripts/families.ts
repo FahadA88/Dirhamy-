@@ -52,6 +52,12 @@ section('Bluff — claim, challenge, reveal (Bluff)');
   check('the caught liar is tallied', s.bluffCaught['A'] === 1 && s.bluffCaught['B'] === 0);
   check('the correct challenger is tallied', s.bluffCalled['B'] === 1 && s.bluffCalled['A'] === 0);
   check('the tally reaches the redacted view', redact(s, 'A').bluffCaught?.A === 1 && redact(s, 'A').bluffCalled?.B === 1);
+  check('the reveal names the lie for what it was',
+    s.lastReveal?.wasTrue === false && s.lastReveal?.claimant === 'A' && s.lastReveal?.challenger === 'B');
+  check('the reveal carries the actual card, not just the verdict',
+    s.lastReveal?.cards.length === 1 && s.lastReveal?.cards[0].id === 'H2' && s.lastReveal?.cards[0].rank === '2');
+  check('the reveal is public — everyone\'s redacted view carries it',
+    redact(s, 'B').lastReveal?.cards[0].id === 'H2');
 
   // A truthful claim survives a challenge, and going out cleanly wins.
   let t: MatchState = createMatch(bluff, P, 2);
@@ -66,6 +72,8 @@ section('Bluff — claim, challenge, reveal (Bluff)');
   check('a truthful claim survives the challenge', t.phase === 'roundOver' && t.winner === 'A');
   check('the wrongful challenger, not the truthful claimant, was penalised',
     (t.zones['hand:B'] || []).length === 2);
+  check('a true claim reveals as true, not a caught lie',
+    t.lastReveal?.wasTrue === true && t.lastReveal?.cards[0].rank === 'K');
   check('a wrongful challenge tallies neither a catch nor a correct call',
     t.bluffCaught['A'] === 0 && t.bluffCaught['B'] === 0 && t.bluffCalled['A'] === 0 && t.bluffCalled['B'] === 0);
 }

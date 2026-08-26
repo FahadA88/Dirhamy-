@@ -109,6 +109,7 @@ export function createMatch(
     pendingClaim: null,
     bluffCaught: Object.fromEntries(players.map((p) => [p, 0])),
     bluffCalled: Object.fromEntries(players.map((p) => [p, 0])),
+    lastReveal: null,
     reflexOut: [],
     chips: def.poker
       ? Object.fromEntries(players.map((p) => [p, carry?.chips?.[p] ?? def.poker!.startingChips]))
@@ -608,6 +609,7 @@ function cloneState(state: MatchState): MatchState {
     pendingClaim: state.pendingClaim ? { ...state.pendingClaim, cardIds: state.pendingClaim.cardIds.slice() } : null,
     bluffCaught: { ...state.bluffCaught },
     bluffCalled: { ...state.bluffCalled },
+    lastReveal: state.lastReveal ? { ...state.lastReveal, cards: state.lastReveal.cards.map((c) => ({ ...c })) } : null,
     reflexOut: state.reflexOut.slice(),
     chips: { ...state.chips },
     committed: { ...state.committed },
@@ -2907,6 +2909,9 @@ function applyBluffMove(s: MatchState, playerId: string, move: Move): MatchState
     const disputed = pile.filter((c) => claim.cardIds.includes(c.id));
     const claimWasTrue = disputed.length === claim.count && disputed.every((c) => c.rank === claim.claimedRank);
     const loser = claimWasTrue ? playerId : claim.player;
+    // The cards themselves, not just the verdict — the reveal is the moment the log line
+    // can't carry, and the pile they're sitting in is about to be swept into the loser's hand.
+    s.lastReveal = { claimant: claim.player, challenger: playerId, claimedRank: claim.claimedRank, cards: disputed.map((c) => ({ ...c })), wasTrue: claimWasTrue, ply: s.ply };
     if (!claimWasTrue) {
       s.bluffCaught[claim.player] = (s.bluffCaught[claim.player] ?? 0) + 1;
       s.bluffCalled[playerId] = (s.bluffCalled[playerId] ?? 0) + 1;
@@ -3786,6 +3791,7 @@ export function redact(state: MatchState, viewer: string): RedactedState {
       : undefined,
     bluffCaught: state.definition.bluff ? { ...state.bluffCaught } : undefined,
     bluffCalled: state.definition.bluff ? { ...state.bluffCalled } : undefined,
+    lastReveal: state.definition.bluff ? state.lastReveal : undefined,
     // reflex
     pileTop: state.definition.reflex ? (topCard(state.zones[reflexPileZone(def)] || []) ?? null) : undefined,
     slapValid: state.definition.reflex ? reflexSlapValid(state) : undefined,

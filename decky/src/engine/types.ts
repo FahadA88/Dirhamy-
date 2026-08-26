@@ -606,6 +606,9 @@ export interface MatchState {
   // of the same event, tallied for whoever it happened to.
   bluffCaught: Record<string, number>;
   bluffCalled: Record<string, number>;
+  // bluff: what a challenge just turned up — the actual cards, face up, and whether the claim
+  // held. Persists until the next challenge resolves, the same way lastBattle sits between wars.
+  lastReveal: { claimant: string; challenger: string; claimedRank: string; cards: Card[]; wasTrue: boolean; ply: number } | null;
   // reflex: who has been eliminated (hand empty), in elimination order — last remaining wins.
   reflexOut: string[];
   // poker: chip stacks, the pot, and betting-round bookkeeping.
@@ -748,6 +751,8 @@ export interface RedactedState {
   pendingClaim?: { player: string; count: number; claimedRank: string } | null;
   bluffCaught?: Record<string, number>;  // lies caught, per liar
   bluffCalled?: Record<string, number>;  // correct challenges made, per challenger
+  /** What the last challenge turned up — public the moment it resolves, same as the real game. */
+  lastReveal?: { claimant: string; challenger: string; claimedRank: string; cards: Card[]; wasTrue: boolean; ply: number } | null;
   // reflex
   pileTop?: Card | null;
   slapValid?: boolean;                // true iff a slap would currently succeed for THIS viewer

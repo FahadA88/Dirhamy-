@@ -1295,6 +1295,25 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
               <b>{view.pendingClaim.count} × {view.pendingClaim.claimedRank}</b>
             </div>
           )}
+          {/* The moment the log line couldn't carry: the actual cards, face up, and the verdict.
+              The wrapper itself is NOT keyed on ply — it used to be, and at a fast enough bot
+              pace (two challenges inside 220ms) that tore the cards' DOM nodes down mid-flight,
+              leaving the flying-card layer's settle() animating an element already detached and
+              the reveal permanently invisible. The cards are real cards (data-flight) and the
+              flight layer already knows how to animate a genuinely new one arriving — keying
+              only the verdict text on ply is enough to replay its own pop each time. */}
+          {view.lastReveal && (
+            <div className={`bluff-reveal ${view.lastReveal.wasTrue ? 'true' : 'lie'}`}>
+              <div className="bluff-reveal-cards">
+                {view.lastReveal.cards.map((c) => (<CardFace key={c.id} card={c} />))}
+              </div>
+              <div key={view.lastReveal.ply} className="bluff-reveal-verdict">
+                <b>{view.lastReveal.wasTrue ? 'True' : 'Lie'}</b>
+                {' — '}
+                {view.lastReveal.claimant === me ? 'you' : nameOf(view.lastReveal.claimant)} claimed {view.lastReveal.claimedRank}
+              </div>
+            </div>
+          )}
           {myLegal.some((m) => m.actionId === 'bluffChallenge') && (
             <button className="primary bluff-challenge" onClick={() => submit({ actionId: 'bluffChallenge' })}>
               🤨 Call bluff!
