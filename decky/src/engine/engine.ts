@@ -106,6 +106,8 @@ export function createMatch(
     ply: 0,
     bonus: {},
     pendingClaim: null,
+    bluffCaught: Object.fromEntries(players.map((p) => [p, 0])),
+    bluffCalled: Object.fromEntries(players.map((p) => [p, 0])),
     reflexOut: [],
     chips: def.poker
       ? Object.fromEntries(players.map((p) => [p, carry?.chips?.[p] ?? def.poker!.startingChips]))
@@ -117,6 +119,7 @@ export function createMatch(
     actedThisRound: {},
     pokerPhase: 'bet',
     market: [],
+    tradesCompleted: Object.fromEntries(players.map((p) => [p, 0])),
     kentTell: null,
     kentLetters: {},
     nextOfferId: 1,
@@ -601,12 +604,15 @@ function cloneState(state: MatchState): MatchState {
     climbBombDeclined: { ...state.climbBombDeclined },
     faceUp: { ...state.faceUp },
     pendingClaim: state.pendingClaim ? { ...state.pendingClaim, cardIds: state.pendingClaim.cardIds.slice() } : null,
+    bluffCaught: { ...state.bluffCaught },
+    bluffCalled: { ...state.bluffCalled },
     reflexOut: state.reflexOut.slice(),
     chips: { ...state.chips },
     committed: { ...state.committed },
     folded: { ...state.folded },
     actedThisRound: { ...state.actedThisRound },
     market: state.market.map((o) => ({ ...o })),
+    tradesCompleted: { ...state.tradesCompleted },
     // Kent's tell and its letters are state like everything else here: shared by reference they
     // would leak across a take-back and across a replay, which is exactly what this clone
     // exists to stop.
@@ -2898,6 +2904,10 @@ function applyBluffMove(s: MatchState, playerId: string, move: Move): MatchState
     const disputed = pile.filter((c) => claim.cardIds.includes(c.id));
     const claimWasTrue = disputed.length === claim.count && disputed.every((c) => c.rank === claim.claimedRank);
     const loser = claimWasTrue ? playerId : claim.player;
+    if (!claimWasTrue) {
+      s.bluffCaught[claim.player] = (s.bluffCaught[claim.player] ?? 0) + 1;
+      s.bluffCalled[playerId] = (s.bluffCalled[playerId] ?? 0) + 1;
+    }
     log(s, playerId, claimWasTrue
       ? `${short(playerId)} called it — but ${short(claim.player)} was telling the truth about the ${claim.claimedRank}s. ${short(playerId)} takes the pile (${pile.length}).`
       : `${short(playerId)} called it — ${short(claim.player)} was lying about the ${claim.claimedRank}s. ${short(claim.player)} takes the pile (${pile.length}).`);
@@ -3306,6 +3316,8 @@ function applyPitMove(s: MatchState, playerId: string, move: Move): MatchState {
     s.zones[`hand:${playerId}`] = hand.filter((c) => !give.includes(c)).concat(get);
     s.zones[`hand:${offer.player}`] = theirHand.filter((c) => !get.includes(c)).concat(give);
     s.market = s.market.filter((o) => o.id !== offer.id);
+    s.tradesCompleted[playerId] = (s.tradesCompleted[playerId] ?? 0) + 1;
+    s.tradesCompleted[offer.player] = (s.tradesCompleted[offer.player] ?? 0) + 1;
     log(s, playerId, `${short(playerId)} trades ${suitCount(offer.count, offer.want)} with ${short(offer.player)} for ${suitWord(offer.give)}.`);
     if (pitCheckWin(s)) return s;
     return s;
@@ -3768,6 +3780,8 @@ export function redact(state: MatchState, viewer: string): RedactedState {
     pendingClaim: state.definition.bluff
       ? (state.pendingClaim ? { player: state.pendingClaim.player, count: state.pendingClaim.count, claimedRank: state.pendingClaim.claimedRank } : null)
       : undefined,
+    bluffCaught: state.definition.bluff ? { ...state.bluffCaught } : undefined,
+    bluffCalled: state.definition.bluff ? { ...state.bluffCalled } : undefined,
     // reflex
     pileTop: state.definition.reflex ? (topCard(state.zones[reflexPileZone(def)] || []) ?? null) : undefined,
     slapValid: state.definition.reflex ? reflexSlapValid(state) : undefined,
@@ -3786,6 +3800,7 @@ export function redact(state: MatchState, viewer: string): RedactedState {
       : undefined,
     // pit
     market: state.definition.pit ? state.market.map((o) => ({ ...o })) : undefined,
+    tradesCompleted: state.definition.pit ? { ...state.tradesCompleted } : undefined,
     cornerSize: state.definition.pit ? pitCorner(state) : undefined,
     // kent: the middle of the table is face up to everybody by definition, the tell is the
     // whole point of the game being visible, and the letters are written down in front of

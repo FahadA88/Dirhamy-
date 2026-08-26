@@ -600,6 +600,10 @@ export interface MatchState {
   moveCount: number;                     // solitaire: moves made, for scoring/stats
   // bluff: the most recent claim, open to challenge until superseded by the next one.
   pendingClaim: { player: string; count: number; claimedRank: string; cardIds: string[] } | null;
+  // bluff: lies caught (per liar) and correct challenges made (per challenger) — the two halves
+  // of the same event, tallied for whoever it happened to.
+  bluffCaught: Record<string, number>;
+  bluffCalled: Record<string, number>;
   // reflex: who has been eliminated (hand empty), in elimination order — last remaining wins.
   reflexOut: string[];
   // poker: chip stacks, the pot, and betting-round bookkeeping.
@@ -613,6 +617,7 @@ export interface MatchState {
   // pit: open offers on the market. Any player may post or accept one at any time.
   market: { id: number; player: string; give: Suit; count: number; want: Suit }[];
   nextOfferId: number;
+  tradesCompleted: Record<string, number>; // pit: trades each player has made, either side counted
   // kent: the tell currently showing, and how many letters each pair has spelt.
   kentTell: { player: string; ply: number } | null;
   kentLetters: Record<string, number>;
@@ -738,6 +743,8 @@ export interface RedactedState {
   // actual cards under it stay hidden until a challenge reveals them.
   centerCount?: number;               // cards face-down in the center pile right now
   pendingClaim?: { player: string; count: number; claimedRank: string } | null;
+  bluffCaught?: Record<string, number>;  // lies caught, per liar
+  bluffCalled?: Record<string, number>;  // correct challenges made, per challenger
   // reflex
   pileTop?: Card | null;
   slapValid?: boolean;                // true iff a slap would currently succeed for THIS viewer
@@ -751,6 +758,7 @@ export interface RedactedState {
   showdown?: { player: string; cards: Card[]; label: string }[]; // revealed only once the hand ends
   // pit
   market?: { id: number; player: string; give: Suit; count: number; want: Suit }[];
+  tradesCompleted?: Record<string, number>;
   /** kent: the face-up pool, whose seat is showing a tell, and the letters each pair has. */
   kentPool?: Card[];
   kentTell?: { player: string } | null;

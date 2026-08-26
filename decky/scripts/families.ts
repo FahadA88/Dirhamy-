@@ -48,6 +48,9 @@ section('Bluff — claim, challenge, reveal (Bluff)');
   check('the liar takes the pile back', (s.zones['hand:A'] || []).some((c) => c.id === 'H2'));
   check('the truthful challenger is not penalised', (s.zones['hand:B'] || []).length === 1);
   check('the liar leads next', s.players[s.turnIndex] === 'A');
+  check('the caught liar is tallied', s.bluffCaught['A'] === 1 && s.bluffCaught['B'] === 0);
+  check('the correct challenger is tallied', s.bluffCalled['B'] === 1 && s.bluffCalled['A'] === 0);
+  check('the tally reaches the redacted view', redact(s, 'A').bluffCaught?.A === 1 && redact(s, 'A').bluffCalled?.B === 1);
 
   // A truthful claim survives a challenge, and going out cleanly wins.
   let t: MatchState = createMatch(bluff, P, 2);
@@ -62,6 +65,8 @@ section('Bluff — claim, challenge, reveal (Bluff)');
   check('a truthful claim survives the challenge', t.phase === 'roundOver' && t.winner === 'A');
   check('the wrongful challenger, not the truthful claimant, was penalised',
     (t.zones['hand:B'] || []).length === 2);
+  check('a wrongful challenge tallies neither a catch nor a correct call',
+    t.bluffCaught['A'] === 0 && t.bluffCaught['B'] === 0 && t.bluffCalled['A'] === 0 && t.bluffCalled['B'] === 0);
 }
 
 // ---------- Reflex: a slap wins the pile, and a stalled flip skips ----------
@@ -137,6 +142,9 @@ section('Pit — the market has no turn order (Pit)');
   s = applyMove(s, 'B', { actionId: 'pitAccept', offerId: 1 });
   check('the swap actually happened', (s.zones['hand:A'] || []).filter((c) => c.suit === 'D').length === 2);
   check('and the offer is gone', s.market.length === 0);
+  check('both sides of the trade are tallied', s.tradesCompleted['A'] === 1 && s.tradesCompleted['B'] === 1);
+  check('a player who traded nothing has none', s.tradesCompleted['C'] === 0);
+  check('the tally reaches the redacted view', redact(s, 'A').tradesCompleted?.A === 1);
 }
 
 // ---------- Contract auction: a bid must beat the last, and a promise is scored ----------

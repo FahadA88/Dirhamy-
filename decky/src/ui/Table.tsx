@@ -126,7 +126,7 @@ const SHAPE_NAME: Record<number, string> = { 1: 'single', 2: 'pair', 3: 'triple'
  * something different in each. Returns null for families where no single number stands out —
  * a made-up statistic is worse than none.
  */
-function highlightOf(view: RedactedState, me: string): { key: string; label: string; value: number } | null {
+function highlightOf(view: RedactedState, me: string, def: GameDefinition): { key: string; label: string; value: number } | null {
   if (view.mode === 'poker') {
     const chips = view.chips?.[me];
     if (typeof chips === 'number') return { key: 'poker-chips', label: 'Biggest stack', value: chips };
@@ -143,8 +143,30 @@ function highlightOf(view: RedactedState, me: string): { key: string; label: str
     const b = view.booksWon?.[me];
     if (typeof b === 'number' && b > 0) return { key: 'books', label: 'Most books', value: b };
   }
-  const score = view.matchScores?.[me] ?? view.scores?.[me];
-  if (typeof score === 'number' && score > 0) return { key: 'score', label: 'Best score', value: score };
+  if (view.mode === 'bluff') {
+    const called = view.bluffCalled?.[me];
+    if (typeof called === 'number' && called > 0) return { key: 'bluffs-called', label: 'Bluffs called', value: called };
+  }
+  if (view.mode === 'pit') {
+    const trades = view.tradesCompleted?.[me];
+    if (typeof trades === 'number' && trades > 0) return { key: 'pit-trades', label: 'Trades made', value: trades };
+  }
+  if (view.mode === 'kent') {
+    // Letters live per pair, not per player — a seat's own team is the even/odd half of the
+    // seating order, the same rule kentTeamOf uses server-side (partners sit opposite).
+    const myIdx = view.players.findIndex((p) => p.id === me);
+    const team = myIdx % 2 === 0 ? 'A' : 'B';
+    const letters = view.kentLetters?.[team];
+    if (typeof letters === 'number' && letters > 0) return { key: 'kent-letters', label: 'Letters spelled toward KENT', value: letters };
+  }
+  // Every other family falls back to the raw score — but only where a bigger score is the
+  // thing worth bragging about. Climb (finish position: 1 = first out) and lowest-wins rummy
+  // (cards left in hand) both score in the OPPOSITE direction, so this used to file a
+  // last-place finish or a hand full of unmelded cards as somebody's "Best score".
+  if (def.scoring.winner === 'highestTotal') {
+    const score = view.matchScores?.[me] ?? view.scores?.[me];
+    if (typeof score === 'number' && score > 0) return { key: 'score', label: 'Best score', value: score };
+  }
   return null;
 }
 
@@ -702,7 +724,7 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
         youWon: isKent
           ? !!winner && teamOf(winner) === teamOf(me)
           : !!winner && localSeats.includes(winner),
-        highlight: highlightOf(view, me),
+        highlight: highlightOf(view, me, def),
         practice,
       });
     }
@@ -1000,6 +1022,12 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
                   <span className="seat-stat">{view.tricksWon?.[p.id]}<i>won</i></span>
                 )}
                 {isFish && <span className="seat-stat">{view.booksWon?.[p.id] ?? 0}<i>books</i></span>}
+                {view.mode === 'bluff' && (view.bluffCaught?.[p.id] ?? 0) > 0 && (
+                  <span className="seat-stat">{view.bluffCaught![p.id]}<i>caught</i></span>
+                )}
+                {isPit && (view.tradesCompleted?.[p.id] ?? 0) > 0 && (
+                  <span className="seat-stat">{view.tradesCompleted![p.id]}<i>trades</i></span>
+                )}
                 {view.mode === 'climb' && view.finished?.includes(p.id) && (
                   <span className="seat-stat">#{view.finished.indexOf(p.id) + 1}<i>out</i></span>
                 )}
