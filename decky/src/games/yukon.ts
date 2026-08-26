@@ -31,7 +31,14 @@ export const yukon: GameDefinition = {
   actions: [], triggers: [], endConditions: [],
   scoring: { mode: 'lowestPoints', winner: 'lowestTotal', cardPoints: {}, target: null },
   solitaire: {
-    decks: 1, columns: 7, deal: 'triangle', faceUp: 'top',
+    decks: 1, columns: 7,
+    // Yukon's own shape: 1, 6, 7, 8, 9, 10, 11 — all fifty-two on the table. A staircase deal
+    // would leave twenty-four cards in a stock this game has no way to reach.
+    deal: 'yukon', faceUp: 'top',
+    // And five turned up per column, not one. That is the whole game: you are looking at
+    // thirty-one cards from the start and the problem is the order they are in, not what they
+    // are. Showing a single card per column made it unwinnable rather than hard.
+    faceUpCount: 5,
     build: 'alt-color',
     // The move the game is named for: lift any face-up card with the whole pile on top of it,
     // however badly ordered, and drop the lot where the bottom card fits.

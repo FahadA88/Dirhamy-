@@ -654,9 +654,19 @@ export function CreateView({ onPlay }: { onPlay?: (def: GameDefinition) => void 
               <label className="field"><span>Tableau columns: <b>{knobs.solColumns}</b></span>
                 <input type="range" min={4} max={12} value={knobs.solColumns} onChange={(e) => set('solColumns', +e.target.value)} /></label>
               <div className="field"><span>Deal shape</span>
-                <Seg options={[['triangle', 'Staircase (1,2,3…)'], ['even', 'Even split']]} value={knobs.solDeal} onChange={(v) => set('solDeal', v)} /></div>
+                <Seg options={[['triangle', 'Staircase (1,2,3…)'], ['even', 'Even split'], ['yukon', "Yukon's (1, 6, 7, 8…)"]]} value={knobs.solDeal} onChange={(v) => set('solDeal', v)} /></div>
+              {knobs.solDeal === 'yukon' && (
+                <span className="mini-label">One card in the first column, then every column gets its buried cards plus five more — which uses the whole pack, so there is nothing left for a stock.</span>
+              )}
               <div className="field"><span>Face up</span>
-                <Seg options={[['top', 'Only the bottom of each column'], ['all', 'Everything']]} value={knobs.solFaceUp} onChange={(v) => set('solFaceUp', v)} /></div>
+                <Seg options={[['top', 'Only the top of each column'], ['all', 'Everything']]} value={knobs.solFaceUp} onChange={(v) => set('solFaceUp', v)} /></div>
+              {knobs.solFaceUp === 'top' && (
+                <label className="field"><span>Cards showing per column: <b>{knobs.solFaceUpCount}</b></span>
+                  <input type="range" min={1} max={8} value={knobs.solFaceUpCount} onChange={(e) => set('solFaceUpCount', +e.target.value)} /></label>
+              )}
+              {knobs.solFaceUp === 'top' && knobs.solFaceUpCount > 1 && (
+                <span className="mini-label">More cards showing is a much easier game — you can see the problem instead of guessing at it. Yukon shows five.</span>
+              )}
               <div className="field"><span>Number of decks</span>
                 <Seg options={[[1, 'One'], [2, 'Two']]} value={knobs.solDecks} onChange={(v) => set('solDecks', v)} /></div>
             </Section>
@@ -669,13 +679,21 @@ export function CreateView({ onPlay }: { onPlay?: (def: GameDefinition) => void 
                   <button className={knobs.solBuild === 'alt-color' ? 'on' : ''} onClick={() => set('solBuild', 'alt-color')}>One higher, other colour</button>
                   <button className={knobs.solBuild === 'same-suit' ? 'on' : ''} onClick={() => set('solBuild', 'same-suit')}>One higher, same suit</button>
                   <button className={knobs.solBuild === 'down-any' ? 'on' : ''} onClick={() => set('solBuild', 'down-any')}>One higher, any suit</button>
+                  <button className={knobs.solBuild === 'up-or-down' ? 'on' : ''} onClick={() => set('solBuild', 'up-or-down')}>One either way, any suit</button>
                 </div></div>
+              <label className="field row"><input type="checkbox" checked={knobs.solWrap} onChange={(e) => set('solWrap', e.target.checked)} />
+                <span>The order joins up — a King sits next to an Ace</span></label>
+              <span className="mini-label">Without this, Kings and Aces are dead ends. With it a chain can always be continued, which turns a game of luck into a game of choices.</span>
               <div className="field"><span>You may pick up…</span>
                 <div className="seg wrap">
                   <button className={knobs.solMoveRun === 'single' ? 'on' : ''} onClick={() => set('solMoveRun', 'single')}>One card</button>
                   <button className={knobs.solMoveRun === 'built' ? 'on' : ''} onClick={() => set('solMoveRun', 'built')}>A properly built run</button>
                   <button className={knobs.solMoveRun === 'same-suit' ? 'on' : ''} onClick={() => set('solMoveRun', 'same-suit')}>A same-suit run only</button>
+                  <button className={knobs.solMoveRun === 'any' ? 'on' : ''} onClick={() => set('solMoveRun', 'any')}>Any card, and everything on it</button>
                 </div></div>
+              {knobs.solMoveRun === 'any' && (
+                <span className="mini-label">Yukon's move: lift a face-up card with the whole untidy pile sitting on top of it, and drop the lot wherever the bottom card fits.</span>
+              )}
               <div className="field"><span>An empty column takes</span>
                 <Seg options={[['any', 'Any card'], ['king', 'A King only'], ['none', 'Nothing']]} value={knobs.solEmpty} onChange={(v) => set('solEmpty', v)} /></div>
               <label className="field"><span>Free cells: <b>{knobs.solFreeCells}</b></span>
@@ -688,10 +706,38 @@ export function CreateView({ onPlay }: { onPlay?: (def: GameDefinition) => void 
 
           {knobs.family === 'solitaire' && (
             <Section title="Finishing & stock" defaultOpen>
-              <label className="field"><span>Foundations: <b>{knobs.solFoundations}</b></span>
-                <input type="range" min={1} max={8} value={knobs.solFoundations} onChange={(e) => set('solFoundations', +e.target.value)} /></label>
-              <label className="field row"><Switch on={knobs.solAutoRuns} onChange={(v) => set('solAutoRuns', v)} />
-                <span>Runs clear themselves — finish a King-to-Ace suit run on the table and it leaves the board (Spider)</span></label>
+              <label className="field row"><Switch on={knobs.solWasteIsTarget} onChange={(v) => set('solWasteIsTarget', v)} />
+                <span>Win by clearing the table — cards are played onto the waste, not off it (Golf)</span></label>
+              <span className="mini-label">
+                {knobs.solWasteIsTarget
+                  ? 'This turns the game inside out: there are no foundations, the waste is the only place a card can go, and columns are never built on. Pair it with "one either way" and a joined-up order.'
+                  : 'Off, the waste is somewhere cards come back from and the foundations are what you fill.'}
+              </span>
+              {!knobs.solWasteIsTarget && (
+                <label className="field"><span>Foundations: <b>{knobs.solFoundations}</b></span>
+                  <input type="range" min={1} max={8} value={knobs.solFoundations} onChange={(e) => set('solFoundations', +e.target.value)} /></label>
+              )}
+              {!knobs.solWasteIsTarget && (
+                <label className="field row"><Switch on={knobs.solDealtBase} onChange={(v) => set('solDealtBase', v)} />
+                  <span>The foundations start from a card turned up at the deal, not from the Aces (Canfield)</span></label>
+              )}
+              {!knobs.solWasteIsTarget && knobs.solDealtBase && (
+                <span className="mini-label">Whatever rank comes up decides it for all four foundations, and the order wraps — a run might go 7, 8, 9… King, Ace, 2 and finish on the 6.</span>
+              )}
+              <label className="field"><span>Reserve: <b>{knobs.solReserve || 'none'}</b></span>
+                <input type="range" min={0} max={26} value={knobs.solReserve} onChange={(e) => set('solReserve', +e.target.value)} /></label>
+              {knobs.solReserve > 0 && (
+                <span className="mini-label">A face-up stack beside the board. You can see every card in it and only ever reach the top one, which is what makes Canfield hard.</span>
+              )}
+              <label className="field"><span>Cards per column: <b>{knobs.solDealCount || 'let the deal shape decide'}</b></span>
+                <input type="range" min={0} max={12} value={knobs.solDealCount} onChange={(e) => set('solDealCount', +e.target.value)} /></label>
+              {knobs.solDealCount > 0 && (
+                <span className="mini-label">Fixes the tableau at {knobs.solDealCount} per column and sends everything else to the stock — the way a game with a small board and a deep stock is built.</span>
+              )}
+              {!knobs.solWasteIsTarget && (
+                <label className="field row"><Switch on={knobs.solAutoRuns} onChange={(v) => set('solAutoRuns', v)} />
+                  <span>Runs clear themselves — finish a King-to-Ace suit run on the table and it leaves the board (Spider)</span></label>
+              )}
               <div className="field"><span>Stock</span>
                 <Seg options={[['none', 'None'], ['waste', 'Turn to a waste pile'], ['deal-row', 'Deal a row to every column']]} value={knobs.solStock} onChange={(v) => set('solStock', v)} /></div>
               {knobs.solStock === 'waste' && <>

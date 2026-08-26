@@ -168,6 +168,10 @@ export function createMatch(
       for (let i = 0; i < cfg.columns; i++) counts.push(cfg.dealCount);
     } else if (cfg.deal === 'triangle') {
       for (let i = 0; i < cfg.columns; i++) counts.push(i + 1);
+    } else if (cfg.deal === 'yukon') {
+      // 1, 6, 7, 8, 9, 10, 11 — fifty-two exactly. The first column is a single card; every
+      // other one is its buried run plus the five that sit face up on top.
+      for (let i = 0; i < cfg.columns; i++) counts.push(i === 0 ? 1 : i + 5);
     } else {
       const per = Math.floor(spare / cfg.columns);
       const extra = spare % cfg.columns;
@@ -207,7 +211,10 @@ export function createMatch(
       for (let n = 0; n < counts[i] && k < deck.length; n++, k++) {
         const card = deck[k];
         state.zones[solZones.tab(i)].push(card);
-        state.faceUp[card.id] = cfg.faceUp === 'all' || n === counts[i] - 1;
+        // 'all' shows the lot; otherwise the top `faceUpCount` cards, which is one unless a
+        // game says otherwise. Yukon says five.
+        const shown = cfg.faceUp === 'all' ? counts[i] : (cfg.faceUpCount ?? 1);
+        state.faceUp[card.id] = n >= counts[i] - shown;
       }
     }
     for (; k < deck.length; k++) {
@@ -2439,8 +2446,10 @@ function solCanStack(s: MatchState, card: Card, onto: Card): boolean {
   // in Canfield the sequence is a circle rather than a line.
   // Golf accepts a card one rank either side, which no descending rule can express.
   if (cfg.build === 'up-or-down') {
-    const d = Math.abs(solRankIndex(s, card.rank) - solRankIndex(s, onto.rank));
-    return d === 1;
+    const gap = Math.abs(solRankIndex(s, card.rank) - solRankIndex(s, onto.rank));
+    // With a wrapping order the two ends of the pack are neighbours too, so the distance the
+    // long way round counts as one as well: a king takes an ace and an ace takes a king.
+    return gap === 1 || (!!cfg.wrap && gap === len - 1);
   }
   const below = cfg.foundationStart === 'dealt'
     ? (solRankIndex(s, onto.rank) - 1 + len) % len
@@ -2581,7 +2590,15 @@ function solitaireLegalMoves(state: MatchState): Move[] {
   }
 
   for (const src of sources) {
-    for (const colId of cols) {
+    /*
+      In a game played onto the waste, the waste is the ONLY destination.
+
+      The tableau there is a board to be cleared, not a board to be built on — Golf has no
+      column-to-column move at all. Offering one let a card be shuffled sideways for as long as
+      the ranks happened to line up, which is both the wrong game and an endless one: cards that
+      never leave the tableau can be passed back and forth forever.
+    */
+    for (const colId of cfg.wasteIsTarget ? [] : cols) {
       if (colId === src.from) continue;
       const empty = (state.zones[colId] || []).length === 0;
       if (src.run.length > solMoveCapacity(state, empty)) continue;

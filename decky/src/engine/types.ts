@@ -350,7 +350,14 @@ export type EmptyRule = 'any' | 'king' | 'none';
 export interface SolitaireConfig {
   decks: number;               // Spider uses two
   columns: number;
-  deal: 'triangle' | 'even';   // Klondike's 1,2,3… staircase vs an even split
+  /**
+   * Klondike's 1,2,3… staircase, an even split, or Yukon's shape.
+   *
+   * 'yukon' is a staircase with a slab on top: one card in the first column, and every other
+   * column gets its buried cards plus five more. That uses all fifty-two, which matters because
+   * Yukon has no stock — anything left over would be out of the game for good.
+   */
+  deal: 'triangle' | 'even' | 'yukon';
   /**
    * Cards per column, when neither shape fits.
    *
@@ -360,9 +367,24 @@ export interface SolitaireConfig {
    */
   dealCount?: number;
   faceUp: 'top' | 'all';       // Klondike/Spider show only the top of each column; FreeCell shows all
+  /**
+   * How many cards at the top of each column are turned up, when `faceUp` is 'top'.
+   *
+   * Defaults to one, which is Klondike. Yukon turns up five, and that is not a detail — a game
+   * with no stock that showed only seven cards would be over before it started.
+   */
+  faceUpCount?: number;
 
   // Stacking a card onto a tableau column.
   build: BuildRule;            // alt-color (Klondike/FreeCell) | down-any (Spider: rank only)
+  /**
+   * Whether the rank order joins up end to end, so a king sits next to an ace.
+   *
+   * Golf without this is a game of stoppers: every king and every ace ends the chain dead, and
+   * a well-played deal still comes out about one time in twenty. With it, the chain can always
+   * be continued in principle and the game becomes a question of choosing well.
+   */
+  wrap?: boolean;
   // Lifting more than one card at a time.
   /**
    * 'any' lifts a face-up card together with everything sitting on it, in whatever order it

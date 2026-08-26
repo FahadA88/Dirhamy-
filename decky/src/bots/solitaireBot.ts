@@ -93,11 +93,37 @@ export function chooseSolitaireMove(
   seen: Set<string>,
   apply: (st: MatchState, m: Move) => MatchState,
 ): Move | null {
+  const cfg = s.definition.solitaire!;
   const moves = legalMoves(s, s.players[0]);
   if (moves.length === 0) return null;
   for (const tier of ['progress', 'stock', 'lateral'] as Tier[]) {
     const pool = moves.filter((m) => tierOf(s, m) === tier).sort((a, b) => rank(s, b) - rank(s, a));
     if (pool.length === 0) continue;
+
+    /*
+      A game played onto the waste gets one ply of lookahead. Every other game does not.
+
+      In Golf the whole question is which of the exposed cards to spend, and the static ranking
+      cannot see that taking the six now leaves nothing playable next. Trying each candidate and
+      counting what the board then offers answers it directly — and the candidates here are
+      column tops, so there are at most seven of them.
+
+      That bound is the reason this is gated. Measured across the whole patience catalogue, the
+      same lookahead run everywhere took the suite from 1m14s to 10m53s and made FreeCell and
+      Spider markedly worse, because those games offer a hundred legal moves at a time and the
+      count of replies is a poor guide when nearly all of them are sideways shuffles.
+    */
+    if (cfg.wasteIsTarget && tier === 'progress') {
+      let best: { move: Move; after: number } | null = null;
+      for (const m of pool) {
+        const next = apply(s, m);
+        if (seen.has(positionKey(next))) continue;
+        const after = next.phase === 'playing' ? legalMoves(next, next.players[0]).length : 999;
+        if (!best || after > best.after) best = { move: m, after };
+      }
+      if (best) return best.move;
+      continue;
+    }
 
     for (const m of pool) {
       if (!seen.has(positionKey(apply(s, m)))) return m;

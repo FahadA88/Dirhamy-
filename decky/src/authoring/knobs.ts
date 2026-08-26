@@ -106,8 +106,24 @@ export interface Knobs {
   setPenalty: number;
   // solitaire — the board is described, not drawn: these are the dials the engine reads.
   solColumns: number;
-  solDeal: 'triangle' | 'even';
+  solDeal: 'triangle' | 'even' | 'yukon';
   solFaceUp: 'top' | 'all';
+  solFaceUpCount: number;    // cards shown at the top of each column when solFaceUp is 'top'
+  solWrap: boolean;          // the rank order joins up, so a King sits next to an Ace
+  /**
+   * Golf's shape: cards are played ONTO the waste and the win is an empty tableau.
+   *
+   * This inverts the whole game. The waste stops being a place cards come from and becomes the
+   * only place they can go, and the foundations stop mattering — so a board built this way is
+   * won by clearing the columns rather than by filling anything.
+   */
+  solWasteIsTarget: boolean;
+  /** Canfield's: the foundations start from a rank turned up at the deal, not from the aces. */
+  solDealtBase: boolean;
+  /** Cards stacked face up beside the tableau, of which only the top one is ever in play. */
+  solReserve: number;
+  /** Cards per column, when the deal shape should not decide it. 0 leaves the shape in charge. */
+  solDealCount: number;
   solBuild: BuildRule;
   solMoveRun: SolitaireConfig['moveRun'];
   solEmpty: 'any' | 'king' | 'none';
@@ -269,6 +285,12 @@ export const defaultKnobs: Knobs = {
   solColumns: 7,
   solDeal: 'triangle',
   solFaceUp: 'top',
+  solFaceUpCount: 1,
+  solWrap: false,
+  solWasteIsTarget: false,
+  solDealtBase: false,
+  solReserve: 0,
+  solDealCount: 0,
   solBuild: 'alt-color',
   solMoveRun: 'built',
   solEmpty: 'king',
@@ -448,11 +470,17 @@ function buildSolitaireDefinition(knobs: Knobs, id: string): GameDefinition {
       columns: clampInt(knobs.solColumns, 4, 12),
       deal: knobs.solDeal,
       faceUp: knobs.solFaceUp,
+      faceUpCount: clampInt(knobs.solFaceUpCount, 1, 12),
       build: knobs.solBuild,
+      wrap: knobs.solWrap,
+      wasteIsTarget: knobs.solWasteIsTarget,
+      foundationStart: knobs.solDealtBase ? 'dealt' : 'ace',
+      reserve: clampInt(knobs.solReserve, 0, 26),
+      ...(knobs.solDealCount > 0 ? { dealCount: clampInt(knobs.solDealCount, 1, 12) } : {}),
       moveRun: knobs.solMoveRun,
       empty: knobs.solEmpty,
       freeCells: clampInt(knobs.solFreeCells, 0, 6),
-      foundations: clampInt(knobs.solFoundations, 1, 8),
+      foundations: knobs.solWasteIsTarget ? 0 : clampInt(knobs.solFoundations, 1, 8),
       foundationMode: knobs.solAutoRuns ? 'auto-run' : 'place',
       stock: knobs.solStock,
       stockTurn: clampInt(knobs.solStockTurn, 1, 3),
@@ -471,10 +499,19 @@ function autoSolitaireDescription(k: Knobs): string {
     ? ` Turn the stock ${k.solStockTurn} at a time${k.solRedeals < 0 ? ', as many passes as you like' : k.solRedeals === 0 ? ', one pass only' : `, ${k.solRedeals} redeals`}.`
     : k.solStock === 'deal-row' ? ' When stuck, deal another row across every column.' : '';
   const cells = k.solFreeCells > 0 ? ` ${k.solFreeCells} free cells each hold one card.` : '';
-  const finish = k.solAutoRuns
-    ? 'Complete a King-to-Ace run in one suit and it clears itself off the board.'
-    : 'Build the foundations up by suit from the aces.';
-  return `A patience laid out in ${k.solColumns} columns. Build the columns downward ${build}. ${finish} ${gap}${cells}${stock}`;
+  const shown = k.solFaceUp === 'top' && k.solFaceUpCount > 1
+    ? ` The top ${k.solFaceUpCount} cards of every column are face up.` : '';
+  const wrap = k.solWrap ? ' The order joins up at the ends, so a King sits next to an Ace.' : '';
+  const finish = k.solWasteIsTarget
+    ? 'There are no foundations: play cards onto the waste and clear every column to win.'
+    : k.solAutoRuns
+      ? 'Complete a King-to-Ace run in one suit and it clears itself off the board.'
+      : k.solDealtBase
+        ? 'One card is turned up at the deal and every foundation builds from that rank, wrapping round the top back to the Ace.'
+        : 'Build the foundations up by suit from the aces.';
+  const reserve = k.solReserve > 0
+    ? ` A reserve of ${k.solReserve} cards sits face up beside the board — you can see them all and only ever take the top one.` : '';
+  return `A patience laid out in ${k.solColumns} columns. Build the columns downward ${build}.${wrap} ${finish} ${gap}${shown}${reserve}${cells}${stock}`;
 }
 
 function buildRummyDefinition(knobs: Knobs, id: string): GameDefinition {
@@ -972,6 +1009,12 @@ export function knobsFromDefinition(def: GameDefinition): Knobs {
     solColumns: def.solitaire?.columns ?? 7,
     solDeal: def.solitaire?.deal ?? 'triangle',
     solFaceUp: def.solitaire?.faceUp ?? 'top',
+    solFaceUpCount: def.solitaire?.faceUpCount ?? 1,
+    solWrap: def.solitaire?.wrap ?? false,
+    solWasteIsTarget: def.solitaire?.wasteIsTarget ?? false,
+    solDealtBase: def.solitaire?.foundationStart === 'dealt',
+    solReserve: def.solitaire?.reserve ?? 0,
+    solDealCount: def.solitaire?.dealCount ?? 0,
     solBuild: def.solitaire?.build ?? 'alt-color',
     solMoveRun: def.solitaire?.moveRun ?? 'built',
     solEmpty: def.solitaire?.empty ?? 'king',

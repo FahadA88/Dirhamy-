@@ -34,10 +34,17 @@ export const golf: GameDefinition = {
     // Rank-only building, one card at a time, and nothing may be put into an empty column —
     // which together is exactly the shape of Golf.
     build: 'up-or-down', moveRun: 'single', empty: 'none',
+    // The rank order joins up: a king takes an ace and an ace takes a king.
+    //
+    // Without this every king and every ace is a stopper, and the chain dies on them often
+    // enough that even a perfectly played deal comes out about one time in twenty — a game
+    // where the right move almost never saves you is not much of a game. Joined up, the chain
+    // can always be continued in principle, so a lost deal is a lost decision.
+    wrap: true,
     // The waste is where cards GO in this game, and clearing the columns is the win. Both are
     // the opposite of every other patience here.
     wasteIsTarget: true,
-    freeCells: 0, foundations: 1, foundationMode: 'place',
+    freeCells: 0, foundations: 0, foundationMode: 'place',
     stock: 'waste', stockTurn: 1, redeals: 0,
     dealCount: 5,
   },

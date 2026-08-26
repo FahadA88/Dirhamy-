@@ -181,7 +181,12 @@ export function validate(def: GameDefinition): ValidationResult {
   if (isSolitaire) {
     const c = def.solitaire!;
     if (c.columns < 1) err('sol.columns', 'A patience needs at least one tableau column.');
-    if (c.foundations < 1) err('sol.foundations', 'A patience needs somewhere for finished cards to go.');
+    // Most patiences are won by filling foundations, so having none is a mistake — but Golf is
+    // won by emptying the tableau onto the waste, and there a foundation is somewhere cards
+    // could go that the game says they may not.
+    if (c.foundations < 1 && !c.wasteIsTarget) {
+      err('sol.foundations', 'A patience needs somewhere for finished cards to go.');
+    }
     const size = deckSize;
     const perFoundation = 13 - (def.deck.excludeRanks ?? []).length;
     if (c.foundations * perFoundation > size) {
