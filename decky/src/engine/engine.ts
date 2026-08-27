@@ -1318,13 +1318,24 @@ function fireRules(state: MatchState, hook: RuleHook, ctx: Ctx & { playedCard?: 
   }
 }
 
+// Item 93 of the audit pass: a genuine tie used to resolve to whichever tied player happened to
+// sit lowest in seat order (the `> 0` comparison below never fires for an exact tie, so `best`
+// simply never moves past the first one reached) — the same seat-0-wins-every-stalemate shape
+// as the fairness bugs already found and fixed elsewhere (items 4, 16-18, 91). Reachable through
+// any author-written custom rule ending the hand on "highest score"/"lowest score".
 /** Which player scores best (dir 1) or worst (dir -1) by some measure. */
-function bestBy(state: MatchState, get: (p: string) => number, dir: 1 | -1): string {
+export function bestBy(state: MatchState, get: (p: string) => number, dir: 1 | -1): string {
   let best = state.players[0];
-  for (const p of state.players) {
-    if ((get(p) - get(best)) * dir > 0) best = p;
+  let tied = [best];
+  for (const p of state.players.slice(1)) {
+    const cmp = (get(p) - get(best)) * dir;
+    if (cmp > 0) { best = p; tied = [p]; }
+    else if (cmp === 0) tied.push(p);
   }
-  return best;
+  if (tied.length === 1) return best;
+  const { result, rngState } = seededShuffle(tied, state.rngState);
+  state.rngState = rngState;
+  return result[0];
 }
 
 // ---------- triggers ----------

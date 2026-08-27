@@ -11,7 +11,7 @@ import { spider } from '../src/games/spider';
 import { kent } from '../src/games/kent';
 import { pinochle } from '../src/games/pinochle';
 import { catalog } from '../src/games/catalog';
-import { createMatch, legalMoves, applyMove, actingPlayers, redact, nextHand, scoreMelds } from '../src/engine/engine';
+import { createMatch, legalMoves, applyMove, actingPlayers, redact, nextHand, scoreMelds, bestBy } from '../src/engine/engine';
 import { chooseMove } from '../src/bots/randomBot';
 import { Card, MatchState } from '../src/engine/types';
 
@@ -888,6 +888,33 @@ section('Schema coverage: a meldPatterns entry scores correctly in every suit, n
     check(`a marriage in ${suit} scores ${expected}${suit === 'S' ? ' (trump, doubled)' : ''}`,
       s.bonus['A'] === expected, s.bonus);
   }
+}
+
+// ---------- bestBy: a genuine tie is broken fairly, not by seat order (item 93) ----------
+//
+// bestBy() decides who a custom "end the hand on highest/lowest score" rule crowns. An exact
+// tie used to resolve to whichever tied player the scan reached first — seat order, in
+// practice — the same seat-0-wins-every-stalemate shape as the fairness bugs already found and
+// fixed elsewhere this pass (items 4, 16-18, 91).
+section('Schema coverage: bestBy() breaks a real tie fairly, not by seat order');
+{
+  const s = createMatch(hearts, ['A', 'B', 'C', 'D'], 3);
+  const winners: Record<string, number> = {};
+  for (let seed = 1; seed <= 200; seed++) {
+    s.rngState = seed >>> 0;
+    // All four tied at 5 — bestBy has nothing to go on but the tie-break itself.
+    const tied = bestBy(s, () => 5, 1);
+    winners[tied] = (winners[tied] ?? 0) + 1;
+  }
+  const seats = Object.keys(winners);
+  check('a 4-way tie is not always won by the same seat', seats.length > 1, winners);
+  check('every seat can win the tie, not just a lucky subset', seats.length === 4, winners);
+
+  // The non-tied path must still be exact — fairness in the tie-break must not blur a real winner.
+  const clear = bestBy(s, (p) => ({ A: 3, B: 9, C: 1, D: 4 }[p] ?? 0), 1);
+  check('a real winner (highest, no tie) is picked exactly, not randomized', clear === 'B', clear);
+  const clearLow = bestBy(s, (p) => ({ A: 3, B: 9, C: 1, D: 4 }[p] ?? 0), -1);
+  check('dir -1 picks the real lowest, no tie', clearLow === 'C', clearLow);
 }
 
 console.log(failed ? '\nMECHANICS: FAILED' : '\nMECHANICS: all checks passed');
