@@ -174,8 +174,13 @@ export function chooseMove(
       if (v > bestV) { bestV = v; best = m; }
     }
     const canPass = moves.some((m) => m.actionId === 'passBid');
-    // On the dealer's forced last call there is no pass — take the best suit going.
-    if (!best) return { move: canPass ? { actionId: 'passBid' } : bids[0], botSeed };
+    // Item 17 of the audit pass: on the dealer's forced last call (stick-the-dealer — no pass
+    // available) with no hand strong enough to prefer, the bot used to always take bids[0] —
+    // always the same suit, since the move list's order never changes. A fair coin flip instead.
+    if (!best) {
+      if (!canPass) { const r = nextRandom(botSeed); return { move: bids[Math.floor(r.value * bids.length)], botSeed: r.state }; }
+      return { move: { actionId: 'passBid' }, botSeed };
+    }
     if (bestV < 6.5 && canPass) return { move: { actionId: 'passBid' }, botSeed };
     if (bestV >= 10.5) {
       const solo = moves.find((m) => m.actionId === best!.actionId && m.choice === best!.choice && m.alone);

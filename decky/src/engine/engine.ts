@@ -2045,6 +2045,16 @@ function resolveTrick(s: MatchState, trickZoneId: string): void {
 // Deliberately not the whole of Bridge: no doubles, no vulnerability, no rubber, and no dummy.
 // The declarer plays their own cards.
 
+// Item 16 of the audit pass: when a hand is thrown in with no bid at all, nobody actually won
+// it — but `s.winner` still has to name somebody. Picking seat 0 every time meant the same seat
+// "won" every stalemate; a seeded shuffle spreads it fairly instead, the same way tie-breaks
+// elsewhere in the engine do (see the seededShuffle calls throughout this file).
+function fairRandomPlayer(s: MatchState): string {
+  const { result, rngState } = seededShuffle(s.players, s.rngState);
+  s.rngState = rngState;
+  return result[0];
+}
+
 /** A bid's place in the order. Higher is stronger; strains are ranked by their config order. */
 function bidRank(cfg: NumericAuctionConfig, level: number, strain: Strain): number {
   const i = cfg.strains.indexOf(strain);
@@ -2087,7 +2097,7 @@ function applyContractBid(s: MatchState, playerId: string, move: Move): MatchSta
       s.auctionRound = 0;
       s.phase = 'roundOver';
       for (const p of s.players) s.scores[p] = 0;
-      s.winner = s.players[0];
+      s.winner = fairRandomPlayer(s);
       finalizeMatchProgress(s);
       return s;
     }
@@ -2135,7 +2145,7 @@ function scoreContract(s: MatchState): void {
   const teams = trickTeams(s);
   if (!bid) {
     for (const p of s.players) s.scores[p] = 0;
-    s.winner = s.players[0];
+    s.winner = fairRandomPlayer(s);
     s.roundOutcome = null;
     return;
   }

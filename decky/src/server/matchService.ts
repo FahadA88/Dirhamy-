@@ -295,8 +295,10 @@ export class MatchService {
     const seat = rec.seats.find((s) => s.id === playerId);
     if (!seat || seat.kind !== 'local') return undefined;
     try {
-      const suggestion = chooseMove(rec.state, playerId, rec.botSeed, 'smart').move;
-      return suggestion && !sameMove(suggestion, actual) ? suggestion : undefined;
+      // Item 18: same fix as hint() above — persist the seed this advisory call actually drew.
+      const r = chooseMove(rec.state, playerId, rec.botSeed, 'smart');
+      rec.botSeed = r.botSeed;
+      return r.move && !sameMove(r.move, actual) ? r.move : undefined;
     } catch {
       return undefined;
     }
@@ -458,7 +460,13 @@ export class MatchService {
     }
     const allowed = legalMoves(rec.state, playerId);
     if (allowed.length === 0) return null;
-    return chooseMove(rec.state, playerId, rec.botSeed, 'smart').move;
+    // Item 18 of the audit pass: every other caller of chooseMove writes its returned botSeed
+    // back to rec.botSeed (see the real-move path below); this one silently dropped it, so the
+    // stream of randomness a real bot at this table would go on to draw from stayed one step
+    // behind wherever a hint had last spent it.
+    const r = chooseMove(rec.state, playerId, rec.botSeed, 'smart');
+    rec.botSeed = r.botSeed;
+    return r.move;
   }
 
   /**
