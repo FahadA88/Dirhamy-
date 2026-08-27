@@ -17,9 +17,12 @@ import { whist } from '../src/games/whist';
 import { spadesLite } from '../src/games/spades';
 import { ohHell } from '../src/games/ohHell';
 import { catalog } from '../src/games/catalog';
-import { createMatch, legalMoves, applyMove, actingPlayers, redact, nextHand, scoreMelds, bestBy } from '../src/engine/engine';
+import { createMatch, legalMoves, applyMove, actingPlayers, redact, nextHand, scoreMelds, bestBy, swapZones } from '../src/engine/engine';
 import { chooseMove } from '../src/bots/randomBot';
-import { Card, MatchState } from '../src/engine/types';
+import { Card, MatchState, Move } from '../src/engine/types';
+import { dutch } from '../src/games/dutch';
+import { MatchService } from '../src/server/matchService';
+import { LocalMatchStore } from '../src/server/localStore';
 
 let failed = false;
 const check = (label: string, cond: boolean, extra?: unknown) => {
@@ -953,6 +956,78 @@ section('Regression: dealerIndex rotates hand over hand for the seat-0-stuck tri
       dealers.add(s.dealerIndex);
     }
     check(`${name}: dealerIndex visits more than one seat across ${n * 2} hands`, dealers.size > 1, [...dealers]);
+  }
+}
+
+// ---------- Regression: sameMove distinguishes moves by slot/targetSlot/poolId, not just
+// actionId/target (item 4 of the site-audit pass, item 97 locking it in) ----------
+//
+// The bug: MatchService.submit() never applies the client's own move object — it looks up the
+// matching entry in legalMoves() via sameMove() and applies THAT instead (so a stale or
+// tampered move can't reach the engine). sameMove() compared actionId, cardId, target and a
+// dozen other fields, but never slot, targetSlot or poolId — the only fields that distinguish
+// one Dutch swapBlind move from another that shares everything else. Every legal swapBlind move
+// in a two-player game shares actionId='swapBlind' and target=<the one opponent>, so the old
+// comparator considered ALL of them equal and `allowed.find()` silently returned whichever came
+// first in the generated list (slot 0, targetSlot 0) no matter which slot the player actually
+// asked to trade. This drives a real Dutch match through MatchService (not the engine directly)
+// so the regression lives at the exact boundary the bug was in, and reads the raw grids straight
+// out of the store to prove the requested slot — not the first-listed one — is what moved.
+section('Regression: sameMove() matches on slot/targetSlot/poolId, not just actionId/target');
+{
+  const store = new LocalMatchStore();
+  const svc = new MatchService(store);
+
+  let matchId = '';
+  let power: { player: string; other: string } | null = null;
+  for (let seed = 1; seed <= 300 && !power; seed++) {
+    const m = svc.create(dutch, 'classic-dutch', ['P1', 'P2'], undefined, undefined, seed);
+    matchId = m.matchId;
+    for (let guard = 0; guard < 80; guard++) {
+      const st = store.get(matchId)!.state;
+      if (st.pendingPower?.kind === 'blindSwap') {
+        power = { player: st.pendingPower.player, other: st.players.find((p) => p !== st.pendingPower!.player)! };
+        break;
+      }
+      if (st.phase !== 'playing') break;
+      const seat = st.players[st.turnIndex];
+      if (st.held && st.held.player === seat) {
+        if (st.held.from === 'stock' && (st.held.card.rank === 'J' || st.held.card.rank === 'Q')) {
+          svc.submit(matchId, seat, { actionId: 'swapThrow' });
+        } else {
+          svc.submit(matchId, seat, { actionId: 'swapPlace', slot: 0 });
+        }
+      } else {
+        svc.submit(matchId, seat, { actionId: 'swapDrawStock' });
+      }
+    }
+  }
+  check('reached a blindSwap decision to trade against', power !== null);
+
+  if (power) {
+    const before = store.get(matchId)!.state;
+    const myGridBefore = [...before.zones[swapZones.grid(power.player)]];
+    const theirGridBefore = [...before.zones[swapZones.grid(power.other)]];
+
+    // Ask for slot 3 <-> targetSlot 3 specifically — the last combination legalMoves() would
+    // generate, and NOT the (0, 0) pair the old buggy comparator always fell back to.
+    const requested: Move = { actionId: 'swapBlind', slot: 3, target: power.other, targetSlot: 3 };
+    const res = svc.submit(matchId, power.player, requested);
+    check('the requested swapBlind move is accepted', res.ok, res.reason);
+
+    const after = store.get(matchId)!.state;
+    const myGridAfter = after.zones[swapZones.grid(power.player)];
+    const theirGridAfter = after.zones[swapZones.grid(power.other)];
+
+    check('my slot 3 became their old slot 3', myGridAfter[3]?.id === theirGridBefore[3]?.id,
+      { requested: myGridAfter[3]?.id, expected: theirGridBefore[3]?.id });
+    check('their slot 3 became my old slot 3', theirGridAfter[3]?.id === myGridBefore[3]?.id,
+      { requested: theirGridAfter[3]?.id, expected: myGridBefore[3]?.id });
+    // The bug always swapped (0, 0) instead — pin that it did NOT happen here.
+    check('my slot 0 was left untouched (the old bug\'s always-picked slot)',
+      myGridAfter[0]?.id === myGridBefore[0]?.id);
+    check('their slot 0 was left untouched (the old bug\'s always-picked slot)',
+      theirGridAfter[0]?.id === theirGridBefore[0]?.id);
   }
 }
 
