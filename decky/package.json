@@ -30,7 +30,8 @@
     "verify:qol": "node scripts/browser/qol.mjs",
     "verify:profile": "node scripts/browser/profile.mjs",
     "verify:online": "node scripts/browser/online.mjs",
-    "verify:pwa": "node scripts/browser/pwa.mjs"
+    "verify:pwa": "node scripts/browser/pwa.mjs",
+    "build:artifact": "vite build --config vite.artifact.config.ts && node scripts/pack-artifact.mjs"
   },
   "dependencies": {
     "react": "^18.3.1",
