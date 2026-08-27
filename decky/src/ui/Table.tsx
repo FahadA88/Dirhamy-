@@ -1222,12 +1222,15 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
           // number is on the chip below, which is where anyone actually reads it.
           const backs = Math.max(1, Math.min(p.handCount, 6));
           return (
+            // A keyboard player can pick a rank but had no way to complete the ask — the seat
+            // itself was a click-only target with no role, tabIndex, or key handler. It's a real
+            // control only while askable; the conditional spread below applies role/tabIndex/
+            // keydown for that case, which the linter's static check can't see.
+            // eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events
             <div key={p.id}
               data-slot={`seat:${p.id}`}
               className={`seat at-${SEAT_RING[opponents.length]?.[i] ?? 't'} ${p.isTurn ? 'active' : ''} ${askable ? 'askable' : ''}`}
               onClick={() => { if (askable) submit({ actionId: 'ask', target: p.id, rank: askRank! }); }}
-              // A keyboard player can pick a rank but had no way to complete the ask — the seat
-              // itself was a click-only target with no role, tabIndex, or key handler.
               {...(askable ? {
                 role: 'button' as const,
                 tabIndex: 0,
@@ -2069,6 +2072,10 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
             {hand.length > 0 && (() => {
               const myClaimTurn = myLegal.some((m) => m.actionId === 'bluffClaim');
               return (
+                // A group with a single delegated keydown handler for arrow-key navigation
+                // between the buttons inside it — the standard roving-tabindex shape, not a
+                // click/keyboard interaction of the group element itself.
+                // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions
                 <div
                   className={`hand hl-${settings.highlight}`}
                   data-slot="hand"
@@ -2245,6 +2252,9 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
             {canFlip && <button className="primary" onClick={() => submit({ actionId: 'warFlip' })}>⚔ Flip</button>}
           </div>
         ) : (
+        // Same roving-tabindex shape as the Bluff hand above: one delegated keydown for arrow
+        // navigation between the buttons inside, not an interaction on the group itself.
+        // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions
         <div
           className={`hand hl-${settings.highlight}`}
           data-slot="hand"
@@ -2516,8 +2526,13 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
       )}
 
       {showHistory && (
+        // Same backdrop pattern as the other modals in this app: click-outside is supplementary,
+        // historyRef wires Escape, and there's a real close affordance inside.
+        // eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events
         <div className="modal" onClick={() => setShowHistory(false)}>
-          <div className="modal-box wide" ref={historyRef} role="dialog" aria-modal="true" aria-label="Move history" onClick={(e) => e.stopPropagation()}>
+          {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/click-events-have-key-events */}
+          <div className="modal-box wide" ref={historyRef} role="dialog" aria-modal="true" aria-label="Move history"
+            onClick={(e) => e.stopPropagation()}>
             <h3>Move history</h3>
             {/*
               Every move is already recorded, so stepping back through them costs nothing but a

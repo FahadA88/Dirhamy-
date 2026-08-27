@@ -16,9 +16,16 @@ export function Confirm({
 }) {
   const ref = useDismissable(true, onCancel);
   return (
+    // Click-outside-to-cancel is a supplementary mouse/touch shortcut, not the only way out —
+    // useDismissable above already wires Escape, and Cancel is a real, reachable button. The
+    // backdrop itself has no business being tab-stoppable or role="button": it isn't a control,
+    // it's the rest of the page dimmed out.
+    // eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events
     <div className="modal" onClick={onCancel}>
+      {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/click-events-have-key-events */}
       <div className="modal-box confirm-box" ref={ref} role="alertdialog" aria-modal="true"
-        aria-label={title} onClick={(e) => e.stopPropagation()}>
+        aria-label={title}
+        onClick={(e) => e.stopPropagation()}>
         <h3>{title}</h3>
         <p className="confirm-body">{body}</p>
         <div className="confirm-actions">

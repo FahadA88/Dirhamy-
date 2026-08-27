@@ -383,7 +383,8 @@ export function CreateView({ onPlay }: { onPlay?: (def: GameDefinition) => void 
                     ? 'War splits one pack between two players — a second deck has nowhere to go.'
                     : 'Poker hand ranks stop meaning anything once a card can appear twice.'}</span>
                 )}
-                <label className="field row"><Switch on={knobs.includeJokers} onChange={(v) => set('includeJokers', v)} /><span>Include jokers</span></label>
+                <div className="field row"><Switch on={knobs.includeJokers} onChange={(v) => set('includeJokers', v)} aria-label="Include jokers" />
+                <span aria-hidden="true">Include jokers</span></div>
                 {knobs.includeJokers && (
                   <>
                     <label className="field"><span>Jokers per deck: <b>{knobs.jokerCount}</b></span>
@@ -435,10 +436,10 @@ export function CreateView({ onPlay }: { onPlay?: (def: GameDefinition) => void 
                 <div key={i} className="pe-row">
                   <input className="pe-vals" value={pile.id} placeholder="kitty"
                     onChange={(e) => set('extraPiles', knobs.extraPiles.map((x, k) => (k === i ? { ...x, id: e.target.value } : x)))} />
-                  <label className="pe-face">
-                    <Switch on={pile.faceUp} onChange={(v) => set('extraPiles', knobs.extraPiles.map((x, k) => (k === i ? { ...x, faceUp: v } : x)))} />
-                    <span>face up</span>
-                  </label>
+                  <div className="pe-face">
+                    <Switch on={pile.faceUp} onChange={(v) => set('extraPiles', knobs.extraPiles.map((x, k) => (k === i ? { ...x, faceUp: v } : x)))} aria-label="face up" />
+                    <span aria-hidden="true">face up</span>
+                  </div>
                   <button className="icon-btn danger" title="Remove this pile"
                     onClick={() => set('extraPiles', knobs.extraPiles.filter((_, k) => k !== i))}>✕</button>
                 </div>
@@ -472,15 +473,20 @@ export function CreateView({ onPlay }: { onPlay?: (def: GameDefinition) => void 
                     <option value="D">♦ Diamonds</option>
                     <option value="C">♣ Clubs</option>
                   </select></label>
-                <label className="field row"><Switch on={knobs.mustFollowSuit} onChange={(v) => set('mustFollowSuit', v)} /><span>Must follow the led suit if able</span></label>
-                <label className="field row"><Switch on={knobs.aceHigh} onChange={(v) => set('aceHigh', v)} /><span>Ace is the highest card</span></label>
-                <label className="field row"><Switch on={knobs.trickBidding} onChange={(v) => set('trickBidding', v)} /><span>Players bid tricks before play</span></label>
+                <div className="field row"><Switch on={knobs.mustFollowSuit} onChange={(v) => set('mustFollowSuit', v)} aria-label="Must follow the led suit if able" />
+                <span aria-hidden="true">Must follow the led suit if able</span></div>
+                <div className="field row"><Switch on={knobs.aceHigh} onChange={(v) => set('aceHigh', v)} aria-label="Ace is the highest card" />
+                <span aria-hidden="true">Ace is the highest card</span></div>
+                <div className="field row"><Switch on={knobs.trickBidding} onChange={(v) => set('trickBidding', v)} aria-label="Players bid tricks before play" />
+                <span aria-hidden="true">Players bid tricks before play</span></div>
                 {knobs.minPlayers <= 4 && knobs.maxPlayers >= 4 && (
-                  <label className="field row"><Switch on={knobs.trickPartnerships} onChange={(v) => set('trickPartnerships', v)} /><span>Partnerships (4 players: seats 1&3 vs 2&4)</span></label>
+                  <div className="field row"><Switch on={knobs.trickPartnerships} onChange={(v) => set('trickPartnerships', v)} aria-label="Partnerships (4 players: seats 1&3 vs 2&4)" />
+                <span aria-hidden="true">Partnerships (4 players: seats 1&3 vs 2&4)</span></div>
                 )}
                 {knobs.trickBidding && (
                   <>
-                    <label className="field row"><Switch on={knobs.bustEnabled} onChange={(v) => set('bustEnabled', v)} /><span>Lose the match instantly if score drops too low</span></label>
+                    <div className="field row"><Switch on={knobs.bustEnabled} onChange={(v) => set('bustEnabled', v)} aria-label="Lose the match instantly if score drops too low" />
+                <span aria-hidden="true">Lose the match instantly if score drops too low</span></div>
                     {knobs.bustEnabled && (
                       <label className="field"><span>Bust at (needs Match play on, below)</span>
                         <input type="number" value={knobs.bustScore} onChange={(e) => set('bustScore', parseInt(e.target.value || '0', 10))} /></label>
@@ -512,10 +518,10 @@ export function CreateView({ onPlay }: { onPlay?: (def: GameDefinition) => void 
                   </span>
                 </>}
                 {knobs.trumpAuction && <>
-                  <label className="field row"><Switch on={knobs.bowers} onChange={(v) => set('bowers', v)} />
-                    <span>Bowers — trump's jack is highest, and the other jack of the same colour becomes trump just under it</span></label>
-                  <label className="field row"><Switch on={knobs.goAlone} onChange={(v) => set('goAlone', v)} />
-                    <span>Going alone — the maker may cut their partner out for a bigger score{knobs.trickPartnerships ? '' : ' (needs partnerships)'}</span></label>
+                  <div className="field row"><Switch on={knobs.bowers} onChange={(v) => set('bowers', v)} aria-label="Bowers — trump's jack is highest, and the other jack of the same colour becomes trump just under it" />
+                <span aria-hidden="true">Bowers — trump's jack is highest, and the other jack of the same colour becomes trump just under it</span></div>
+                  <div className="field row"><Switch on={knobs.goAlone} onChange={(v) => set('goAlone', v)} aria-label="Going alone — the maker may cut their partner out for a bigger score" />
+                <span aria-hidden="true">Going alone — the maker may cut their partner out for a bigger score{knobs.trickPartnerships ? '' : ' (needs partnerships)'}</span></div>
                   <span className="mini-label">
                     {knobs.trickPartnerships
                       ? 'Scores Euchre-style: 1 for making it, 2 for all tricks, 4 alone, and 2 to the defenders if the makers fall short.'
@@ -541,10 +547,10 @@ export function CreateView({ onPlay }: { onPlay?: (def: GameDefinition) => void 
                 )}
                 {knobs.trickScoreBy === 'penalty' && <>
                   <span className="mini-label">Lowest penalty total wins (this is how Hearts works).</span>
-                  <label className="field row"><Switch on={knobs.shootTheMoon} onChange={(v) => set('shootTheMoon', v)} />
-                    <span>Shooting the moon — take every penalty point and you score 0 while everyone else takes the lot</span></label>
-                  <label className="field row"><Switch on={knobs.brokenSuitLead} onChange={(v) => set('brokenSuitLead', v)} />
-                    <span>A suit must be broken before it can be led</span></label>
+                  <div className="field row"><Switch on={knobs.shootTheMoon} onChange={(v) => set('shootTheMoon', v)} aria-label="Shooting the moon — take every penalty point and you score 0 while everyone else takes the lot" />
+                <span aria-hidden="true">Shooting the moon — take every penalty point and you score 0 while everyone else takes the lot</span></div>
+                  <div className="field row"><Switch on={knobs.brokenSuitLead} onChange={(v) => set('brokenSuitLead', v)} aria-label="A suit must be broken before it can be led" />
+                <span aria-hidden="true">A suit must be broken before it can be led</span></div>
                   {/* Hard-coded to hearts before this, though the engine never cared which. */}
                   {knobs.brokenSuitLead && (
                     <label className="field"><span>Which suit</span>
@@ -556,8 +562,8 @@ export function CreateView({ onPlay }: { onPlay?: (def: GameDefinition) => void 
                       </select></label>
                   )}
                 </>}
-                <label className="field row"><Switch on={knobs.forceOpeningLead} onChange={(v) => set('forceOpeningLead', v)} />
-                  <span>One named card must lead the first trick{knobs.trickScoreBy === 'penalty' ? ', and no points may fall on it' : ''}</span></label>
+                <div className="field row"><Switch on={knobs.forceOpeningLead} onChange={(v) => set('forceOpeningLead', v)} aria-label="One named card must lead the first trick" />
+                <span aria-hidden="true">One named card must lead the first trick{knobs.trickScoreBy === 'penalty' ? ', and no points may fall on it' : ''}</span></div>
                 {/* Also hard-coded — to the 2♣, which is Hearts' convention and nobody else's. */}
                 {knobs.forceOpeningLead && (
                   <div className="field"><span>Which card leads</span>
@@ -609,8 +615,8 @@ export function CreateView({ onPlay }: { onPlay?: (def: GameDefinition) => void 
                 <Seg options={[[2, '2'], [3, '3'], [4, '4']]} value={knobs.rummySetMin} onChange={(v) => set('rummySetMin', v)} /></div>
               <div className="field"><span>Run length (sequence in a suit)</span>
                 <Seg options={[[2, '2'], [3, '3'], [4, '4'], [5, '5']]} value={knobs.rummyRunMin} onChange={(v) => set('rummyRunMin', v)} /></div>
-              <label className="field row"><Switch on={knobs.rummyKnock} onChange={(v) => set('rummyKnock', v)} />
-                <span>Knocking (Gin) — melds stay hidden in hand and you end the hand by knocking</span></label>
+              <div className="field row"><Switch on={knobs.rummyKnock} onChange={(v) => set('rummyKnock', v)} aria-label="Knocking (Gin) — melds stay hidden in hand and you end the hand by knocking" />
+                <span aria-hidden="true">Knocking (Gin) — melds stay hidden in hand and you end the hand by knocking</span></div>
               {knobs.rummyKnock && (
                 <>
                   <label className="field"><span>Knock when your unmatched cards total <b>{knobs.rummyKnockAt}</b> or less</span>
@@ -621,10 +627,10 @@ export function CreateView({ onPlay }: { onPlay?: (def: GameDefinition) => void 
                   </div>
                 </>
               )}
-              <label className="field row"><Switch on={knobs.rummyLayOff} onChange={(v) => set('rummyLayOff', v)} />
-                <span>Lay-off — spare cards can extend a meld already on the table</span></label>
-              <label className="field row"><Switch on={knobs.rummyWilds} onChange={(v) => set('rummyWilds', v)} />
-                <span>Wild cards fill gaps in sets and runs (Canasta, Kalooki)</span></label>
+              <div className="field row"><Switch on={knobs.rummyLayOff} onChange={(v) => set('rummyLayOff', v)} aria-label="Lay-off — spare cards can extend a meld already on the table" />
+                <span aria-hidden="true">Lay-off — spare cards can extend a meld already on the table</span></div>
+              <div className="field row"><Switch on={knobs.rummyWilds} onChange={(v) => set('rummyWilds', v)} aria-label="Wild cards fill gaps in sets and runs (Canasta, Kalooki)" />
+                <span aria-hidden="true">Wild cards fill gaps in sets and runs (Canasta, Kalooki)</span></div>
               {knobs.rummyWilds && (
                 <>
                   <div className="field"><span>Wilds allowed in one meld</span>
@@ -706,8 +712,8 @@ export function CreateView({ onPlay }: { onPlay?: (def: GameDefinition) => void 
 
           {knobs.family === 'solitaire' && (
             <Section title="Finishing & stock" defaultOpen>
-              <label className="field row"><Switch on={knobs.solWasteIsTarget} onChange={(v) => set('solWasteIsTarget', v)} />
-                <span>Win by clearing the table — cards are played onto the waste, not off it (Golf)</span></label>
+              <div className="field row"><Switch on={knobs.solWasteIsTarget} onChange={(v) => set('solWasteIsTarget', v)} aria-label="Win by clearing the table — cards are played onto the waste, not off it (Golf)" />
+                <span aria-hidden="true">Win by clearing the table — cards are played onto the waste, not off it (Golf)</span></div>
               <span className="mini-label">
                 {knobs.solWasteIsTarget
                   ? 'This turns the game inside out: there are no foundations, the waste is the only place a card can go, and columns are never built on. Pair it with "one either way" and a joined-up order.'
@@ -718,8 +724,8 @@ export function CreateView({ onPlay }: { onPlay?: (def: GameDefinition) => void 
                   <input type="range" min={1} max={8} value={knobs.solFoundations} onChange={(e) => set('solFoundations', +e.target.value)} /></label>
               )}
               {!knobs.solWasteIsTarget && (
-                <label className="field row"><Switch on={knobs.solDealtBase} onChange={(v) => set('solDealtBase', v)} />
-                  <span>The foundations start from a card turned up at the deal, not from the Aces (Canfield)</span></label>
+                <div className="field row"><Switch on={knobs.solDealtBase} onChange={(v) => set('solDealtBase', v)} aria-label="The foundations start from a card turned up at the deal, not from the Aces (Canfield)" />
+                <span aria-hidden="true">The foundations start from a card turned up at the deal, not from the Aces (Canfield)</span></div>
               )}
               {!knobs.solWasteIsTarget && knobs.solDealtBase && (
                 <span className="mini-label">Whatever rank comes up decides it for all four foundations, and the order wraps — a run might go 7, 8, 9… King, Ace, 2 and finish on the 6.</span>
@@ -735,8 +741,8 @@ export function CreateView({ onPlay }: { onPlay?: (def: GameDefinition) => void 
                 <span className="mini-label">Fixes the tableau at {knobs.solDealCount} per column and sends everything else to the stock — the way a game with a small board and a deep stock is built.</span>
               )}
               {!knobs.solWasteIsTarget && (
-                <label className="field row"><Switch on={knobs.solAutoRuns} onChange={(v) => set('solAutoRuns', v)} />
-                  <span>Runs clear themselves — finish a King-to-Ace suit run on the table and it leaves the board (Spider)</span></label>
+                <div className="field row"><Switch on={knobs.solAutoRuns} onChange={(v) => set('solAutoRuns', v)} aria-label="Runs clear themselves — finish a King-to-Ace suit run on the table and it leaves the board (Spider)" />
+                <span aria-hidden="true">Runs clear themselves — finish a King-to-Ace suit run on the table and it leaves the board (Spider)</span></div>
               )}
               <div className="field"><span>Stock</span>
                 <Seg options={[['none', 'None'], ['waste', 'Turn to a waste pile'], ['deal-row', 'Deal a row to every column']]} value={knobs.solStock} onChange={(v) => set('solStock', v)} /></div>
@@ -798,8 +804,8 @@ export function CreateView({ onPlay }: { onPlay?: (def: GameDefinition) => void 
               <span className="mini-label">Everyone flips onto a shared pile. When the trigger shows, first hand on the pile takes it.</span>
               <div className="mini-label">Slap when the top card is…</div>
               <RankGrid ranks={RANKS_13} selected={knobs.reflexSlapRanks} onToggle={(r) => toggleRank('reflexSlapRanks', r)} />
-              <label className="field row"><Switch on={knobs.reflexSlapMatch} onChange={(v) => set('reflexSlapMatch', v)} />
-                <span>…or whenever the top two cards match rank (Snap)</span></label>
+              <div className="field row"><Switch on={knobs.reflexSlapMatch} onChange={(v) => set('reflexSlapMatch', v)} aria-label="…or whenever the top two cards match rank (Snap)" />
+                <span aria-hidden="true">…or whenever the top two cards match rank (Snap)</span></div>
               {knobs.reflexSlapRanks.length === 0 && !knobs.reflexSlapMatch && (
                 <span className="mini-label warn-text">Nothing triggers a slap, so nobody can ever take the pile. Pick a rank or turn on matching.</span>
               )}
@@ -840,7 +846,8 @@ export function CreateView({ onPlay }: { onPlay?: (def: GameDefinition) => void 
 
           {knobs.family === 'war' && (
             <Section title="War rules" defaultOpen>
-              <label className="field row"><Switch on={knobs.aceHigh} onChange={(v) => set('aceHigh', v)} /><span>Ace is the highest card</span></label>
+              <div className="field row"><Switch on={knobs.aceHigh} onChange={(v) => set('aceHigh', v)} aria-label="Ace is the highest card" />
+                <span aria-hidden="true">Ace is the highest card</span></div>
               <span className="mini-label">2 players. Split the deck, flip; higher card takes both, ties trigger a war. Take every card to win.</span>
             </Section>
           )}
@@ -853,10 +860,10 @@ export function CreateView({ onPlay }: { onPlay?: (def: GameDefinition) => void 
                   <button className={knobs.climbTwosHigh ? 'on' : ''} onClick={() => set('climbTwosHigh', true)}>3 low … 2 high (President)</button>
                   <button className={!knobs.climbTwosHigh ? 'on' : ''} onClick={() => set('climbTwosHigh', false)}>2 low … Ace high</button>
                 </div></div>
-              <label className="field row"><Switch on={knobs.climbCombos} onChange={(v) => set('climbCombos', v)} />
-                <span>Allow pairs & triples {knobs.climbCombos ? '(a reply must match the shape)' : '(single cards only)'}</span></label>
-              <label className="field row"><Switch on={knobs.climbBombSize > 0} onChange={(v) => set('climbBombSize', v ? 4 : 0)} />
-                <span>Bombs — four of a kind beats any pile, playable even out of turn</span></label>
+              <div className="field row"><Switch on={knobs.climbCombos} onChange={(v) => set('climbCombos', v)} aria-label="Allow pairs & triples" />
+                <span aria-hidden="true">Allow pairs & triples {knobs.climbCombos ? '(a reply must match the shape)' : '(single cards only)'}</span></div>
+              <div className="field row"><Switch on={knobs.climbBombSize > 0} onChange={(v) => set('climbBombSize', v ? 4 : 0)} aria-label="Bombs — four of a kind beats any pile, playable even out of turn" />
+                <span aria-hidden="true">Bombs — four of a kind beats any pile, playable even out of turn</span></div>
             </Section>
           )}
 
@@ -864,17 +871,22 @@ export function CreateView({ onPlay }: { onPlay?: (def: GameDefinition) => void 
           <Section title="Deal & drawing" defaultOpen>
             <label className="field"><span>Cards dealt each: <b>{knobs.handSize}</b></span>
               <input type="range" min={1} max={13} value={knobs.handSize} onChange={(e) => set('handSize', +e.target.value)} /></label>
-            <label className="field row"><Switch on={knobs.canAlwaysDraw} onChange={(v) => set('canAlwaysDraw', v)} /><span>Draw anytime {knobs.canAlwaysDraw ? '' : '(only when you can’t play)'}</span></label>
+            <div className="field row"><Switch on={knobs.canAlwaysDraw} onChange={(v) => set('canAlwaysDraw', v)} aria-label="Draw anytime" />
+                <span aria-hidden="true">Draw anytime {knobs.canAlwaysDraw ? '' : '(only when you can’t play)'}</span></div>
             {!knobs.canAlwaysDraw && (
-              <label className="field row"><Switch on={knobs.drawUntilCanPlay} onChange={(v) => set('drawUntilCanPlay', v)} /><span>Keep drawing until you can play</span></label>
+              <div className="field row"><Switch on={knobs.drawUntilCanPlay} onChange={(v) => set('drawUntilCanPlay', v)} aria-label="Keep drawing until you can play" />
+                <span aria-hidden="true">Keep drawing until you can play</span></div>
             )}
           </Section>
 
           <Section title="Matching rules" defaultOpen>
             <span className="mini-label">A card is legal to play if it matches the top card by…</span>
-            <label className="field row"><Switch on={knobs.matchSuit} onChange={(v) => set('matchSuit', v)} /><span>Suit (or the chosen wild suit)</span></label>
-            <label className="field row"><Switch on={knobs.matchRank} onChange={(v) => set('matchRank', v)} /><span>Rank</span></label>
-            <label className="field row"><Switch on={knobs.matchColor} onChange={(v) => set('matchColor', v)} /><span>Colour (red / black)</span></label>
+            <div className="field row"><Switch on={knobs.matchSuit} onChange={(v) => set('matchSuit', v)} aria-label="Suit (or the chosen wild suit)" />
+                <span aria-hidden="true">Suit (or the chosen wild suit)</span></div>
+            <div className="field row"><Switch on={knobs.matchRank} onChange={(v) => set('matchRank', v)} aria-label="Rank" />
+                <span aria-hidden="true">Rank</span></div>
+            <div className="field row"><Switch on={knobs.matchColor} onChange={(v) => set('matchColor', v)} aria-label="Colour (red / black)" />
+                <span aria-hidden="true">Colour (red / black)</span></div>
           </Section>
 
           <Section title="Wild cards">
@@ -950,14 +962,15 @@ export function CreateView({ onPlay }: { onPlay?: (def: GameDefinition) => void 
                 <input type="number" value={knobs.jokerPoints} onChange={(e) => set('jokerPoints', parseInt(e.target.value || '0', 10))} /></label>
             </div>
             <CardValues values={knobs.cardValues} onChange={(v) => set('cardValues', v)} />
-            <label className="field row"><Switch on={knobs.unpricedScoreRankValue} onChange={(v) => set('unpricedScoreRankValue', v)} />
-              <span>Anything left unpriced scores its own pip value (ace 1, faces 10)</span></label>
+            <div className="field row"><Switch on={knobs.unpricedScoreRankValue} onChange={(v) => set('unpricedScoreRankValue', v)} aria-label="Anything left unpriced scores its own pip value (ace 1, faces 10)" />
+                <span aria-hidden="true">Anything left unpriced scores its own pip value (ace 1, faces 10)</span></div>
           </Section>
           </>}
 
           <Section title="Match play">
             <span className="mini-label">Play repeated hands with a running score, instead of ending after one hand.</span>
-            <label className="field row"><Switch on={knobs.matchPlay} onChange={(v) => set('matchPlay', v)} /><span>Play to a target score across multiple hands</span></label>
+            <div className="field row"><Switch on={knobs.matchPlay} onChange={(v) => set('matchPlay', v)} aria-label="Play to a target score across multiple hands" />
+                <span aria-hidden="true">Play to a target score across multiple hands</span></div>
             {knobs.matchPlay && (
               <label className="field"><span>Points to win the match</span>
                 <input type="number" value={knobs.pointTarget} onChange={(e) => set('pointTarget', parseInt(e.target.value || '0', 10))} /></label>
@@ -1403,8 +1416,11 @@ function RankGrid({ selected, onToggle, ranks = RANK_CHOICES }: { selected: Rank
   );
 }
 
-function Switch({ on, onChange }: { on: boolean; onChange: (v: boolean) => void }) {
-  return <button className={`toggle ${on ? 'on' : ''}`} onClick={() => onChange(!on)} aria-pressed={on}><span className="knob" /></button>;
+// Item 24 of the audit pass: this button's only content is an empty knob span, so without its
+// own accessible name it announced to a screen reader as "button, pressed" — nothing saying
+// what it toggled. Every call site now passes the same text its sighted label already shows.
+function Switch({ on, onChange, 'aria-label': ariaLabel }: { on: boolean; onChange: (v: boolean) => void; 'aria-label': string }) {
+  return <button className={`toggle ${on ? 'on' : ''}`} onClick={() => onChange(!on)} aria-pressed={on} aria-label={ariaLabel}><span className="knob" /></button>;
 }
 
 // Options can be numbers (deck counts) or strings (deal shapes), so this is generic over both.

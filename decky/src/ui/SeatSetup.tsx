@@ -127,9 +127,9 @@ export function SeatSetup({ def, defaultSeats, defaultName, onStart, onCancel }:
         </ol>
 
         <label className="practice-toggle">
-          <input type="checkbox" checked={practice} onChange={(e) => setPractice(e.target.checked)} />
+          <input type="checkbox" checked={practice} onChange={(e) => setPractice(e.target.checked)} aria-label="Practice" />
           <span>
-            <b>Practice</b>
+            <b aria-hidden="true">Practice</b>
             <em>Nothing is recorded, and you can always take a move back.</em>
           </span>
         </label>

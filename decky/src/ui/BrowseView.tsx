@@ -256,6 +256,12 @@ function Carousel({ games, onOpen, onPlay }: {
   const hold = () => { stop.current = true; setHeld(true); };
 
   return (
+    // The region itself isn't a control — onPointerDown/onFocusCapture just notice that the
+    // user is interacting with it at all (pointer down anywhere in it, focus landing on a card
+    // inside it) and pause auto-advance so a game they're looking at doesn't slide away under
+    // them. Real interaction happens on the buttons and links inside; onKeyDown below is this
+    // region's own genuine keyboard support (arrow keys), not a workaround for this rule.
+    // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions
     <div
       className="carousel"
       onPointerDown={hold}

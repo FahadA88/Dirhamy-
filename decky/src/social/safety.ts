@@ -105,8 +105,11 @@ export function syncCode(): string {
   }
 }
 
-/** Point this device at somebody else's code — that is, at your own list on another device. */
-export function useSyncCode(code: string): void {
+/** Point this device at somebody else's code — that is, at your own list on another device.
+ *  Named adoptSyncCode, not useSyncCode: a `use`-prefixed plain function reads as a React hook
+ *  to both humans and eslint-plugin-react-hooks, which flagged this exact call as a hooks-rules
+ *  violation for being invoked inside an onClick — it never was one. */
+export function adoptSyncCode(code: string): void {
   try { localStorage.setItem(SYNC, code.trim().toUpperCase()); } catch { /* ignore */ }
 }
 

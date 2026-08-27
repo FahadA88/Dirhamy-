@@ -3,7 +3,7 @@ import { useSettings } from '../settings/SettingsContext';
 import { useDismissable } from './useEscape';
 import { resetFirstRun } from './FirstRun';
 import { Confirm } from './Confirm';
-import { pullSafety, pushSafety, syncCode, useSyncCode } from '../social/safety';
+import { adoptSyncCode, pullSafety, pushSafety, syncCode } from '../social/safety';
 import { hostInfo } from '../net/host';
 import { ENGINE_CHANGELOG } from '../engine/changelog';
 import {
@@ -71,7 +71,11 @@ export function SettingsPanel({ open, onClose }: { open: boolean; onClose: () =>
   if (!open) return null;
 
   return (
+    // Click-outside-to-close is supplementary — the ref below wires Escape, and there's a real
+    // Close button inside. The scrim is the dimmed rest of the page, not a control.
+    // eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events
     <div className="prefs-scrim" onClick={onClose}>
+      {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/click-events-have-key-events */}
       <div className="prefs" ref={ref} role="dialog" aria-modal="true" aria-label="Preferences"
         onClick={(e) => e.stopPropagation()}>
 
@@ -223,6 +227,10 @@ function LookSection({ s, set }: { s: Settings; set: Setter }) {
           {unsaved && (
             naming ? (
               <form className="swatch wide save-mix" onSubmit={(e) => { e.preventDefault(); saveMix(); }}>
+                {/* This is the case autoFocus is meant for: the field only exists because the
+                    user just clicked "Save as new look", so focus was already headed here — it
+                    never steals it on page load or from anywhere the user didn't just ask. */}
+                {/* eslint-disable-next-line jsx-a11y/no-autofocus */}
                 <input autoFocus value={name} onChange={(e) => setName(e.target.value)}
                   placeholder="Name this look" maxLength={24} aria-label="Name for this look" />
                 <div className="save-mix-actions">
@@ -616,7 +624,7 @@ function SyncCode() {
           aria-label="Another device's sync code"
           onChange={(e) => setEntry(e.target.value.toUpperCase())} />
         <button className="ghost sm" disabled={entry.trim().length < 8}
-          onClick={() => { useSyncCode(entry); setCode(entry.trim().toUpperCase()); setEntry(''); setStatus('Code changed. Fetch to pull that list in.'); }}>
+          onClick={() => { adoptSyncCode(entry); setCode(entry.trim().toUpperCase()); setEntry(''); setStatus('Code changed. Fetch to pull that list in.'); }}>
           Use it
         </button>
       </div>

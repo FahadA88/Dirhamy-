@@ -230,10 +230,13 @@ export function SolitaireTable({ def, daily = false }: { def: GameDefinition; da
                   </div>
                 )}
                 {(view.freeCells ?? []).map((cell) => (
+                  // Only needs to be a keyboard target while empty — an occupied cell's card
+                  // already carries its own <button> for picking it up, and a free cell can
+                  // never itself be a drop target once it holds a card. The role/tabIndex/keydown
+                  // are real, just applied by the conditional spread below rather than statically,
+                  // which is more than the linter's static check can see.
+                  // eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events
                   <div key={cell.id} className={`sol-slot cell ${dropOk(cell.id) ? 'target' : ''}`} onClick={() => tapZone(cell.id)}
-                    // Only needs to be a keyboard target while empty — an occupied cell's card
-                    // already carries its own <button> for picking it up, and a free cell can
-                    // never itself be a drop target once it holds a card.
                     {...(!cell.card ? { role: 'button' as const, tabIndex: 0, 'aria-label': 'Free cell, empty', onKeyDown: (e: React.KeyboardEvent) => zoneKeyDown(e, cell.id) } : {})}>
                     {cell.card ? (
                       <button className={`sol-card ${canMoveFrom(cell.id, cell.card.id) ? 'live' : ''} ${isPicked(cell.id, cell.card.id) ? 'picked' : ''} ${isHinted(cell.id, cell.card.id) ? 'hinted' : ''}`}
@@ -269,7 +272,9 @@ export function SolitaireTable({ def, daily = false }: { def: GameDefinition; da
                 // Only needs to be a keyboard target while empty — every card already in the
                 // column carries its own <button>, and clicking any one of them while holding a
                 // picked card already drops onto the column, so an occupied column has a
-                // keyboard path with no help from the div itself.
+                // keyboard path with no help from the div itself. Same conditional-spread shape
+                // as the free cells above, and the same static-analysis blind spot.
+                // eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events
                 <div key={col.id} className={`sol-col ${dropOk(col.id) ? 'target' : ''}`} onClick={() => tapZone(col.id)}
                   {...(col.cards.length === 0 ? { role: 'button' as const, tabIndex: 0, 'aria-label': 'Column, empty', onKeyDown: (e: React.KeyboardEvent) => zoneKeyDown(e, col.id) } : {})}>
                   {col.cards.length === 0 && <div className="sol-empty col-empty" />}
