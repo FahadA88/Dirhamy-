@@ -418,6 +418,13 @@ export function createMatch(
     log(state, null, `${cfg.slots} face down each. You saw ${cfg.peekAtStart} of yours — remember them.`);
   }
 
+  // Old Maid: the deck was dealt out whole by the definition's own `dealAll` step, unevenly if
+  // it must be — 51 cards never split evenly by four. Whatever landed in a hand, any pair in it
+  // falls out before the first turn, same as it will after every draw from here on.
+  if (def.maid) {
+    for (const p of players) maidDiscardPairs(state, p);
+  }
+
   if (def.layout) {
     const cfg = def.layout;
     const draw = state.zones['draw'] || (state.zones['draw'] = []);
@@ -720,6 +727,7 @@ function familyLegalMoves(state: MatchState, playerId: string): Move[] {
   if (state.definition.kent) return kentLegalMoves(state, playerId);
   if (state.definition.layout) return layoutLegalMoves(state, playerId);
   if (state.definition.swap) return swapLegalMoves(state, playerId);
+  if (state.definition.maid) return maidLegalMoves(state, playerId);
   if (state.definition.set) return setLegalMoves(state);
 
   // Resolve a pending choice first (e.g. pick a suit after a wild).
@@ -1045,6 +1053,7 @@ export function applyMove(state: MatchState, playerId: string, move: Move): Matc
   if (def.kent) return afterFamilyMove(applyKentMove(s, playerId, move), playerId, handBefore);
   if (def.layout) return afterFamilyMove(applyLayoutMove(s, playerId, move), playerId, handBefore);
   if (def.swap) return afterFamilyMove(applySwapMove(s, playerId, move), playerId, handBefore);
+  if (def.maid) return afterFamilyMove(applyMaidMove(s, playerId, move), playerId, handBefore);
   if (def.set) return afterFamilyMove(applySetMove(s, playerId, move), playerId, handBefore);
 
   // Resolve a pending suit choice.
@@ -4245,6 +4254,102 @@ function endSwapRound(s: MatchState): MatchState {
   return s;
 }
 
+// ---------- maid family (Old Maid) ----------
+//
+// The one family here where a turn touches someone else's hand rather than a pile. Nobody
+// chooses which card changes hands — the drawer names a POSITION in the target's fan, sight
+// unseen, exactly as blind to them as it is to the person being drawn from.
+
+/** Pull every same-rank pair out of a hand, into the void, until none remain. */
+function maidDiscardPairs(s: MatchState, playerId: string): void {
+  const hand = s.zones[`hand:${playerId}`] || (s.zones[`hand:${playerId}`] = []);
+  const voidPile = (s.zones['void'] ||= []);
+  for (;;) {
+    const byRank = new Map<string, number>();
+    let pairAt = -1;
+    for (let i = 0; i < hand.length; i++) {
+      const seen = byRank.get(hand[i].rank);
+      if (seen !== undefined) { pairAt = i; byRank.set(hand[i].rank, seen); break; }
+      byRank.set(hand[i].rank, i);
+    }
+    if (pairAt < 0) break;
+    const rank = hand[pairAt].rank;
+    const partner = hand.findIndex((c) => c.rank === rank);
+    const [a, b] = [pairAt, partner].sort((x, y) => y - x);
+    const cardA = hand.splice(a, 1)[0];
+    const cardB = hand.splice(b, 1)[0];
+    voidPile.push(cardA, cardB);
+    log(s, playerId, `${short(playerId)} pairs off ${cardLabel(cardA)}.`);
+  }
+}
+
+/** The next player still holding cards, walking forward from `from` — the one you draw from. */
+function maidNextHolder(s: MatchState, from: number): string | null {
+  const n = s.players.length;
+  for (let step = 1; step <= n; step++) {
+    const p = s.players[(from + step) % n];
+    if ((s.zones[`hand:${p}`] || []).length > 0) return p;
+  }
+  return null;
+}
+
+function maidLegalMoves(state: MatchState, playerId: string): Move[] {
+  if (state.phase !== 'playing') return [];
+  if (state.players[state.turnIndex] !== playerId) return [];
+  const target = maidNextHolder(state, state.turnIndex);
+  if (!target) return [];
+  const hand = state.zones[`hand:${target}`] || [];
+  return hand.map((_, i) => ({ actionId: 'maidDraw', target, slot: i }));
+}
+
+function applyMaidMove(s: MatchState, playerId: string, move: Move): MatchState {
+  if (move.actionId !== 'maidDraw') return s;
+  const target = move.target ?? '';
+  const targetHand = s.zones[`hand:${target}`] || [];
+  const i = move.slot ?? 0;
+  if (i < 0 || i >= targetHand.length) return s;
+  const card = targetHand.splice(i, 1)[0];
+  const hand = (s.zones[`hand:${playerId}`] ||= []);
+  hand.push(card);
+  log(s, playerId, `${short(playerId)} draws blind from ${short(target)}.`);
+  maidDiscardPairs(s, playerId);
+
+  // Everyone but one player empty-handed: whoever is left is holding the card that could never
+  // pair, and that is the whole loss condition — nothing else about how they played mattered.
+  const holders = s.players.filter((p) => (s.zones[`hand:${p}`] || []).length > 0);
+  if (holders.length <= 1) {
+    s.phase = 'roundOver';
+    const loser = holders[0] ?? playerId;
+    for (const p of s.players) s.scores[p] = p === loser ? 1 : 0;
+    // Everyone but the loser tied for not losing — there is no second place in Old Maid, only
+    // one player who is it and everyone who is not. `s.winner` still has to name somebody, and
+    // naming the same seat every time (whoever happens to sort first) would make that seat look
+    // like it was winning the GAME rather than merely not holding one unlucky card at the end.
+    // Picked fairly at random from the safe group instead of by array position.
+    const safe = s.players.filter((p) => p !== loser);
+    const { result, rngState } = seededShuffle(safe, s.rngState);
+    s.rngState = rngState;
+    s.winner = result[0] ?? s.players[0];
+    log(s, null, `${short(loser)} is left holding it.`);
+    finalizeMatchProgress(s);
+    return s;
+  }
+  /*
+    Emptying your hand is safe for good, not just until the next card lands on you.
+
+    `advanceTurn` moves one seat at a time regardless of what is in anybody's hand, which is
+    right for every other family — a shedding player who goes out is DONE for the hand, they do
+    not draw again. Old Maid is the same idea from the other side: once you have nothing left,
+    you have nothing left to hold the odd card with, and the turn has no reason to ever come
+    back to you. Skipping straight to the next actual holder is not an optimisation, it is the
+    rule — without it an emptied hand could draw its way back into risk, which is a different
+    and much longer game than the one being dealt.
+  */
+  const next = maidNextHolder(s, s.turnIndex);
+  if (next) s.turnIndex = s.players.indexOf(next);
+  return s;
+}
+
 // ---------- layout family (Kings Corner) ----------
 //
 // A shared tableau. Everybody builds on the same piles, so a card you cannot use is a card you
@@ -4732,7 +4837,7 @@ export function redact(state: MatchState, viewer: string): RedactedState {
     scores: { ...state.scores },
     log: state.log.slice(-40),
     mode: state.definition.solitaire ? 'solitaire' : state.definition.trick ? 'trick' : state.definition.climb ? 'climb' : state.definition.fish ? 'fish' : state.definition.rummy ? 'rummy' : state.definition.war ? 'war'
-      : state.definition.bluff ? 'bluff' : state.definition.reflex ? 'reflex' : state.definition.poker ? 'poker' : state.definition.pit ? 'pit' : state.definition.kent ? 'kent' : state.definition.set ? 'set' : state.definition.layout ? 'layout' : state.definition.swap ? 'swap' : 'shedding',
+      : state.definition.bluff ? 'bluff' : state.definition.reflex ? 'reflex' : state.definition.poker ? 'poker' : state.definition.pit ? 'pit' : state.definition.kent ? 'kent' : state.definition.set ? 'set' : state.definition.layout ? 'layout' : state.definition.swap ? 'swap' : state.definition.maid ? 'maid' : 'shedding',
     ...(state.definition.solitaire ? solitaireView(state) : {}),
     layoutPiles: state.definition.layout
       ? layoutPileIds(state.definition).map((id, i) => ({

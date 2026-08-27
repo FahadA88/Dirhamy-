@@ -539,6 +539,18 @@ export function chooseMove(
     card somebody else is going to go out ahead of you with.
   */
   /*
+    Old Maid. Every move is a position in a hand nobody, including this bot, can see into — so
+    there is no "smart" pick, and pretending otherwise would be inventing information that does
+    not exist. Uniform random over the offered positions is not a fallback here, it is the
+    correct policy.
+  */
+  if (moves.length > 0 && moves[0].actionId === 'maidDraw') {
+    const r = nextRandom(botSeed);
+    botSeed = r.state;
+    return { move: moves[Math.floor(r.value * moves.length)], botSeed };
+  }
+
+  /*
     Dutch. The bot is held to the same knowledge a person would have: it only trusts
     `state.seen[playerId]`, never the raw grid, because the engine state handed to a bot is the
     unredacted truth and reading straight off it would be the bot cheating at its own memory

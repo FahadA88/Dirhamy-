@@ -210,6 +210,11 @@ export function explainGame(def: GameDefinition): string[] {
     const ranks = def.reflex.slapRanks.join(', ') || 'nothing by rank';
     out.push(`Flip a card each turn onto the shared pile. When the top card is a ${ranks}${def.reflex.slapMatch ? ', or the top two match,' : ''}, anyone may slap to take it.`);
     out.push('Last player still holding cards wins.');
+  } else if (def.maid) {
+    const cfg = def.maid;
+    out.push(`Every card in the pack pairs off except one ${cfg.oddRank}, which has no partner.`);
+    out.push('Any pair in your hand falls out of it at once. On your turn, draw one card — sight unseen — from whoever draws next after you, naming a position in their fan rather than a card.');
+    out.push(`Whoever is holding the odd ${cfg.oddRank} once everyone else is empty-handed loses.`);
   } else if (def.swap) {
     const cfg = def.swap;
     out.push(`${cfg.slots} cards face down in front of each player. You may look at ${cfg.peekAtStart} of your own, once, and then they stay down.`);

@@ -52,8 +52,9 @@ export function validate(def: GameDefinition): ValidationResult {
   const isSet = !!def.set;
   const isLayout = !!def.layout;
   const isSwap = !!def.swap;
+  const isMaid = !!def.maid;
   const isSpecial = isTrick || isClimb || isFish || isRummy || isWar || isSolitaire
-    || isBluff || isReflex || isPoker || isPit || isSet || isKent || isLayout || isSwap;
+    || isBluff || isReflex || isPoker || isPit || isSet || isKent || isLayout || isSwap || isMaid;
 
   // --- players ---
   // Patience is played alone, and spotting sets on a shared board works just as well solo, so

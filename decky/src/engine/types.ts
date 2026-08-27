@@ -115,6 +115,8 @@ export interface GameDefinition {
   kent?: KentConfig;
   /** A shared tableau everyone builds on — Kings Corner. */
   layout?: LayoutConfig;
+  /** Blind draw from a neighbour's hand — Old Maid. */
+  maid?: MaidConfig;
   /** Four face-down cards you may not look at — Dutch. */
   swap?: SwapConfig;
   set?: SetConfig;
@@ -227,6 +229,21 @@ export interface PokerConfig {
  * Kings Corner is the game it was written for. Sevens, Michigan and Kings in the Corner all sit
  * on the same bones.
  */
+/**
+ * Blind draw — Old Maid, and the family it belongs to.
+ *
+ * Everything else here draws from a pile nobody owns. This draws from a PERSON: on your turn you
+ * take one card, sight unseen, from whoever draws next after you — you pick which of their cards
+ * by position in their fan, not by what it is, because you cannot see it any more than they can
+ * choose which one you get. Any pair in a hand falls out of it the moment it forms. Whoever is
+ * still holding a card once everyone else's hand is empty is holding the one card that could
+ * never pair, and loses on that alone.
+ */
+export interface MaidConfig {
+  /** The rank with one card missing its pair — traditionally the queen. */
+  oddRank: Rank;
+}
+
 export interface LayoutConfig {
   /** Piles seeded with one card each at the deal — the cross, in Kings Corner. */
   piles: number;
@@ -1061,7 +1078,7 @@ export interface RedactedState {
   log: LogEntry[];
   // family-specific view
   mode: 'shedding' | 'trick' | 'climb' | 'fish' | 'rummy' | 'war' | 'solitaire'
-    | 'bluff' | 'reflex' | 'poker' | 'pit' | 'set' | 'kent' | 'layout' | 'swap';
+    | 'bluff' | 'reflex' | 'poker' | 'pit' | 'set' | 'kent' | 'layout' | 'swap' | 'maid';
   // solitaire
   tableau?: { id: string; cards: Card[]; faceDown: number }[];
   foundations?: { id: string; cards: Card[] }[];

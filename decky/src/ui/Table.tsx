@@ -368,6 +368,7 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
   const isKent = view.mode === 'kent';
   const isLayout = view.mode === 'layout';
   const isSwap = view.mode === 'swap';
+  const isMaid = view.mode === 'maid';
   const moonShooter = view.shotMoon ?? null;
   // Gin and an undercut are the two gin-rummy endings worth a beat of their own; an ordinary
   // knock is the unremarkable case the generic "X takes it" heading already covers.
@@ -1638,6 +1639,39 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
             )}
             {view.caller && <span className="lay-note swap-called">{view.caller === me ? 'You called' : `${view.caller} called`} — one turn each left.</span>}
           </div>
+        </div>
+      ) : isMaid ? (
+        /*
+          The middle of an Old Maid table: whoever draws next after you, as a fan of cards with
+          nothing on their faces — the point is that neither of you knows which is which. Each
+          back is one legal move, keyed to the position it sits in, not to a card.
+        */
+        <div className="center maid-center">
+          {(() => {
+            const targetId = myLegal[0]?.target;
+            const target = view.players.find((p) => p.id === targetId);
+            if (!target) {
+              return <span className="lay-note">Waiting for the others…</span>;
+            }
+            return (
+              <>
+                <div className="maid-fan-label">{target.id === me ? 'You' : target.id}'s hand — pick one</div>
+                <div className="maid-fan" role="group" aria-label={`${target.id}'s hand, face down`}>
+                  {myLegal.map((m, i) => (
+                    <button
+                      key={i}
+                      className="maid-card"
+                      style={{ '--i': i, '--n': myLegal.length } as React.CSSProperties}
+                      aria-label={`Draw the card in position ${i + 1} of ${myLegal.length}`}
+                      onClick={() => submit(m)}
+                    >
+                      <div className={backCls} />
+                    </button>
+                  ))}
+                </div>
+              </>
+            );
+          })()}
         </div>
       ) : isLayout ? (
         /*
