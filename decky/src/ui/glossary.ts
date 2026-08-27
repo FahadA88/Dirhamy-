@@ -81,6 +81,10 @@ const GAME_TERMS: Record<string, [string, string][]> = {
     ['Blind swap', 'Trading one of your own cards for one of an opponent\'s, with neither player looking at either.'],
     ['Call', 'Declaring that you believe you are lowest. Everyone else gets one more turn, then the cards come over — call it wrong and it costs you.'],
   ],
+  'classic-old-maid': [
+    ['Blind draw', 'Picking a card from someone else\'s hand by its position in their fan, not by what it is — neither of you knows until it\'s out.'],
+    ['The Old Maid', 'The one queen with no partner left in the pack. Every other card in the deck pairs off with something; this is the card that never can.'],
+  ],
 };
 
 export function termsFor(def: GameDefinition): { term: string; def: string }[] {

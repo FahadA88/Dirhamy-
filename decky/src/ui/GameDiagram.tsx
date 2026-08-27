@@ -158,6 +158,40 @@ function panelsFor(def: GameDefinition): Panel[] {
     ];
   }
 
+  if (def.layout) {
+    const corner = def.layout.cornerRank;
+    return [{
+      caption: `A corner opens only on a ${corner}. Every other pile builds downward, alternating colour.`,
+      board: [{ card: c('9', 'S') }, { card: c('8', 'H'), label: 'on the pile' }],
+      choices: [
+        { card: c('7', 'C'), ok: true, why: 'one rank down, alternating colour' },
+        { card: c('6', 'H'), ok: false, why: 'same colour as the card it would land on' },
+      ],
+    }];
+  }
+
+  if (def.swap) {
+    return [{
+      caption: 'Your row stays face down all game, except what you\'ve peeked at or seen change — you can never be sure what you\'re holding.',
+      board: [{ card: c('K', 'S'), label: 'one of yours, seen once' }],
+      choices: [
+        { card: c('K', 'S'), ok: false, why: 'a high card — worth swapping away if you can' },
+        { card: c('3', 'C'), ok: true, why: 'low enough to be worth keeping' },
+      ],
+    }];
+  }
+
+  if (def.maid) {
+    return [{
+      caption: 'On your turn you draw one unseen card from whoever comes after you. Any pair in your hand falls out at once.',
+      board: [{ card: c('9', 'H'), label: 'already in hand' }],
+      choices: [
+        { card: c('9', 'C'), ok: true, why: 'pairs with the nine already there — both fall out' },
+        { card: c('4', 'D'), ok: false, why: 'no match yet — stays in your hand' },
+      ],
+    }];
+  }
+
   // The shedding family, and anything built from it.
   const matchSuit = def.actions.some((a) => JSON.stringify(a).includes('suitMatches'))
     || fam === 'shedding-matching';
