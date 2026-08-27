@@ -1,20 +1,24 @@
 # Decky
 
-A web app where people play card games and create their own, using a standard 54-card deck.
+A web app where people play card games and build their own, using a standard 54-card deck.
 **The engine is the referee** — it deals, enforces every rule, hides what should be hidden,
-tracks score, and decides the winner. Clients only render state and submit intended moves.
-
-This covers **Milestones M1–M5** from the master build spec: the pure deterministic engine,
-a classics library, a static validator, a bot-simulator, a visual editor (remix + family
-skeleton), and an AI co-pilot with interview behavior — all in a playable web app.
+tracks score, and decides the winner. Clients only render state and submit intended moves; a
+tampered client cannot make an illegal move or see a card it shouldn't.
 
 ## The core idea: a game is data, not code
 
-Every game is a `GameDefinition` (structured JSON) that the one engine reads and runs.
-`src/games/crazyEights.ts` is Crazy Eights expressed entirely as data — there is no
-Crazy-Eights logic anywhere in the engine. Add a game = add data, never engine code.
+Every game is a `GameDefinition` (structured JSON) that one engine reads and runs. Adding a
+game means adding data, never engine code — `src/games/crazyEights.ts` is Crazy Eights
+expressed entirely as data, and there is no Crazy-Eights-specific logic anywhere in the engine.
 
 ## What's here
+
+Over 50 classic games ship today, across every major card-game family: trick-taking (Hearts,
+Spades, Euchre, Whist, Bridge, Skat, Pinochle, Napoleon, Sixty-Six…), shedding (Crazy Eights,
+Switch, Palace…), climbing (Big Two, President, Undertow…), rummy (Gin Rummy, Canasta, Hand &
+Foot, Continental…), fishing (Go Fish), comparing/war, bluffing (Bluff, Slapjack), betting
+(Showdown Poker), trading (Pit), signalling (Kent), spotting (Trio), and solitaire (Klondike,
+FreeCell, Spider, Yukon, Golf, Canfield, and more).
 
 ```
 src/engine/
@@ -22,72 +26,91 @@ src/engine/
   rng.ts         # seeded deterministic RNG (mulberry32 + Fisher–Yates)
   deck.ts        # standard-54 deck build, card tags
   engine.ts      # the interpreter: createMatch, legalMoves, applyMove, isTerminal, redact
-  validator.ts   # M3: static well-formedness checks (missing zones/tags, unreachable win…)
-  simulator.ts   # M3: bot-simulator — proves a game terminates, is winnable, roughly balanced
-src/games/
-  crazyEights.ts # a classic, as pure data
-  switch.ts      # M2: a second classic (action cards) — ran with ZERO engine changes
-  catalog.ts     # the classics library
+  validator.ts   # static well-formedness checks (missing zones/tags, unreachable win…)
+  simulator.ts   # bot-simulator — proves a game terminates, is winnable, roughly balanced
+src/games/       # every classic, as pure data — 50+ definitions, no per-game engine code
 src/authoring/
-  knobs.ts       # M4: the authoring model — knobs compile to a full GameDefinition
-  copilot.ts     # M5: describe→knobs translator + interview (offline; LLM-swap seam)
+  knobs.ts       # the guided-builder authoring model — knobs compile to a full GameDefinition
+  ruleKit.ts     # the near-programmable custom-rule layer: when / if / then, never eval'd
+  copilot.ts     # describe→knobs translator + interview (offline; LLM-swap seam)
+src/server/
+  matchService.ts # the sole holder of unredacted MatchState; callers only ever get redact()'d views
+  local.ts        # in-process transport for solo/pass-and-play
+src/net/
+  wsServer.ts    # WebSocket host: per-seat auth tokens, invite-code tables, quick-play
+  wsClient.ts    # WebSocket client transport, same protocol as the local one
 src/settings/
   settings.ts    # user customization: theme/accent/cards/motion/gameplay, persisted
   SettingsContext.tsx # provider that applies settings to the DOM live
+src/library/
+  library.ts     # publish, discovery, ratings, follows, collections, community moderation
+src/social/
+  daily.ts       # the daily deal — one seeded Klondike hand, the same for everyone each day
+  safety.ts      # name/description screening, reporting, blocks/mutes, cross-device sync
 src/bots/
   randomBot.ts   # legal-move bot (works for ANY game for free — engine enumerates moves)
 src/ui/
-  App.tsx        # Play / Create router
+  App.tsx        # Play / Create / You router
   Table.tsx      # renders the REDACTED view, highlights legal moves, drives bots
-  PlayView.tsx   # the classics library + discovery
-  CreateView.tsx # M4/M5: the visual editor + AI co-pilot + live validation + test/playtest
+  SolitaireTable.tsx # the patience-family table
+  PlayView.tsx   # the classics library + discovery + resumable/in-progress games
+  CreateView.tsx # the visual editor + AI co-pilot + RuleBuilder + live validation + playtest
+  ProfileView.tsx # achievements, stats, streaks
 scripts/
-  selftest.ts    # headless self-play over every classic — the engine's acceptance test
-  validate.ts    # proves the validator passes classics and catches broken definitions
+  selftest.ts, mechanics.ts, phase1-5.ts, families.ts, author.ts # headless correctness proofs
+  browser/       # real Playwright suites against a running build
 ```
 
-## Architecture (mirrors the authoritative-server model)
+## Architecture (authoritative-server model)
 
 The engine is a **pure function of `(state, move)`** — no I/O, no clock, no network; all
 randomness flows through the seeded RNG in state. That purity is what lets the *same* engine
-run headless in the simulator, in the browser today, and on an authoritative server later.
+run headless in the simulator, in a solo browser tab, and behind a real WebSocket host.
 
 - `legalMoves(state, player)` is the single source of truth for **both** the UI's
   legal-move highlighting **and** the bots' option list.
 - `redact(state, player)` derives each player's allowed view from each zone's `visibility` —
   the one place hidden information is enforced (you never receive cards you can't see).
-- The UI holds full state locally for this solo slice, but only ever renders the redacted
-  view, exactly as a thin client would against a real server.
+- `MatchService` is the only place unredacted `MatchState` lives; every client — local,
+  pass-and-play, or over the wire — only ever sees `redact()`'d state.
+- Real-time multiplayer runs over WebSocket with a per-seat authentication token: joining or
+  opening a seat hands back a token that must be presented on every request for that seat, so
+  one browser tab cannot read another player's hand or move as them.
+- Fairness is commit-reveal: `sha256(serverSeed)` is published before dealing, so a shuffle can
+  be verified after the fact rather than taken on trust.
+- Definitions are pinned into a match on creation, so editing a game in the builder can never
+  change the rules of a match already in progress.
+- No real-money gambling.
+
+## Beyond the engine
+
+- **Near-programmable custom rules** — a guided when/if/then builder (never `eval`'d) for
+  twists no preset covers, with an offline AI co-pilot that turns a plain-English description
+  into knobs and asks about whatever it left ambiguous.
+- **Play with people** — real-time WebSocket tables (invite code or quick-play matchmaking),
+  local pass-and-play, and async play with turn notifications, multiple concurrent games, and
+  reconnect/resume.
+- **Publish and discover** — community games with ratings, tags, search, staff picks, a daily
+  featured rotation, creator follows, and reporting/moderation.
+- **Progression** — achievements, per-game stats, and a daily deal with a streak.
+- **Accessibility** — full keyboard play, screen-reader move announcements, a colour-vision
+  simulator, honoured `prefers-reduced-motion`, and an `eslint-plugin-jsx-a11y` gate in `npm
+  test` so a regression here fails the build, not a screen reader.
+- **Installable PWA** — works offline once cached, with safe-area-inset support for notched
+  phones running it standalone.
+- **Deep customization** — themes, accents, table felts, card backs (including a from-scratch
+  designer and image upload), avatars, animation speed, and more, all persisted locally.
 
 ## Run it
 
 ```bash
 npm install
-npm run test       # selftest (bot self-play over all classics) + validator checks
-npm run dev        # the web app: Play the classics, or Create your own
-npm run build      # production build
+npm test           # engine, validator, mechanics, acceptance, bundle-size budget, lint
+npm run dev         # the web app: Play the classics, Create your own, or watch You
+npm run build       # production build
+npm run host         # the WebSocket multiplayer host, for real-time tables
+npm run verify:all  # the full Playwright browser suite (needs `npm run preview` on :4173)
 ```
 
-In the app: **Play** a classic solo vs bots, or **Create** — start from a blank skeleton or
-remix a classic, turn knobs, describe rules to the co-pilot, watch it interview you about
-gaps, run the simulator, and playtest. The **⚙ Customize** drawer controls appearance and
-gameplay: light/dark/system theme, 7 accent colors, card backs, card size, four-color deck,
-table surface, ambient-3D toggles, motion, density — plus your name, bot labels/speed/
-difficulty, legal-move highlight style, hand sorting, confirm-to-play, log, and sound. All
-persisted to localStorage.
-
-## Verified
-
-- **Engine (`npm run selftest`):** 1000 four-player games each of Crazy Eights and Switch —
-  all terminate, all winnable, no move-cap hits. Crazy Eights ~29 moves, Switch ~52.
-- **Validator (`npm run validate`):** classics validate clean; deliberately broken defs
-  (missing tag, unreachable win, over-deal, missing zone) are all caught.
-- **Co-pilot:** parses e.g. *"Deal 7 each, jokers wild, queens reverse, 2s draw two"* into the
-  right knobs and asks about the unspecified draw-pile-empty rule.
-
-## Next (per the master build spec)
-
-The remaining V1 pieces: an **authoritative multiplayer server** (the UI already renders only
-the redacted view, so this is a lift-and-shift), **reconnect/resume**, **publish + discovery +
-moderation** for community games, and swapping the offline co-pilot translator for a live LLM
-behind the existing `Translator` seam. See `docs/card-game-engine-master-build-spec.md`.
+See `CLAUDE.md` for the architecture rules this project holds itself to, and the full command
+list.
