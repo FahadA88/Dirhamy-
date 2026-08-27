@@ -77,7 +77,7 @@ export function createMatch(
     tricksWon: Object.fromEntries(players.map((p) => [p, 0])),
     bids: {},
     bidding: !!def.trick?.bidding,
-    trumpSuit: def.trick?.auction ? null : (def.trick?.trump ?? null),
+    trumpSuit: (def.trick?.auction || def.trick?.turnedTrump) ? null : (def.trick?.trump ?? null),
     auctionRound: 0,
     auctionPasses: 0,
     turnedDownSuit: null,
@@ -298,6 +298,20 @@ export function createMatch(
         const card = state.zones[step.from].pop();
         if (card) state.zones[step.to].push(card);
       }
+    }
+  }
+
+  // Whist's own rule: trump is not named by anyone, it is whatever suit the last card dealt
+  // happens to be. That card was the last one pushed by the round-robin deal loop above, so it
+  // sits on top of the last seat's hand — turn it up, tell the table, and leave it exactly
+  // where it landed; it is a card in that hand like any other from the next trick onward.
+  if (def.trick?.turnedTrump) {
+    const lastSeat = players[players.length - 1];
+    const hand = state.zones[zoneKey(def, 'hand', lastSeat)] || [];
+    const turned = hand[hand.length - 1];
+    if (turned) {
+      state.trumpSuit = turned.suit;
+      log(state, null, `${short(lastSeat)} turns up ${cardLabel(turned)} — trump is ${turned.suit}.`);
     }
   }
 
@@ -1609,7 +1623,7 @@ function scoreMelds(s: MatchState): void {
 // unset on purpose, which is exactly 'none'.
 export function trumpOf(s: MatchState): Suit | 'none' {
   const cfg = s.definition.trick!;
-  if (cfg.auction || cfg.numericAuction) return s.trumpSuit ?? 'none';
+  if (cfg.auction || cfg.numericAuction || cfg.turnedTrump) return s.trumpSuit ?? 'none';
   return cfg.trump;
 }
 

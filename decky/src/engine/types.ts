@@ -353,6 +353,13 @@ export interface FishConfig {
 
 export interface TrickConfig {
   trump: Suit | 'none';        // suit that beats all others when resolving a trick
+  /**
+   * Trump is not named by anyone — it is whatever suit the last card dealt happens to be, shown
+   * to the table and left in that hand. `trump` above is meaningless when this is set (write
+   * 'none') and is overridden the moment the deal finishes, the same way an auction's trump
+   * overrides it once the bidding closes.
+   */
+  turnedTrump?: boolean;
   mustFollowSuit: boolean;     // must play the led suit if you hold one
   aceHigh: boolean;            // Ace is the strongest rank (else lowest)
   scoreBy: 'mostTricks' | 'fewestTricks' | 'penalty';
