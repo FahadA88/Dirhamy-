@@ -171,7 +171,7 @@ export async function joinRemoteTable(base: string, code: string, name: string) 
     method: 'POST', headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ code, name }),
   });
-  return r.json() as Promise<{ matchId: string; seat: string; token: string } | { error: string }>;
+  return r.json() as Promise<{ matchId: string; seat: string; token: string; gameId: string } | { error: string }>;
 }
 
 export async function quickPlay(base: string, gameId: string, name: string, seats = 4) {

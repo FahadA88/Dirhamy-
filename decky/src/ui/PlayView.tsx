@@ -14,6 +14,7 @@ import type { OnlineSession } from './OnlineTable';
 import { hostInfo } from '../net/host';
 import { recordPlay } from '../library/library';
 import { dailyGame, dailyStreak, resultFor, todayKey } from '../social/daily';
+import { WebSocketApi, joinRemoteTable } from '../net/wsClient';
 
 // Worklist #98, continued: the websocket client, the remote-table protocol and the online
 // lobby only matter to the fraction of sessions that ever click "Play with people" — most
@@ -63,8 +64,50 @@ export function PlayView() {
   const [resumeId, setResumeId] = useState<string | null>(null);
   // Today's Deal: the same Klondike seed for everyone playing today (see social/daily.ts).
   const [dailyMode, setDailyMode] = useState(false);
+  // Item 60 of the audit pass: the invite-link "Copy link" button built a ?table=CODE URL that,
+  // until now, did nothing special when opened — it just landed on the ordinary shelf. This is
+  // what makes that link actually join the table it points at.
+  const [joiningLink, setJoiningLink] = useState<'idle' | 'joining' | 'error'>('idle');
+  const [joinLinkError, setJoinLinkError] = useState('');
 
   useEffect(() => { void hostInfo().then((h) => setHostUp(h.up)).finally(() => setHostChecked(true)); }, []);
+
+  useEffect(() => {
+    const code = new URLSearchParams(window.location.search).get('table');
+    if (!code) return;
+    // Strip it from the address bar immediately — reloading, or coming back later via browser
+    // history, should land on the ordinary shelf, not try to rejoin a table that may be over.
+    const url = new URL(window.location.href);
+    url.searchParams.delete('table');
+    window.history.replaceState(null, '', url.toString());
+
+    let cancelled = false;
+    setJoiningLink('joining');
+    void (async () => {
+      const info = await hostInfo();
+      if (cancelled) return;
+      if (!info.up) { setJoinLinkError('No host is running — this link needs one to join.'); setJoiningLink('error'); return; }
+      const r = await joinRemoteTable(info.base, code, settings.playerName);
+      if (cancelled) return;
+      if ('error' in r) { setJoinLinkError(r.error); setJoiningLink('error'); return; }
+      const def = catalog.find((g) => g.meta.id === r.gameId);
+      if (!def) { setJoinLinkError('This host is playing a game this app does not have.'); setJoiningLink('error'); return; }
+      try {
+        const { connectSession } = await import('./OnlineTable');
+        const api = new WebSocketApi(info.ws);
+        const session = await connectSession(api, r.matchId, r.seat, r.token, code);
+        if (cancelled) { api.close(); return; }
+        setSession(session);
+        setGame(def);
+        setJoiningLink('idle');
+      } catch (e) {
+        if (!cancelled) { setJoinLinkError(e instanceof Error ? e.message : 'Could not join that table.'); setJoiningLink('error'); }
+      }
+    })();
+    return () => { cancelled = true; };
+    // Deliberately runs once, reading the URL directly — re-running on every settings.playerName
+    // change would try to rejoin the same link's table over and over.
+  }, []);
 
   // Refreshed whenever we come back to the shelf, which is the only time it is on screen.
   useEffect(() => { if (!game && !setupFor && !onlineFor) setInProgress(openGames()); },
@@ -77,6 +120,19 @@ export function PlayView() {
     const def = catalog.find((g) => g.meta.id === saved.gameId);
     if (def) setResumable({ gameId: saved.gameId, name: def.meta.name, matchId: saved.matchId, seats: saved.seats });
   }, []);
+
+  if (joiningLink === 'joining') {
+    return <div className="view-loading muted">Joining the table from your link…</div>;
+  }
+  if (joiningLink === 'error') {
+    return (
+      <div className="online-error" role="alert">
+        <b>That link didn't work.</b>
+        <p className="muted">{joinLinkError}</p>
+        <button className="ghost sm" onClick={() => setJoiningLink('idle')}>Go to the shelf instead</button>
+      </div>
+    );
+  }
 
   if (onlineFor && !session) {
     return (

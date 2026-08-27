@@ -40,6 +40,7 @@ export interface HostOptions {
 interface Table {
   matchId: string;
   code: string;
+  gameId: string;                           // which catalog entry this table is playing
   sockets: Map<WebSocket, string | null>;   // socket -> seat it claims (null = spectator)
   open: boolean;                            // still accepting players
   /**
@@ -91,8 +92,8 @@ export class GameHost {
   ): { matchId: string; code: string; seatTokens: Record<string, string> } {
     const summary = this.service.create(definition, gameId ?? definition.meta.id, seats);
     const table: Table = {
-      matchId: summary.matchId, code: summary.inviteCode, sockets: new Map(), open: true,
-      seatTokens: new Map(),
+      matchId: summary.matchId, code: summary.inviteCode, gameId: gameId ?? definition.meta.id,
+      sockets: new Map(), open: true, seatTokens: new Map(),
     };
     for (const s of seats) if (s.kind === 'remote') table.seatTokens.set(s.id, randomToken());
     this.tables.set(table.code, table);
@@ -104,7 +105,7 @@ export class GameHost {
   }
 
   /** Take an open seat at a table, by code. This is what an invite link resolves to. */
-  join(code: string, name: string): { matchId: string; seat: string; token: string } | { error: string } {
+  join(code: string, name: string): { matchId: string; seat: string; token: string; gameId: string } | { error: string } {
     const table = this.tables.get(code.toUpperCase());
     if (!table) return { error: 'No table with that code.' };
     const seats = this.service.seats(table.matchId);
@@ -116,7 +117,9 @@ export class GameHost {
     table.seatTokens.set(free.id, token);
     this.broadcast(table, { type: 'seats', matchId: table.matchId, at: Date.now() });
     this.stepBots(table);
-    return { matchId: table.matchId, seat: free.id, token };
+    // gameId is what lets a play-by-link join skip straight to the right table without the
+    // visitor ever having picked a game from the shelf first.
+    return { matchId: table.matchId, seat: free.id, token, gameId: table.gameId };
   }
 
   /**

@@ -26,6 +26,23 @@ export interface OnlineSession {
   seats: Seat[];
 }
 
+/**
+ * Connect, take a seat already claimed via /open or /join, and read the opening position once.
+ * Pulled out of the component so a play-by-link join (PlayView reads ?table= before any game
+ * has even been chosen, so there's no OnlineTable instance yet to hold the socket) can reach the
+ * exact same connect path a person typing a code by hand does — one way onto a table, not two.
+ */
+export async function connectSession(
+  api: WebSocketApi, matchId: string, seat: string, token: string, inviteCode: string,
+): Promise<OnlineSession> {
+  await api.identify(matchId, seat, token);
+  const view = await api.view(matchId, seat);
+  const legal = view.isYourTurn ? await api.legal(matchId, seat) : [];
+  const summary = await api.summary(matchId);
+  const client = new RemoteTableClient(matchId, api, seat, { matchId, view, legal });
+  return { client, seat, code: inviteCode, seats: summary.seats };
+}
+
 export function OnlineTable({ def, onStart, onCancel }: {
   def: GameDefinition;
   onStart: (session: OnlineSession) => void;
@@ -50,14 +67,10 @@ export function OnlineTable({ def, onStart, onCancel }: {
   async function enter(info: HostInfo, matchId: string, seat: string, inviteCode: string, token: string) {
     const api = new WebSocketApi(info.ws);
     apiRef.current = api;
-    await api.identify(matchId, seat, token);
-    const view = await api.view(matchId, seat);
-    const legal = view.isYourTurn ? await api.legal(matchId, seat) : [];
-    const summary = await api.summary(matchId);
-    const client = new RemoteTableClient(matchId, api, seat, { matchId, view, legal });
+    const session = await connectSession(api, matchId, seat, token, inviteCode);
     // The socket now belongs to the client, which closes it when the table ends.
     apiRef.current = null;
-    onStart({ client, seat, code: inviteCode, seats: summary.seats });
+    onStart(session);
   }
 
   async function doHost() {
