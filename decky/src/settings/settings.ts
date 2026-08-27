@@ -111,6 +111,15 @@ export interface Settings {
   /** How opponents are named: numbered seats, raw seat ids, or a name from the house pool. */
   botNaming: BotNaming;
   defaultSeats: number;
+  /**
+   * The seat count you last chose FOR EACH GAME, keyed by game id.
+   *
+   * `defaultSeats` is a single global fallback — the number offered before you have ever played
+   * a given game. It was also, until this, the number offered every OTHER time too: you almost
+   * always play Hearts with four and Bluff with six, and the app made you re-pick every visit.
+   * A game not yet in here falls back to `defaultSeats`, same as always.
+   */
+  perGameSeats: Record<string, number>;
   botSpeed: BotSpeed;
   botDiff: BotDiff;
   highlight: Highlight;
@@ -173,6 +182,7 @@ export const defaultSettings: Settings = {
   myLooks: [],
   autoPlayForced: true,
   defaultSeats: 3,
+  perGameSeats: {},
   botSpeed: 'normal',
   botDiff: 'normal',
   highlight: 'glow',
@@ -401,6 +411,21 @@ export function loadSettings(): Settings {
     const num = (v: unknown, lo: number, hi: number, fallback: number) =>
       (typeof v === 'number' && Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : fallback);
     merged.defaultSeats = num(merged.defaultSeats, 2, 8, defaultSettings.defaultSeats);
+    // A record from local storage is attacker-shaped data from the player's own browser, not
+    // from anywhere untrusted — but it can still be hand-edited or just stale from an older
+    // schema, so every entry is re-validated the same way defaultSeats itself is, and anything
+    // that fails becomes absent rather than crashing the settings load.
+    if (merged.perGameSeats && typeof merged.perGameSeats === 'object') {
+      const clean: Record<string, number> = {};
+      for (const [id, n] of Object.entries(merged.perGameSeats as Record<string, unknown>)) {
+        if (typeof id === 'string' && id && typeof n === 'number' && Number.isFinite(n) && n >= 1 && n <= 8) {
+          clean[id] = n;
+        }
+      }
+      merged.perGameSeats = clean;
+    } else {
+      merged.perGameSeats = {};
+    }
     merged.undoGraceMs = num(merged.undoGraceMs, 0, 60000, defaultSettings.undoGraceMs);
     merged.turnSeconds = num(merged.turnSeconds, 0, 3600, defaultSettings.turnSeconds);
     if (typeof merged.playerName !== 'string' || !merged.playerName.trim()) {

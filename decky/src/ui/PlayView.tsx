@@ -39,7 +39,7 @@ function ordinal(n: number): string {
 
 // Discover + play the classics library (and, once wired, published community games).
 export function PlayView() {
-  const { settings } = useSettings();
+  const { settings, set } = useSettings();
   const [game, setGame] = useState<GameDefinition | null>(null);
   const [seats, setSeats] = useState(settings.defaultSeats);
   const [resumable, setResumable] = useState<
@@ -133,7 +133,12 @@ export function PlayView() {
                 (_, i) => game.meta.players.min + i,
               ).filter((n) => (n - game.meta.players.min) % (game.meta.players.step ?? 1) === 0).map((n) => (
                 <button key={n} className={`seg-btn ${seats === n ? 'on' : ''}`}
-                  onClick={() => setSeats(n)}>{n}</button>
+                  onClick={() => {
+                    setSeats(n);
+                    // Remembered per game — see Settings.perGameSeats — so the NEXT time this
+                    // same game is opened, this is the count already selected.
+                    set('perGameSeats', { ...settings.perGameSeats, [game.meta.id]: n });
+                  }}>{n}</button>
               ))}
             </div>
           )}
@@ -254,7 +259,7 @@ export function PlayView() {
           setPlan(null);
           setPractice(false);
           setResumeId(null);
-          setSeats(seatsFor(def, settings.defaultSeats));
+          setSeats(seatsFor(def, settings.perGameSeats[def.meta.id] ?? settings.defaultSeats));
           setGame(def);
         }}
         onSetup={(def) => { recordPlay(def.meta.id); setSetupFor(def); }}
