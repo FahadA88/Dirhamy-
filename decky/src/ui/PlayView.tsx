@@ -168,7 +168,12 @@ export function PlayView({ startDailyTrigger }: { startDailyTrigger?: number } =
     return (
       <SeatSetup
         def={setupFor}
-        defaultSeats={seatsFor(setupFor, settings.defaultSeats)}
+        // Item 90 of the audit pass: this used settings.defaultSeats alone, so a seat count
+        // remembered for this specific game (see perGameSeats below, and the quick-Play path
+        // a few screens over which already reads it) was silently ignored the moment a player
+        // went through Setup instead — the one path where you'd expect that memory the most,
+        // since Setup is exactly where seat count actually gets chosen.
+        defaultSeats={seatsFor(setupFor, settings.perGameSeats[setupFor.meta.id] ?? settings.defaultSeats)}
         defaultName={settings.playerName}
         onCancel={() => setSetupFor(null)}
         onStart={(seatPlan, isPractice) => {
