@@ -98,7 +98,7 @@ export function SettingsPanel({ open, onClose }: { open: boolean; onClose: () =>
         {confirmingReset && (
           <Confirm
             title="Reset every setting?"
-            body="This puts your theme, table, cards, and everything else here back to how it started — including any custom card back or table cloth you've made. It can't be undone."
+            body="This puts your theme, table, cards, and everything else here back to how it started — including any custom card back or table cloth you’ve made. It can’t be undone."
             confirmLabel="Reset everything"
             onConfirm={() => { reset(); setConfirmingReset(false); }}
             onCancel={() => setConfirmingReset(false)}
@@ -514,7 +514,7 @@ function AccessSection({ s, set }: { s: Settings; set: Setter }) {
       </Row>
       <Row
         label="See it as"
-        hint="Filters the whole app through a colour-vision deficiency, so a choice like the one above can be checked rather than taken on faith. Turn it back off when you're done — it applies everywhere, not just here."
+        hint="Filters the whole app through a colour-vision deficiency, so a choice like the one above can be checked rather than taken on faith. Turn it back off when you’re done — it applies everywhere, not just here."
         keywords="colourblind colorblind deficiency protanopia deuteranopia tritanopia simulate preview accessibility"
         wide
       >
@@ -579,7 +579,7 @@ function AboutSection() {
           the poker-family games are scorekeeping, not currency.
         </p>
       </Row>
-      <Row label="What's changed" wide keywords="about changelog rules updates history version">
+      <Row label="What’s changed" wide keywords="about changelog rules updates history version">
         <p className="about-p">
           Rules are data, and data changes. A new game, a rules fix or a scoring change lands
           here — not every visual tweak, just the ones that change how a game actually plays.

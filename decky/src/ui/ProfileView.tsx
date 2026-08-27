@@ -85,7 +85,7 @@ export function ProfileView({ onPlay }: { onPlay: () => void }) {
             <span className="eh-card c2">K♥</span>
             <span className="eh-card c3">Q♦</span>
           </div>
-          <h3>Nothing here yet — that's the whole story</h3>
+          <h3>Nothing here yet — that’s the whole story</h3>
           <p className="muted">
             Win, lose or draw, every finished game lands here — results, streaks and how you do
             at each one. Practice games are left out on purpose, so the first line in this

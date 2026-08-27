@@ -19,7 +19,7 @@ export interface Report {
 }
 
 export const REPORT_REASONS: { value: ReportReason; label: string }[] = [
-  { value: 'broken', label: "It doesn't work" },
+  { value: 'broken', label: 'It doesn’t work' },
   { value: 'offensive', label: 'Offensive content' },
   { value: 'stolen', label: 'Copied without credit' },
   { value: 'impersonation', label: 'Pretending to be someone else' },

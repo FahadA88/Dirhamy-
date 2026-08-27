@@ -624,7 +624,7 @@ export function CreateView({ onPlay }: { onPlay?: (def: GameDefinition) => void 
                   <Seg options={[[0, 'None'], [1, 'One'], [2, 'Two'], [3, 'Three']]}
                     value={knobs.handPassCount} onChange={(v) => set('handPassCount', v)} /></div>
                 {knobs.handPassCount > 0 && (
-                  <span className="mini-label">Direction rotates every hand: left, right, across, then a hold hand with no pass. Everyone picks at the same time and nobody sees what's coming.</span>
+                  <span className="mini-label">Direction rotates every hand: left, right, across, then a hold hand with no pass. Everyone picks at the same time and nobody sees what’s coming.</span>
                 )}
               </Section>
             </>

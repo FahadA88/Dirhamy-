@@ -601,7 +601,7 @@ function GameDetail({ game, me, onBack, onPlay, onSetup, onOnline, onlineHostDow
           {confirmingUnpublish && (
             <Confirm
               title={`Unpublish ${game.definition.meta.name}?`}
-              body="This removes it from the shelf for everyone, along with its ratings and reviews. It can't be undone — though anyone who forked it keeps their own copy."
+              body="This removes it from the shelf for everyone, along with its ratings and reviews. It can’t be undone — though anyone who forked it keeps their own copy."
               confirmLabel="Unpublish it"
               onConfirm={() => { unpublish(game.id); onChanged(); onBack(); }}
               onCancel={() => setConfirmingUnpublish(false)}
@@ -612,7 +612,7 @@ function GameDetail({ game, me, onBack, onPlay, onSetup, onOnline, onlineHostDow
             <div className="safety">
               {reporting ? (
                 <div className="safety-form">
-                  <span className="mini-label">What's wrong with this game?</span>
+                  <span className="mini-label">What’s wrong with this game?</span>
                   <select value={reason} onChange={(e) => setReason(e.target.value as ReportReason)} aria-label="Reason">
                     {REPORT_REASONS.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
                   </select>

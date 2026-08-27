@@ -145,7 +145,7 @@ export function PlayView({ startDailyTrigger }: { startDailyTrigger?: number } =
   if (joiningLink === 'error') {
     return (
       <div className="online-error" role="alert">
-        <b>That link didn't work.</b>
+        <b>That link didn’t work.</b>
         <p className="muted">{joinLinkError}</p>
         <button className="ghost sm" onClick={() => setJoiningLink('idle')}>Go to the shelf instead</button>
       </div>
