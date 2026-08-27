@@ -20,7 +20,7 @@ Short, quick sentences. Straight to the point. No long paragraphs.
 
 ## Commands
 
-- `npm test` — engine, validator, mechanics, phase 1/2/3/5 acceptance
+- `npm test` — engine, validator, mechanics, phase 1/2/3/5 acceptance, bundle-size budget
 - `npm run typecheck`
 - `npm run build`
 - `npm run verify:all` — all five browser suites (needs `npm run preview` up on :4173)
