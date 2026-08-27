@@ -322,6 +322,12 @@ export interface KentConfig {
   tellPlies: number;
   /** Letters to spell before a pair is out. K-E-N-T is four. */
   letters: string;
+  /**
+   * A hard cap on moves within one round, the same shape as war's roundCap and swap's turnCap.
+   * There is no turn order to force a stalemate through, and nothing else stops a stubborn or
+   * hostile client from swapping and refreshing forever without ever signalling. Default 3000.
+   */
+  roundCap?: number;
 }
 
 // Present iff this is a trading game (Pit-style): no turn order at all. Any player may post an
@@ -330,6 +336,8 @@ export interface KentConfig {
 // `cornerSize` cards of a single suit wins — "corners the market".
 export interface PitConfig {
   cornerSize: number;
+  /** A hard cap on moves within one round — see KentConfig.roundCap. Default 3000. */
+  roundCap?: number;
 }
 
 export interface RummyConfig {
@@ -981,6 +989,10 @@ export interface MatchState {
   folded: Record<string, boolean>;
   actedThisRound: Record<string, boolean>; // has acted since the last bet/raise
   pokerPhase: 'bet' | 'showdown';
+  /** Did the hand actually reach a showdown (2+ players saw it through), or did everyone else
+   *  just fold? Real poker never requires a fold-winner to reveal their hand — only redact()'s
+   *  gate on this, not on `phase === 'roundOver'` alone, keeps that true here too. */
+  pokerWasShowdown: boolean | null;
   // pit: open offers on the market. Any player may post or accept one at any time.
   market: { id: number; player: string; give: Suit; count: number; want: Suit }[];
   nextOfferId: number;

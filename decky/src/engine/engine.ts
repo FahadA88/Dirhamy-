@@ -128,6 +128,7 @@ export function createMatch(
     folded: {},
     actedThisRound: {},
     pokerPhase: 'bet',
+    pokerWasShowdown: null,
     market: [],
     tradesCompleted: Object.fromEntries(players.map((p) => [p, 0])),
     kentTell: null,
@@ -3882,6 +3883,7 @@ function pokerShowdown(s: MatchState): void {
 }
 
 function pokerAwardPot(s: MatchState, winner: string, wasShowdown: boolean): void {
+  s.pokerWasShowdown = wasShowdown;
   s.chips[winner] = (s.chips[winner] ?? 0) + s.pot;
   log(s, null, wasShowdown
     ? `${short(winner)} wins the showdown and takes the pot (${s.pot}).`
@@ -3931,6 +3933,32 @@ function pitLegalMoves(state: MatchState, playerId: string): Move[] {
 
 function applyPitMove(s: MatchState, playerId: string, move: Move): MatchState {
   const hand = s.zones[`hand:${playerId}`] || (s.zones[`hand:${playerId}`] = []);
+
+  // No turn order here either, and no natural stalemate detection — two players could in
+  // principle keep re-offering and cancelling forever without anyone ever cornering the market.
+  // A hard cap, the same shape as war's roundCap and swap's turnCap.
+  const cap = s.definition.pit!.roundCap ?? 3000;
+  s.stallCount += 1;
+  if (s.stallCount >= cap) {
+    s.phase = 'roundOver';
+    // Nobody cornered the market, so score by whoever came closest — most of any one suit —
+    // fairly random among ties rather than by seat order.
+    const mostOfOneSuit = (p: string): number => {
+      const bySuit: Record<string, number> = {};
+      for (const c of s.zones[`hand:${p}`] || []) bySuit[c.suit] = (bySuit[c.suit] ?? 0) + 1;
+      return Math.max(0, ...Object.values(bySuit));
+    };
+    const best = Math.max(...s.players.map(mostOfOneSuit));
+    const leaders = s.players.filter((p) => mostOfOneSuit(p) === best);
+    const { result, rngState } = seededShuffle(leaders, s.rngState);
+    s.rngState = rngState;
+    const winner = result[0];
+    s.winner = winner;
+    for (const q of s.players) s.scores[q] = q === winner ? 1 : 0;
+    log(s, null, `Nobody cornered the market in time — ${short(winner)} was closest.`);
+    finalizeMatchProgress(s);
+    return s;
+  }
 
   if (move.actionId === 'pitOffer') {
     const count = Number(move.cards?.[0] ?? 0);
@@ -4348,6 +4376,10 @@ function maidLegalMoves(state: MatchState, playerId: string): Move[] {
 function applyMaidMove(s: MatchState, playerId: string, move: Move): MatchState {
   if (move.actionId !== 'maidDraw') return s;
   const target = move.target ?? '';
+  // Re-checked here, not just at legalMoves() time, the same way every sibling family
+  // re-validates inside its own apply* — a draw can only ever be from the one hand next in
+  // rotation, never a named hand of the caller's choosing.
+  if (target !== maidNextHolder(s, s.turnIndex)) return s;
   const targetHand = s.zones[`hand:${target}`] || [];
   const i = move.slot ?? 0;
   if (i < 0 || i >= targetHand.length) return s;
@@ -4491,6 +4523,11 @@ function applyLayoutMove(s: MatchState, playerId: string, move: Move): MatchStat
     const i = hand.findIndex((c) => c.id === move.cardId);
     if (i < 0) return s;
     const card = hand[i];
+    // Re-checked here, not just at legalMoves() time — every sibling family (trick, climb, fish,
+    // rummy, bluff, reflex, poker) re-validates inside its own apply* the same way, so a build-
+    // order violation can't reach the board even if something bypasses the legal-moves gate.
+    const pileIndex = Number((move.to ?? '').split(':')[1]);
+    if (!Number.isInteger(pileIndex) || !layoutAccepts(s, pileIndex, card)) return s;
     const pile = (s.zones[move.to ?? ''] ||= []);
     hand.splice(i, 1);
     pile.push(card);
@@ -4512,6 +4549,8 @@ function applyLayoutMove(s: MatchState, playerId: string, move: Move): MatchStat
     const src = s.zones[move.from ?? ''] || [];
     const dest = (s.zones[move.to ?? ''] ||= []);
     if (src.length === 0) return s;
+    const destIndex = Number((move.to ?? '').split(':')[1]);
+    if (!Number.isInteger(destIndex) || dest.length === 0 || !layoutAccepts(s, destIndex, src[0])) return s;
     dest.push(...src.splice(0, src.length));
     s.layoutIdle = 0;
     log(s, playerId, `${short(playerId)} moves a pile across.`);
@@ -4620,6 +4659,24 @@ function applyKentMove(s: MatchState, playerId: string, move: Move): MatchState 
   const hand = s.zones[`hand:${playerId}`] || (s.zones[`hand:${playerId}`] = []);
   const pool = kentPool(s);
 
+  // There is no turn order here to force a stalemate through — war has roundCap, swap has
+  // turnCap, reflex has flipCap; Kent had nothing, so a stubborn or hostile client that only
+  // ever swaps and refreshes without ever signalling could keep a round open forever.
+  const cap = cfg.roundCap ?? 3000;
+  s.stallCount += 1;
+  if (s.stallCount >= cap) {
+    // Nobody signalled and nobody was caught, so no letter is owed to anyone — the "winner"
+    // recorded is a fair random pick among the partnerships rather than always the same seat.
+    const teams = [...new Set(s.players.map((p) => kentTeamOf(s, p)))];
+    const { result, rngState } = seededShuffle(teams, s.rngState);
+    s.rngState = rngState;
+    const winners = result[0];
+    const caller = s.players.find((p) => kentTeamOf(s, p) === winners) ?? playerId;
+    log(s, null, 'Nobody signalled in time — the round is thrown in.');
+    kentEndRound(s, winners, null, caller);
+    return s;
+  }
+
   if (move.actionId === 'kentSwap') {
     if (kentTellLive(s)) return s;
     const mine = hand.findIndex((c) => c.id === move.cardId);
@@ -4670,7 +4727,20 @@ function applyKentMove(s: MatchState, playerId: string, move: Move): MatchState 
     // Whoever spotted it wins the round, whichever side of the table they are on: a partner
     // calling it takes it for their pair, an opponent calling it off takes it for theirs.
     const winners = kentTeamOf(s, playerId);
-    const losers = winners === 'A' ? 'B' : 'A';
+    const teams = [...new Set(s.players.map((p) => kentTeamOf(s, p)))];
+    /*
+      "The other team" only means one specific thing when there are exactly two. At 6 players
+      there are three partnerships, and an opponent calling off a signal unambiguously costs the
+      TELLER's own team a letter regardless of how many teams are at the table — but a partner
+      correctly confirming their own team's signal doesn't say anything about either of the
+      OTHER two pairs, so there is no honest way to pick one of them to punish for a round they
+      were not even part of. Two-team tables keep the original always-somebody-loses scoring
+      (unchanged from what shipped and was measured); a confirmed signal at a 3-pair table wins
+      the round for that pair without forcing a letter onto an uninvolved third pair.
+    */
+    const losers = teams.length <= 2
+      ? teams.find((t) => t !== winners) ?? winners
+      : (sameTeam ? null : kentTeamOf(s, teller));
     log(s, playerId, sameTeam
       ? `${short(playerId)} calls Kent — ${short(teller)} had four ${kentFourRank(s, teller)}s.`
       : `${short(playerId)} calls it off — ${short(teller)} was signalling.`);
@@ -4686,18 +4756,24 @@ function kentFourRank(s: MatchState, playerId: string): string {
   return hand[0]?.rank ?? '?';
 }
 
-/** A round is over: the losing pair takes a letter, and a fresh hand goes out. */
-function kentEndRound(s: MatchState, winners: string, losers: string, caller: string): void {
+/** A round is over: the losing pair takes a letter (if there is one this round), and a fresh
+ *  hand goes out. `losers` is null only at a 3-pair table when a partner confirms their own
+ *  team's signal — a genuine round win with no pair to blame it on. */
+function kentEndRound(s: MatchState, winners: string, losers: string | null, caller: string): void {
   const cfg = s.definition.kent!;
-  s.kentLetters[losers] = (s.kentLetters[losers] ?? 0) + 1;
   s.kentTell = null;
   s.phase = 'roundOver';
   for (const p of s.players) s.scores[p] = kentTeamOf(s, p) === winners ? 1 : 0;
   // The round belongs to whoever spotted it. Naming whichever partner happens to sit first
   // made every game in the self-play report look as though seats three and four never won one.
   s.winner = caller;
-  const spelt = cfg.letters.slice(0, s.kentLetters[losers]);
-  log(s, null, `Pair ${losers} takes a letter — ${spelt.split('').join('-')}.`);
+  if (losers) {
+    s.kentLetters[losers] = (s.kentLetters[losers] ?? 0) + 1;
+    const spelt = cfg.letters.slice(0, s.kentLetters[losers]);
+    log(s, null, `Pair ${losers} takes a letter — ${spelt.split('').join('-')}.`);
+  } else {
+    log(s, null, `Pair ${winners} wins the round.`);
+  }
   finalizeMatchProgress(s);
 }
 
@@ -4995,7 +5071,9 @@ export function redact(state: MatchState, viewer: string): RedactedState {
     currentBet: state.definition.poker ? state.currentBet : undefined,
     committed: state.definition.poker ? { ...state.committed } : undefined,
     folded: state.definition.poker ? { ...state.folded } : undefined,
-    showdown: state.definition.poker && state.phase === 'roundOver'
+    // Gated on an actual showdown, not merely "the hand is over" — a fold-winner never has to
+    // show their cards, in this engine or at a real table.
+    showdown: state.definition.poker && state.phase === 'roundOver' && state.pokerWasShowdown
       ? state.players.filter((p) => !state.folded[p]).map((p) => {
           const cards = state.zones[`hand:${p}`] || [];
           return { player: p, cards: cards.slice(), label: pokerHandStrength(def, cards).label };
