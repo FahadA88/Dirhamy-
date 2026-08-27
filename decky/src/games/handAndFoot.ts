@@ -68,6 +68,8 @@ export const handAndFoot: GameDefinition = {
   rummy: {
     setMin: 3,
     runMin: 3,
+    // Hand & Foot is Canasta's family game — melds are rank-groups only, no same-suit runs.
+    allowRuns: false,
     layOff: true,
     wilds: true,
     maxWildsPerMeld: 2,

@@ -335,6 +335,12 @@ export interface PitConfig {
 export interface RummyConfig {
   setMin: number; // cards of equal rank to form a set (usually 3)
   runMin: number; // consecutive same-suit cards to form a run (usually 3)
+  /**
+   * Whether a same-suit sequence counts as a meld at all. Default true. Canasta and Hand & Foot
+   * set this false — their melds are rank-groups only, and a run there would score wrong and
+   * contradict the rules the game describes to the player.
+   */
+  allowRuns?: boolean;
 
   // Gin-family rules. With `knock` set, melds are never laid down during play — you hold them
   // concealed and end the hand by knocking, scoring the difference in unmatched ("deadwood") cards.

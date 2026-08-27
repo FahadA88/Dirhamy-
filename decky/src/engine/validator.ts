@@ -4,7 +4,7 @@
 //
 // Returns structured issues. `errors` block publishing; `warnings` are advisory.
 
-import { CustomRule, Effect, GameDefinition, Predicate, RuleHook } from './types';
+import { CustomRule, Effect, GameDefinition, Predicate, RuleHook, RuleValue } from './types';
 import { buildDeck } from './deck';
 
 export interface Issue {
@@ -84,13 +84,17 @@ export function validate(def: GameDefinition): ValidationResult {
   if (isTrick && def.trick!.trump !== 'none' && !['C', 'D', 'H', 'S'].includes(def.trick!.trump)) {
     err('trick.trump', `Trump must be a suit or "none" (got "${def.trick!.trump}").`);
   }
-  if (isClimb && !def.zones.some((z) => z.visibility === 'top-public')) {
-    err('zones.pile', 'Climbing games need a shared play pile (a top-public discard).');
-  }
 
   const zoneRef = (id: string | undefined, where: string) => {
     if (id && !zoneIds.has(id)) err('zone.missing', `${where} references unknown zone "${id}".`);
   };
+
+  // The auction reads and empties this zone at runtime with an unguarded pop — a typo here was
+  // never anything but a crash waiting to happen, and nothing checked for it before now.
+  if (isTrick && def.trick!.auction) zoneRef(def.trick!.auction.upcardZone, 'trick.auction.upcardZone');
+  if (isClimb && !def.zones.some((z) => z.visibility === 'top-public')) {
+    err('zones.pile', 'Climbing games need a shared play pile (a top-public discard).');
+  }
 
   // --- setup ---
   for (const step of def.setup) {
@@ -114,7 +118,21 @@ export function validate(def: GameDefinition): ValidationResult {
     warn('deck.tight', `Dealing ${dealt} of ${deckSize} cards leaves a thin draw pile at max players.`);
   }
 
-  // --- tags referenced in predicates/triggers must exist ---
+  // --- tags/zones referenced in predicates/triggers/values must exist ---
+  // A RuleValue's only zone reference is `count` (cards in a zone). Recurse through the
+  // arithmetic wrappers so a bad zone buried in `add`/`sub`/etc. is still caught, not just one
+  // sitting bare in a comparison.
+  const checkRuleValue = (v: RuleValue, where: string) => {
+    // '$hand' is a sentinel for "the acting player's own hand", resolved at runtime — not a
+    // zone id itself, so it is not something zoneRef can check against def.zones.
+    if ('count' in v && v.count !== '$hand') zoneRef(v.count, `${where}.count`);
+    if ('add' in v) v.add.forEach((x) => checkRuleValue(x, where));
+    if ('sub' in v) v.sub.forEach((x) => checkRuleValue(x, where));
+    if ('mul' in v) v.mul.forEach((x) => checkRuleValue(x, where));
+    if ('min' in v) v.min.forEach((x) => checkRuleValue(x, where));
+    if ('max' in v) v.max.forEach((x) => checkRuleValue(x, where));
+  };
+
   const checkPredicate = (p: Predicate, where: string) => {
     if ('cardHasTag' in p && !tagNames.has(p.cardHasTag)) {
       err('tag.missing', `${where} references unknown card tag "${p.cardHasTag}".`);
@@ -127,6 +145,9 @@ export function validate(def: GameDefinition): ValidationResult {
       if (m.equalsTopOf) zoneRef(m.equalsTopOf, `${where}.matches`);
       if (m.equalsStateOrTopOf) zoneRef(m.equalsStateOrTopOf[1], `${where}.matches`);
     }
+    // A bad zone inside a `cmp` used to pass validation clean and then just evaluate to 0
+    // forever at runtime — silently wrong rather than caught at authoring time.
+    if ('cmp' in p) { checkRuleValue(p.cmp.left, `${where}.cmp.left`); checkRuleValue(p.cmp.right, `${where}.cmp.right`); }
     if ('any' in p) p.any.forEach((s) => checkPredicate(s, where));
     if ('all' in p) p.all.forEach((s) => checkPredicate(s, where));
     if ('not' in p) checkPredicate(p.not, where);
@@ -138,6 +159,13 @@ export function validate(def: GameDefinition): ValidationResult {
       if (e.op === 'forceDraw') zoneRef(e.from, `${where}.forceDraw.from`);
       if (e.op === 'drawUntilPlayable') zoneRef(e.from, `${where}.drawUntilPlayable.from`);
       if (e.op === 'reshuffleDiscardInto') zoneRef(e.zone, `${where}.reshuffle`);
+      // moveMany/drawTo carry the same plain zone-id fields as move/forceDraw, and were simply
+      // missed when those were added — same crash risk from a typo'd zone.
+      if (e.op === 'moveMany') { zoneRef(e.from, `${where}.moveMany.from`); zoneRef(e.to, `${where}.moveMany.to`); checkRuleValue(e.count, `${where}.moveMany.count`); }
+      if (e.op === 'drawTo') { zoneRef(e.from, `${where}.drawTo.from`); checkRuleValue(e.count, `${where}.drawTo.count`); }
+      if (e.op === 'addScore') checkRuleValue(e.amount, `${where}.addScore.amount`);
+      if (e.op === 'setVarNum') checkRuleValue(e.value, `${where}.setVarNum.value`);
+      if (e.op === 'appendVar') checkRuleValue(e.value, `${where}.appendVar.value`);
       if (e.op === 'if') { checkPredicate(e.cond, `${where}.if`); checkEffects(e.then, `${where}.if.then`); if (e.else) checkEffects(e.else, `${where}.if.else`); }
     }
   };
@@ -147,7 +175,15 @@ export function validate(def: GameDefinition): ValidationResult {
     checkPredicate(a.when, `action "${a.id}".when`);
     checkEffects(a.effects, `action "${a.id}"`);
   }
-  for (const t of def.triggers) checkEffects(t.do, `trigger "${t.on}"`);
+  for (const t of def.triggers) {
+    // Only checked the effects before — a trigger narrowed to a nonexistent tag passed
+    // validation clean and then simply never fired, the same silent-miss shape as an unreachable
+    // hook.
+    if (t.cardHasTag && !tagNames.has(t.cardHasTag)) {
+      err('tag.missing', `trigger "${t.on}" reacts to unknown card tag "${t.cardHasTag}".`);
+    }
+    checkEffects(t.do, `trigger "${t.on}"`);
+  }
 
   // --- layout ---
   if (isLayout) {
@@ -209,14 +245,19 @@ export function validate(def: GameDefinition): ValidationResult {
 
   // --- dead-end / fallback move ---
   // There must be a move a player can always fall back on (a draw, a pass) when nothing matches,
-  // otherwise a player with no legal play is stuck and the game can deadlock.
-  const hasFallback = def.actions.some((a) => {
-    if (a.target) return false; // targeted plays can all be blocked
-    // an untargeted action whose legality is either always-true or only gated on "can't play"
-    return true;
-  });
-  if (!isSpecial && !hasFallback) {
+  // otherwise a player with no legal play is stuck and the game can deadlock. A targeted action
+  // can always be blocked (nothing in `target.from` may match), so only an untargeted one can
+  // possibly serve. Untargeted is necessary but was being treated as sufficient: an untargeted
+  // action gated behind a narrow `when` (say, a specific tag or a rare game state) is not
+  // actually guaranteed to be there the moment it's needed, only an unconditional one is.
+  const untargeted = def.actions.filter((a) => !a.target);
+  const unconditionalFallback = untargeted.some((a) => 'always' in a.when && a.when.always === true);
+  if (!isSpecial && untargeted.length === 0) {
     warn('deadend.fallback', 'No fallback action (e.g. draw or pass) — players may get stuck with no legal move.');
+  } else if (!isSpecial && !unconditionalFallback) {
+    warn('deadend.fallback.conditional',
+      'Every untargeted action (draw/pass) is gated by a condition, not unconditionally available — '
+      + 'if that condition can ever be false for every action at once, a player would be stuck with no legal move.');
   }
 
   // --- solitaire sanity ---

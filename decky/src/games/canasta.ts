@@ -68,6 +68,10 @@ export const canasta: GameDefinition = {
   rummy: {
     setMin: 3,
     runMin: 3,
+    // Real Canasta melds are rank-groups only — seven of a kind is the canasta itself, and a
+    // same-suit run scores and plays nothing like that. Off, or the engine would silently offer
+    // and score runs a real table would never allow.
+    allowRuns: false,
     layOff: true,
     wilds: true,
     maxWildsPerMeld: 2,

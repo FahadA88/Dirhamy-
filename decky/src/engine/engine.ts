@@ -345,7 +345,20 @@ export function createMatch(
     state.turnIndex = (state.dealerIndex + 1) % players.length;
     const up = topCard(state.zones[def.trick.auction.upcardZone] || []);
     log(state, null, `${short(players[state.dealerIndex])} deals. ${up ? `${cardLabel(up)} is turned up.` : ''}`);
-  } else if (def.trick && !state.passDirection && !state.bidding) {
+  } else if (def.trick?.bidding) {
+    // Bidding trick games (Spades, Oh Hell) settle their own opening seat, independent of
+    // turnFlow.startPlayer: the deal rotates each hand and bidding opens to the dealer's left,
+    // the same as a trump auction — otherwise every hand of the match would bid, and then lead,
+    // from seat one.
+    state.dealerIndex = ((carry?.handNumber ?? 1) - 1) % players.length;
+    state.turnIndex = (state.dealerIndex + 1) % players.length;
+    log(state, null, `${short(players[state.dealerIndex])} deals. Bidding is open.`);
+  } else if (def.trick && !state.passDirection) {
+    // No auction, no bidding: whoever holds the designated lead card opens (Hearts' 2♣).
+    // Failing that — Briscola, Sixty-Six, Black Maria, Pinochle, Whist — the deal still has to
+    // rotate, or the same seat opens trick one of every single hand of the match forever, the
+    // exact seat bias the dealerLeft branch below exists to fix for the other families.
+    state.dealerIndex = ((carry?.handNumber ?? 1) - 1) % players.length;
     state.turnIndex = openingLeadSeat(state);
   } else if (def.turnFlow.startPlayer === 'dealerLeft') {
     /*
@@ -1155,12 +1168,14 @@ function resolvePassCards(s: MatchState): void {
   advanceAndCheck(s);
 }
 
-// Who leads trick 1: the holder of the designated lead card (Hearts' 2♣), else seat 0.
+// Who leads trick 1: the holder of the designated lead card (Hearts' 2♣), else the dealer's
+// left — never a flat seat 0, or a game with no lead card would open every hand at the same seat.
 function openingLeadSeat(s: MatchState): number {
+  const fallback = (s.dealerIndex + 1) % s.players.length;
   const lead = s.definition.trick?.leadCard;
-  if (!lead) return 0;
+  if (!lead) return fallback;
   const i = s.players.findIndex((p) => (s.zones[`hand:${p}`] || []).some((c) => c.id === lead));
-  return i >= 0 ? i : 0;
+  return i >= 0 ? i : fallback;
 }
 
 // A pre-hand exchange (Hearts): everyone gives `count` cards at once before any trick is played.
@@ -1490,12 +1505,29 @@ function finalizeMatchProgress(s: MatchState): void {
     for (const p of s.players) row[p] = s.scores[p] ?? 0;
     s.handScores.push(row);
     for (const p of s.players) s.matchScores[p] = (s.matchScores[p] ?? 0) + (s.scores[p] ?? 0);
-    const out = (['A', 'B'] as const).find((t) => (s.kentLetters[t] ?? 0) >= word);
-    if (out) {
-      const won = out === 'A' ? 'B' : 'A';
+    // At 4 players this is a straight two-pair contest. At 6 it is three pairs, and spelling the
+    // whole word only eliminates the pair that spelt it — the winner is whichever surviving pair
+    // is furthest from spelling it themselves, ties (including the ordinary 2-pair case) broken
+    // fairly at random rather than by seat order.
+    const teams = [...new Set(s.players.map((p) => kentTeamOf(s, p)))];
+    const spelledOut = teams.filter((t) => (s.kentLetters[t] ?? 0) >= word);
+    if (spelledOut.length > 0) {
+      const surviving = teams.filter((t) => !spelledOut.includes(t));
+      const bestLetters = surviving.length > 0 ? Math.min(...surviving.map((t) => s.kentLetters[t] ?? 0)) : 0;
+      const bestTeams = surviving.filter((t) => (s.kentLetters[t] ?? 0) === bestLetters);
+      let won: string | undefined;
+      if (bestTeams.length <= 1) {
+        won = bestTeams[0];
+      } else {
+        const { result, rngState } = seededShuffle(bestTeams, s.rngState);
+        s.rngState = rngState;
+        won = result[0];
+      }
       s.matchOver = true;
-      s.matchWinner = s.players.find((p) => kentTeamOf(s, p) === won) ?? null;
-      log(s, null, `Pair ${out} spells ${s.definition.kent.letters} — pair ${won} takes the game.`);
+      s.matchWinner = won ? (s.players.find((p) => kentTeamOf(s, p) === won) ?? null) : null;
+      log(s, null,
+        `Pair ${spelledOut.join(' & ')} spell${spelledOut.length === 1 ? 's' : ''} ${s.definition.kent.letters}`
+        + (won ? ` — pair ${won} takes the game.` : '.'));
     } else {
       s.matchOver = false;
       s.matchWinner = null;
@@ -1799,7 +1831,13 @@ function applyTrickMove(s: MatchState, playerId: string, move: Move): MatchState
     s.bids[playerId] = parseInt(move.choice!, 10);
     log(s, playerId, `${short(playerId)} bids ${move.choice}${move.choice === '0' ? ' (nil)' : ''}.`);
     fireRules(s, 'bidMade', { playerId });
-    if (Object.keys(s.bids).length >= s.players.length) { s.bidding = false; s.turnIndex = 0; }
+    // Bidding opened at the dealer's left and goes all the way around, so the last bid is the
+    // dealer's own — the lead then passes back to the same seat bidding started at, not to a
+    // flat seat 0, or the dealer's neighbour would open trick one of every single hand.
+    if (Object.keys(s.bids).length >= s.players.length) {
+      s.bidding = false;
+      s.turnIndex = (s.dealerIndex + 1) % s.players.length;
+    }
     else s.turnIndex = ((s.turnIndex + s.direction) % s.players.length + s.players.length) % s.players.length;
     return s;
   }
@@ -2927,19 +2965,22 @@ function findMelds(state: MatchState, hand: Card[]): { cards: string[]; label: s
     }
   }
 
-  // runs: consecutive same-suit sequences, wilds filling single gaps
-  for (const suit of ['C', 'D', 'H', 'S']) {
-    const cs = natural.filter((c) => c.suit === suit).sort((a, b) => order.indexOf(a.rank as never) - order.indexOf(b.rank as never));
-    let i = 0;
-    while (i < cs.length) {
-      let j = i + 1;
-      while (j < cs.length && order.indexOf(cs[j].rank as never) === order.indexOf(cs[j - 1].rank as never) + 1) j++;
-      const run = cs.slice(i, j);
-      if (run.length >= cfg.runMin) out.push({ cards: run.map((c) => c.id), label: `${run[0].rank}–${run[run.length - 1].rank}${suitSym(suit)}` });
-      i = j > i + 1 ? j : i + 1;
-    }
-    if (wild.on && wilds.length > 0 && cs.length > 0) {
-      for (const m of wildRuns(state, cs, wilds, suit)) out.push(m);
+  // runs: consecutive same-suit sequences, wilds filling single gaps — Canasta and Hand & Foot
+  // turn this off, since their melds are rank-groups only.
+  if (cfg.allowRuns !== false) {
+    for (const suit of ['C', 'D', 'H', 'S']) {
+      const cs = natural.filter((c) => c.suit === suit).sort((a, b) => order.indexOf(a.rank as never) - order.indexOf(b.rank as never));
+      let i = 0;
+      while (i < cs.length) {
+        let j = i + 1;
+        while (j < cs.length && order.indexOf(cs[j].rank as never) === order.indexOf(cs[j - 1].rank as never) + 1) j++;
+        const run = cs.slice(i, j);
+        if (run.length >= cfg.runMin) out.push({ cards: run.map((c) => c.id), label: `${run[0].rank}–${run[run.length - 1].rank}${suitSym(suit)}` });
+        i = j > i + 1 ? j : i + 1;
+      }
+      if (wild.on && wilds.length > 0 && cs.length > 0) {
+        for (const m of wildRuns(state, cs, wilds, suit)) out.push(m);
+      }
     }
   }
   // Two different spans can want the same cards — 5,6,[gap] and [gap],5,6 are one meld to a
@@ -3027,31 +3068,33 @@ function meldMasks(state: MatchState, hand: Card[]): number[] {
     }
   }
 
-  for (const suit of ['C', 'D', 'H', 'S']) {
-    const cs = hand.map((c, i) => ({ c, i })).filter((x) => x.c.suit === suit && !isW(x.i))
-      .sort((a, b) => order.indexOf(a.c.rank as never) - order.indexOf(b.c.rank as never));
-    for (let i = 0; i < cs.length; i++) {
-      let mask = 1 << cs[i].i;
-      for (let j = i + 1; j < cs.length; j++) {
-        if (order.indexOf(cs[j].c.rank as never) !== order.indexOf(cs[j - 1].c.rank as never) + 1) break;
-        mask |= 1 << cs[j].i;
-        if (j - i + 1 >= cfg.runMin) masks.push(mask);
-      }
-    }
-    if (!wild.on || wildIdx.length === 0 || cs.length === 0) continue;
-    // Gapped runs: every span of the rank order this suit partly covers, with wilds for the rest.
-    const at = new Map<number, number>();
-    for (const x of cs) at.set(order.indexOf(x.c.rank as never), x.i);
-    for (let a = 0; a < order.length; a++) {
-      for (let b = a + cfg.runMin - 1; b < order.length; b++) {
-        let mask = 0;
-        let gaps = 0;
-        for (let k = a; k <= b; k++) {
-          const idx = at.get(k);
-          if (idx === undefined) gaps++; else mask |= 1 << idx;
+  if (cfg.allowRuns !== false) {
+    for (const suit of ['C', 'D', 'H', 'S']) {
+      const cs = hand.map((c, i) => ({ c, i })).filter((x) => x.c.suit === suit && !isW(x.i))
+        .sort((a, b) => order.indexOf(a.c.rank as never) - order.indexOf(b.c.rank as never));
+      for (let i = 0; i < cs.length; i++) {
+        let mask = 1 << cs[i].i;
+        for (let j = i + 1; j < cs.length; j++) {
+          if (order.indexOf(cs[j].c.rank as never) !== order.indexOf(cs[j - 1].c.rank as never) + 1) break;
+          mask |= 1 << cs[j].i;
+          if (j - i + 1 >= cfg.runMin) masks.push(mask);
         }
-        if (gaps === 0 || gaps > wild.max || mask === 0) continue;
-        for (const w of fillers(gaps)) masks.push(mask | w.mask);
+      }
+      if (!wild.on || wildIdx.length === 0 || cs.length === 0) continue;
+      // Gapped runs: every span of the rank order this suit partly covers, with wilds for the rest.
+      const at = new Map<number, number>();
+      for (const x of cs) at.set(order.indexOf(x.c.rank as never), x.i);
+      for (let a = 0; a < order.length; a++) {
+        for (let b = a + cfg.runMin - 1; b < order.length; b++) {
+          let mask = 0;
+          let gaps = 0;
+          for (let k = a; k <= b; k++) {
+            const idx = at.get(k);
+            if (idx === undefined) gaps++; else mask |= 1 << idx;
+          }
+          if (gaps === 0 || gaps > wild.max || mask === 0) continue;
+          for (const w of fillers(gaps)) masks.push(mask | w.mask);
+        }
       }
     }
   }
@@ -4506,8 +4549,15 @@ function applyLayoutMove(s: MatchState, playerId: string, move: Move): MatchStat
 export const kentZones = { pool: 'kent:pool' };
 
 /** Partners sit opposite, so pairs are the odd seats against the even ones. */
+// Partners sit opposite — seat i and seat i+n/2, not "the even seats vs the odd seats", which
+// only happen to be the same split at 4 players. At 6, seat parity groups {0,2,4} against
+// {1,3,5}, three players a side rather than three genuine two-person partnerships {0,3},{1,4},
+// {2,5}; opposite-seat pairing is the one formula that gives real partners at both table sizes.
 export function kentTeamOf(s: MatchState, playerId: string): string {
-  return s.players.indexOf(playerId) % 2 === 0 ? 'A' : 'B';
+  const n = s.players.length;
+  const half = n / 2;
+  const i = s.players.indexOf(playerId);
+  return String.fromCharCode(65 + Math.min(i, (i + half) % n));
 }
 
 function kentPool(s: MatchState): Card[] {
