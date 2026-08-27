@@ -62,11 +62,6 @@ export const pinochle: GameDefinition = {
     melds: [
       // The one the game is named after.
       { name: 'a pinochle', cards: ['SQ', 'DJ'], points: 40 },
-      // A marriage in each suit; trump's is worth double, as it always is.
-      { name: 'the royal marriage', cards: ['SK', 'SQ'], points: 40 },
-      { name: 'a marriage in hearts', cards: ['HK', 'HQ'], points: 20 },
-      { name: 'a marriage in diamonds', cards: ['DK', 'DQ'], points: 20 },
-      { name: 'a marriage in clubs', cards: ['CK', 'CQ'], points: 20 },
       // One of each, across the suits.
       { name: 'a hundred aces', cards: ['CA', 'DA', 'HA', 'SA'], points: 100 },
       { name: 'eighty kings', cards: ['CK', 'DK', 'HK', 'SK'], points: 80 },
@@ -74,6 +69,11 @@ export const pinochle: GameDefinition = {
       { name: 'forty jacks', cards: ['CJ', 'DJ', 'HJ', 'SJ'], points: 40 },
       // The run in trumps, which subsumes the royal marriage sitting inside it.
       { name: 'a run in trumps', cards: ['SA', 'S10', 'SK', 'SQ', 'SJ'], points: 150 },
+    ],
+    // A marriage in each suit — one pattern instead of the four separate entries this used to
+    // be, and trump's still comes out double the way it always has.
+    meldPatterns: [
+      { name: 'marriage', ranks: ['K', 'Q'], points: 20, doubleInTrump: true },
     ],
   },
 };

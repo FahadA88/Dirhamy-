@@ -1589,11 +1589,27 @@ export function nextHand(state: MatchState, seed: number): MatchState {
  * finally worked out rather than needing its own path through every family's scorer.
  */
 function scoreMelds(s: MatchState): void {
-  const melds = s.definition.trick?.melds;
-  if (!melds || melds.length === 0) return;
+  const literal = s.definition.trick?.melds ?? [];
+  const patterns = s.definition.trick?.meldPatterns ?? [];
+  if (literal.length === 0 && patterns.length === 0) return;
+
+  // Every suit actually in the deck, so a pattern expands correctly whether it is a full pack
+  // or a short one — Skat's 32 cards are still all four suits, but a hypothetical three-suit
+  // deck should not be checked against a fourth that was never dealt.
+  const suits = [...new Set(buildDeck(s.definition).map((c) => c.suit))];
+  const trump = trumpOf(s);
+  const all = [
+    ...literal.map((m) => ({ name: m.name, cards: m.cards, points: m.points })),
+    ...patterns.flatMap((m) => suits.map((suit) => ({
+      name: suit === trump && m.doubleInTrump ? `the royal ${m.name}` : `a ${m.name} in ${suitName(suit)}`,
+      cards: m.ranks.map((r) => `${suit}${r}`),
+      points: suit === trump && m.doubleInTrump ? m.points * 2 : m.points,
+    }))),
+  ];
+
   for (const p of s.players) {
     const hand = s.zones[`hand:${p}`] || [];
-    for (const meld of melds) {
+    for (const meld of all) {
       const pool = hand.map((c) => `${c.suit}${c.rank}`);
       let copies = 0;
       // Keep taking whole copies out of the pool until one cannot be completed.

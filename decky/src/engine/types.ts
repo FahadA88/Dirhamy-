@@ -391,6 +391,21 @@ export interface TrickConfig {
    * rank. A hand scores a meld once per complete copy it holds.
    */
   melds?: { name: string; cards: string[]; points: number }[];
+  /**
+   * A meld that repeats once per suit, without being written out four times.
+   *
+   * "A king and queen of any one suit" was four literal `melds` entries — one per suit — and
+   * every game with a marriage paid that tax. A pattern is one line: `ranks` names the cards a
+   * single copy needs, one of each, ALL IN THE SAME SUIT, and it is checked against every suit
+   * in the deck the way `melds` checks one fixed combination.
+   */
+  meldPatterns?: {
+    name: string;
+    ranks: string[];
+    points: number;
+    /** Worth double when the matching suit is also trump — a royal marriage, not just a marriage. */
+    doubleInTrump?: boolean;
+  }[];
   partnerships?: boolean;      // 4 players in 2 teams (seats 1&3 vs 2&4)
 
   // Euchre-family rules. With `auction`, trump is not fixed by the definition — it is named

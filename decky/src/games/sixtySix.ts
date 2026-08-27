@@ -55,12 +55,10 @@ export const sixtySix: GameDefinition = {
     aceHigh: true,
     scoreBy: 'penalty',
     penaltyPoints: { A: 11, '10': 10, K: 4, Q: 3, J: 2, '9': 0 },
-    melds: [
-      // Trumps first — a royal marriage is worth two ordinary ones.
-      { name: 'the royal marriage', cards: ['HK', 'HQ'], points: 40 },
-      { name: 'a marriage in spades', cards: ['SK', 'SQ'], points: 20 },
-      { name: 'a marriage in diamonds', cards: ['DK', 'DQ'], points: 20 },
-      { name: 'a marriage in clubs', cards: ['CK', 'CQ'], points: 20 },
+    // One pattern rather than four literal entries — a king and queen of any one suit, worth
+    // double when that suit is trump.
+    meldPatterns: [
+      { name: 'marriage', ranks: ['K', 'Q'], points: 20, doubleInTrump: true },
     ],
   },
 };
