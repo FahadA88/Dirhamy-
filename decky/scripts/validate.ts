@@ -6,11 +6,30 @@ import { GameDefinition } from '../src/engine/types';
 
 let failed = false;
 
+/*
+  A warning has been wrong here before and nobody noticed for a release: Switch and Trade Winds
+  both shipped with "leaves a thin draw pile at max players", correctly detected, and then never
+  printed anywhere a human would read it — `r.ok` only looks at ERRORS, so a game with nothing
+  but warnings logged as a bare issue count and the count was never once looked at.
+
+  Every issue on every premade game gets printed now, not folded into a number. Warnings do not
+  fail the build — some are advisory judgement calls an author can reasonably accept — but they
+  are never allowed to be silent again, and the count at the bottom is there so a scrollback full
+  of green lines cannot hide the one game near the top that had something to say.
+*/
 console.log('Classics should validate clean:');
+let warnCount = 0;
 for (const g of catalog) {
   const r = validate(g);
   console.log(`  ${r.status.toUpperCase().padEnd(6)} ${g.meta.name}  (${r.issues.length} issues)`);
-  if (!r.ok) { failed = true; r.issues.forEach((i) => console.log(`     ! ${i.message}`)); }
+  for (const i of r.issues) {
+    if (i.level === 'error') failed = true; else warnCount++;
+    console.log(`     ${i.level === 'error' ? '!' : '~'} ${i.message}`);
+  }
+}
+if (warnCount > 0) {
+  console.log(`\n${warnCount} warning${warnCount === 1 ? '' : 's'} above, on games that are shipping anyway —`
+    + ' each is an accepted trade-off, not an oversight, but they earn a second look on request.');
 }
 
 console.log('\nBroken definitions should be caught:');
