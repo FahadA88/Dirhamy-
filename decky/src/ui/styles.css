@@ -23,6 +23,17 @@
     U+2113, U+2C60-2C7F, U+A720-A7FF;
 }
 
+@font-face {
+  font-family: "Bodoni Moda";
+  font-style: normal;
+  font-weight: 400 900;
+  font-display: swap;
+  src: url("/fonts/bodoni-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215,
+    U+FEFF, U+FFFD;
+}
+
 /* ------------------------------------------------------------------
    THE CARD ROOM
    A private room with a good table in it. Near-black walls with a warm
@@ -5787,3 +5798,622 @@ button.bluff-go:disabled {
    smear, and the swatch is already telling you the colour, which is what it is for. */
 .felt-swatch .dressing.dr .dr-name, .pack-swatch .dressing.dr .dr-name,
 .pp-stage .dressing.dr .dr-name { display: none; }
+
+/* ==================================================================
+   THE HOUSE
+   ------------------------------------------------------------------
+   The card room, but somebody spent money on it.
+
+   Everything above this line built an honest room: warm near-black,
+   one brass accent, no glow. That was right, and none of it is
+   thrown away here. What this adds is the half a good room has that
+   a plain one does not — a display face with real contrast in it,
+   surfaces that behave like glass over lamplight instead of flat
+   paint, metal that catches the light along one edge, and grain, so
+   a large dark area reads as a photograph of a room rather than a
+   filled rectangle.
+
+   The rule the whole section is written to: an expensive object is
+   quiet and specific. Glow is a material property of things that are
+   LIVE — your turn, a legal place to put a card, a hand that just
+   won. It is never decoration. Everything else earns its depth from
+   a hairline, a shadow and a single specular highlight, which is how
+   real objects do it.
+   ================================================================== */
+
+:root {
+  /* --- the ground, deepened ----------------------------------------
+     A shade under what it was, with the warmth pushed toward red
+     rather than yellow. Brass on a warmer, darker ground reads as
+     brighter metal without being made any lighter itself. */
+  --bg0: #070605;
+  --bg1: #110d0a;
+
+  /* --- metal -------------------------------------------------------
+     Brass is not one colour. A hairline that runs from lit to shadow
+     down its own height reads as a machined edge; a hairline of flat
+     rgba reads as a border. Three stops is all it takes. */
+  --brass-lo: #6d5220;
+  --brass:    #c9a24a;
+  --brass-hi: #f0dcae;
+  --metal-edge: linear-gradient(
+    180deg,
+    rgba(240, 220, 174, 0.42) 0%,
+    rgba(201, 162, 74, 0.18) 34%,
+    rgba(109, 82, 32, 0.10) 100%);
+
+  /* --- glass -------------------------------------------------------
+     A panel is a sheet of smoked glass held a few millimetres off the
+     wall: you can see the lamp through it, it picks up a highlight
+     along its top edge, and it throws a shadow. The fill is
+     translucent so the room's own gradients show through and no two
+     panels on the page are quite the same colour — which is the tell
+     that separates glass from grey paint. */
+  --glass-fill: rgba(34, 27, 21, 0.56);
+  --glass-fill-hi: rgba(46, 37, 28, 0.68);
+  --glass-blur: saturate(150%) blur(18px);
+  --glass-top: rgba(255, 238, 208, 0.10);
+
+  /* --- elevation ---------------------------------------------------
+     Four tiers, named for how far off the surface the thing is. Each
+     is a contact shadow plus a cast shadow, because one shadow alone
+     always looks like a sticker. */
+  --e1: 0 1px 1px rgba(0,0,0,.34), 0 2px 6px rgba(0,0,0,.26);
+  --e2: 0 1px 2px rgba(0,0,0,.40), 0 8px 22px rgba(0,0,0,.34);
+  --e3: 0 2px 3px rgba(0,0,0,.44), 0 18px 44px rgba(0,0,0,.44);
+  --e4: 0 3px 5px rgba(0,0,0,.50), 0 40px 90px rgba(0,0,0,.56);
+  --shadow-panel: var(--e3);
+
+  /* --- motion ------------------------------------------------------
+     One curve, used everywhere. It starts fast and settles slowly,
+     which is what mass looks like. The old 0.14s linear-ish
+     transitions read as a web page; this reads as a drawer closing. */
+  --ease: cubic-bezier(0.16, 0.84, 0.28, 1);
+  --t-fast: 180ms;
+  --t-mid: 320ms;
+  --t-slow: 620ms;
+
+  /* Glow, kept on a short leash — see the LIVE section below. */
+  --lit: rgba(240, 220, 174, 0.34);
+
+  --serif: "Bodoni Moda", "Hoefler Text", "Didot", Georgia, serif;
+}
+
+:root[data-theme="light"] {
+  /* Warm ivory and ink. Not grey: grey in daylight is the same
+     mistake as neon after dark — a default rather than a choice. */
+  --bg0: #e9e0cf;
+  --bg1: #f7f3ea;
+  --brass-lo: #6a4f16;
+  --brass:    #a87a12;
+  --brass-hi: #d8b45c;
+  --metal-edge: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.86) 0%,
+    rgba(168, 122, 18, 0.24) 40%,
+    rgba(106, 79, 22, 0.14) 100%);
+  --glass-fill: rgba(255, 253, 247, 0.66);
+  --glass-fill-hi: rgba(255, 255, 255, 0.84);
+  --glass-top: rgba(255, 255, 255, 0.92);
+  --e1: 0 1px 1px rgba(84, 62, 26, .07), 0 2px 6px rgba(84, 62, 26, .07);
+  --e2: 0 1px 2px rgba(84, 62, 26, .09), 0 8px 22px rgba(84, 62, 26, .10);
+  --e3: 0 2px 3px rgba(84, 62, 26, .10), 0 18px 44px rgba(84, 62, 26, .13);
+  --e4: 0 3px 5px rgba(84, 62, 26, .12), 0 40px 90px rgba(84, 62, 26, .17);
+  --shadow-panel: var(--e3);
+  --lit: rgba(168, 122, 18, 0.30);
+}
+
+/* ------------------------------------------------------------------
+   1 · THE VOICE
+
+   A Didone against a geometric sans. The contrast between a hairline
+   serif and a thick stem is the single most expensive-looking thing
+   typography can do — it is why the same face is on the front of
+   every fashion magazine — and it costs one 46KB file.
+
+   It is spent on titles and on numbers, and nowhere else. Body copy
+   stays in the sans, because a high-contrast serif at 14px is a
+   worse read and pretending otherwise is how a page ends up looking
+   like a wedding invitation.
+   ------------------------------------------------------------------ */
+h1, h2, h3,
+.display,
+.hero-body h2,
+.sc-main h3,
+.game-card h3,
+.crumb-title {
+  font-family: var(--serif);
+  font-weight: 700;
+  /* A Didone is already dramatic; tight tracking is what stops it
+     being florid. */
+  letter-spacing: -0.012em;
+  line-height: 1.06;
+  font-optical-sizing: auto;
+}
+h1 {
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+h2 { font-size: 25px; font-weight: 700; letter-spacing: -0.014em; }
+.game-card h3 { font-size: 23px; letter-spacing: -0.012em; }
+
+/* The wordmark, set in the display face rather than the mono it was
+   using — the mono said "developer tool", which is the opposite of
+   what the rest of the room says. */
+header h1 {
+  font-family: var(--serif);
+  font-size: 30px;
+  font-weight: 600;
+  letter-spacing: 0.005em;
+}
+
+/* An eyebrow: letterspaced, small, and sitting on a hairline that
+   runs out to the end of its line. The rule is the part that makes
+   it read as typeset rather than as a small heading. */
+.section-head > .muted,
+.fam-badge {
+  font-family: var(--display);
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  font-size: 10.5px;
+  font-weight: 600;
+}
+.fam-badge {
+  border-color: transparent;
+  background: var(--metal-edge);
+  color: var(--brass-hi);
+  padding: 4px 11px;
+}
+:root[data-theme="light"] .fam-badge { color: #5c4620; }
+
+/* Digits line up in columns wherever there is more than one of them.
+   Scores that jitter as they tick are the cheapest-looking thing on
+   a screen with numbers on it. */
+.score, .sc-main, .scorepad, .scorepad td, .scorepad th,
+.count, .stat-n, .lb-row, .match-chip b, .seat-score {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Foil. A brass gradient clipped to the letterforms, for the two
+   places that deserve it: the name of the site, and having won.
+   Everywhere else this would be a gradient on text, which is the
+   first thing that reads as generic. */
+.foil,
+header h1,
+.win-banner h2 {
+  /* The dark stop sits at 78%, not 62%. Polished metal is mostly
+     bright with one dark band low down where it turns away from the
+     light — put the dark band in the middle and the letterforms lose
+     their middle, which at this weight is most of the letter. */
+  background: linear-gradient(
+    168deg,
+    #fdf1d6 0%,
+    var(--brass-hi) 26%,
+    var(--brass) 58%,
+    var(--brass-lo) 78%,
+    var(--brass-hi) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+}
+
+:root[data-theme="light"] .foil,
+:root[data-theme="light"] header h1,
+:root[data-theme="light"] .win-banner h2 {
+  /* Same metal, lit from the other side. On ivory the bright stops are
+     the ones that disappear, so the gradient runs dark-to-bright-to-dark
+     instead — polished brass seen against a white wall rather than a
+     black one. */
+  background: linear-gradient(
+    168deg,
+    #6a4f16 0%,
+    #a87a12 30%,
+    #d8b45c 52%,
+    #8a6516 74%,
+    #5c4413 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+
+/* Card names on the Create shelf are spans, not headings, so the voice
+   rule above misses them — and a page where half the titles are Didone
+   and half are not reads as unfinished rather than as mixed. */
+.tc-name, .sc-name, .lb-name, .ach-name {
+  font-family: var(--serif);
+  font-weight: 700;
+  letter-spacing: -0.008em;
+}
+
+/* ------------------------------------------------------------------
+   2 · GLASS
+
+   Every panel in the app already carries .glass or .game-card. They
+   get the same treatment: a translucent fill over a blur, a lit top
+   edge, and a shadow. The `::before` is the highlight — one hairline
+   along the top inside edge, which is what a sheet of glass does
+   under a lamp and what a border-top cannot fake, because a border
+   is the same brightness all the way across.
+   ------------------------------------------------------------------ */
+.glass, .game-card, .panel, .sheet, .modal-card, .pop {
+  position: relative;
+  background: var(--glass-fill);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid transparent;
+  /* The hairline is metal, not rgba: bright along the top, gone by
+     the bottom. `border-box` under `padding-box` is the only way to
+     put a gradient on a border without a wrapper element. */
+  background-image:
+    linear-gradient(var(--glass-fill), var(--glass-fill)),
+    var(--metal-edge);
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
+  box-shadow: var(--e3);
+  transition: box-shadow var(--t-mid) var(--ease),
+              transform var(--t-mid) var(--ease),
+              background-color var(--t-mid) var(--ease);
+}
+
+/* The specular: a single soft band across the top-left corner. One
+   highlight, placed where the room's own key light is — the body
+   background puts its warm lamp at 10% from the left, and this
+   agrees with it. */
+.glass::before, .game-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: radial-gradient(
+    120% 80% at 6% -14%,
+    var(--glass-top) 0%,
+    transparent 58%);
+  opacity: 0.9;
+}
+
+/* Lift on hover, and let a little more light through. A card that
+   rises 2px and brightens is doing what a physical card does when
+   you pick up its edge. */
+.game-card:hover {
+  transform: translateY(-3px);
+  background-color: var(--glass-fill-hi);
+  box-shadow: var(--e4);
+  border-color: transparent;
+}
+
+/* ------------------------------------------------------------------
+   3 · MACHINED CONTROLS
+
+   A button is a piece of metal set into the surface. It has a lip
+   you can see the thickness of, a highlight along its top, and when
+   you press it, it goes DOWN — the lip shortens and the shadow
+   tightens, rather than the whole thing changing colour.
+   ------------------------------------------------------------------ */
+button.ghost, button.primary, .tabs button, .seg-btn {
+  transition: transform var(--t-fast) var(--ease),
+              box-shadow var(--t-fast) var(--ease),
+              background var(--t-fast) var(--ease),
+              color var(--t-fast) var(--ease);
+}
+
+button.ghost {
+  position: relative;
+  background:
+    linear-gradient(var(--glass-fill), var(--glass-fill)),
+    var(--metal-edge);
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
+  border: 1px solid transparent;
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  box-shadow: var(--e1);
+  font-weight: 600;
+  letter-spacing: 0.005em;
+}
+button.ghost:hover {
+  background:
+    linear-gradient(var(--glass-fill-hi), var(--glass-fill-hi)),
+    var(--metal-edge);
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
+  border-color: transparent;
+  transform: translateY(-1px);
+  box-shadow: var(--e2);
+}
+button.ghost:active { transform: translateY(0); box-shadow: var(--e1); }
+
+/* The one loud object on the page. Solid brass, and the only control
+   that is a colour rather than a piece of glass — which is what makes
+   it obvious without anything having to glow. */
+button.primary {
+  background: linear-gradient(178deg, var(--brass-hi) 0%, var(--brass) 46%, var(--brass-lo) 100%);
+  color: #17110a;
+  border: 1px solid rgba(240, 220, 174, 0.5);
+  font-weight: 700;
+  letter-spacing: 0.005em;
+  /* The lip: a solid dark edge under the object, then the shadow it
+     throws. Take the lip away on :active and the button descends. */
+  box-shadow:
+    inset 0 1px 0 rgba(255, 246, 224, 0.62),
+    0 3px 0 var(--brass-lo),
+    var(--e2);
+}
+button.primary:hover {
+  background: linear-gradient(178deg, #fbeacb 0%, var(--brass-hi) 46%, var(--brass) 100%);
+  color: #17110a;
+  border-color: rgba(255, 246, 224, 0.7);
+  transform: translateY(-1px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 250, 236, 0.7),
+    0 4px 0 var(--brass-lo),
+    var(--e3);
+}
+button.primary:active {
+  transform: translateY(3px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 246, 224, 0.45),
+    0 0 0 var(--brass-lo),
+    var(--e1);
+}
+
+.tabs {
+  background: var(--glass-fill);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border-color: transparent;
+  background-image:
+    linear-gradient(var(--glass-fill), var(--glass-fill)),
+    var(--metal-edge);
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
+  box-shadow: var(--e1);
+}
+.tabs button.on {
+  background: linear-gradient(178deg, var(--brass-hi), var(--brass));
+  color: #17110a;
+  box-shadow: var(--e1);
+}
+.seg-btn.on {
+  background: linear-gradient(178deg, var(--brass-hi), var(--brass));
+  color: #17110a;
+  border-color: rgba(240, 220, 174, 0.5);
+}
+
+/* ------------------------------------------------------------------
+   4 · FOCUS
+
+   Browser blue on a brass-and-near-black page is the single loudest
+   wrong note available, and it appears the moment anybody uses a
+   keyboard. Brass, two rings — a dark one under a bright one, so it
+   holds up over both the cloth and the glass.
+   ------------------------------------------------------------------ */
+:focus-visible {
+  outline: 2px solid var(--brass-hi);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+button:focus-visible, a:focus-visible, [role="button"]:focus-visible {
+  outline: 2px solid var(--brass-hi);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 5px rgba(0, 0, 0, 0.45), 0 0 18px var(--lit);
+}
+:root[data-theme="light"] button:focus-visible,
+:root[data-theme="light"] a:focus-visible {
+  box-shadow: 0 0 0 5px rgba(255, 255, 255, 0.8), 0 0 18px var(--lit);
+}
+
+/* ------------------------------------------------------------------
+   5 · LIVE
+
+   The whole glow budget, spent here. Three states, all of them
+   meaning "this, now": it is your turn, this is somewhere the card
+   you are holding may go, and this hand has just been won. Nothing
+   else on the page glows, which is the only reason these read as
+   signals rather than as styling.
+   ------------------------------------------------------------------ */
+@keyframes lux-breathe {
+  0%, 100% { box-shadow: 0 0 0 1px var(--brass), 0 0 14px -2px var(--lit), var(--e2); }
+  50%      { box-shadow: 0 0 0 1px var(--brass-hi), 0 0 30px 2px var(--lit), var(--e3); }
+}
+.seat.active, .your-turn, .turn-badge.on {
+  animation: lux-breathe 3.4s var(--ease) infinite;
+  border-color: var(--brass) !important;
+}
+.drop-ok, .legal-target, .sol-col.drop-ok {
+  box-shadow: 0 0 0 2px var(--brass-hi), 0 0 26px -4px var(--lit);
+  transition: box-shadow var(--t-fast) var(--ease);
+}
+.win-banner, .winner-row {
+  box-shadow: 0 0 0 1px var(--brass), 0 0 44px -6px var(--lit), var(--e4);
+}
+
+/* ------------------------------------------------------------------
+   6 · THE ROOM ITSELF
+
+   Grain and a vignette, both on one fixed overlay that sits above the
+   page background and below everything else.
+
+   Grain is the whole trick with large dark areas. A flat near-black
+   rectangle on an OLED screen is visibly a filled shape; the same
+   rectangle with a couple of percent of noise over it reads as a
+   photograph of an unlit wall. The vignette does the other half —
+   real rooms are darker at the edges, and a page that is uniformly
+   bright to all four corners never looks like a place.
+   ------------------------------------------------------------------ */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image:
+    /* the corners falling away */
+    radial-gradient(130% 100% at 50% 42%, transparent 44%, rgba(0, 0, 0, 0.44) 100%),
+    /* the grain: one tiny SVG turbulence, tiled */
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.86' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='0.42'/%3E%3C/svg%3E");
+  background-size: cover, 160px 160px;
+  mix-blend-mode: overlay;
+  opacity: 0.5;
+}
+:root[data-theme="light"] body::after {
+  background-image:
+    radial-gradient(130% 100% at 50% 42%, transparent 52%, rgba(96, 74, 38, 0.16) 100%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.86' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='0.28'/%3E%3C/svg%3E");
+  opacity: 0.36;
+}
+/* The app has to sit above the overlay or the grain lands on the type.
+   The backdrop is deliberately NOT in this list: it lives at z-index -1
+   so the grain falls over the drifting orbs as well, and giving it a
+   positive index would float it over the page content. */
+.app, header { position: relative; z-index: 1; }
+
+/* ------------------------------------------------------------------
+   7 · THE CLOTH
+
+   Felt is woven, and the weave is what your eye uses to tell cloth
+   from a coloured rectangle. Two one-pixel gratings at right angles,
+   at a couple of percent, laid over whatever colour the chosen felt
+   already is — so every table theme gets it and none of them change
+   hue.
+   ------------------------------------------------------------------ */
+.felt::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background-image:
+    repeating-linear-gradient(0deg,   rgba(255,255,255,.030) 0 1px, transparent 1px 3px),
+    repeating-linear-gradient(90deg,  rgba(0,0,0,.055)       0 1px, transparent 1px 3px);
+  /* Darker into the corners: the cloth is stretched over a frame and
+     the light comes from above it. */
+  -webkit-mask-image: radial-gradient(120% 100% at 50% 34%, #000 40%, rgba(0,0,0,.55) 100%);
+  mask-image: radial-gradient(120% 100% at 50% 34%, #000 40%, rgba(0,0,0,.55) 100%);
+  opacity: 0.9;
+}
+
+/* ------------------------------------------------------------------
+   8 · THE DECK
+
+   Cards are the one thing on the page that must not become glass:
+   they are paper, and paper is opaque. What they get instead is
+   thickness — the shadow is built so you can see the card has a
+   side — and a sheen that moves under the pointer.
+   ------------------------------------------------------------------ */
+.card {
+  box-shadow:
+    /* the side of the card */
+    0 1px 0 var(--card-edge),
+    0 2px 0 rgba(0, 0, 0, 0.16),
+    /* what it throws on the cloth */
+    0 4px 10px rgba(0, 0, 0, 0.30),
+    0 12px 26px rgba(0, 0, 0, 0.20);
+}
+.card.face {
+  /* Paper is not white, and a real deck yellows toward its centre. */
+  background:
+    radial-gradient(120% 90% at 30% 8%, #fffefb 0%, var(--card-bg) 48%, #f6f0e3 100%);
+}
+.card-btn {
+  transition: transform var(--t-fast) var(--ease),
+              filter var(--t-fast) var(--ease);
+}
+.card-btn:hover { filter: brightness(1.04) saturate(1.03); }
+
+/* The sheen. `--mx`/`--my` are set by the existing pointer-tilt hook
+   where it runs; anywhere it does not, the fallback puts the
+   highlight at the top-left, which is where the room's key light is,
+   so a static card still looks lit rather than flat. */
+.card.face::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  border-radius: inherit;
+  background: radial-gradient(
+    62% 48% at var(--mx, 26%) var(--my, 12%),
+    rgba(255, 255, 255, 0.5) 0%,
+    rgba(255, 255, 255, 0.12) 34%,
+    transparent 68%);
+  opacity: 0;
+  transition: opacity var(--t-mid) var(--ease);
+}
+.card-btn:hover .card.face::after,
+.card.face.lit::after { opacity: 1; }
+
+/* ------------------------------------------------------------------
+   9 · WEIGHT
+
+   Expensive things are slow to start and slow to stop. The transitions
+   above this section were mostly `0.14s` with no curve named, which is
+   the browser default and reads as a web page rather than an object.
+   ------------------------------------------------------------------ */
+.crumbs, .tabs, .glass, .game-card, .fam-badge, .seg-btn,
+.seat, .match-bar, .scorepad {
+  transition-timing-function: var(--ease);
+}
+
+/* Everything above is decoration on top of a game. If the reader has
+   asked for less movement, the breathing stops and the sheen stops;
+   the materials stay, because a material is not motion. */
+@media (prefers-reduced-motion: reduce) {
+  .seat.active, .your-turn, .turn-badge.on { animation: none; }
+  .card.face::after { transition: none; }
+  .glass, .game-card, button.ghost, button.primary { transition: none; }
+  .game-card:hover { transform: none; }
+}
+
+/* ------------------------------------------------------------------
+   10 · AIR
+
+   The last thing separating this from an expensive page is that
+   everything is the same distance from everything else. A shelf laid
+   out on one 16px step reads as a list of components; a room reads as
+   a room because the gaps between groups are much bigger than the
+   gaps inside them.
+
+   So: the page gets wider, sections get a lot more space between them
+   than within them, and the headings get bigger — scale contrast is
+   free and it is most of what "designed" looks like.
+   ------------------------------------------------------------------ */
+.app {
+  max-width: 1180px;
+  padding: 34px 28px 110px;
+}
+
+/* Between one section and the next, not between a heading and its own
+   content — that gap stays tight, which is what makes them read as
+   belonging together. */
+.section-head { margin-bottom: 20px; }
+.section-head + * { margin-top: 0; }
+h2 { font-size: 30px; }
+
+/* The rule beside a section heading is already in the sheet, a few
+   thousand lines up. It is a 3px bar, which at this weight of type is
+   a highlighter mark rather than a rule — a hairline says the same
+   thing and says it in a quieter voice. */
+.section-head h2::after {
+  height: 1px;
+  width: 64px;
+  border-radius: 0;
+  background: linear-gradient(90deg, var(--brass), transparent);
+}
+
+/* Cards on the shelf get room to be objects rather than tiles. */
+.cards-grid {
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 22px;
+}
+
+@media (max-width: 780px) {
+  /* On a phone the wide gutters are just lost screen, and the display
+     face needs to come down or a two-word title wraps to three lines. */
+  .app { padding: 20px 16px 80px; }
+  h2 { font-size: 24px; }
+  header h1 { font-size: 25px; }
+  .cards-grid { grid-template-columns: 1fr; gap: 16px; }
+  .section-head h2::after { display: none; }
+}

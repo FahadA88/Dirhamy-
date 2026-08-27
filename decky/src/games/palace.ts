@@ -31,13 +31,23 @@ export const palace: GameDefinition = {
   },
   zones: [
     { id: 'draw', type: 'pile', ordered: true, faceDown: true, visibility: 'none', shared: true },
-    { id: 'pile', type: 'pile', ordered: true, faceDown: false, visibility: 'all', shared: true },
+    // 'top-public' is how the engine recognises the pile you play onto: only the top card is
+    // in play, and everything under it is history. A climbing game without one has nowhere to
+    // put a card.
+    { id: 'discard', type: 'pile', ordered: true, faceDown: false, visibility: 'top-public', shared: true },
     { id: 'hand', type: 'hand', ordered: false, faceDown: true, visibility: 'owner', perPlayer: true },
   ],
   setup: [
     { op: 'shuffle', zone: 'draw' },
-    // Six each. Enough to have a plan, few enough that picking the pile up really hurts.
-    { op: 'deal', from: 'draw', to: 'hand', countPerPlayer: 6 },
+    /*
+      The whole pack, dealt out. Not six each.
+
+      Six each measured out at a 75/25 split between two players, which is not a game — with a
+      short hand whoever leads sheds first and there is not enough left afterwards for the deal
+      to even out. Dealing everything gives the pile something to do: it grows, somebody has to
+      swallow it, and the advantage of going first is spent within a few turns.
+    */
+    { op: 'dealAll', from: 'draw', to: 'hand' },
   ],
   turnFlow: { order: 'clockwise', startPlayer: 'first', actionsPerTurn: { min: 1, max: 1 } },
   actions: [],
