@@ -10,6 +10,9 @@
 // device-local app can actually promise — your own result for today, and the streak of days
 // you've solved it — rather than a leaderboard this app has no way to run.
 
+import { catalog } from '../games/catalog';
+import { GameDefinition } from '../engine/types';
+
 const KEY = 'decky.daily.v1';
 
 export interface DailyResult {
@@ -22,6 +25,24 @@ export interface DailyResult {
  * Earth, not separately per time zone. */
 export function todayKey(d = new Date()): string {
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
+}
+
+/**
+ * Which patience is today's deal.
+ *
+ * It used to always be Klondike — one of forty-nine other games and Klondike got the daily
+ * slot every single day. Picked by hashing the date string rather than counting through the
+ * catalog in order: counting would make the sequence "day 1 is game 1, day 2 is game 2" and
+ * repeat in lockstep with whatever order games happen to be declared in; a hash spreads them
+ * out and is exactly as reproducible — the same date always lands on the same game, for
+ * everyone, which is the one property this actually has to keep.
+ */
+export function dailyGame(d = new Date()): GameDefinition {
+  const pool = catalog.filter((g) => g.solitaire);
+  const key = todayKey(d);
+  let h = 0;
+  for (let i = 0; i < key.length; i++) h = (Math.imul(h, 31) + key.charCodeAt(i)) >>> 0;
+  return pool[h % pool.length];
 }
 
 function read(): Record<string, DailyResult> {

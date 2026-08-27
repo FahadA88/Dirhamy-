@@ -1,6 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { catalog } from '../games/catalog';
-import { klondike } from '../games/klondike';
 import { Table } from './Table';
 import { SolitaireTable } from './SolitaireTable';
 import { ErrorBoundary } from './ErrorBoundary';
@@ -14,7 +13,7 @@ import { BrowseView } from './BrowseView';
 import type { OnlineSession } from './OnlineTable';
 import { hostInfo } from '../net/host';
 import { recordPlay } from '../library/library';
-import { dailyStreak, resultFor, todayKey } from '../social/daily';
+import { dailyGame, dailyStreak, resultFor, todayKey } from '../social/daily';
 
 // Worklist #98, continued: the websocket client, the remote-table protocol and the online
 // lobby only matter to the fraction of sessions that ever click "Play with people" — most
@@ -177,13 +176,13 @@ export function PlayView() {
             <p className="muted">
               {todaysDaily
                 ? todaysDaily.won ? `Solved in ${todaysDaily.moves} moves.` : 'Not today — back tomorrow for a new one.'
-                : 'One Klondike deal, the same for everyone playing today.'}
+                : `One ${dailyGame().meta.name} deal, the same for everyone playing today.`}
               {streak > 1 && ` ${streak} days running.`}
             </p>
           </div>
         </div>
         {!todaysDaily && (
-          <button className="primary sm" onClick={() => { setDailyMode(true); setGame(klondike); }}>
+          <button className="primary sm" onClick={() => { setDailyMode(true); setGame(dailyGame()); }}>
             Play →
           </button>
         )}
