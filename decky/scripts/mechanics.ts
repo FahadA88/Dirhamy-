@@ -10,6 +10,12 @@ import { freecell } from '../src/games/freecell';
 import { spider } from '../src/games/spider';
 import { kent } from '../src/games/kent';
 import { pinochle } from '../src/games/pinochle';
+import { briscola } from '../src/games/briscola';
+import { sixtySix } from '../src/games/sixtySix';
+import { blackMaria } from '../src/games/blackMaria';
+import { whist } from '../src/games/whist';
+import { spadesLite } from '../src/games/spades';
+import { ohHell } from '../src/games/ohHell';
 import { catalog } from '../src/games/catalog';
 import { createMatch, legalMoves, applyMove, actingPlayers, redact, nextHand, scoreMelds, bestBy } from '../src/engine/engine';
 import { chooseMove } from '../src/bots/randomBot';
@@ -915,6 +921,39 @@ section('Schema coverage: bestBy() breaks a real tie fairly, not by seat order')
   check('a real winner (highest, no tie) is picked exactly, not randomized', clear === 'B', clear);
   const clearLow = bestBy(s, (p) => ({ A: 3, B: 9, C: 1, D: 4 }[p] ?? 0), -1);
   check('dir -1 picks the real lowest, no tie', clearLow === 'C', clearLow);
+}
+
+// ---------- Regression: the dealer actually rotates in every trick game that had it stuck at
+// seat 0 (items 2-3 of the site-audit pass, item 96 locking it in) ----------
+//
+// The bug: Briscola, Sixty-Six, Black Maria, Pinochle and Whist declare no auction, no bidding,
+// and no lead card — createMatch()'s branch for that case defaulted openingLeadSeat() to a flat
+// seat 0 and never rotated dealerIndex for it, so hand 1's opener was hand 40's opener too.
+// Spades and Oh Hell (bidding: true) had the same dealerIndex bug, plus a second one: the
+// post-bid turnIndex was hardcoded to 0 regardless of who the dealer actually was.
+//
+// None of these seven declare turnFlow.startPlayer: 'dealerLeft' (the generic schema-coverage
+// test above only checks games that do) — the fix lives entirely inside createMatch's own
+// trick-family branches, so this needs its own direct check. The original fix was verified by
+// hand ("dealerIndex across 6 simulated Briscola hands went from [0,0,0,0,0,0] to
+// [0,1,0,1,0,1]") but never captured as a permanent test — this is that test.
+section('Regression: dealerIndex rotates hand over hand for the seat-0-stuck trick games');
+{
+  const games: [string, typeof briscola][] = [
+    ['Briscola', briscola], ['Sixty-Six', sixtySix], ['Black Maria', blackMaria],
+    ['Pinochle', pinochle], ['Whist', whist], ['Spades', spadesLite], ['Oh Hell', ohHell],
+  ];
+  for (const [name, def] of games) {
+    const n = def.meta.players.min;
+    const seats = Array.from({ length: n }, (_, i) => `P${i + 1}`);
+    let s = createMatch(def, seats, 11);
+    const dealers = new Set<number>([s.dealerIndex]);
+    for (let hand = 0; hand < n * 2; hand++) {
+      s = nextHand(s, hand + 100);
+      dealers.add(s.dealerIndex);
+    }
+    check(`${name}: dealerIndex visits more than one seat across ${n * 2} hands`, dealers.size > 1, [...dealers]);
+  }
 }
 
 console.log(failed ? '\nMECHANICS: FAILED' : '\nMECHANICS: all checks passed');
