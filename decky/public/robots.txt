@@ -1,0 +1,4 @@
+# Decky is a single-page app — everything lives behind one URL, so there's nothing here for a
+# crawler to be excluded from and no multi-page sitemap to offer.
+User-agent: *
+Allow: /

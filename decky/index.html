@@ -9,6 +9,10 @@
          white bar above a dark table. -->
     <meta name="theme-color" content="#12172a" />
     <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+    <!-- A browser or crawler too old to use the SVG above falls back to this — without it, it
+         falls back to nothing, since an explicit icon link (even to a format it can't use)
+         stops the usual automatic /favicon.ico request. -->
+    <link rel="icon" href="/favicon.ico" sizes="32x32" />
     <!-- iOS does not reliably rasterize an SVG for its home-screen icon — this needs a real
          PNG, unlike every other icon reference on this page. -->
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
