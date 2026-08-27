@@ -11,7 +11,9 @@ export const slapjack: GameDefinition = {
     name: 'Slapjack',
     description:
       'Flip your top card onto the shared pile on your turn. The instant a Jack lands on top — even on top of another Jack — slap first and the whole pile is yours; the slap button only ever appears when it is genuinely valid, so there is no risk in trying. Last player holding cards wins.',
-    players: { min: 2, max: 6 },
+    // Seats up to eight: a reflex game gets sharper with more people watching the same
+    // pile, not duller.
+    players: { min: 2, max: 8 },
     family: 'reflex',
   },
   deck: {

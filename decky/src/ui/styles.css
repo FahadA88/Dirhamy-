@@ -6497,3 +6497,40 @@ h2 { font-size: 30px; }
   font-family: var(--display);
   font-variant-numeric: tabular-nums;
 }
+
+/* ------------------------------------------------------------------
+   13 · ONE SELECTED STATE
+
+   A selected pill was an ink/background inversion, which in this room
+   lands on warm cream. That was a reasonable answer when nothing else
+   on the page was metal. It is not one now: the tabs and the seat
+   stepper went brass a few sections up, and a white pill sitting in a
+   row of brass ones is the single thing on the Preferences panel that
+   looks unconsidered.
+
+   Everything that means "this one is chosen" now says it the same way,
+   in the same material, in both themes — so it is defined once at the
+   token instead of being restated at each of the six places that use
+   it.
+   ------------------------------------------------------------------ */
+:root {
+  --seg-on-bg: linear-gradient(178deg, var(--brass-hi), var(--brass));
+  --seg-on-ink: #17110a;
+}
+:root[data-theme="light"] {
+  /* Brass has to darken in daylight to hold its own, and then the ink
+     on top of it has to go the other way. */
+  --seg-on-bg: linear-gradient(178deg, var(--brass), #7d5a10);
+  --seg-on-ink: #fdf6e6;
+}
+
+/* `border-color` cannot take a gradient, so the six rules that set it
+   from the same token would drop their border entirely. Give them the
+   solid metal instead. */
+.seg-btn.on,
+.seg button.on,
+.rb-join button.on,
+.tabs button.on,
+.nav-dock button.on {
+  border-color: var(--brass);
+}

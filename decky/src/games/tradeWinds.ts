@@ -10,6 +10,10 @@ export const tradeWinds: GameDefinition = {
     name: 'Trade Winds',
     description:
       "Shed your hand by matching the top discard's rank or suit. Whenever a Jack is played, a trade wind sweeps the table — everyone passes one card to their left, all at once. First to empty their hand wins.",
+    // Six, not seven. Self-play at seven finishes every match with an even spread, but it
+    // deals 49 of the 52 cards and the validator is right to object: a three-card draw pile is
+    // a game that works until the moment somebody needs to draw. Undertow seats seven and eight
+    // on a deal that leaves room.
     players: { min: 3, max: 6 },
     family: 'shedding-matching',
   },

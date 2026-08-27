@@ -25,7 +25,9 @@ export const handAndFoot: GameDefinition = {
       + 'put up to two wilds in each, so a meld can be built out of almost anything. Lay off '
       + 'onto anybody. Go out and everyone counts what they are still holding — and a joker '
       + 'caught in your hand is fifty against you.',
-    players: { min: 4, max: 6 },
+    // Seats up to eight — four packs is enough for them, and eight is who the game is
+    // for in the first place.
+    players: { min: 4, max: 8 },
     family: 'rummy',
   },
   deck: {

@@ -16,7 +16,8 @@ export const ratscrew: GameDefinition = {
       + 'when the top two cards match, which is the one you will miss. First hand down takes '
       + 'the whole pile into the bottom of theirs. The slap only appears when it is genuinely '
       + 'valid, so there is nothing to lose by trying. Last player still holding cards wins.',
-    players: { min: 2, max: 6 },
+    // Seats up to eight, which is about as many as fit round a real table.
+    players: { min: 2, max: 8 },
     family: 'reflex',
   },
   deck: {

@@ -18,7 +18,8 @@ export const contractWhist: GameDefinition = {
     description:
       'Bid a number and a suit, each bid beating the last. Win the auction and you have promised '
       + 'that many tricks — make it and you score, fall short and the other side does.',
-    players: { min: 3, max: 4 },
+    // Seats up to seven: the hand shrinks as the table grows, so the pack still deals.
+    players: { min: 3, max: 7 },
     family: 'trick',
   },
   deck: {

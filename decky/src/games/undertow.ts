@@ -11,7 +11,9 @@ export const undertow: GameDefinition = {
     name: 'Undertow',
     description:
       "Beat the pile with a single card, a pair, or a triple — your reply has to match the same shape as what's down. A four-of-a-kind is a bomb: play it any time, even out of turn, and it beats anything. First to empty their hand wins.",
-    players: { min: 3, max: 5 },
+    // Seats up to eight, verified over 150 matches at each size — the pack stretches,
+    // and a trading game wants a crowd.
+    players: { min: 3, max: 8 },
     family: 'climbing',
   },
   deck: {

@@ -21,7 +21,9 @@ export const napoleon: GameDefinition = {
       + 'alone against everyone else at the table. Follow suit if you can. Make your bid and you '
       + 'score it; fall short and it costs you double while the defenders collect. Everyone else '
       + 'wins together, so all they need is one trick more than you can spare.',
-    players: { min: 4, max: 6 },
+    // Seats up to seven: five cards each means the pack has room to spare, and the
+    // declarer being outnumbered six to one is more of the same joke, not less.
+    players: { min: 4, max: 7 },
     family: 'trick-taking',
   },
   deck: {

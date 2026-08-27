@@ -21,7 +21,9 @@ export const palace: GameDefinition = {
       + 'way. A Two can be played on anything and resets the pile to nothing. Four of a rank in '
       + 'a row burns the pile out of the game. So the small cards are the valuable ones and a '
       + 'hand full of aces is a trap. First player out of cards wins.',
-    players: { min: 2, max: 6 },
+    // Seats up to eight: the whole pack is dealt out, so it divides however many are
+    // sitting down.
+    players: { min: 2, max: 8 },
     family: 'climbing',
   },
   deck: {

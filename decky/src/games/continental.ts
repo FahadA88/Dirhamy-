@@ -19,7 +19,8 @@ export const continental: GameDefinition = {
       + 'or more, and discard. Wild cards fill whatever a meld is short of, up to two per meld, '
       + 'and a meld always needs real cards in it. Lay spare cards onto melds already down. '
       + 'First to shed a whole hand ends it; lowest total when someone passes the target wins.',
-    players: { min: 2, max: 6 },
+    // Seats up to eight. The printed rules go to twelve; the pack here goes to eight.
+    players: { min: 2, max: 8 },
     family: 'rummy',
   },
   deck: {
