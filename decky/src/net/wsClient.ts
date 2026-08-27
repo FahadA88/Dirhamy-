@@ -19,14 +19,19 @@ export class WebSocketApi implements MatchApi {
   private queued: (() => void)[] = [];
   private closed = false;
   private attempt = 0;
-  private seatClaim: { matchId: string; seat: string | null } | null = null;
+  private seatClaim: { matchId: string; seat: string | null; token: string | null } | null = null;
 
   constructor(private url: string) { this.connect(); }
 
-  /** Announce which seat this client is, so the host can mark it present and route events. */
-  identify(matchId: string, seat: string | null): Promise<MatchSummary> {
-    this.seatClaim = { matchId, seat };
-    return this.call({ kind: 'hello', matchId, seat }).then((r) => expectKind(r, 'summary').summary);
+  /**
+   * Announce which seat this client is, so the host can mark it present and route events.
+   * `token` is the secret handed back when this seat was opened or joined — required for any
+   * real seat (a spectator identifying with `seat: null` needs none), and re-sent on every
+   * reconnect so the host never has to just take a seat's word for it.
+   */
+  identify(matchId: string, seat: string | null, token: string | null = null): Promise<MatchSummary> {
+    this.seatClaim = { matchId, seat, token };
+    return this.call({ kind: 'hello', matchId, seat, token }).then((r) => expectKind(r, 'summary').summary);
   }
 
   private connect(): void {
@@ -158,7 +163,7 @@ export async function openRemoteTable(base: string, gameId: string, seats: Seat[
     method: 'POST', headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ gameId, seats }),
   });
-  return r.json() as Promise<{ matchId: string; code: string } | { error: string }>;
+  return r.json() as Promise<{ matchId: string; code: string; seatTokens: Record<string, string> } | { error: string }>;
 }
 
 export async function joinRemoteTable(base: string, code: string, name: string) {
@@ -166,7 +171,7 @@ export async function joinRemoteTable(base: string, code: string, name: string) 
     method: 'POST', headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ code, name }),
   });
-  return r.json() as Promise<{ matchId: string; seat: string } | { error: string }>;
+  return r.json() as Promise<{ matchId: string; seat: string; token: string } | { error: string }>;
 }
 
 export async function quickPlay(base: string, gameId: string, name: string, seats = 4) {
@@ -174,5 +179,7 @@ export async function quickPlay(base: string, gameId: string, name: string, seat
     method: 'POST', headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ gameId, name, seats }),
   });
-  return r.json() as Promise<{ matchId: string; seat: string; code: string; hosted: boolean } | { error: string }>;
+  return r.json() as Promise<
+    { matchId: string; seat: string; code: string; hosted: boolean; token: string } | { error: string }
+  >;
 }

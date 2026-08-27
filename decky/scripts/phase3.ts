@@ -192,13 +192,13 @@ async function main() {
   section('Two clients on one socket table see their own hand and nobody else’s');
   {
     const opened = await openRemoteTable(base, 'classic-hearts', seatsFor(['remote', 'remote', 'bot', 'bot']));
-    const { matchId, code } = opened as { matchId: string; code: string };
+    const { matchId, code, seatTokens } = opened as { matchId: string; code: string; seatTokens: Record<string, string> };
     await joinRemoteTable(base, code, 'Bob');
 
     const alice = new WebSocketApi(wsUrl);
     const bob = new WebSocketApi(wsUrl);
-    await alice.identify(matchId, 'P1');
-    await bob.identify(matchId, 'P2');
+    await alice.identify(matchId, 'P1', seatTokens.P1);
+    await bob.identify(matchId, 'P2', seatTokens.P2);
 
     const aView = await alice.view(matchId, 'P1');
     const bView = await bob.view(matchId, 'P2');
@@ -225,6 +225,31 @@ async function main() {
 
     alice.close();
     bob.close();
+  }
+
+  section('A seat cannot be read from or moved as without its token');
+  {
+    // The invite code gets a whole table into a match; it must not also let anyone read or act
+    // as a specific seat inside it. That is what the per-seat token guards.
+    const opened = await openRemoteTable(base, 'classic-crazy-eights', seatsFor(['remote', 'bot', 'bot']));
+    const { matchId, seatTokens } = opened as { matchId: string; seatTokens: Record<string, string> };
+
+    const impostor = new WebSocketApi(wsUrl);
+    let helloRejected = false;
+    try { await impostor.identify(matchId, 'P1', 'not-the-real-token'); } catch { helloRejected = true; }
+    check('a wrong token is refused at hello', helloRejected);
+
+    let leaked = false;
+    try { await impostor.view(matchId, 'P1'); leaked = true; } catch { /* expected refusal */ }
+    check('and that socket never gets to read the seat it failed to claim', !leaked);
+    impostor.close();
+
+    const genuine = new WebSocketApi(wsUrl);
+    await genuine.identify(matchId, 'P1', seatTokens.P1);
+    let sawOther = false;
+    try { await genuine.view(matchId, 'P2'); sawOther = true; } catch { /* expected refusal */ }
+    check('and a genuinely-claimed seat cannot read a different seat over the same socket', !sawOther);
+    genuine.close();
   }
 
   // ---------- the headline ----------
@@ -282,9 +307,9 @@ async function main() {
   section('A dropped connection loses nothing');
   {
     const opened = await openRemoteTable(base, 'classic-crazy-eights', seatsFor(['remote', 'bot', 'bot']));
-    const { matchId } = opened as { matchId: string };
+    const { matchId, seatTokens } = opened as { matchId: string; seatTokens: Record<string, string> };
     const client = new WebSocketApi(wsUrl);
-    await client.identify(matchId, 'P1');
+    await client.identify(matchId, 'P1', seatTokens.P1);
     const legal = await client.legal(matchId, 'P1');
     if (legal.length) await client.submit(matchId, 'P1', legal[0]);
     const before = JSON.stringify(await client.view(matchId, 'P1'));
@@ -292,7 +317,7 @@ async function main() {
 
     await new Promise((r) => setTimeout(r, 120));
     const back = new WebSocketApi(wsUrl);
-    await back.identify(matchId, 'P1');
+    await back.identify(matchId, 'P1', seatTokens.P1);
     const after = JSON.stringify(await back.view(matchId, 'P1'));
     check('reconnecting resumes the same position', before === after);
     check('and the seat is marked present again', host.service.seats(matchId)[0].connected === true);

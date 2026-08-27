@@ -13,7 +13,10 @@ import { MatchSummary, MoveRecord, Seat, TakebackRequest } from '../server/match
 // construction rather than by discipline.
 
 export type Request =
-  | { kind: 'hello'; matchId: string; seat: string | null }
+  // `token` is the secret handed back when this seat was opened or joined (see GameHost). A
+  // spectator (`seat: null`) needs none; a real seat's token must match what the host issued, or
+  // the invite code alone would let any client read or move as somebody else's hand.
+  | { kind: 'hello'; matchId: string; seat: string | null; token: string | null }
   | { kind: 'summary'; matchId: string }
   | { kind: 'view'; matchId: string; seat: string }
   | { kind: 'legal'; matchId: string; seat: string }

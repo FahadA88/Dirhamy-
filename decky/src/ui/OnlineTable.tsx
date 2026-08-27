@@ -46,10 +46,10 @@ export function OnlineTable({ def, onStart, onCancel }: {
   useEffect(() => () => { apiRef.current?.close(); }, []);
 
   /** Connect, take the seat the host gave us, and read the opening position once. */
-  async function enter(info: HostInfo, matchId: string, seat: string, inviteCode: string) {
+  async function enter(info: HostInfo, matchId: string, seat: string, inviteCode: string, token: string) {
     const api = new WebSocketApi(info.ws);
     apiRef.current = api;
-    await api.identify(matchId, seat);
+    await api.identify(matchId, seat, token);
     const view = await api.view(matchId, seat);
     const legal = view.isYourTurn ? await api.legal(matchId, seat) : [];
     const summary = await api.summary(matchId);
@@ -76,7 +76,7 @@ export function OnlineTable({ def, onStart, onCancel }: {
     setCode(r.code);
     setStage('waiting');
     try {
-      await enter(host, r.matchId, 'P1', r.code);
+      await enter(host, r.matchId, 'P1', r.code, r.seatTokens.P1);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not reach the table.');
       setStage('error');
@@ -90,7 +90,7 @@ export function OnlineTable({ def, onStart, onCancel }: {
     const r = await joinRemoteTable(host.base, typed.trim().toUpperCase(), settings.playerName);
     if ('error' in r) { setError(r.error); setStage('error'); return; }
     try {
-      await enter(host, r.matchId, r.seat, typed.trim().toUpperCase());
+      await enter(host, r.matchId, r.seat, typed.trim().toUpperCase(), r.token);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not reach the table.');
       setStage('error');
@@ -105,7 +105,7 @@ export function OnlineTable({ def, onStart, onCancel }: {
     if ('error' in r) { setError(r.error); setStage('error'); return; }
     setCode(r.code);
     try {
-      await enter(host, r.matchId, r.seat, r.code);
+      await enter(host, r.matchId, r.seat, r.code, r.token);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not reach the table.');
       setStage('error');

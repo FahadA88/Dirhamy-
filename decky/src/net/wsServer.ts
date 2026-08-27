@@ -1,5 +1,6 @@
 import { createServer, IncomingMessage, ServerResponse } from 'node:http';
 import { readFile } from 'node:fs/promises';
+import { randomBytes } from 'node:crypto';
 import { extname, join, normalize } from 'node:path';
 import { WebSocketServer, WebSocket } from 'ws';
 import { MatchService, Seat } from '../server/matchService';
@@ -41,7 +42,24 @@ interface Table {
   code: string;
   sockets: Map<WebSocket, string | null>;   // socket -> seat it claims (null = spectator)
   open: boolean;                            // still accepting players
+  /**
+   * The secret that must accompany a `hello` for a given seat. Issued once, when the seat is
+   * opened or joined, and handed back only in that one response — never broadcast, never
+   * re-derivable from the invite code. Without this, the invite code (which the whole table
+   * knows) would double as a credential for reading or moving as any other seat too.
+   */
+  seatTokens: Map<string, string>;
 }
+
+function randomToken(): string {
+  return randomBytes(16).toString('hex');
+}
+
+/** Requests that name a seat and must come from the socket that helloed as that exact seat. */
+const SEATED_KINDS = new Set([
+  'view', 'legal', 'submit', 'setSeat', 'requestTakeback', 'agreeTakeback',
+  'declineTakeback', 'hint', 'quickUndo',
+]);
 
 export class GameHost {
   readonly service = new MatchService();
@@ -66,20 +84,27 @@ export class GameHost {
 
   // ----- table lifecycle -----
 
-  /** Open a table. Returns the invite code a person can read out. */
-  openTable(definition: GameDefinition, seats: Seat[], gameId?: string): { matchId: string; code: string } {
+  /** Open a table. Returns the invite code a person can read out, and a token for every seat
+   *  that starts out remote (the host's own seat) — the caller already knows which one is theirs. */
+  openTable(
+    definition: GameDefinition, seats: Seat[], gameId?: string,
+  ): { matchId: string; code: string; seatTokens: Record<string, string> } {
     const summary = this.service.create(definition, gameId ?? definition.meta.id, seats);
-    const table: Table = { matchId: summary.matchId, code: summary.inviteCode, sockets: new Map(), open: true };
+    const table: Table = {
+      matchId: summary.matchId, code: summary.inviteCode, sockets: new Map(), open: true,
+      seatTokens: new Map(),
+    };
+    for (const s of seats) if (s.kind === 'remote') table.seatTokens.set(s.id, randomToken());
     this.tables.set(table.code, table);
     this.byMatch.set(table.matchId, table);
     // The very first seat to act might already be a bot's (an all-bot filler table, or a game
     // whose dealer/opener isn't seat 0) — step it before anyone has sent a single message.
     this.stepBots(table);
-    return { matchId: table.matchId, code: table.code };
+    return { matchId: table.matchId, code: table.code, seatTokens: Object.fromEntries(table.seatTokens) };
   }
 
   /** Take an open seat at a table, by code. This is what an invite link resolves to. */
-  join(code: string, name: string): { matchId: string; seat: string } | { error: string } {
+  join(code: string, name: string): { matchId: string; seat: string; token: string } | { error: string } {
     const table = this.tables.get(code.toUpperCase());
     if (!table) return { error: 'No table with that code.' };
     const seats = this.service.seats(table.matchId);
@@ -87,9 +112,11 @@ export class GameHost {
     const free = seats.find((s) => s.kind === 'bot');
     if (!free) return { error: 'That table is full.' };
     this.service.setSeat(table.matchId, free.id, { kind: 'remote', name, connected: true });
+    const token = randomToken();
+    table.seatTokens.set(free.id, token);
     this.broadcast(table, { type: 'seats', matchId: table.matchId, at: Date.now() });
     this.stepBots(table);
-    return { matchId: table.matchId, seat: free.id };
+    return { matchId: table.matchId, seat: free.id, token };
   }
 
   /**
@@ -117,7 +144,9 @@ export class GameHost {
    * Deliberately the same join path — matchmaking is a way of finding a code, not a second
    * kind of game.
    */
-  quickPlay(definition: GameDefinition, name: string, seatCount = 4): { matchId: string; seat: string; code: string; hosted: boolean } {
+  quickPlay(
+    definition: GameDefinition, name: string, seatCount = 4,
+  ): { matchId: string; seat: string; code: string; hosted: boolean; token: string } {
     while (this.queue.length > 0) {
       const code = this.queue[0];
       const r = this.join(code, name);
@@ -135,7 +164,7 @@ export class GameHost {
     }));
     const t = this.openTable(definition, seats);
     this.queue.push(t.code);
-    return { matchId: t.matchId, seat: 'P1', code: t.code, hosted: true };
+    return { matchId: t.matchId, seat: 'P1', code: t.code, hosted: true, token: t.seatTokens.P1 };
   }
 
   closeTable(code: string): void {
@@ -161,6 +190,26 @@ export class GameHost {
         try { msg = JSON.parse(String(raw)); } catch { return; }
         const req = msg.body;
         const table = this.byMatch.get(req.matchId);
+        const refuse = (error: string) => sock.send(JSON.stringify({ id: msg.id, body: { ok: false, error }, reply: true }));
+
+        // A seat is a secret once opened or joined: hello must present the exact token that
+        // request was handed back, and every later request naming a seat must come from the
+        // socket that helloed as it — otherwise the invite code, which the whole table knows,
+        // would double as a credential for reading or moving as anyone else's hand.
+        if (req.kind === 'hello') {
+          if (table && req.seat) {
+            const expected = table.seatTokens.get(req.seat);
+            if (expected === undefined || expected !== req.token) {
+              refuse('That seat needs the token it was issued when it was opened or joined.');
+              return;
+            }
+          }
+        } else if (table && SEATED_KINDS.has(req.kind)) {
+          if (table.sockets.get(sock) !== (req as { seat?: string }).seat) {
+            refuse('Say hello for this seat on this connection first.');
+            return;
+          }
+        }
 
         if (req.kind === 'hello' && table) {
           table.sockets.set(sock, req.seat);
