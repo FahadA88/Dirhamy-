@@ -558,8 +558,20 @@ function GameDetail({ game, me, onBack, onPlay, onSetup, onOnline, onlineHostDow
               <button className="ghost" onClick={onOnline}>Play with people</button>
             )}
             {!game.definition.solitaire && !onOnline && onlineHostDown && (
-              <span className="gd-online-off" title="Run `npm run host` on a machine everyone here can reach, then reload.">
-                Play with people — needs a host running
+              /*
+                This used to say "Play with people — needs a host running" with the actual
+                instruction hidden in a hover tooltip nobody was going to find. That is a dead
+                end for the person it is talking to: `npm run host` means nothing without a
+                terminal, and most people looking at this button do not have one open. "Set up a
+                table" sits right next to this and plays with other people on THIS device right
+                now, which is the answer for the person who came here to do that — so this says
+                so directly instead of pointing at a wall.
+              */
+              <span className="gd-online-off">
+                Playing over the network needs somebody to run a host —
+                <code>npm run host</code>{' '}
+                on a machine everyone here can reach. Until then, "Set up a table" plays with
+                other people on this device, passed hand to hand.
               </span>
             )}
             {onRemix && (

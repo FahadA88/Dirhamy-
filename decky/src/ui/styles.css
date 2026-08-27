@@ -1739,10 +1739,17 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
 }
 .gd-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; align-items: center; }
 /* Explains the gap where the online button would be, rather than leaving the option to look
-   like it never existed. Not a button — there is nothing to click until a host answers. */
+   like it never existed — and says the actual answer (Set up a table, right there on the same
+   row) rather than hiding it in a hover tooltip nobody was going to find. Not a button — there
+   is nothing here to click. */
 .gd-online-off {
-  font-size: 13px; color: var(--muted); padding: 9px 4px;
-  border-bottom: 1px dashed var(--panel-brd); cursor: help;
+  display: block;
+  max-width: 46ch;
+  font-size: 13px; line-height: 1.5; color: var(--muted); padding: 9px 4px;
+}
+.gd-online-off code {
+  font-family: var(--mono); font-size: 12px; background: var(--panel-hi);
+  padding: 1px 6px; border-radius: 5px; color: var(--ink);
 }
 .ghost.danger { color: var(--red); border-color: color-mix(in srgb, var(--red) 40%, transparent); }
 .gd-sub { margin: 20px 0 10px; font-size: 15px; }
