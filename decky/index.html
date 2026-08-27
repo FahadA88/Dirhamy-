@@ -9,11 +9,25 @@
          white bar above a dark table. -->
     <meta name="theme-color" content="#12172a" />
     <link rel="icon" href="/icon.svg" type="image/svg+xml" />
-    <link rel="apple-touch-icon" href="/icon.svg" />
+    <!-- iOS does not reliably rasterize an SVG for its home-screen icon — this needs a real
+         PNG, unlike every other icon reference on this page. -->
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Decky" />
+
+    <!-- So a link to this app shows a real preview when shared, instead of a bare URL. -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Decky — play & build card games" />
+    <meta property="og:description" content="Play card games against bots or people, and build your own." />
+    <meta property="og:image" content="/og-card.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Decky — play & build card games" />
+    <meta name="twitter:description" content="Play card games against bots or people, and build your own." />
+    <meta name="twitter:image" content="/og-card.png" />
   </head>
   <body>
     <div id="root"></div>
