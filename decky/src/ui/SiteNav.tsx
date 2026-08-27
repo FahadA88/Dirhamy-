@@ -1,3 +1,5 @@
+import { dailyStreak } from '../social/daily';
+
 // The navigation, five ways.
 //
 // These are all live — `?nav=rail`, `?nav=centre`, `?nav=dock`, `?nav=plate`, or nothing for
@@ -21,22 +23,34 @@ export function navStyle(): NavStyle {
   return (NAV_STYLES.some((n) => n.id === q) ? q : 'bar') as NavStyle;
 }
 
-export function SiteNav({ style, view, onView, onSettings }: {
+export function SiteNav({ style, view, onView, onSettings, onDaily }: {
   style: NavStyle;
   view: 'play' | 'create' | 'profile';
   onView: (v: 'play' | 'create' | 'profile') => void;
   onSettings: () => void;
+  /**
+   * Item 84 of the audit pass: the daily deal is described in its own code as "the single
+   * highest-value thing on this list for bringing anybody back tomorrow," and yet it had zero
+   * presence in primary navigation — it only existed as one card, easy to miss, inside the Play
+   * tab's shelf. This puts it in the same row as Play/Create/You on every screen, not just one.
+   */
+  onDaily: () => void;
 }) {
   // The marks are only rendered where they are used. Hiding them with CSS leaves the glyph in
   // the element's text, so a button reading "Play" is really "\u2660Play" to anything matching on
   // text — screen readers included.
   const marks = style === 'rail' || style === 'dock';
   const settingsLabel = style === 'rail';
+  const streak = dailyStreak();
   const items = (
     <>
       <button className={view === 'play' ? 'on' : ''} onClick={() => onView('play')}>
         {marks && <span className="nv-mark" aria-hidden="true">♠</span>}
         <span className="nv-label">Play</span>
+      </button>
+      <button className="nv-daily" title={streak > 0 ? `Today's Deal — ${streak} day streak` : "Today's Deal"} onClick={onDaily}>
+        {marks && <span className="nv-mark" aria-hidden="true">♦</span>}
+        <span className="nv-label">Daily{streak > 0 ? ` · ${streak}` : ''}</span>
       </button>
       <button className={view === 'create' ? 'on' : ''} onClick={() => onView('create')}>
         {marks && <span className="nv-mark" aria-hidden="true">✎</span>}

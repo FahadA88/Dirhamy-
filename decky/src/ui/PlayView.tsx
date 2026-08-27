@@ -31,6 +31,13 @@ function seatsFor(def: GameDefinition, want: number): number {
   return min + Math.floor((clamped - min) / step) * step;
 }
 
+// Item 84: which press of the nav's Daily button has already been acted on. Module-scoped, not
+// component state, because App only mounts PlayView while the Play tab is open — pressing Daily
+// from Create or You bumps the trigger and mounts a BRAND NEW PlayView with that bumped value
+// already in place, so a ref seeded from props on mount would see "no change" and never fire.
+// Starts at 0 to match App's own initial dailyTrigger state, so first mount is not a "press".
+let lastDailyTrigger: number | undefined = 0;
+
 function ordinal(n: number): string {
   const r = n % 100;
   if (r >= 11 && r <= 13) return `${n}th`;
@@ -38,7 +45,7 @@ function ordinal(n: number): string {
 }
 
 // Discover + play the classics library (and, once wired, published community games).
-export function PlayView() {
+export function PlayView({ startDailyTrigger }: { startDailyTrigger?: number } = {}) {
   const { settings, set } = useSettings();
   const [game, setGame] = useState<GameDefinition | null>(null);
   const [seats, setSeats] = useState(settings.defaultSeats);
@@ -71,6 +78,17 @@ export function PlayView() {
   const [joinLinkError, setJoinLinkError] = useState('');
 
   useEffect(() => { void hostInfo().then((h) => setHostUp(h.up)).finally(() => setHostChecked(true)); }, []);
+
+  // Item 84: the nav's Daily button bumps startDailyTrigger from any tab. Only an actual
+  // increment over the last one we acted on should jump the shelf straight into today's deal —
+  // see lastDailyTrigger above for why this can't be a plain mount-seeded ref.
+  useEffect(() => {
+    if (startDailyTrigger !== undefined && startDailyTrigger !== lastDailyTrigger) {
+      lastDailyTrigger = startDailyTrigger;
+      setDailyMode(true);
+      setGame(dailyGame());
+    }
+  }, [startDailyTrigger]);
 
   useEffect(() => {
     const code = new URLSearchParams(window.location.search).get('table');

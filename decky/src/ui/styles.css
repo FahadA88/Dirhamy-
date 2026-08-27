@@ -298,6 +298,9 @@ button.primary.sm, button.ghost.sm { padding: 7px 14px; font-size: 13px; }
 }
 .tabs button:hover { color: var(--ink); }
 .tabs button.on { color: var(--bg1); background: var(--ink); }
+/* Item 84: the diamond keeps its suit colour so the Daily entry reads as a card, not a tab,
+   even sitting in the same row as Play/Create/You. */
+.nv-daily .nv-mark { color: var(--red-text); }
 
 .crumbs { display: flex; align-items: center; gap: 14px; margin: 18px 0; flex-wrap: wrap; }
 .crumb-title { font-weight: 700; letter-spacing: -0.01em; color: var(--ink); }

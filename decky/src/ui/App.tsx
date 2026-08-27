@@ -55,15 +55,22 @@ export function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   // Fixed at start-up: the navigation is being chosen between, not switched at runtime.
   const [nav] = useState(navStyle);
+  // Bumped every time the nav's Daily button is pressed. PlayView watches it (it owns the
+  // actual daily-deal boot logic already, for the shelf's own "Today's Deal" card) and jumps
+  // straight into today's deal on every change, from whichever of the three tabs was open.
+  const [dailyTrigger, setDailyTrigger] = useState(0);
   // One document-level listener, started once: see cardSheen.ts.
   useEffect(() => startCardSheen(), []);
   return (
     <div className={`app nav-is-${nav}`}>
       <ColorVisionFilters />
       <Backdrop />
-      <SiteNav style={nav} view={view} onView={setView} onSettings={() => setSettingsOpen(true)} />
+      <SiteNav
+        style={nav} view={view} onView={setView} onSettings={() => setSettingsOpen(true)}
+        onDaily={() => { setView('play'); setDailyTrigger((n) => n + 1); }}
+      />
       <main>
-        {view === 'play' ? <PlayView />
+        {view === 'play' ? <PlayView startDailyTrigger={dailyTrigger} />
           : view === 'create'
             ? <Suspense fallback={<div className="view-loading muted">Loading the builder…</div>}><CreateView /></Suspense>
           : <ProfileView onPlay={() => setView('play')} />}
