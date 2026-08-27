@@ -868,6 +868,15 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
     if (move.actionId === 'bluffClaim' || move.actionId === 'bluffChallenge') playSound('play', settings);
     if (move.actionId === 'reflexSlap') playSound('slap', settings);
     if (move.actionId === 'reflexFlip') playSound('play', settings);
+    // Kings Corner, Dutch, and Old Maid — the three families added most recently — had no card
+    // sound of their own at all beyond the generic selection click and the fanfare at the end
+    // of a round; every move that actually changed the board was silent.
+    if (move.actionId === 'layoutPlay' || move.actionId === 'layoutMove') playSound('play', settings);
+    if (move.actionId === 'layoutDraw') playSound('draw', settings);
+    if (move.actionId === 'swapPlace' || move.actionId === 'swapThrow') playSound('play', settings);
+    if (move.actionId === 'swapDrawStock' || move.actionId === 'swapTakeDiscard') playSound('draw', settings);
+    if (move.actionId === 'swapBlind') playSound('trade', settings);
+    if (move.actionId === 'maidDraw') playSound('draw', settings);
     // Worklist #62: "the advisor that drives the hint and the bots could mark the moves it
     // would not have made. In practice mode that is free coaching, and it is not wired up."
     // matchService already computes this on every move a real person makes (see #59) — practice
