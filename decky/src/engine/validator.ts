@@ -50,8 +50,9 @@ export function validate(def: GameDefinition): ValidationResult {
   const isPit = !!def.pit;
   const isKent = !!def.kent;
   const isSet = !!def.set;
+  const isLayout = !!def.layout;
   const isSpecial = isTrick || isClimb || isFish || isRummy || isWar || isSolitaire
-    || isBluff || isReflex || isPoker || isPit || isSet || isKent;
+    || isBluff || isReflex || isPoker || isPit || isSet || isKent || isLayout;
 
   // --- players ---
   // Patience is played alone, and spotting sets on a shared board works just as well solo, so
@@ -144,6 +145,23 @@ export function validate(def: GameDefinition): ValidationResult {
     checkEffects(a.effects, `action "${a.id}"`);
   }
   for (const t of def.triggers) checkEffects(t.do, `trigger "${t.on}"`);
+
+  // --- layout ---
+  if (isLayout) {
+    const cfg = def.layout!;
+    if (cfg.piles < 1) err('layout.piles', 'A shared layout needs at least one pile to build on.');
+    if (!def.deck.rankOrder.includes(cfg.cornerRank)) {
+      err('layout.cornerRank',
+        `Corners open on a ${cfg.cornerRank}, which is not a rank in this deck.`);
+    }
+    // Every card the deal puts down has to come from somewhere, and there is only one deck.
+    const need = cfg.handSize * def.meta.players.max + cfg.piles;
+    if (need > deckSize) {
+      err('layout.deal',
+        `Dealing ${cfg.handSize} each to ${def.meta.players.max} players plus ${cfg.piles} piles `
+        + `needs ${need} cards, and the deck has ${deckSize}.`);
+    }
+  }
 
   // --- end conditions ---
   // Special families end on rules the engine enforces itself (all books claimed, all tricks

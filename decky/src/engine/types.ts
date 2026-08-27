@@ -113,6 +113,8 @@ export interface GameDefinition {
   pit?: PitConfig;
   // Present iff this is Kent — see KentConfig.
   kent?: KentConfig;
+  /** A shared tableau everyone builds on — Kings Corner. */
+  layout?: LayoutConfig;
   set?: SetConfig;
   // Present iff this is a single-player patience game: build the tableau down, the foundations
   // up, and win by clearing the deck. No opponents, no turns, no bot.
@@ -212,6 +214,42 @@ export interface PokerConfig {
  * and everyone can see it — so what is actually raced is the same thing that is raced at a
  * real table, which is who is paying attention.
  */
+/**
+ * A tableau in the middle that everybody builds on.
+ *
+ * Every other family here either keeps the table to one pile (climbing, shedding) or gives the
+ * tableau to one player (patience). This is the third thing: a shared layout of several piles,
+ * open to the whole table, where your turn is spent finding somewhere for your cards to go and
+ * the person after you inherits whatever you left.
+ *
+ * Kings Corner is the game it was written for. Sevens, Michigan and Kings in the Corner all sit
+ * on the same bones.
+ */
+export interface LayoutConfig {
+  /** Piles seeded with one card each at the deal — the cross, in Kings Corner. */
+  piles: number;
+  /**
+   * Piles that start empty and stay shut until somebody has the one rank that opens them.
+   *
+   * They are the whole tension of the game: four extra places to unload, none of which you can
+   * use, and a king in hand is worth more for the door it opens than for the card it is.
+   */
+  cornerPiles: number;
+  /** The rank that opens a corner. */
+  cornerRank: Rank;
+  /** How a card joins a pile it is not starting. */
+  build: 'alt-color' | 'same-suit' | 'down-any';
+  handSize: number;
+  /**
+   * Whether a whole pile may be picked up and dropped on another whose top card it continues.
+   *
+   * This is the move that makes the game a game rather than a sorting exercise: it frees a pile
+   * for somebody, usually you, and deciding whether that somebody is going to be you is most of
+   * the thinking in it.
+   */
+  movePiles?: boolean;
+}
+
 export interface KentConfig {
   handSize: number;
   poolSize: number;
@@ -860,6 +898,16 @@ export interface MatchState {
   tradesCompleted: Record<string, number>; // pit: trades each player has made, either side counted
   // kent: the tell currently showing, and how many letters each pair has spelt.
   kentTell: { player: string; ply: number } | null;
+  /** Layout: the seat that has already taken its one card this turn. */
+  layoutDrew: string | null;
+  /**
+   * Layout: consecutive turns in which nobody put a card anywhere.
+   *
+   * With the stock gone, passing is always legal, so a table where nobody can move would hand
+   * the turn round for ever. Once it has been all the way round with nothing played, the round
+   * is over and fewest cards wins.
+   */
+  layoutIdle: number;
   kentLetters: Record<string, number>;
   // numeric (Bridge-style) contract auction: the standing high bid, if any.
   highBid: { player: string; level: number; strain: Strain } | null;
@@ -928,7 +976,7 @@ export interface RedactedState {
   log: LogEntry[];
   // family-specific view
   mode: 'shedding' | 'trick' | 'climb' | 'fish' | 'rummy' | 'war' | 'solitaire'
-    | 'bluff' | 'reflex' | 'poker' | 'pit' | 'set' | 'kent';
+    | 'bluff' | 'reflex' | 'poker' | 'pit' | 'set' | 'kent' | 'layout';
   // solitaire
   tableau?: { id: string; cards: Card[]; faceDown: number }[];
   foundations?: { id: string; cards: Card[] }[];
@@ -937,6 +985,14 @@ export interface RedactedState {
   stockCount?: number;
   wasteCards?: Card[];
   redealsLeft?: number;
+  /**
+   * A shared layout: every pile in the middle, in order — the cross first, then the corners.
+   * `opensOn` is the rank an empty corner is waiting for, and null for a pile that takes
+   * anything, which is what lets the table draw the difference without knowing the game.
+   */
+  layoutPiles?: { id: string; cards: Card[]; opensOn: string | null }[];
+  /** A shared layout: whether this viewer has already taken their one card this turn. */
+  layoutDrawn?: boolean;
   /** Patience: the reserve pile, top card last, and the rank foundations build from. */
   reserve?: Card[];
   foundationBase?: string | null;
@@ -1011,6 +1067,7 @@ export interface RedactedState {
   /** kent: the face-up pool, whose seat is showing a tell, and the letters each pair has. */
   kentPool?: Card[];
   kentTell?: { player: string } | null;
+  layoutDrew?: string | null;
   kentLetters?: Record<string, number>;
   kentWord?: string;
   /** kent: true when your own hand is four of a kind, so the table can offer the signal. */

@@ -131,6 +131,8 @@ export function createMatch(
     market: [],
     tradesCompleted: Object.fromEntries(players.map((p) => [p, 0])),
     kentTell: null,
+    layoutDrew: null,
+    layoutIdle: 0,
     kentLetters: {},
     nextOfferId: 1,
     highBid: null,
@@ -374,6 +376,24 @@ export function createMatch(
   // Kent: four in the middle, face up, after the hands have gone out. The letters already
   // spelt come in with the carry, because a round is one hand but a game is however many
   // rounds it takes a pair to spell the word.
+  if (def.layout) {
+    const cfg = def.layout;
+    const draw = state.zones['draw'] || (state.zones['draw'] = []);
+    for (const p of players) {
+      const hand = (state.zones[`hand:${p}`] ||= []);
+      for (let i = 0; i < cfg.handSize; i++) { const c = draw.pop(); if (c) hand.push(c); }
+    }
+    // The cross gets a card each and the corners stay shut until somebody has a king.
+    for (let i = 0; i < cfg.piles + cfg.cornerPiles; i++) {
+      const pile = (state.zones[layoutZones.pile(i)] ||= []);
+      if (i < cfg.piles) {
+        const c = draw.pop();
+        if (c) { pile.push(c); state.faceUp[c.id] = true; }
+      }
+    }
+    log(state, null, `${cfg.piles} piles up, ${cfg.cornerPiles} corners waiting on a ${cfg.cornerRank}.`);
+  }
+
   if (def.kent) {
     const pool = (state.zones[kentZones.pool] ||= []);
     const draw = state.zones['draw'] || [];
@@ -656,6 +676,7 @@ function familyLegalMoves(state: MatchState, playerId: string): Move[] {
   if (state.definition.poker) return pokerLegalMoves(state, playerId);
   if (state.definition.pit) return pitLegalMoves(state, playerId);
   if (state.definition.kent) return kentLegalMoves(state, playerId);
+  if (state.definition.layout) return layoutLegalMoves(state, playerId);
   if (state.definition.set) return setLegalMoves(state);
 
   // Resolve a pending choice first (e.g. pick a suit after a wild).
@@ -979,6 +1000,7 @@ export function applyMove(state: MatchState, playerId: string, move: Move): Matc
   if (def.poker) return afterFamilyMove(applyPokerMove(s, playerId, move), playerId, handBefore);
   if (def.pit) return afterFamilyMove(applyPitMove(s, playerId, move), playerId, handBefore);
   if (def.kent) return afterFamilyMove(applyKentMove(s, playerId, move), playerId, handBefore);
+  if (def.layout) return afterFamilyMove(applyLayoutMove(s, playerId, move), playerId, handBefore);
   if (def.set) return afterFamilyMove(applySetMove(s, playerId, move), playerId, handBefore);
 
   // Resolve a pending suit choice.
@@ -3903,6 +3925,160 @@ function pitCheckWin(s: MatchState): boolean {
 // not grow one: a rule that depends on wall time cannot be replayed from a seed and a list of
 // moves, and being able to do that is the one property every rule in here has to keep.
 
+
+// ---------- layout family (Kings Corner) ----------
+//
+// A shared tableau. Everybody builds on the same piles, so a card you cannot use is a card you
+// are handing to the next player, and the pile you free is one anybody may fill.
+
+export const layoutZones = { pile: (i: number) => `lay:${i}` };
+
+/** The corners are the last `cornerPiles` of them, which is what makes them corners. */
+function layoutIsCorner(def: MatchState['definition'], i: number): boolean {
+  return i >= def.layout!.piles;
+}
+
+/** Every pile in the middle, in order: the cross first, then the corners. */
+export function layoutPileIds(def: MatchState['definition']): string[] {
+  const cfg = def.layout!;
+  return Array.from({ length: cfg.piles + cfg.cornerPiles }, (_, i) => layoutZones.pile(i));
+}
+
+/**
+ * May this card sit on that pile?
+ *
+ * Two questions, really. An empty corner asks for one rank and nothing else. An empty ordinary
+ * pile asks for nothing at all. A pile with something on it wants the next card down, in the
+ * shape the game builds in.
+ */
+function layoutAccepts(s: MatchState, pileIndex: number, card: Card): boolean {
+  const cfg = s.definition.layout!;
+  const pile = s.zones[layoutZones.pile(pileIndex)] || [];
+  if (pile.length === 0) {
+    return layoutIsCorner(s.definition, pileIndex) ? card.rank === cfg.cornerRank : true;
+  }
+  const top = pile[pile.length - 1];
+  const order = s.definition.deck.rankOrder as readonly string[];
+  // One rank below the top card. Kings are the ceiling, so nothing goes on them but a queen.
+  if (order.indexOf(card.rank) !== order.indexOf(top.rank) - 1) return false;
+  if (cfg.build === 'alt-color') return cardColor(card) !== cardColor(top) && cardColor(card) !== 'none';
+  if (cfg.build === 'same-suit') return card.suit === top.suit;
+  return true;
+}
+
+function layoutLegalMoves(state: MatchState, playerId: string): Move[] {
+  if (state.phase !== 'playing') return [];
+  if (state.players[state.turnIndex] !== playerId) return [];
+  const cfg = state.definition.layout!;
+  const moves: Move[] = [];
+  const hand = state.zones[`hand:${playerId}`] || [];
+  const draw = state.zones['draw'] || [];
+  const n = cfg.piles + cfg.cornerPiles;
+
+  // One card, taken before anything else — so the choice you make is made with it in hand.
+  if (state.layoutDrew !== playerId && draw.length > 0) return [{ actionId: 'layoutDraw' }];
+
+  for (const c of hand) {
+    for (let i = 0; i < n; i++) {
+      if (layoutAccepts(state, i, c)) moves.push({ actionId: 'layoutPlay', cardId: c.id, to: layoutZones.pile(i) });
+    }
+  }
+
+  if (cfg.movePiles) {
+    for (let from = 0; from < n; from++) {
+      const src = state.zones[layoutZones.pile(from)] || [];
+      if (src.length === 0) continue;
+      for (let to = 0; to < n; to++) {
+        if (to === from) continue;
+        // A whole pile moves on the strength of its BOTTOM card, which is the one that has to
+        // land somewhere legal — everything above it is already in order behind it.
+        const dest = state.zones[layoutZones.pile(to)] || [];
+        // Dropping a pile into an empty ordinary space just moves the problem, so it is only a
+        // move when the destination has something to continue.
+        if (dest.length === 0) continue;
+        if (layoutAccepts(state, to, src[0])) {
+          moves.push({ actionId: 'layoutMove', from: layoutZones.pile(from), to: layoutZones.pile(to) });
+        }
+      }
+    }
+  }
+
+  // Stopping is always allowed: you may be holding a card you would rather not give away.
+  moves.push({ actionId: 'layoutDone' });
+  return moves;
+}
+
+function applyLayoutMove(s: MatchState, playerId: string, move: Move): MatchState {
+  const hand = s.zones[`hand:${playerId}`] || (s.zones[`hand:${playerId}`] = []);
+
+  if (move.actionId === 'layoutDraw') {
+    const draw = s.zones['draw'] || [];
+    const c = draw.pop();
+    if (c) { hand.push(c); s.faceUp[c.id] = true; }
+    s.layoutDrew = playerId;
+    log(s, playerId, `${short(playerId)} draws.`);
+    return s;
+  }
+
+  if (move.actionId === 'layoutPlay') {
+    const i = hand.findIndex((c) => c.id === move.cardId);
+    if (i < 0) return s;
+    const card = hand[i];
+    const pile = (s.zones[move.to ?? ''] ||= []);
+    hand.splice(i, 1);
+    pile.push(card);
+    s.faceUp[card.id] = true;
+    s.layoutIdle = 0;
+    log(s, playerId, `${short(playerId)} plays ${cardLabel(card)}.`);
+    if (hand.length === 0) {
+      s.phase = 'roundOver';
+      s.winner = playerId;
+      if (!s.finished.includes(playerId)) s.finished.push(playerId);
+      s.players.forEach((p) => { s.scores[p] = (s.zones[`hand:${p}`] || []).length; });
+      log(s, null, `${short(playerId)} is out — round over.`);
+      finalizeMatchProgress(s);
+    }
+    return s;
+  }
+
+  if (move.actionId === 'layoutMove') {
+    const src = s.zones[move.from ?? ''] || [];
+    const dest = (s.zones[move.to ?? ''] ||= []);
+    if (src.length === 0) return s;
+    dest.push(...src.splice(0, src.length));
+    s.layoutIdle = 0;
+    log(s, playerId, `${short(playerId)} moves a pile across.`);
+    return s;
+  }
+
+  // layoutDone
+  s.layoutIdle += 1;
+  s.layoutDrew = null;
+  /*
+    Nobody has played a card for a whole time round the table.
+
+    With the stock gone, stopping is the only move anybody has, so the turn would go round for
+    ever. When it has been all the way round with nothing played, the round is over and the
+    smallest hand wins — which is how it ends at a real table too, once everyone has looked at
+    the layout and shrugged.
+  */
+  if (s.layoutIdle >= s.players.length && (s.zones['draw'] || []).length === 0) {
+    s.phase = 'roundOver';
+    let best = s.players[0];
+    for (const p of s.players) {
+      if ((s.zones[`hand:${p}`] || []).length < (s.zones[`hand:${best}`] || []).length) best = p;
+    }
+    s.winner = best;
+    s.players.forEach((p) => { s.scores[p] = (s.zones[`hand:${p}`] || []).length; });
+    log(s, null, `Nobody can move — ${short(best)} is left holding the fewest.`);
+    finalizeMatchProgress(s);
+    return s;
+  }
+  advanceTurn(s);
+  log(s, playerId, `${short(playerId)} is done.`);
+  return s;
+}
+
 export const kentZones = { pool: 'kent:pool' };
 
 /** Partners sit opposite, so pairs are the odd seats against the even ones. */
@@ -4237,8 +4413,17 @@ export function redact(state: MatchState, viewer: string): RedactedState {
     scores: { ...state.scores },
     log: state.log.slice(-40),
     mode: state.definition.solitaire ? 'solitaire' : state.definition.trick ? 'trick' : state.definition.climb ? 'climb' : state.definition.fish ? 'fish' : state.definition.rummy ? 'rummy' : state.definition.war ? 'war'
-      : state.definition.bluff ? 'bluff' : state.definition.reflex ? 'reflex' : state.definition.poker ? 'poker' : state.definition.pit ? 'pit' : state.definition.kent ? 'kent' : state.definition.set ? 'set' : 'shedding',
+      : state.definition.bluff ? 'bluff' : state.definition.reflex ? 'reflex' : state.definition.poker ? 'poker' : state.definition.pit ? 'pit' : state.definition.kent ? 'kent' : state.definition.set ? 'set' : state.definition.layout ? 'layout' : 'shedding',
     ...(state.definition.solitaire ? solitaireView(state) : {}),
+    layoutPiles: state.definition.layout
+      ? layoutPileIds(state.definition).map((id, i) => ({
+        id,
+        cards: (state.zones[id] || []).slice(),
+        // Only a shut corner is waiting for a rank; everything else takes what it is given.
+        opensOn: i >= state.definition.layout!.piles ? state.definition.layout!.cornerRank : null,
+      }))
+      : undefined,
+    layoutDrawn: state.definition.layout ? state.layoutDrew === viewer : undefined,
     battle: state.definition.war ? (state.lastBattle ?? []).map((b) => b.card) : undefined,
     warsCount: state.definition.war ? state.warsCount : undefined,
     shotMoon: state.definition.trick?.shootTheMoon ? (state.shotMoon ?? null) : undefined,

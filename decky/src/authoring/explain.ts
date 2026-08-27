@@ -210,6 +210,13 @@ export function explainGame(def: GameDefinition): string[] {
     const ranks = def.reflex.slapRanks.join(', ') || 'nothing by rank';
     out.push(`Flip a card each turn onto the shared pile. When the top card is a ${ranks}${def.reflex.slapMatch ? ', or the top two match,' : ''}, anyone may slap to take it.`);
     out.push('Last player still holding cards wins.');
+  } else if (def.layout) {
+    const cfg = def.layout;
+    out.push(`${cfg.handSize} cards each, and ${cfg.piles + cfg.cornerPiles} piles in the middle that everybody plays into.`);
+    out.push(`Draw one card at the start of your turn, then place as many as you can. Build down ${cfg.build === 'alt-color' ? 'in alternating colours' : cfg.build === 'same-suit' ? 'in suit' : 'by rank, any suit'}.`);
+    out.push(`${cfg.cornerPiles} of the piles start empty and only a ${cfg.cornerRank} may open one — which is why holding a ${cfg.cornerRank} is worth more than the card itself.`);
+    if (cfg.movePiles) out.push('You can also lift a whole pile onto another it continues, which frees a space for whoever gets there first.');
+    out.push('First to empty their hand wins.');
   } else if (def.kent) {
     out.push(`${def.kent.handSize} cards each and ${def.kent.poolSize} face up in the middle. There are no turns: swap one of yours for one of the table's whenever you like, and turn the middle over when nobody wants it.`);
     out.push('Partners sit opposite. Collect four of a kind and a tell goes up at your seat for the whole table to see — if your partner reads it first your pair takes the round.');

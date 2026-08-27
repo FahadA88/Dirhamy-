@@ -6534,3 +6534,91 @@ h2 { font-size: 30px; }
 .nav-dock button.on {
   border-color: var(--brass);
 }
+
+/* ------------------------------------------------------------------
+   14 · THE SHARED LAYOUT (Kings Corner)
+
+   Eight places on the cloth: the cross on the top row, the corners on
+   the bottom. A shut corner shows the rank it is waiting for rather
+   than sitting blank — "you need a King" is the single most useful
+   thing this board can say to somebody who has not played before, and
+   an empty square says nothing.
+   ------------------------------------------------------------------ */
+.lay-center { display: flex; flex-direction: column; align-items: center; gap: 18px; }
+
+.lay-grid {
+  display: grid;
+  grid-template-columns: repeat(4, var(--cw));
+  gap: 14px;
+  justify-content: center;
+}
+
+.lay-pile {
+  width: var(--cw);
+  height: var(--ch);
+  padding: 0;
+  border-radius: 9px;
+  cursor: default;
+  background: rgba(0, 0, 0, 0.16);
+  /* A dashed edge reads as "nothing here yet" without needing a label. */
+  border: 1px dashed var(--t-line, rgba(255, 255, 255, 0.22));
+  display: grid;
+  place-items: center;
+  position: relative;
+  transition: transform var(--t-fast) var(--ease), box-shadow var(--t-fast) var(--ease);
+}
+/* A pile with a card on it is an object, not a slot. */
+.lay-pile:has(.card) { border-style: solid; border-color: transparent; background: none; }
+
+.lay-empty {
+  font-family: var(--serif);
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--t-muted, rgba(255, 255, 255, 0.42));
+}
+
+/* How many cards are underneath — the pile you lift is the pile you can see the depth of. */
+.lay-depth {
+  position: absolute;
+  /* Top-right. Bottom-right is where a card prints its own rotated index, and the badge sat
+     right on top of it. */
+  right: -7px;
+  top: -7px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: var(--r-pill);
+  background: var(--t-panel, rgba(0, 0, 0, 0.6));
+  border: 1px solid var(--t-line, rgba(255, 255, 255, 0.2));
+  color: var(--t-ink, #fff);
+  font-size: 11px;
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
+  display: grid;
+  place-items: center;
+}
+
+/* Somewhere the card in your hand can actually go. This is the live-state glow, spent the way
+   the rest of the sheet spends it: on a thing that is true right now. */
+.lay-pile.live {
+  cursor: pointer;
+  border-color: var(--brass);
+  box-shadow: 0 0 0 2px var(--brass-hi), 0 0 26px -4px var(--lit);
+}
+.lay-pile.live:hover { transform: translateY(-3px); }
+/* The pile you have picked up, waiting to be put somewhere. */
+.lay-pile.picked {
+  cursor: pointer;
+  box-shadow: 0 0 0 2px var(--cyan-hi), 0 0 22px -6px var(--lit);
+  transform: translateY(-4px);
+}
+
+.lay-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; justify-content: center; }
+.lay-note { color: var(--t-muted, var(--muted)); font-size: 13px; }
+
+@media (max-width: 620px) {
+  /* Eight card-widths across does not fit a phone; four and four does. */
+  .lay-grid { grid-template-columns: repeat(4, var(--bw)); gap: 9px; }
+  .lay-pile { width: var(--bw); height: var(--bh); }
+  .lay-empty { font-size: 19px; }
+}

@@ -244,6 +244,8 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
   // One toast, two tones: a refusal is a red ✕, a status note is not.
   const [toast, setToast] = useState<{ text: string; tone: 'bad' | 'info' } | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
+  // A shared layout has a second thing you can pick up: a whole pile, to drop on another one.
+  const [selPile, setSelPile] = useState<string | null>(null);
   const [askRank, setAskRank] = useState<string | null>(null);
   // True while the dealer's hands are working. The cards are already in the view by then —
   // this only holds them back on screen so they appear to arrive rather than to have been
@@ -347,6 +349,7 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
   const isPit = view.mode === 'pit';
   const isSet = view.mode === 'set';
   const isKent = view.mode === 'kent';
+  const isLayout = view.mode === 'layout';
   const moonShooter = view.shotMoon ?? null;
   // Gin and an undercut are the two gin-rummy endings worth a beat of their own; an ordinary
   // knock is the unremarkable case the generic "X takes it" heading already covers.
@@ -901,6 +904,10 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
     // Kent has nowhere to play a card TO: a card leaves your hand only by being traded for one
     // on the table, so a click picks rather than plays.
     if (isKent) { setSelected(selected === id ? null : id); playSound('ui', settings); return; }
+    // A shared layout has EIGHT places a card could go, and which one is the decision — so a
+    // click picks the card up and the piles light up to be chosen between. Submitting here
+    // would be submitting a move with no destination, which is no move at all.
+    if (isLayout) { setSelPile(null); setSelected(selected === id ? null : id); playSound('ui', settings); return; }
     if (settings.confirmPlays && selected !== id) { setSelected(id); playSound('ui', settings); return; }
     if (playActionId === 'climbPlay') { submit({ actionId: 'climbPlay', cards: [id] }); return; }
     submit({ actionId: playActionId, cardId: id });
@@ -913,7 +920,7 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
   // confirmPlays double-tap setting, since finishing a drag already took a deliberate motion a
   // misclick could never produce by accident.
   const { ghost: dragGhost, startDrag, wasDrag } = useCardDrag(
-    !isFish && !isKent,
+    !isFish && !isKent && !isLayout,
     (id) => {
       if (!playableCardIds.has(id)) return;
       if (playActionId === 'climbPlay') { submit({ actionId: 'climbPlay', cards: [id] }); return; }
@@ -1497,6 +1504,77 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
               🤨 Call bluff!
             </button>
           )}
+        </div>
+      ) : isLayout ? (
+        /*
+          The middle of a Kings Corner table.
+
+          Eight places: the cross on top, the corners beneath. A corner that is still shut says
+          what it is waiting for rather than sitting there blank, because "you need a King" is
+          the single most useful thing the board can tell a new player, and a blank square tells
+          them nothing at all.
+
+          A pile lights up when the card you have picked up can go on it. Picking a pile instead
+          of a card is how you move the whole thing somewhere else.
+        */
+        <div className="center lay-center">
+          <div className="lay-grid">
+            {(view.layoutPiles ?? []).map((pile) => {
+              const play = myLegal.find((m) => m.actionId === 'layoutPlay'
+                && m.cardId === selected && m.to === pile.id);
+              const move = myLegal.find((m) => m.actionId === 'layoutMove'
+                && m.from === selPile && m.to === pile.id);
+              const canLift = !!selected === false && (view.layoutPiles ?? []).some(
+                (q) => myLegal.some((m) => m.actionId === 'layoutMove' && m.from === pile.id && q.id === m.to));
+              const live = play || move;
+              const top = pile.cards[pile.cards.length - 1];
+              return (
+                <button
+                  key={pile.id}
+                  className={`lay-pile ${live ? 'live' : ''} ${selPile === pile.id ? 'picked' : ''}`}
+                  data-slot={pile.id}
+                  aria-label={
+                    top ? `${spokenCard(top.rank, top.suit)}, ${pile.cards.length} card${pile.cards.length === 1 ? '' : 's'}`
+                      : pile.opensOn ? `Empty corner — needs a ${pile.opensOn}`
+                        : 'Empty space — takes any card'
+                  }
+                  onClick={() => {
+                    if (play) { submit(play); setSelected(null); return; }
+                    if (move) { submit(move); setSelPile(null); return; }
+                    if (canLift) { setSelPile(selPile === pile.id ? null : pile.id); setSelected(null); }
+                  }}
+                >
+                  {top ? <CardFace card={top} />
+                    : <span className="lay-empty">{pile.opensOn ? pile.opensOn : '+'}</span>}
+                  {pile.cards.length > 1 && <i className="lay-depth">{pile.cards.length}</i>}
+                </button>
+              );
+            })}
+          </div>
+          <div className="lay-actions">
+            {myLegal.some((m) => m.actionId === 'layoutDraw') ? (
+              <button className="primary" onClick={() => submit({ actionId: 'layoutDraw' })}>
+                Draw a card
+              </button>
+            ) : !view.isYourTurn ? (
+              // The panel used to say "pick a card" to somebody who could not pick anything,
+              // because it renders on every seat's screen and only checked what was legal.
+              <span className="lay-note">Waiting for the others…</span>
+            ) : (
+              <>
+                <span className="lay-note">
+                  {selPile ? 'Now pick where that pile goes.'
+                    : selected ? 'Now pick a pile for it.'
+                      : 'Pick a card, or lift a whole pile.'}
+                </span>
+                {myLegal.some((m) => m.actionId === 'layoutDone') && (
+                  <button className="ghost sm" onClick={() => { setSelected(null); setSelPile(null); submit({ actionId: 'layoutDone' }); }}>
+                    Done — next player
+                  </button>
+                )}
+              </>
+            )}
+          </div>
         </div>
       ) : isKent ? (
         /*

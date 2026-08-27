@@ -526,6 +526,49 @@ export function chooseMove(
   // call it off — but not every time, because a bot that never misses a tell is not an
   // opponent, it is a wall, and spotting one is the only thing a person is actually racing.
   // Nothing showing: collect. Pick the rank you hold most of and trade towards it.
+  /*
+    Kings Corner. Empty your hand, and prefer the plays that keep you able to.
+
+    The ordering is the whole strategy: get rid of the biggest cards first, because a king can
+    only ever go in a corner and a queen only on a king, so the high cards are the ones that run
+    out of places to be. Opening a corner is worth doing the moment you can — it is a place to
+    put things that did not exist a second ago. Consolidating two piles is worth doing after
+    that, because it frees a space, and free spaces take anything.
+
+    Stopping is last, and only when there is nothing else, because every card left in hand is a
+    card somebody else is going to go out ahead of you with.
+  */
+  if (moves.some((m) => m.actionId === 'layoutPlay' || m.actionId === 'layoutDone'
+    || m.actionId === 'layoutDraw')) {
+    const draw = moves.find((m) => m.actionId === 'layoutDraw');
+    if (draw) return { move: draw, botSeed };
+
+    const cfg = state.definition.layout!;
+    const order = state.definition.deck.rankOrder as readonly string[];
+    const plays = moves.filter((m) => m.actionId === 'layoutPlay');
+    if (plays.length > 0) {
+      const hand = state.zones[`hand:${playerId}`] || [];
+      let best = plays[0];
+      let bestScore = -1;
+      for (const m of plays) {
+        const card = hand.find((c) => c.id === m.cardId);
+        if (!card) continue;
+        const idx = Number((m.to ?? '').split(':')[1]);
+        const opening = idx >= cfg.piles && (state.zones[m.to ?? ''] || []).length === 0;
+        // Opening a corner beats anything; after that, spend the highest card you can.
+        const score = (opening ? 1000 : 0) + order.indexOf(card.rank);
+        if (score > bestScore) { bestScore = score; best = m; }
+      }
+      return { move: best, botSeed };
+    }
+
+    const consolidate = moves.find((m) => m.actionId === 'layoutMove');
+    if (consolidate) return { move: consolidate, botSeed };
+
+    const done = moves.find((m) => m.actionId === 'layoutDone');
+    if (done) return { move: done, botSeed };
+  }
+
   if (moves.some((m) => m.actionId === 'kentCall' || m.actionId === 'kentStop'
     || m.actionId === 'kentSignal' || m.actionId === 'kentSwap')) {
     const call = moves.find((m) => m.actionId === 'kentCall');
