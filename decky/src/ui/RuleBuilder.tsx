@@ -5,6 +5,7 @@ import {
   newRestrictionDraft, newRuleDraft, PATTERNS,
 } from '../authoring/ruleKit';
 import { explainPredicate, explainRule } from '../authoring/explain';
+import { Confirm } from './Confirm';
 
 // The near-programmable layer, as a screen.
 //
@@ -21,6 +22,9 @@ export function RuleBuilder({ rules, onChange }: {
 }) {
   const [openId, setOpenId] = useState<string | null>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  // Item 43 of the audit pass: deleting a whole rule — every clause, every effect, all of it —
+  // fired instantly on one click, with nothing else in the builder that destructive.
+  const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
 
   function add() {
     const draft = newRuleDraft(rules.length + 1);
@@ -107,9 +111,14 @@ export function RuleBuilder({ rules, onChange }: {
                   <button className="icon-btn" title="Move down" onClick={() => move(rule.id, 1)} disabled={i === rules.length - 1}>↓</button>
                   <button className={`icon-btn ${rule.enabled ? 'on' : ''}`} title={rule.enabled ? 'Turn this rule off' : 'Turn this rule on'}
                     onClick={() => update(rule.id, { enabled: !rule.enabled })}>{rule.enabled ? '●' : '○'}</button>
-                  <button className="icon-btn danger" title="Delete" onClick={() => remove(rule.id)}>✕</button>
+                  <button className="icon-btn danger" title="Delete" onClick={() => setConfirmingDeleteId(rule.id)}>✕</button>
                 </div>
               </div>
+              {confirmingDeleteId === rule.id && (
+                <Confirm title="Delete this rule?" body={`"${rule.name}" and everything in it will be gone for good.`}
+                  confirmLabel="Delete" onCancel={() => setConfirmingDeleteId(null)}
+                  onConfirm={() => { remove(rule.id); setConfirmingDeleteId(null); }} />
+              )}
 
               {open && (
                 <div className="rb-body">
@@ -292,6 +301,8 @@ export function RestrictionBuilder({ restrictions, onChange }: {
 }) {
   const [openId, setOpenId] = useState<string | null>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  // Item 43 of the audit pass — same fix as RuleBuilder's own delete above.
+  const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
 
   const update = (id: string, patch: Partial<RestrictionDraft>) =>
     onChange(restrictions.map((r) => (r.id === id ? { ...r, ...patch } : r)));
@@ -339,9 +350,18 @@ export function RestrictionBuilder({ restrictions, onChange }: {
                   <button className={`icon-btn ${r.enabled ? 'on' : ''}`} title={r.enabled ? 'Turn this off' : 'Turn this on'}
                     onClick={() => update(r.id, { enabled: !r.enabled })}>{r.enabled ? '●' : '○'}</button>
                   <button className="icon-btn danger" title="Delete"
-                    onClick={() => { onChange(restrictions.filter((x) => x.id !== r.id)); if (open) setOpenId(null); }}>✕</button>
+                    onClick={() => setConfirmingDeleteId(r.id)}>✕</button>
                 </div>
               </div>
+              {confirmingDeleteId === r.id && (
+                <Confirm title="Delete this restriction?" body={`"${r.name}" will be gone for good.`}
+                  confirmLabel="Delete" onCancel={() => setConfirmingDeleteId(null)}
+                  onConfirm={() => {
+                    onChange(restrictions.filter((x) => x.id !== r.id));
+                    if (open) setOpenId(null);
+                    setConfirmingDeleteId(null);
+                  }} />
+              )}
               {open && (
                 <div className="rb-body">
                   <label className="field"><span>Name it</span>

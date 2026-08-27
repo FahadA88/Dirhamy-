@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Knobs, RANK_CHOICES, RANKS_13, buildDefinition, defaultKnobs, knobsFromDefinition, rankLabel,
 } from '../authoring/knobs';
@@ -35,21 +35,51 @@ const STEPS: { id: Step; label: string; blurb: string }[] = [
   { id: 'publish', label: 'Publish', blurb: 'Put it on the shelf.' },
 ];
 
+// Item 47 of the audit pass: a half-built game had nowhere to go but a browser tab. Switching
+// to Play to check something, or just closing the tab, threw the whole draft away — every knob,
+// every rule written by hand — with no warning that it wasn't being kept anywhere.
+const DRAFT_KEY = 'decky.createDraft.v1';
+
+interface CreateDraft { step: Step; seats: number; tags: string; knobs: Knobs }
+
+function loadDraft(): CreateDraft | null {
+  try {
+    const raw = localStorage.getItem(DRAFT_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object' || !parsed.knobs) return null;
+    return parsed as CreateDraft;
+  } catch { return null; }
+}
+
+function saveDraft(d: CreateDraft): void {
+  try { localStorage.setItem(DRAFT_KEY, JSON.stringify(d)); } catch { /* ignore */ }
+}
+
+function clearDraft(): void {
+  try { localStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ }
+}
+
 export function CreateView({ onPlay }: { onPlay?: (def: GameDefinition) => void } = {}) {
   const { settings } = useSettings();
-  const [step, setStep] = useState<Step>('start');
-  const [seats, setSeats] = useState(3);
-  const [tags, setTags] = useState('');
+  const savedDraft = useMemo(loadDraft, []);
+  const [step, setStep] = useState<Step>(savedDraft?.step ?? 'start');
+  const [seats, setSeats] = useState(savedDraft?.seats ?? 3);
+  const [tags, setTags] = useState(savedDraft?.tags ?? '');
   const [published, setPublished] = useState<{ id: string; name: string } | null>(null);
   // Where this game came from. Set when the writer produced it, so publishing can say so.
   const [writtenFrom, setWrittenFrom] = useState<string | null>(null);
   const [publishError, setPublishError] = useState<string | null>(null);
-  const [knobs, setKnobs] = useState<Knobs>({ ...defaultKnobs });
+  const [knobs, setKnobs] = useState<Knobs>(savedDraft?.knobs ?? { ...defaultKnobs });
   const [override, setOverride] = useState<GameDefinition | null>(null);
   const [desc, setDesc] = useState('');
   const [proposal, setProposal] = useState<TranslateResult | null>(null);
   const [report, setReport] = useState<SimReport | null>(null);
   const [playtest, setPlaytest] = useState(false);
+
+  // Autosave: written on every change, restored above on mount. Cleared only in startFrom
+  // below, when the author deliberately picks a different starting point.
+  useEffect(() => { saveDraft({ step, seats, tags, knobs }); }, [step, seats, tags, knobs]);
 
   const built = useMemo(() => buildDefinition(knobs), [knobs]);
   const def = override ?? built;
@@ -106,6 +136,9 @@ export function CreateView({ onPlay }: { onPlay?: (def: GameDefinition) => void 
       prompt: writtenFrom ?? undefined,
     });
     setPublished({ id: g.id, name: g.definition.meta.name });
+    // It's safely on the shelf now — no reason for a returning visit to Create to look like
+    // there's still unfinished, unsaved work sitting here.
+    clearDraft();
   }
 
   async function askCopilot() {
