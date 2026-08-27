@@ -210,10 +210,6 @@ export function recordPlay(id: string): void {
   write(PLAYS, hist);
 }
 
-export function lastPlayed(id: string): number | undefined {
-  return read<Record<string, number>>(PLAYS, {})[id];
-}
-
 export function favourites(): string[] { return read<string[]>(FAVS, []); }
 export function isFavourite(id: string): boolean { return favourites().includes(id); }
 
@@ -287,11 +283,6 @@ export function creator(name: string, games: PublishedGame[]): Creator {
     plays: mine.reduce((t, g) => t + g.stats.plays, 0),
     rating: count > 0 ? sum / count : null,
   };
-}
-
-export function creators(games: PublishedGame[]): Creator[] {
-  return dedupe(games.map((g) => g.author)).map((a) => creator(a, games))
-    .sort((a, b) => b.games.length - a.games.length);
 }
 
 // ---------- collections ----------
@@ -379,15 +370,9 @@ export function collections(games: PublishedGame[]): Collection[] {
   return out.filter((c) => c.games.length > 0);
 }
 
-/** The one game to put at the top today. Rotates daily so the front page isn't frozen. */
-export function featured(games: PublishedGame[]): PublishedGame | undefined {
-  return featuredSet(games, 1)[0];
-}
-
 /**
- * The games the carousel turns through. Same daily rotation as `featured`, so slide one is
- * today's pick and the rest follow it — the carousel is the feature, widened, not a second
- * unrelated shortlist.
+ * The games the carousel turns through, in a daily rotation so slide one is today's pick and
+ * the rest follow it — the carousel is the feature, widened, not a second unrelated shortlist.
  */
 export function featuredSet(games: PublishedGame[], n: number): PublishedGame[] {
   const pool = games.filter((g) => g.staffPick || (averageRating(g.stats) ?? 0) >= 4);
@@ -572,8 +557,3 @@ function slugId(name: string, existing: PublishedGame[]): string {
 }
 
 function dedupe(xs: string[]): string[] { return Array.from(new Set(xs.filter(Boolean))); }
-
-/** Everything a game can be tagged with, gathered from what has actually been published. */
-export function allTags(games: PublishedGame[]): string[] {
-  return dedupe(games.flatMap((g) => g.tags)).sort();
-}

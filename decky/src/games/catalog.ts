@@ -73,7 +73,3 @@ export const catalog: GameDefinition[] = [
   // against the rest, and a contract settled on card points rather than tricks.
   skat,
 ];
-
-export function getGame(id: string): GameDefinition | undefined {
-  return catalog.find((g) => g.meta.id === id);
-}

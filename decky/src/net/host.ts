@@ -64,6 +64,3 @@ export function hostInfo(): Promise<HostInfo> {
   })();
   return cached;
 }
-
-/** Forget the cached answer — used after a deliberate retry. */
-export function forgetHost(): void { cached = null; }

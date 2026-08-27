@@ -50,7 +50,3 @@ export function allDrafts(): Draft[] { return read(); }
 export function forgetDraft(id: string): void {
   write(read().filter((d) => d.id !== id));
 }
-
-export function clearDrafts(): void {
-  try { localStorage.removeItem(KEY); } catch { /* ignore */ }
-}

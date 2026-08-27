@@ -1,5 +1,4 @@
 import { CustomRule, Effect, GameDefinition, HandQuery, Predicate, RuleHook, RuleValue } from '../engine/types';
-import { SUIT_SYMBOLS } from '../engine/deck';
 
 // Rules are data, which means they can be read back to the person who wrote them. Everything a
 // builder can express has a sentence here, so nobody has to interpret a tree of JSON to know
@@ -286,6 +285,3 @@ function bareRank(r: string): string {
   return { A: 'Ace', J: 'Jack', Q: 'Queen', K: 'King', JOKER: 'Joker' }[r] ?? r;
 }
 function isOne(v: RuleValue): boolean { return 'lit' in v && v.lit === 1; }
-
-/** Suit glyphs for anywhere a sentence wants the symbol instead of the word. */
-export const SUIT_GLYPH = SUIT_SYMBOLS;

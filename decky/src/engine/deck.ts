@@ -72,10 +72,6 @@ export function cardTags(def: GameDefinition, card: Card): string[] {
   return tags;
 }
 
-export const SUIT_NAMES: Record<string, string> = {
-  C: 'Clubs', D: 'Diamonds', H: 'Hearts', S: 'Spades', JOKER: 'Joker',
-};
-
 export const SUIT_SYMBOLS: Record<string, string> = {
   C: '♣', D: '♦', H: '♥', S: '♠', JOKER: '★',
 };

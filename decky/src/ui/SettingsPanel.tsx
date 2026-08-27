@@ -6,6 +6,7 @@ import { Confirm } from './Confirm';
 import { adoptSyncCode, pullSafety, pushSafety, syncCode } from '../social/safety';
 import { hostInfo } from '../net/host';
 import { ENGINE_CHANGELOG } from '../engine/changelog';
+import { canSpeak } from './speech';
 import {
   ACCENTS, AVATARS, AccentId, BACKS, CardBack, CardFace, CustomBack, CustomFelt, FACES, FELTS,
   MAX_BACK_IMAGE, MyLook, Settings, TableFelt, THEME_PACKS,
@@ -539,9 +540,14 @@ function AccessSection({ s, set }: { s: Settings; set: Setter }) {
       <Row label="Show the introduction again" hint="The three cards you saw the first time." keywords="intro tutorial onboarding help first run again">
         <button className="ghost sm" onClick={() => resetFirstRun()}>Show it</button>
       </Row>
-      <Row label="Read the table aloud" hint="Speaks each move and your hand through the browser's own voice. Separate from a screen reader, which is always supported." keywords="speech speak voice audio blind narrate tts">
-        <Toggle on={s.speak} onChange={(v) => set('speak', v)} label="Read the table aloud" />
-      </Row>
+      {/* Item 92 of the audit pass: canSpeak() existed for exactly this — hiding a setting that
+          cannot do anything — but nothing ever called it, so the toggle showed up even in a
+          browser with no speechSynthesis to speak through. */}
+      {canSpeak() && (
+        <Row label="Read the table aloud" hint="Speaks each move and your hand through the browser's own voice. Separate from a screen reader, which is always supported." keywords="speech speak voice audio blind narrate tts">
+          <Toggle on={s.speak} onChange={(v) => set('speak', v)} label="Read the table aloud" />
+        </Row>
+      )}
     </>
   );
 }

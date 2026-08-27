@@ -73,14 +73,6 @@ export interface TableEvent {
   at: number;
 }
 
-export interface Envelope {
-  id: number;
-  from: string;
-  body: Request | Response | TableEvent;
-  reply?: boolean;
-  event?: boolean;
-}
-
 /**
  * The client-side surface. Everything the table UI needs, and nothing that could hand it a card
  * it should not see — `view` takes the seat it is answering for, and `spectate` cannot take one

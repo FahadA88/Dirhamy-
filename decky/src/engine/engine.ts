@@ -9,7 +9,7 @@
 //   redact(state, playerId)         -> RedactedState
 
 import {
-  ActionDef, Card, CustomRule, Effect, GameDefinition, MatchState, Move, NumericAuctionConfig,
+  ActionDef, Card, Effect, GameDefinition, MatchState, Move, NumericAuctionConfig,
   PlayerRef, Predicate, RedactedState, RedactedZone, RuleHook, RuleValue, ScoringDef, Strain,
   Suit, TrickConfig, ZoneDef,
 } from './types';
@@ -1325,16 +1325,6 @@ function bestBy(state: MatchState, get: (p: string) => number, dir: 1 | -1): str
     if ((get(p) - get(best)) * dir > 0) best = p;
   }
   return best;
-}
-
-/** Does this definition carry any author-written rule for a given hook? */
-export function hasRuleHook(def: GameDefinition, hook: RuleHook): boolean {
-  return (def.rules ?? []).some((r) => r.enabled !== false && r.when === hook);
-}
-
-/** The rules an author wrote, for the rules panel. */
-export function customRules(def: GameDefinition): CustomRule[] {
-  return (def.rules ?? []).filter((r) => r.enabled !== false);
 }
 
 // ---------- triggers ----------
