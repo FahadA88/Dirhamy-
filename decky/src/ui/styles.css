@@ -29,9 +29,22 @@
   font-weight: 400 900;
   font-display: swap;
   src: url("/fonts/bodoni-latin.woff2") format("woff2");
+  /*
+    U+2013 and U+2014 are deliberately cut out of this range.
+
+    The en dash and the em dash are in this subset as glyphs with a width and no ink — they
+    advance the pen and draw nothing. Rendered, "Nothing here yet — that's the whole story"
+    came out as two phrases with a hole between them, and every heading on the site that used a
+    dash had the same hole in it. The measured proof: rasterising each punctuation mark at 60px
+    gives the apostrophe 69 ink pixels, the ellipsis 156, and both dashes exactly 0.
+
+    Excluding them from the range hands those two codepoints to the next family in the stack,
+    which draws them properly. A dash set in the sans beside a serif is a difference you have to
+    be looking for; a dash that is not there is one you cannot miss.
+  */
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
-    U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215,
-    U+FEFF, U+FFFD;
+    U+0304, U+0308, U+0329, U+2000-2012, U+2015-206F, U+20AC, U+2122, U+2191, U+2193,
+    U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
 /* ------------------------------------------------------------------
@@ -5927,7 +5940,10 @@ h1, h2, h3,
   /* A Didone is already dramatic; tight tracking is what stops it
      being florid. */
   letter-spacing: -0.012em;
-  line-height: 1.06;
+  /* 1.06 was inherited from the sans and it clipped the tops off — a
+     Didone reaches noticeably further above the x-height, and a
+     heading in a box with overflow hidden loses the difference. */
+  line-height: 1.16;
   font-optical-sizing: auto;
 }
 h1 {
@@ -6446,4 +6462,38 @@ h2 { font-size: 30px; }
      rail. */
   .car-arrow.prev:hover { transform: translateX(-2px); }
   .car-arrow.next:hover { transform: translateX(2px); }
+}
+
+/* ------------------------------------------------------------------
+   12 · ONE VOICE FOR TITLES
+
+   Nineteen rules in this sheet name `--display` directly. Every one was
+   written when there was only one face and it meant "the title face" —
+   but half of them are on headings and half are on labels, chips and
+   readouts, and only the first half should now be the Didone.
+
+   The rule of thumb: if it is the NAME of something, it is the serif.
+   If it is a label about something, or a number you read at a glance,
+   it stays the sans, which is what a sans is for.
+   ------------------------------------------------------------------ */
+.profile-head h2,
+.badge h4,
+.empty-hero h3,
+.online-card h4,
+.online-none h3,
+.modal-box.intro h3,
+.hero-title,
+.gh-title,
+.sc-name {
+  font-family: var(--serif);
+  font-weight: 700;
+  letter-spacing: -0.008em;
+}
+
+/* Numbers stay in the sans and stay in columns. A Didone's figures are
+   beautiful and, at a glance, harder to read — and these are read at a
+   glance or not at all. */
+.stat-value, .hl-value {
+  font-family: var(--display);
+  font-variant-numeric: tabular-nums;
 }
