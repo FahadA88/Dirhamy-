@@ -732,6 +732,13 @@ function sameMove(a: Move, b: Move): boolean {
   if (a.offerId !== b.offerId) return false;
   if (a.give !== b.give || a.want !== b.want) return false;
   if (a.level !== b.level || a.strain !== b.strain) return false;
+  // Swap and Kent moves are otherwise identical across different slots/pool cards — without
+  // these, two legal moves that only differ in WHICH slot or pool card they target compared
+  // equal, and `allowed.find()` would silently hand back whichever of them happened to be first
+  // in the list rather than the one the player actually chose.
+  if (a.poolId !== b.poolId) return false;
+  if (a.slot !== b.slot) return false;
+  if (a.targetSlot !== b.targetSlot) return false;
   const ac = a.cards ?? [], bc = b.cards ?? [];
   if (ac.length !== bc.length) return false;
   return ac.every((x, i) => x === bc[i]);
