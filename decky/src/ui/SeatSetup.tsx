@@ -89,7 +89,7 @@ export function SeatSetup({ def, defaultSeats, defaultName, onStart, onCancel }:
         <div className="field"><span>How many seats</span>
           <div className="seg wrap">
             {Array.from({ length: max - min + 1 }, (_, i) => min + i).map((n) => (
-              <button key={n} className={count === n ? 'on' : ''} onClick={() => resize(n)}>{n}</button>
+              <button key={n} className={count === n ? 'on' : ''} aria-pressed={count === n} onClick={() => resize(n)}>{n}</button>
             ))}
           </div>
         </div>
@@ -104,6 +104,7 @@ export function SeatSetup({ def, defaultSeats, defaultName, onStart, onCancel }:
                 {KINDS.map((k) => (
                   <button key={k.value} className={s.kind === k.value ? 'on' : ''}
                     title={k.blurb}
+                    aria-pressed={s.kind === k.value}
                     onClick={() => patch(i, { kind: k.value, name: defaultNameFor(k.value, i, defaultName) })}>
                     {k.label}
                   </button>

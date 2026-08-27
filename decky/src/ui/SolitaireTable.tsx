@@ -135,6 +135,14 @@ export function SolitaireTable({ def, daily = false }: { def: GameDefinition; da
     else setPick(null);
   }
 
+  // A free cell, foundation, or empty tableau column has no card of its own to carry a button —
+  // this is what lets Enter/Space complete a drop onto one from the keyboard, the same as
+  // clicking it. Cards that ARE present already get their own <button>; this only has to cover
+  // the zone itself.
+  function zoneKeyDown(e: React.KeyboardEvent, zone: string) {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); tapZone(zone); }
+  }
+
   // Double-tap sends a card home if it can go.
   function sendHome(zone: string, cardId: string) {
     const m = moves.find((x) => x.cardId === cardId && x.from === zone && x.to?.startsWith('found'));
@@ -222,7 +230,11 @@ export function SolitaireTable({ def, daily = false }: { def: GameDefinition; da
                   </div>
                 )}
                 {(view.freeCells ?? []).map((cell) => (
-                  <div key={cell.id} className={`sol-slot cell ${dropOk(cell.id) ? 'target' : ''}`} onClick={() => tapZone(cell.id)}>
+                  <div key={cell.id} className={`sol-slot cell ${dropOk(cell.id) ? 'target' : ''}`} onClick={() => tapZone(cell.id)}
+                    // Only needs to be a keyboard target while empty — an occupied cell's card
+                    // already carries its own <button> for picking it up, and a free cell can
+                    // never itself be a drop target once it holds a card.
+                    {...(!cell.card ? { role: 'button' as const, tabIndex: 0, 'aria-label': 'Free cell, empty', onKeyDown: (e: React.KeyboardEvent) => zoneKeyDown(e, cell.id) } : {})}>
                     {cell.card ? (
                       <button className={`sol-card ${canMoveFrom(cell.id, cell.card.id) ? 'live' : ''} ${isPicked(cell.id, cell.card.id) ? 'picked' : ''} ${isHinted(cell.id, cell.card.id) ? 'hinted' : ''}`}
                         onClick={(e) => { e.stopPropagation(); tapCard(cell.id, cell.card!.id); }}
@@ -238,7 +250,13 @@ export function SolitaireTable({ def, daily = false }: { def: GameDefinition; da
                 {(view.foundations ?? []).map((f) => {
                   const top = f.cards[f.cards.length - 1];
                   return (
-                    <div key={f.id} className={`sol-slot found ${dropOk(f.id) ? 'target' : ''}`} onClick={() => tapZone(f.id)}>
+                    // The top card here is a plain CardFace, never a <button> — unlike a tableau
+                    // column, a foundation has no per-card button to fall back on even when it
+                    // holds cards, so this needs the keyboard treatment unconditionally.
+                    <div key={f.id} className={`sol-slot found ${dropOk(f.id) ? 'target' : ''}`} onClick={() => tapZone(f.id)}
+                      role="button" tabIndex={0}
+                      aria-label={top ? `Foundation, ${top.rank} of ${top.suit} on top` : 'Foundation, empty'}
+                      onKeyDown={(e) => zoneKeyDown(e, f.id)}>
                       {top ? <CardFace card={top} /> : <div className="sol-empty">♠</div>}
                     </div>
                   );
@@ -248,7 +266,12 @@ export function SolitaireTable({ def, daily = false }: { def: GameDefinition; da
 
             <div className="sol-tableau" style={{ '--cols': cfg.columns } as React.CSSProperties}>
               {(view.tableau ?? []).map((col) => (
-                <div key={col.id} className={`sol-col ${dropOk(col.id) ? 'target' : ''}`} onClick={() => tapZone(col.id)}>
+                // Only needs to be a keyboard target while empty — every card already in the
+                // column carries its own <button>, and clicking any one of them while holding a
+                // picked card already drops onto the column, so an occupied column has a
+                // keyboard path with no help from the div itself.
+                <div key={col.id} className={`sol-col ${dropOk(col.id) ? 'target' : ''}`} onClick={() => tapZone(col.id)}
+                  {...(col.cards.length === 0 ? { role: 'button' as const, tabIndex: 0, 'aria-label': 'Column, empty', onKeyDown: (e: React.KeyboardEvent) => zoneKeyDown(e, col.id) } : {})}>
                   {col.cards.length === 0 && <div className="sol-empty col-empty" />}
                   {col.cards.map((c, i) => {
                     const down = i < col.faceDown;

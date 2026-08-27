@@ -1214,7 +1214,17 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
             <div key={p.id}
               data-slot={`seat:${p.id}`}
               className={`seat at-${SEAT_RING[opponents.length]?.[i] ?? 't'} ${p.isTurn ? 'active' : ''} ${askable ? 'askable' : ''}`}
-              onClick={() => { if (askable) submit({ actionId: 'ask', target: p.id, rank: askRank! }); }}>
+              onClick={() => { if (askable) submit({ actionId: 'ask', target: p.id, rank: askRank! }); }}
+              // A keyboard player can pick a rank but had no way to complete the ask — the seat
+              // itself was a click-only target with no role, tabIndex, or key handler.
+              {...(askable ? {
+                role: 'button' as const,
+                tabIndex: 0,
+                'aria-label': `Ask ${nameOf(p.id)} for ${askRank}s`,
+                onKeyDown: (e: React.KeyboardEvent) => {
+                  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); submit({ actionId: 'ask', target: p.id, rank: askRank! }); }
+                },
+              } : {})}>
               <div className="seat-head">
                 <span className="seat-name">{nameOf(p.id)}</span>
                 {teamOf(p.id) && <span className="team-tag">{teamOf(p.id)}</span>}
