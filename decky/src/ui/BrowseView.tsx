@@ -556,7 +556,9 @@ function GameDetail({ game, me, onBack, onPlay, onSetup, onOnline, onlineHostDow
           </div>
 
           <div className="gd-actions">
-            <button className="primary" onClick={onPlay}>Play solo</button>
+            {/* Same action, same words, as the front-page hero's CTA for the identical thing —
+                "Play solo" here and "Deal me in ▶" there used to name the same button two ways. */}
+            <button className="primary" onClick={onPlay}>Deal me in ▶</button>
             {!game.definition.solitaire && <button className="ghost" onClick={onSetup}>Set up a table</button>}
             {!game.definition.solitaire && onOnline && (
               <button className="ghost" onClick={onOnline}>Play with people</button>

@@ -1885,7 +1885,6 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
           {isInterrupt && <span className="bomb-badge">💣 Bomb?</span>}
           {discardMoves.length > 0 && <span className="turn-badge">Discard one</span>}
           {/* "Your turn" is meaningless where there are no turns — everybody is always in. */}
-          {/* "Your turn" is meaningless where there are no turns — everybody is always in. */}
           {!view.passDirection && view.isYourTurn && !suitPickerOpen && !isInterrupt && !isSet && !isPit && !isKent
             && <span className="turn-badge">Your turn</span>}
           {isSet && view.isYourTurn && <span className="turn-badge">Find a set</span>}
