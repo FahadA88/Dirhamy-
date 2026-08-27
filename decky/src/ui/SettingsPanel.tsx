@@ -700,7 +700,9 @@ function BackDesigner({ value, onChange }: { value: CustomBack; onChange: (v: Cu
         <div className="field"><span>Emblem</span>
           <div className="seg wrap">
             {EMBLEMS.map((g) => (
-              <button key={g || 'none'} className={value.emblem === g ? 'on' : ''} onClick={() => patch({ emblem: g })}>{g || 'None'}</button>
+              <button key={g || 'none'} className={value.emblem === g ? 'on' : ''}
+                aria-label={g ? `Emblem ${g}` : undefined} aria-pressed={value.emblem === g}
+                onClick={() => patch({ emblem: g })}>{g || 'None'}</button>
             ))}
           </div>
         </div>

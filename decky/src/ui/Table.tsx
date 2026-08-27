@@ -1353,7 +1353,8 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
               </div>
               <div className="bid-buttons">
                 {auctionMoves.filter((m) => !m.alone).map((m, i) => (
-                  <button key={`a${i}`} className={`bid-btn s-${m.choice}`} onClick={() => submit(m)}>
+                  <button key={`a${i}`} className={`bid-btn s-${m.choice}`} onClick={() => submit(m)}
+                    aria-label={m.actionId === 'orderUp' ? 'Order up' : `Name ${SUIT_NAMES[m.choice as string] ?? m.choice} trump`}>
                     {m.actionId === 'orderUp' ? 'Order up' : SUIT_SYMBOLS[m.choice!] ?? m.choice}
                   </button>
                 ))}
