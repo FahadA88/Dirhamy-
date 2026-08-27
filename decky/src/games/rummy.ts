@@ -30,7 +30,7 @@ export const rummy: GameDefinition = {
     { op: 'deal', from: 'draw', to: 'hand', countPerPlayer: 7, countByPlayers: { 2: 10 } },
     { op: 'move', from: 'draw', to: 'discard', count: 1 },
   ],
-  turnFlow: { order: 'clockwise', startPlayer: 'first', actionsPerTurn: { min: 1, max: 1 } },
+  turnFlow: { order: 'clockwise', startPlayer: 'dealerLeft', actionsPerTurn: { min: 1, max: 1 } },
   actions: [],
   triggers: [],
   endConditions: [{ id: 'handEmpty', when: { zoneCount: { zone: 'hand', of: 'anyPlayer', eq: 0 } }, result: 'roundOver' }],

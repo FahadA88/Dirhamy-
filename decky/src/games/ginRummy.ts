@@ -29,7 +29,7 @@ export const ginRummy: GameDefinition = {
     { op: 'deal', from: 'stock', to: 'hand', countPerPlayer: 10 },
     { op: 'move', from: 'stock', to: 'discard', count: 1 },
   ],
-  turnFlow: { order: 'clockwise', startPlayer: 'first', actionsPerTurn: { min: 1, max: 1 } },
+  turnFlow: { order: 'clockwise', startPlayer: 'dealerLeft', actionsPerTurn: { min: 1, max: 1 } },
   actions: [],
   triggers: [],
   endConditions: [{ id: 'handEmpty', when: { zoneCount: { zone: 'hand', of: 'anyPlayer', eq: 0 } }, result: 'roundOver' }],

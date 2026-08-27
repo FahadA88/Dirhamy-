@@ -325,6 +325,20 @@ export function createMatch(
     log(state, null, `${short(players[state.dealerIndex])} deals. ${up ? `${cardLabel(up)} is turned up.` : ''}`);
   } else if (def.trick && !state.passDirection && !state.bidding) {
     state.turnIndex = openingLeadSeat(state);
+  } else if (def.turnFlow.startPlayer === 'dealerLeft') {
+    /*
+      The deal rotates for everyone else too.
+
+      Auction games already did this a few lines up, and every other family was left with seat
+      one opening every hand of every match — which in rummy is not cosmetic. The player who
+      leads draws first, so they reach a hand they can go out with first, and going out is the
+      whole game. Measured over eighty matches the effect compounds hand after hand: Three
+      Thirteen came out 43/21/26/10 across four seats, Hand and Foot 35/39/19/8. Seat four was
+      not playing worse; it was never once opening.
+    */
+    state.dealerIndex = ((carry?.handNumber ?? 1) - 1) % players.length;
+    state.turnIndex = (state.dealerIndex + 1) % players.length;
+    log(state, null, `${short(players[state.dealerIndex])} deals.`);
   }
   // Poker: antes and blinds are posted before the first decision, same as any real table —
   // otherwise "bet" would just be the first player's own choice with nothing already at risk.

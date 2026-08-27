@@ -44,7 +44,7 @@ export const canasta: GameDefinition = {
     { op: 'deal', from: 'draw', to: 'hand', countPerPlayer: 11 },
     { op: 'move', from: 'draw', to: 'discard', count: 1 },
   ],
-  turnFlow: { order: 'clockwise', startPlayer: 'first', actionsPerTurn: { min: 1, max: 1 } },
+  turnFlow: { order: 'clockwise', startPlayer: 'dealerLeft', actionsPerTurn: { min: 1, max: 1 } },
   actions: [],
   triggers: [],
   endConditions: [

@@ -1,7 +1,8 @@
-import { lazy, Suspense, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { PlayView } from './PlayView';
 import { ProfileView } from './ProfileView';
 import { Backdrop } from './Backdrop';
+import { startCardSheen } from './cardSheen';
 import { SettingsPanel } from './SettingsPanel';
 import { SiteNav, navStyle } from './SiteNav';
 import { FirstRun } from './FirstRun';
@@ -54,6 +55,8 @@ export function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   // Fixed at start-up: the navigation is being chosen between, not switched at runtime.
   const [nav] = useState(navStyle);
+  // One document-level listener, started once: see cardSheen.ts.
+  useEffect(() => startCardSheen(), []);
   return (
     <div className={`app nav-is-${nav}`}>
       <ColorVisionFilters />
