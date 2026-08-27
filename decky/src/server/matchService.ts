@@ -167,6 +167,10 @@ export class MatchService {
     clientSeed?: string,
     // A host with its own CSPRNG (or a test that needs determinism) may supply the secret.
     injectedServerSeed?: string,
+    // A specific hand seed to deal from directly, bypassing the commit-reveal derivation —
+    // see `replaySameDeal`. Left undefined for every ordinary match, where the whole point of
+    // commit-reveal is that nobody, including this method, gets to pick the seed in advance.
+    forcedHandSeed?: number,
   ): MatchSummary {
     const { definition } = migrate(rawDefinition);
     const pinned = pinDefinition(definition);
@@ -176,7 +180,7 @@ export class MatchService {
     const serverSeed = injectedServerSeed ?? newServerSeed();
     const seed0 = clientSeed ?? newClientSeed();
     const nonce = 1;
-    const handSeed = deriveSeed(serverSeed, seed0, nonce);
+    const handSeed = forcedHandSeed ?? deriveSeed(serverSeed, seed0, nonce);
 
     const rec: MatchRecord = {
       matchId: newId(),
@@ -597,6 +601,26 @@ export class MatchService {
   }
 
   summaryOf(matchId: string): MatchSummary { return this.summary(this.require(matchId)); }
+
+  /**
+   * Deal a brand-new match from the exact same starting layout as an existing one.
+   *
+   * "The exact same layout" means hand one's seed specifically, not whichever hand happens to
+   * be in progress — for a match with a points target that has gone on a while, "that deal was
+   * brutal, let me try it again" means the deal that started the match, not hand six. For
+   * patience, the two are always the same hand anyway.
+   *
+   * Deliberately bypasses the normal commit-reveal derivation: this seed was already played
+   * once and both sides have seen the whole hand, so there is nothing left to keep secret, and
+   * asking the caller to supply a fresh commit for a deal that is only going to reproduce an
+   * old one would just be theatre. Fairness still holds for the ORIGINAL match — this only
+   * ever hands out a seed that already finished being commit-revealed once.
+   */
+  replaySameDeal(matchId: string, gameId: string): MatchSummary {
+    const rec = this.require(matchId);
+    const seed = rec.handSeeds[0];
+    return this.create(rec.definition, gameId, rec.seats, undefined, undefined, seed);
+  }
 
   /** The pinned rules this match is running, for a rules panel that is guaranteed accurate. */
   definitionOf(matchId: string): GameDefinition { return this.require(matchId).definition; }

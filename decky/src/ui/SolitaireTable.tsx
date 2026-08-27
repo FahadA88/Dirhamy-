@@ -93,6 +93,25 @@ export function SolitaireTable({ def, daily = false }: { def: GameDefinition; da
     setBoard(boot(def, daily));
   }
 
+  /**
+   * The exact deal this table started from, dealt again from scratch — not a new shuffle.
+   *
+   * The one place this earns its keep more than anywhere else in the app: a patience deal is
+   * either winnable or it is not, and right now the only way to find out is to remember the
+   * layout yourself and hope you shuffle back into it, which nobody does. Not offered on Today's
+   * Deal, which is already the one deal everybody is replaying together.
+   */
+  function replayDeal() {
+    setPick(null);
+    setHint(null);
+    setCanUndo(false);
+    setCanRedo(false);
+    const nextId = service.replaySameDeal(matchId, def.meta.id).matchId;
+    try { service.end(matchId); } catch { /* already gone */ }
+    recordedDaily.current = false;
+    setBoard({ matchId: nextId, view: service.view(nextId, ME) });
+  }
+
   function showHint() {
     setHint(service.hint(matchId, ME));
     playSound('ui', settings);
@@ -163,7 +182,12 @@ export function SolitaireTable({ def, daily = false }: { def: GameDefinition; da
                     button here would just be a way to quietly stop playing it. */}
                 {daily
                   ? <span className="sol-stat" title="Today's Deal is the same for everyone">📅 Today's Deal</span>
-                  : <button className="ghost sm" onClick={newDeal}>New deal</button>}
+                  : (
+                    <>
+                      <button className="ghost sm" onClick={replayDeal} title="Deal this exact layout again">Replay</button>
+                      <button className="ghost sm" onClick={newDeal}>New deal</button>
+                    </>
+                  )}
               </div>
             </div>
 
@@ -270,6 +294,9 @@ export function SolitaireTable({ def, daily = false }: { def: GameDefinition; da
             </p>
             <div className="sol-end-actions">
               {!view.winner && <button className="ghost" onClick={undo} disabled={!canUndo}>Undo</button>}
+              {/* Stuck is exactly when replaying the same deal matters most — proving it really
+                  was unwinnable, or that it wasn't and you missed something. */}
+              {!daily && !view.winner && <button className="ghost" onClick={replayDeal}>Replay this deal</button>}
               {/* Today's Deal offers no replacement deal — see the sol-actions bar above for why —
                   so undoing back into it is the only way to keep going; there is nothing to press
                   once you are actually done, the same as the daily deal it is modelled on. */}

@@ -323,6 +323,23 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
     setUndoable(false);
     deal(true);
   }
+
+  /**
+   * The exact hand this table started from, dealt fresh — not a new random one. Only offered
+   * for a local table (see TableClient.replaySameDeal): an online match's deal belongs to
+   * whoever is hosting it, not to any one seat at it.
+   */
+  function replayDeal() {
+    const fn = clientRef.current.replaySameDeal;
+    if (!fn) return;
+    const newId = fn.call(clientRef.current, def.meta.id);
+    if (!newId) return;
+    setUndoable(false);
+    clientRef.current = new LocalTableClient(newId, service);
+    rememberSession(newId, def.meta.id, players.length);
+    setBoard(clientRef.current.read(localSeats[0] ?? HUMAN));
+    setMe(localSeats[0] ?? HUMAN);
+  }
   const isFish = view.mode === 'fish';
   // Climbing moves carry a card group rather than a single cardId; a one-card group is still
   // a plain tap-to-play, so fold those in alongside the normal cardId moves.
@@ -1913,6 +1930,11 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
                   <button role="menuitem" onClick={() => { setTableMenu(false); restart(); }}>
                     Restart<i>deal a fresh game</i>
                   </button>
+                  {typeof clientRef.current.replaySameDeal === 'function' && (
+                    <button role="menuitem" onClick={() => { setTableMenu(false); replayDeal(); }}>
+                      Replay this deal<i>the exact same hand, from the start</i>
+                    </button>
+                  )}
                 </div>
               </>
             )}

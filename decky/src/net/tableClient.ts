@@ -57,6 +57,12 @@ export interface TableClient {
   nextHand(): void;
   seats(): Seat[];
   end(): void;
+  /**
+   * Deal a fresh match from the exact same starting layout as this one, if this client can —
+   * only a local table can, since an online one's deal belongs to whoever is hosting it. Returns
+   * the new match's id, or null where this is not offered.
+   */
+  replaySameDeal?(gameId: string): string | null;
   /** null for an online table for now — the reveal round-trip isn't wired over the socket yet. */
   fairness(): FairnessInfo | null;
   /** Fires whenever the cached position changes, so React can re-read. */
@@ -108,6 +114,10 @@ export class LocalTableClient implements TableClient {
   }
   nextHand() { this.service.nextHand(this.matchId); this.changed(); }
   seats() { return this.service.seats(this.matchId); }
+  replaySameDeal(gameId: string): string | null {
+    const next = this.service.replaySameDeal(this.matchId, gameId);
+    return next.matchId;
+  }
   end() { try { this.service.end(this.matchId); } catch { /* already gone */ } }
 
   fairness(): FairnessInfo {
