@@ -834,5 +834,34 @@ section('Redaction — every classic, every seat, on and off turn');
   }
 }
 
+// ---------- Schema coverage: startPlayer: 'dealerLeft' actually rotates ----------
+//
+// This exact knob did nothing outside auction games for the entire life of the project — every
+// other family fell through to turnIndex 0 and seat one opened every hand of every match. It
+// was found by accident, not by a test, which is the reason this exists: every game in the
+// catalog that declares `startPlayer: 'dealerLeft'` gets checked, not just the one game that
+// happened to be under the microscope when the bug was found.
+section("Schema coverage: 'dealerLeft' rotates the opener, hand over hand");
+{
+  const declares = catalog.filter((g) => g.turnFlow.startPlayer === 'dealerLeft');
+  check('at least one game declares dealerLeft, or this proves nothing', declares.length > 0, declares.length);
+  for (const g of declares) {
+    const n = g.meta.players.min;
+    const seats = Array.from({ length: n }, (_, i) => String.fromCharCode(97 + i));
+    let s = createMatch(g, seats, 1);
+    const openers = new Set<string>();
+    for (let hand = 0; hand < n; hand++) {
+      openers.add(s.players[s.turnIndex]);
+      s = nextHand(s, hand + 2);
+    }
+    // A game with its own opening-lead rule (a trick game leads off the turned or led suit
+    // rather than straight off the dealer) is allowed to repeat an opener; every other family
+    // has nothing else deciding it, so n hands should visit n different openers.
+    const expectDistinct = !g.trick;
+    check(`${g.meta.name}: the opener moves round the table`,
+      !expectDistinct || openers.size === n, [...openers]);
+  }
+}
+
 console.log(failed ? '\nMECHANICS: FAILED' : '\nMECHANICS: all checks passed');
 process.exit(failed ? 1 : 0);
