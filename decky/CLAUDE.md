@@ -20,8 +20,9 @@ Short, quick sentences. Straight to the point. No long paragraphs.
 
 ## Commands
 
-- `npm test` — engine, validator, mechanics, phase 1/2/3/5 acceptance, bundle-size budget, lint
+- `npm test` — engine, validator, mechanics, phase 1/2/3/5 acceptance, bundle-size budget, contrast, lint
 - `npm run lint` — eslint-plugin-jsx-a11y over the .tsx UI (accessibility regressions fail here)
+- `npm run contrast` — WCAG AA contrast ratios for the core theme tokens, both themes
 - `npm run typecheck`
 - `npm run build`
 - `npm run verify:all` — all five browser suites (needs `npm run preview` up on :4173)
