@@ -84,6 +84,10 @@
   --violet: #8c6f4a;
   --lime: #9ec6a4;
   --red: #c4453f;
+  /* --red as small text on a panel measures ~3.7:1 here — fine for a background or a border,
+     not enough for reading. A separate, brighter token for red TEXT specifically, so a warning
+     nobody notices doesn't share a color with a button nobody has to read. */
+  --red-text: #e0554f;
   --amber: #dfa53a;
 
   /* Older names, still asked for all over the sheet. Pointed at the new lights rather than
@@ -155,6 +159,7 @@
   --violet: #7a5c34;
   --lime: #4f7d57;
   --red: #a8352f;
+  --red-text: #a8352f;   /* already ~6.5:1 against a light panel — no separate value needed */
   --amber: #a97516;
 
   --card-edge: #d9d2c4;
@@ -1030,7 +1035,7 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
 .sd-row input { width: 64px; }
 .sd-note { color: var(--muted); font-size: 11px; }
 .sd-note.bad { color: #c0392b; font-weight: 600; }
-.warn-text { color: #c0392b; }
+.warn-text { color: var(--red-text); }
 .propedit { display: flex; flex-direction: column; gap: 6px; margin: 8px 0; }
 .pe-row { display: flex; gap: 6px; align-items: center; }
 .pe-name { width: 90px; flex: none; }
@@ -1109,33 +1114,6 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
      per-board size and pushed Spider's ten columns off the screen. */
   .table .felt-content:not(.sol) { --cw: 60px; --ch: 86px; }
 }
-
-/* ---------------- customization: icon button + drawer ---------------- */
-.icon-btn {
-  width: 38px; height: 38px; border-radius: 50%; cursor: pointer; font-size: 17px;
-  background: rgba(255,255,255,0.7); color: var(--ink); border: 1px solid var(--panel-brd); transition: 0.16s;
-}
-.icon-btn:hover { border-color: var(--green); color: var(--green-d); transform: rotate(45deg); box-shadow: 0 4px 14px var(--glow); }
-
-.drawer-scrim { position: fixed; inset: 0; background: rgba(16, 40, 28, 0.32); backdrop-filter: blur(3px); z-index: 40; display: flex; justify-content: flex-end; }
-.drawer {
-  width: min(420px, 92vw); height: 100%; overflow-y: auto; border-radius: 0; border-left: 1px solid var(--panel-brd);
-  padding: 20px; animation: slideIn 0.22s ease-out;
-}
-@keyframes slideIn { from { transform: translateX(30px); opacity: 0.4; } }
-.drawer-head { display: flex; align-items: center; justify-content: space-between; position: sticky; top: -20px; background: var(--panel-solid); margin: -20px -20px 6px; padding: 18px 20px; border-bottom: 1px solid var(--panel-brd); z-index: 1; }
-.drawer-head h2 { margin: 0; }
-.drawer-head-actions { display: flex; gap: 8px; }
-
-.cust-group { padding: 14px 0; border-top: 1px solid var(--panel-brd); }
-.cust-group:first-of-type { border-top: none; }
-.cust-group-title { font-family: var(--mono); font-size: 12px; letter-spacing: 1px; text-transform: uppercase; color: var(--green-d); margin-bottom: 10px; }
-.cust-field { display: flex; flex-direction: column; gap: 7px; margin: 12px 0; font-size: 13.5px; }
-.cust-field > span { color: var(--muted); }
-.cust-field.row { flex-direction: row; align-items: center; justify-content: space-between; }
-.cust-field.row > span { color: var(--ink); }
-.cust-field.disabled { opacity: 0.4; }
-.cust-field input[type=range] { accent-color: var(--green); }
 
 .seg.wrap { flex-wrap: wrap; }
 .seg.wrap button { flex: 1 1 auto; min-width: 62px; }
@@ -1334,7 +1312,10 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
 .rb-sentence { display: block; font-size: 12px; color: var(--muted); line-height: 1.4; margin-top: 2px; }
 .rb-tools { display: flex; gap: 4px; flex: 0 0 auto; }
 .icon-btn {
-  width: 26px; height: 26px; border-radius: 7px; cursor: pointer; font-size: 12px;
+  /* 26px was under the ~44px touch-target minimum on a builder that otherwise means to work on
+     a phone — a dead, shadowed-by-source-order first definition of this same class used to say
+     38px, which masked how small the one actually in effect really was. */
+  width: 40px; height: 40px; border-radius: 9px; cursor: pointer; font-size: 14px;
   background: transparent; border: 1px solid var(--panel-brd); color: var(--muted);
 }
 .icon-btn:hover:not(:disabled) { border-color: var(--green-d); color: var(--green-d); }
@@ -2574,13 +2555,19 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
 .car-arrow.prev:hover { transform: translateY(-50%) translateX(-2px); }
 .car-arrow.next:hover { transform: translateY(-50%) translateX(2px); }
 
-.car-dots { display: flex; gap: 8px; justify-content: center; margin-top: 14px; }
+.car-dots { display: flex; gap: 2px; justify-content: center; margin-top: 14px; }
+/* The button is the full touch target (32px); the visible dot is a smaller ::after inside it,
+   so the tap area is real without the pagination row looking like a row of buttons. */
 .car-dot {
-  width: 8px; height: 8px; padding: 0; border-radius: 50%; cursor: pointer;
+  position: relative; width: 32px; height: 32px; padding: 0; border: none; background: transparent;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+}
+.car-dot::after {
+  content: ""; width: 8px; height: 8px; border-radius: 999px;
   border: 1px solid var(--panel-brd); background: transparent;
   transition: width 200ms, background 200ms, border-color 200ms;
 }
-.car-dot.on { width: 26px; border-radius: 999px; background: var(--gold); border-color: var(--gold); }
+.car-dot.on::after { width: 26px; background: var(--gold); border-color: var(--gold); }
 
 /* --- tabs: what kind of game --- */
 .kindtabs {
@@ -3047,12 +3034,12 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
   margin: 0 0 8px; font-family: var(--mono); font-size: 11px;
   letter-spacing: 1.2px; text-transform: uppercase; color: var(--oak);
 }
-.prefs-nomatch { color: var(--dim); font-size: 12.5px; margin-top: 18px; }
+.prefs-nomatch { color: var(--muted); font-size: 12.5px; margin-top: 18px; }
 
 .pref-section { margin-top: 6px; }
 .pref-section h4 {
   margin: 16px 0 2px; font-family: var(--mono); font-size: 10.5px;
-  letter-spacing: 1.4px; text-transform: uppercase; color: var(--dim); font-weight: 600;
+  letter-spacing: 1.4px; text-transform: uppercase; color: var(--muted); font-weight: 600;
 }
 /* A section whose every row was filtered out is not a heading with a gap under it. */
 .pref-section:not(:has(.pref-row)) { display: none; }
@@ -3102,7 +3089,9 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
 
 .swatches.inline { display: flex; gap: 8px; flex-wrap: wrap; }
 .swatch.dot {
-  width: 26px; height: 26px; border-radius: 50%; padding: 0; cursor: pointer;
+  /* The whole circle IS the visible swatch, unlike the carousel's pagination dots — so meeting
+     the ~44px touch target just means growing the swatch itself, not adding a separate hit area. */
+  width: 44px; height: 44px; border-radius: 50%; padding: 0; cursor: pointer;
   border: 2px solid transparent; box-shadow: 0 0 0 1px var(--panel-brd);
 }
 .swatch.dot.on { border-color: var(--panel-solid); box-shadow: 0 0 0 2px var(--oak); }
@@ -3115,7 +3104,7 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
 }
 .pp-title {
   align-self: flex-start; font-family: var(--mono); font-size: 10px;
-  letter-spacing: 1.4px; text-transform: uppercase; color: var(--dim);
+  letter-spacing: 1.4px; text-transform: uppercase; color: var(--muted);
 }
 .pp-stage {
   position: relative; width: 100%; height: 104px; border-radius: 12px; overflow: hidden;
@@ -3722,8 +3711,8 @@ header h1 {
    order regardless of what the real one says, so the button stayed a leftover navy circle
    through the whole repaint. */
 .car-arrow:hover { background: var(--hot); border-color: var(--hot); box-shadow: 0 0 24px rgba(201, 162, 74,.6); }
-.car-dot { border-color: rgba(255,255,255,.34); }
-.car-dot.on { background: var(--hot); border-color: var(--hot); box-shadow: 0 0 14px rgba(201, 162, 74,.8); }
+.car-dot::after { border-color: rgba(255,255,255,.34); }
+.car-dot.on::after { background: var(--hot); border-color: var(--hot); box-shadow: 0 0 14px rgba(201, 162, 74,.8); }
 
 /* --- shelf cards lift and light up --- */
 .shelfcard {
@@ -5154,8 +5143,14 @@ button.bluff-go:disabled {
    label can shrink (it already sets min-width: 0); the dots cannot usefully. */
 .pref-control .swatches.inline { flex-wrap: nowrap; }
 /* And the dots keep their size: as flex children of a nowrap strip they shrink by default,
-   which turned seven 34px dots into seven 11px ones rather than widening the strip. */
-.pref-control .swatches.inline .swatch { flex: 0 0 auto; width: 26px; height: 26px; padding: 0; }
+   which turned seven 34px dots into seven 11px ones rather than widening the strip.
+   32px rather than the ~44px touch-target minimum elsewhere — this selector beats the more
+   general .swatch.dot rule (it's what was actually in effect, at 26px, despite that rule
+   saying 44px), and seven of them have to keep fitting in one row on a narrow phone without
+   reintroducing the wrap this line was written to fix. A real 44px target here would need the
+   visible dot and the tappable area to be different sizes (a pseudo-element, the way the
+   carousel's pagination dots work) rather than just growing the button. */
+.pref-control .swatches.inline .swatch { flex: 0 0 auto; width: 32px; height: 32px; padding: 0; }
 .pref-control { min-width: 0; }
 
 /* The picture that sells the game, on the page you land on when you tap it. */

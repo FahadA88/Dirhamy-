@@ -539,9 +539,11 @@ function GameDetail({ game, me, onBack, onPlay, onSetup, onOnline, onlineHostDow
                 </p>
               )}
             </div>
+            {/* Favouriting and rating are two different things on the same screen — a ★ here,
+                right above the actual ★-rating control below, made them look like one control. */}
             <button className={`star big ${fav ? 'on' : ''}`} aria-pressed={fav}
               aria-label={fav ? 'Remove from favourites' : 'Add to favourites'}
-              onClick={() => { toggleFavourite(game.id); onChanged(); }}>★</button>
+              onClick={() => { toggleFavourite(game.id); onChanged(); }}>♥</button>
           </div>
 
           <Meta game={game} />
