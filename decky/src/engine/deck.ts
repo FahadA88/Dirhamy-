@@ -24,6 +24,9 @@ export function buildDeck(def: GameDefinition): Card[] {
 
   const copies = Math.max(1, def.deck.deckCount ?? 1);
   const excluded = new Set(def.deck.excludeRanks ?? []);
+  // Whole suits struck out. A pack of one suit is not a quarter of a game — it is a game where
+  // every card of a rank is interchangeable, which changes what the rules mean.
+  const excludedSuits = new Set(def.deck.excludeSuits ?? []);
   // Individual cards struck out of the pack, by the same suit+rank key the rest of the engine
   // uses to name one card. Removing a rank takes all four; this takes exactly the one.
   const excludedCards = new Set(def.deck.excludeCards ?? []);
@@ -32,6 +35,7 @@ export function buildDeck(def: GameDefinition): Card[] {
   for (let c = 0; c < copies; c++) {
     const sfx = c === 0 ? '' : `#${c}`;
     for (const suit of SUITS) {
+      if (excludedSuits.has(suit)) continue;
       for (const rank of RANKS) {
         if (excluded.has(rank)) continue;
         if (excludedCards.has(`${suit}${rank}`)) continue;

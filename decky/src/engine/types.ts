@@ -56,6 +56,14 @@ export interface GameDefinition {
     deckCount?: number;        // how many copies of the deck are shuffled together (default 1)
     excludeRanks?: Rank[];     // ranks removed from the deck entirely (short-deck games)
     /**
+     * Suits removed from the deck entirely.
+     *
+     * The point is not usually a smaller pack — it is a pack with fewer KINDS of card. One-suit
+     * Spider is eight copies of the spades, all 104 of them, and it is a different game from
+     * four-suit Spider rather than an easier deal of the same one.
+     */
+    excludeSuits?: Suit[];
+    /**
      * Individual cards removed from the deck, keyed suit-then-rank the same way penaltyPoints
      * names one card: "SQ" is the queen of spades, "H10" the ten of hearts. Applies to every
      * copy when deckCount > 1 — a card excluded from the pack is excluded from all of it.

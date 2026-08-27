@@ -1,4 +1,4 @@
-import { MatchState, Move } from '../engine/types';
+import { Card, MatchState, Move } from '../engine/types';
 import { legalMoves, solZones } from '../engine/engine';
 
 // Solitaire has no opponent, so this is not a bot in the usual sense — it is the greedy player
@@ -50,10 +50,30 @@ export function tierOf(s: MatchState, m: Move): Tier {
   // Digging into the reserve is the whole game in Canfield: the cards under it are unreachable
   // until the ones above are gone.
   if (from.startsWith('free') || from === solZones.waste || from === solZones.reserve) return 'progress';
-  // Spider: stacking onto your own suit is the only tableau move that builds toward a run.
+  /*
+    Spider: stacking onto your own suit is the only tableau move that builds toward a run — but
+    only if the card was not already sitting on one.
+
+    Without that second half, one-suit Spider is pathological. Every card is the same suit, so
+    every move looks like progress, and the player spends the game sliding a nine off one ten
+    and onto another: it hit the move cap on 104 of 120 deals. A card that is already the right
+    rank below the right suit has nothing to gain by moving, so that is churn, and churn belongs
+    in the bottom tier where it is only played when nothing else is available.
+  */
   const destTop = (s.zones[to] || []).slice(-1)[0];
-  if (card && destTop && card.suit === destTop.suit) return 'progress';
+  if (card && destTop && card.suit === destTop.suit && !inSuitRun(s, col, idx)) return 'progress';
   return 'lateral';
+}
+
+// Is this card already the next rank down from a face-up card of its own suit? Then it is
+// already where a Spider run wants it, and sliding it sideways achieves nothing.
+function inSuitRun(s: MatchState, col: Card[], idx: number): boolean {
+  if (idx <= 0) return false;
+  const below = col[idx - 1];
+  const card = col[idx];
+  if (!below || !card || !s.faceUp[below.id] || below.suit !== card.suit) return false;
+  const order = s.definition.deck.rankOrder as readonly string[];
+  return order.indexOf(below.rank) === order.indexOf(card.rank) + 1;
 }
 
 // Higher scores get played first within a tier.
@@ -94,7 +114,26 @@ export function chooseSolitaireMove(
   apply: (st: MatchState, m: Move) => MatchState,
 ): Move | null {
   const cfg = s.definition.solitaire!;
-  const moves = legalMoves(s, s.players[0]);
+  const all = legalMoves(s, s.players[0]);
+  if (all.length === 0) return null;
+
+  /*
+    Churn is not a last resort, it is a trap — so it is refused outright rather than demoted.
+
+    Taking a card that already sits on its own suit, one rank up, and sliding it onto a different
+    card of the same suit and rank leaves the board in a position that is different from the one
+    before and no better. One-suit Spider is nothing but those moves: with the whole pack one
+    suit, every ten will take every nine, and the player spent 72 of 120 deals doing that until
+    the move cap stopped it. The seen-positions guard cannot help, because each shuffle really is
+    a new position.
+  */
+  const moves = all.filter((m) => {
+    const from = m.from ?? '';
+    if (!from.startsWith('tab') || !(m.to ?? '').startsWith('tab')) return true;
+    const col = s.zones[from] || [];
+    return !inSuitRun(s, col, col.findIndex((c) => c.id === m.cardId));
+  });
+  // If churn was the only thing on offer, the game is over in every sense that matters.
   if (moves.length === 0) return null;
   for (const tier of ['progress', 'stock', 'lateral'] as Tier[]) {
     const pool = moves.filter((m) => tierOf(s, m) === tier).sort((a, b) => rank(s, b) - rank(s, a));

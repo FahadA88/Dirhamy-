@@ -14,6 +14,19 @@ import { ginRummy } from './ginRummy';
 import { klondike } from './klondike';
 import { freecell } from './freecell';
 import { spider } from './spider';
+import { whist } from './whist';
+import { briscola } from './briscola';
+import { napoleon } from './napoleon';
+import { sixtySix } from './sixtySix';
+import { snap } from './snap';
+import { palace } from './palace';
+import { scorpion } from './scorpion';
+import { fortyThieves } from './fortyThieves';
+import { triPeaks } from './triPeaks';
+import { threeThirteen } from './threeThirteen';
+import { handAndFoot } from './handAndFoot';
+import { spiderOneSuit } from './spiderOneSuit';
+import { spiderTwoSuits } from './spiderTwoSuits';
 import { bluff } from './bluff';
 import { slapjack } from './slapjack';
 import { showdownPoker } from './showdownPoker';
@@ -38,7 +51,9 @@ import { skat } from './skat';
 // The classics library. Each entry is a hand-authored game, expressed purely as data.
 export const catalog: GameDefinition[] = [
   crazyEights, switchGame, spadesLite, hearts, euchre, president, goFish, rummy, ginRummy, war,
-  tradeWinds, undertow, klondike, freecell, spider, bluff, slapjack, showdownPoker, pit,
+  tradeWinds, undertow, klondike, freecell, spider, spiderOneSuit, spiderTwoSuits,
+  scorpion, fortyThieves, triPeaks,
+  whist, briscola, napoleon, sixtySix, snap, palace, threeThirteen, handAndFoot, bluff, slapjack, showdownPoker, pit,
   contractWhist, trio, kent,
   // Added once the engine could express them: a joker that wins tricks (Five Hundred), a deal
   // that changes with the table (Oh Hell), individually priced cards (Black Maria), wild melds
