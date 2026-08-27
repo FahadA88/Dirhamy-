@@ -14,6 +14,7 @@ import {
 import { leaderboard } from '../social/records';
 import { useSettings } from '../settings/SettingsContext';
 import { GameArt } from './GameArt';
+import { Confirm } from './Confirm';
 
 
 // The shelf.
@@ -499,6 +500,7 @@ function GameDetail({ game, me, onBack, onPlay, onSetup, onOnline, onlineHostDow
   const board = leaderboard(game.id, boardScope === 'friends' ? friendNames : undefined).slice(0, 5);
   const fav = isFavourite(game.id);
   const rating = averageRating(game.stats);
+  const [confirmingUnpublish, setConfirmingUnpublish] = useState(false);
 
   function submit() {
     if (stars < 1) return;
@@ -582,11 +584,21 @@ function GameDetail({ game, me, onBack, onPlay, onSetup, onOnline, onlineHostDow
               </button>
             )}
             {!game.builtIn && (
-              <button className="ghost danger" onClick={() => { unpublish(game.id); onChanged(); onBack(); }}>
+              <button className="ghost danger" onClick={() => setConfirmingUnpublish(true)}>
                 Unpublish
               </button>
             )}
           </div>
+
+          {confirmingUnpublish && (
+            <Confirm
+              title={`Unpublish ${game.definition.meta.name}?`}
+              body="This removes it from the shelf for everyone, along with its ratings and reviews. It can't be undone — though anyone who forked it keeps their own copy."
+              confirmLabel="Unpublish it"
+              onConfirm={() => { unpublish(game.id); onChanged(); onBack(); }}
+              onCancel={() => setConfirmingUnpublish(false)}
+            />
+          )}
 
           {!game.builtIn && (
             <div className="safety">

@@ -62,6 +62,13 @@ export function FirstRun() {
 
   useEffect(() => {
     try { if (!localStorage.getItem(KEY)) setOpen(true); } catch { /* private mode: skip it */ }
+    // Settings' "Show it again" used to force a full page reload to get back here — which also
+    // silently threw away anything unsaved elsewhere on the page (a game mid-build in Create,
+    // most of all). Showing it in place, on this same event, means resetFirstRun() never has to
+    // reload anything.
+    const show = () => { setAt(0); setOpen(true); };
+    window.addEventListener('decky:show-intro', show);
+    return () => window.removeEventListener('decky:show-intro', show);
   }, []);
 
   function close() {
@@ -107,7 +114,10 @@ export function FirstRun() {
   );
 }
 
-/** Lets Settings offer to show it again, rather than it being a one-time thing you cannot revisit. */
+/** Lets Settings offer to show it again, rather than it being a one-time thing you cannot revisit.
+ *  Dispatches an event rather than requiring a reload, so nothing unsaved elsewhere on the page
+ *  is lost just to see this again. */
 export function resetFirstRun(): void {
   try { localStorage.removeItem(KEY); } catch { /* ignore */ }
+  window.dispatchEvent(new Event('decky:show-intro'));
 }

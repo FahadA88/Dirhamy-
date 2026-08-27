@@ -934,6 +934,9 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
 .modal { position: fixed; inset: 0; background: rgba(16, 40, 28, 0.35); backdrop-filter: blur(4px); display: grid; place-items: center; z-index: 30; }
 .modal-box { background: var(--panel-solid); border: 1px solid rgba(214, 175, 92, 0.4); border-radius: 18px; padding: 28px 32px; text-align: center; max-width: 380px; max-height: min(88vh, 720px); overflow-y: auto; box-shadow: 0 20px 60px rgba(16, 64, 40, 0.22); }
 .modal-box h3 { margin: 0 0 14px; font-size: 22px; }
+.confirm-body { color: var(--muted); font-size: 14px; line-height: 1.55; margin: 0 0 20px; }
+.confirm-actions { display: flex; gap: 10px; justify-content: center; }
+.confirm-actions button { flex: 1 1 auto; }
 .scores { color: var(--muted); font-size: 14px; font-family: var(--mono); }
 .suit-choices { display: flex; gap: 12px; justify-content: center; margin-top: 12px; }
 .suit-btn { width: 62px; height: 62px; font-size: 32px; border-radius: 12px; cursor: pointer; border: 1px solid var(--panel-brd); background: #fff; transition: 0.15s; }

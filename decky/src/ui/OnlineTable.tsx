@@ -39,6 +39,7 @@ export function OnlineTable({ def, onStart, onCancel }: {
   const [error, setError] = useState('');
   const [seatCount, setSeatCount] = useState(Math.max(2, def.meta.players.min));
   const [copied, setCopied] = useState(false);
+  const [copyFailed, setCopyFailed] = useState(false);
   // Kept so leaving the screen closes the socket rather than orphaning it.
   const apiRef = useRef<WebSocketApi | null>(null);
 
@@ -114,10 +115,17 @@ export function OnlineTable({ def, onStart, onCancel }: {
 
   function copyLink() {
     const link = `${window.location.origin}${window.location.pathname}?table=${code}`;
-    void navigator.clipboard?.writeText(link).then(
-      () => { setCopied(true); setTimeout(() => setCopied(false), 2000); },
-      () => { /* a browser that will not copy is not worth an error */ },
+    if (!navigator.clipboard) { setCopyFailed(true); return; }
+    void navigator.clipboard.writeText(link).then(
+      () => { setCopied(true); setCopyFailed(false); setTimeout(() => setCopied(false), 2000); },
+      // A browser that refuses to copy still needs to say so — the button used to just sit
+      // there reading "Copy link" forever with no sign anything had gone wrong.
+      () => { setCopyFailed(true); },
     );
+  }
+
+  function inviteLink(): string {
+    return `${window.location.origin}${window.location.pathname}?table=${code}`;
   }
 
   if (host === null) {
@@ -158,6 +166,13 @@ export function OnlineTable({ def, onStart, onCancel }: {
           <div className="invite-actions">
             <button className="ghost sm" onClick={copyLink}>{copied ? 'Copied' : 'Copy link'}</button>
           </div>
+          {copyFailed && (
+            <div className="field" role="alert">
+              <span>Couldn't copy that automatically — select the link and copy it yourself.</span>
+              <input className="pref-text code-input" readOnly value={inviteLink()}
+                onFocus={(e) => e.currentTarget.select()} aria-label="Invite link" />
+            </div>
+          )}
           <p className="muted">
             Any seat nobody takes is played by a bot, so you are never stuck waiting.
           </p>

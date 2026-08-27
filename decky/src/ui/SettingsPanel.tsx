@@ -2,6 +2,7 @@ import { createContext, useContext, useMemo, useState } from 'react';
 import { useSettings } from '../settings/SettingsContext';
 import { useDismissable } from './useEscape';
 import { resetFirstRun } from './FirstRun';
+import { Confirm } from './Confirm';
 import { pullSafety, pushSafety, syncCode, useSyncCode } from '../social/safety';
 import { hostInfo } from '../net/host';
 import { ENGINE_CHANGELOG } from '../engine/changelog';
@@ -63,6 +64,7 @@ export function SettingsPanel({ open, onClose }: { open: boolean; onClose: () =>
   const ref = useDismissable(open, onClose);
   const [section, setSection] = useState<SectionId>('look');
   const [query, setQuery] = useState('');
+  const [confirmingReset, setConfirmingReset] = useState(false);
   const q = query.trim().toLowerCase();
   const searching = q.length > 0;
 
@@ -84,10 +86,20 @@ export function SettingsPanel({ open, onClose }: { open: boolean; onClose: () =>
             aria-label="Search settings"
           />
           <div className="prefs-head-actions">
-            <button className="ghost sm" onClick={reset}>Reset all</button>
+            <button className="ghost sm" onClick={() => setConfirmingReset(true)}>Reset all</button>
             <button className="primary sm" onClick={onClose}>Done</button>
           </div>
         </header>
+
+        {confirmingReset && (
+          <Confirm
+            title="Reset every setting?"
+            body="This puts your theme, table, cards, and everything else here back to how it started — including any custom card back or table cloth you've made. It can't be undone."
+            confirmLabel="Reset everything"
+            onConfirm={() => { reset(); setConfirmingReset(false); }}
+            onCancel={() => setConfirmingReset(false)}
+          />
+        )}
 
         <div className="prefs-body">
           <nav className="prefs-rail" aria-label="Settings categories">
@@ -517,7 +529,7 @@ function AccessSection({ s, set }: { s: Settings; set: Setter }) {
         <SyncCode />
       </Row>
       <Row label="Show the introduction again" hint="The three cards you saw the first time." keywords="intro tutorial onboarding help first run again">
-        <button className="ghost sm" onClick={() => { resetFirstRun(); location.reload(); }}>Show it</button>
+        <button className="ghost sm" onClick={() => resetFirstRun()}>Show it</button>
       </Row>
       <Row label="Read the table aloud" hint="Speaks each move and your hand through the browser's own voice. Separate from a screen reader, which is always supported." keywords="speech speak voice audio blind narrate tts">
         <Toggle on={s.speak} onChange={(v) => set('speak', v)} label="Read the table aloud" />
@@ -650,6 +662,7 @@ function Preview() {
  */
 function BackDesigner({ value, onChange }: { value: CustomBack; onChange: (v: CustomBack) => void }) {
   const patch = (p: Partial<CustomBack>) => onChange({ ...value, ...p });
+  const [imgError, setImgError] = useState<string | null>(null);
   return (
     <div className="designer">
       <div className="dz-preview">
@@ -687,12 +700,12 @@ function BackDesigner({ value, onChange }: { value: CustomBack; onChange: (v: Cu
           <div className="dz-image">
             <label className="ghost sm file-btn">
               {value.image ? 'Replace' : 'Upload'}
-              <input type="file" accept="image/*" onChange={(e) => readBackImage(e, patch)} />
+              <input type="file" accept="image/*" onChange={(e) => readBackImage(e, patch, setImgError)} />
             </label>
             {value.image && (
               <button className="ghost sm" onClick={() => patch({ image: null })}>Remove</button>
             )}
-            <em className="muted">A picture covers the pattern.</em>
+            {imgError ? <em className="warn-text" role="alert">{imgError}</em> : <em className="muted">A picture covers the pattern.</em>}
           </div>
         </div>
       </div>
@@ -708,6 +721,7 @@ function BackDesigner({ value, onChange }: { value: CustomBack; onChange: (v: Cu
 function readBackImage(
   e: React.ChangeEvent<HTMLInputElement>,
   patch: (p: Partial<CustomBack>) => void,
+  onError: (message: string | null) => void,
 ): void {
   const file = e.target.files?.[0];
   e.target.value = '';           // so choosing the same file twice still fires
@@ -717,9 +731,12 @@ function readBackImage(
     const data = typeof reader.result === 'string' ? reader.result : '';
     if (!data) return;
     if (data.length > MAX_BACK_IMAGE) {
-      alert('That picture is too big to keep. Try one under about 300 KB.');
+      // A blocking alert() was the only place in Settings that didn't use the panel's own
+      // inline status styling — shown in place instead, the same as every other error here.
+      onError('That picture is too big to keep. Try one under about 300 KB.');
       return;
     }
+    onError(null);
     patch({ image: data });
   };
   reader.readAsDataURL(file);

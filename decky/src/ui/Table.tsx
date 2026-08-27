@@ -14,6 +14,7 @@ import { haptic } from './haptics';
 import { speak, stopSpeaking, spokenCard } from './speech';
 import { useTurnAlert } from './useTurnAlert';
 import { useDismissable } from './useEscape';
+import { Confirm } from './Confirm';
 import { useCardFlights } from './cardFlight';
 import { useCardDrag } from './cardDrag';
 import { useGamepad } from './useGamepad';
@@ -228,6 +229,7 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
   // The three match-level buttons — history, take back, restart — live behind one control
   // rather than on the line above your cards. See the .table-menu note below.
   const [tableMenu, setTableMenu] = useState(false);
+  const [confirmingRestart, setConfirmingRestart] = useState(false);
   const [hint, setHint] = useState<string | null>(null);
   const [history, setHistory] = useState<MoveRecord[]>([]);
   // The referee, and the last position it gave us. A local table makes its own client; an
@@ -1971,7 +1973,13 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
                       Take back<i>ask the table to undo your last move</i>
                     </button>
                   )}
-                  <button role="menuitem" onClick={() => { setTableMenu(false); restart(); }}>
+                  <button role="menuitem" onClick={() => {
+                    setTableMenu(false);
+                    // Rematch/Play again only ever appear once a hand is actually over — this is
+                    // the one way to throw away a match still in progress, so it's the one that
+                    // needs to ask first.
+                    if (view.phase === 'playing') setConfirmingRestart(true); else restart();
+                  }}>
                     Restart<i>deal a fresh game</i>
                   </button>
                   {typeof clientRef.current.replaySameDeal === 'function' && (
@@ -1984,6 +1992,15 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
             )}
           </div>
         </div>
+        {confirmingRestart && (
+          <Confirm
+            title="Restart this game?"
+            body="This throws away the hand in progress and deals a brand new one. Nobody's moves so far can be recovered."
+            confirmLabel="Restart"
+            onConfirm={() => { setConfirmingRestart(false); restart(); }}
+            onCancel={() => setConfirmingRestart(false)}
+          />
+        )}
         {isSet ? (
           /*
             No hand and no turn: one board everybody can see. Picking the right number of cards
