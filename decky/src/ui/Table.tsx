@@ -350,6 +350,7 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
   const isSet = view.mode === 'set';
   const isKent = view.mode === 'kent';
   const isLayout = view.mode === 'layout';
+  const isSwap = view.mode === 'swap';
   const moonShooter = view.shotMoon ?? null;
   // Gin and an undercut are the two gin-rummy endings worth a beat of their own; an ordinary
   // knock is the unremarkable case the generic "X takes it" heading already covers.
@@ -1203,7 +1204,7 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
               {/* Nobody holds cards in a spotting game — everything is face up on the board —
                   so a fan of backs and the word "out" under it said the player had been knocked
                   out of a game they were in fact winning. Show what they have actually got. */}
-              {p.handCount > 0 && (
+              {p.handCount > 0 && !isLayout && !isSwap && (
                 <div className="fanned" aria-hidden="true">
                   {Array.from({ length: backs }).map((_, k) => (<div key={k} className={backCls} />))}
                 </div>
@@ -1211,6 +1212,11 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
               <div className="seat-stats">
                 {isSet ? (
                   <span className="seat-stat">{view.scores?.[p.id] ?? 0}<i>{(view.scores?.[p.id] ?? 0) === 1 ? 'set' : 'sets'}</i></span>
+                ) : isLayout || isSwap ? (
+                  // Both families sit somebody's whole holding on the table for the length of
+                  // the round — a shared layout, or a face-down row everyone can see the BACKS
+                  // of — so "0 in hand, must be out" is simply the wrong reading of the number.
+                  null
                 ) : (
                   <span className="count-chip" title={`${p.handCount} cards in hand`}>
                     {p.handCount === 0 ? 'out' : `${p.handCount}`}
@@ -1504,6 +1510,117 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
               🤨 Call bluff!
             </button>
           )}
+        </div>
+      ) : isSwap ? (
+        /*
+          The middle of a Dutch table: everyone's row, the stock and pile, and — because this is
+          the one family where two people looking at the same card see different things — every
+          slot drawn from THIS viewer's own `view.grids`, not from a single shared board.
+
+          A slot is a face if this viewer has ever been shown it, and a back otherwise, and that
+          is exactly as true of the viewer's own row as anyone else's: forgetting your own cards
+          is the whole game.
+        */
+        <div className="center swap-center">
+          <div className="swap-rows">
+            {(view.grids ?? []).map((row) => (
+              <div key={row.player} className={`swap-row ${row.player === me ? 'mine' : ''} ${view.players.find((p) => p.id === row.player)?.isTurn ? 'active' : ''}`}>
+                <span className="swap-row-name">{row.player === me ? 'You' : row.player}</span>
+                <div className="swap-slots">
+                  {row.slots.map((c, i) => {
+                    const peekSelf = myLegal.find((m) => m.actionId === 'swapPeekSelf' && m.slot === i && row.player === me);
+                    const peekOther = myLegal.find((m) => m.actionId === 'swapPeekOther' && m.target === row.player && m.slot === i);
+                    const place = myLegal.find((m) => m.actionId === 'swapPlace' && m.slot === i && row.player === me);
+                    const blindMine = myLegal.find((m) => m.actionId === 'swapBlind' && m.slot === i && row.player === me);
+                    const blindTheirs = myLegal.find((m) => m.actionId === 'swapBlind' && m.target === row.player && m.targetSlot === i);
+                    const live = peekSelf || peekOther || place || blindMine || blindTheirs;
+                    return (
+                      <button
+                        key={i}
+                        className={`swap-slot ${live ? 'live' : ''} ${c ? 'known' : ''}`}
+                        disabled={!live}
+                        aria-label={c ? spokenCard(c.rank, c.suit) : `Face down, slot ${i + 1}`}
+                        onClick={() => live && submit(live)}
+                      >
+                        {c ? <CardFace card={c} /> : <div className={backCls} />}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="swap-middle">
+            {/*
+              The pile graphic is a `.card.back.big`, and every "big" pile in this app carries a
+              permanent rotateX(14deg) — the tilted-stack look every draw pile has. Elsewhere
+              that div is decoration next to a separate flat "Draw" button; here the pile IS the
+              button, and putting the click handler on the rotated element itself turned out to
+              be a real hit-testing bug, not just a test one: a 3D-rotated quad under a
+              `perspective` ancestor does not reliably fill its own axis-aligned bounding box, so
+              a click aimed at the geometric centre can land on whatever is behind it instead.
+              The fix already exists elsewhere in the app — keep the control flat, and make the
+              tilted card purely decorative (`pointer-events: none`) inside it.
+            */}
+            <button
+              className={`swap-pile-btn ${myLegal.some((m) => m.actionId === 'swapDrawStock') ? 'live' : 'dim'}`}
+              disabled={!myLegal.some((m) => m.actionId === 'swapDrawStock')}
+              aria-label="Draw from the stock"
+              onClick={() => submit({ actionId: 'swapDrawStock' })}
+            >
+              <div className={`${backCls} big`} />
+            </button>
+            {(() => {
+              const top = (view.zones?.discard?.cards ?? []).slice(-1)[0];
+              const canTake = myLegal.some((m) => m.actionId === 'swapTakeDiscard');
+              return (
+                <button
+                  className={`swap-pile-btn ${canTake ? 'live' : ''}`}
+                  disabled={!canTake}
+                  aria-label={top ? `Take ${spokenCard(top.rank, top.suit)} from the pile` : 'Nothing in the pile'}
+                  onClick={() => submit({ actionId: 'swapTakeDiscard' })}
+                >
+                  {top ? <div className="card face big"><CardFace card={top} /></div> : <div className="card empty big" />}
+                </button>
+              );
+            })()}
+            {view.held && (
+              <div className="swap-held">
+                <span className="lay-note">Holding</span>
+                <div className="card face big"><CardFace card={view.held} /></div>
+                {myLegal.some((m) => m.actionId === 'swapThrow') && (
+                  <button className="ghost sm" onClick={() => submit({ actionId: 'swapThrow' })}>
+                    Throw it away
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div className="swap-actions">
+            {!view.isYourTurn ? (
+              <span className="lay-note">Waiting for the others…</span>
+            ) : view.power ? (
+              <span className="lay-note">
+                {view.power === 'peekSelf' ? 'Pick one of your own to look at.'
+                  : view.power === 'peekOther' ? "Pick a card on the table to look at."
+                    : 'Pick one of yours, then one of theirs — swapped sight unseen.'}
+              </span>
+            ) : view.held ? (
+              <span className="lay-note">Slide it into your row, or throw it away.</span>
+            ) : (
+              <>
+                <span className="lay-note">Draw from the stock, or take the top of the pile.</span>
+                {myLegal.some((m) => m.actionId === 'swapCall') && (
+                  <button className="primary" onClick={() => submit({ actionId: 'swapCall' })}>
+                    Call {def.swap?.callName ?? 'Dutch'}!
+                  </button>
+                )}
+              </>
+            )}
+            {view.caller && <span className="lay-note swap-called">{view.caller === me ? 'You called' : `${view.caller} called`} — one turn each left.</span>}
+          </div>
         </div>
       ) : isLayout ? (
         /*

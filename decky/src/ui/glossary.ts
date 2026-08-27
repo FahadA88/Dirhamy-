@@ -73,6 +73,14 @@ const GAME_TERMS: Record<string, [string, string][]> = {
   'classic-kent': [
     ['Signal', 'The private, wordless way a pair agrees to tell each other something the rest of the table cannot read.'],
   ],
+  'classic-kings-corner': [
+    ['Corner', 'One of four piles that starts empty and stays shut until somebody has the rank that opens it.'],
+    ['Pile move', 'Lifting a whole stack and dropping it on another it continues — the move that frees a space for whoever gets there next.'],
+  ],
+  'classic-dutch': [
+    ['Blind swap', 'Trading one of your own cards for one of an opponent\'s, with neither player looking at either.'],
+    ['Call', 'Declaring that you believe you are lowest. Everyone else gets one more turn, then the cards come over — call it wrong and it costs you.'],
+  ],
 };
 
 export function termsFor(def: GameDefinition): { term: string; def: string }[] {

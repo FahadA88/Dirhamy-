@@ -210,6 +210,16 @@ export function explainGame(def: GameDefinition): string[] {
     const ranks = def.reflex.slapRanks.join(', ') || 'nothing by rank';
     out.push(`Flip a card each turn onto the shared pile. When the top card is a ${ranks}${def.reflex.slapMatch ? ', or the top two match,' : ''}, anyone may slap to take it.`);
     out.push('Last player still holding cards wins.');
+  } else if (def.swap) {
+    const cfg = def.swap;
+    out.push(`${cfg.slots} cards face down in front of each player. You may look at ${cfg.peekAtStart} of your own, once, and then they stay down.`);
+    out.push('On your turn take the top of the stock or the top of the pile, then either slide it into your row — throwing out whatever was there — or throw it away.');
+    const powers: string[] = [];
+    if (cfg.peekSelfRanks?.length) powers.push(`${cfg.peekSelfRanks.join(' and ')} buy a look at one of your own`);
+    if (cfg.peekOtherRanks?.length) powers.push(`${cfg.peekOtherRanks.join(' and ')} a look at somebody else's`);
+    if (cfg.blindSwapRanks?.length) powers.push(`${cfg.blindSwapRanks.join(' and ')} trade one of yours for one of theirs, neither of you looking`);
+    if (powers.length) out.push(`Thrown away, ${powers.join('; ')}.`);
+    out.push(`Call ${cfg.callName} to end the round: everyone else gets one more turn, then the cards come over and the lowest total wins. Call it and not be lowest and it costs you ${cfg.callPenalty}.`);
   } else if (def.layout) {
     const cfg = def.layout;
     out.push(`${cfg.handSize} cards each, and ${cfg.piles + cfg.cornerPiles} piles in the middle that everybody plays into.`);

@@ -115,6 +115,8 @@ export interface GameDefinition {
   kent?: KentConfig;
   /** A shared tableau everyone builds on — Kings Corner. */
   layout?: LayoutConfig;
+  /** Four face-down cards you may not look at — Dutch. */
+  swap?: SwapConfig;
   set?: SetConfig;
   // Present iff this is a single-player patience game: build the tableau down, the foundations
   // up, and win by clearing the deck. No opponents, no turns, no bot.
@@ -248,6 +250,48 @@ export interface LayoutConfig {
    * the thinking in it.
    */
   movePiles?: boolean;
+}
+
+/**
+ * Four cards face down in front of you that you are not allowed to look at.
+ *
+ * Dutch is the game — also met as Cabo, Pablo, Cambio and Golf. You get one look at two of your
+ * four at the start and then they go face down for good, and from there the whole game is
+ * memory against arithmetic: you are trying to have the lowest total on the table, using cards
+ * you cannot see, half of which you swapped in blind.
+ *
+ * This is the first family where two players looking at the same card see different things.
+ * Everything else here is hidden by ZONE — a hand is yours, a stock is nobody's. Here it is
+ * hidden per person: the same card in the same slot is known to whoever has looked at it and a
+ * mystery to everyone else, and it stays that way until somebody spends a seven to peek.
+ */
+export interface SwapConfig {
+  /** Cards face down in front of each player. Four, in the game everybody knows. */
+  slots: number;
+  /** How many of your own you get to look at before play starts. */
+  peekAtStart: number;
+  /** Thrown away, these let you look at one of your own. */
+  peekSelfRanks?: Rank[];
+  /** These let you look at one of somebody else's. */
+  peekOtherRanks?: Rank[];
+  /** These let you trade one of yours for one of theirs, neither of you looking. */
+  blindSwapRanks?: Rank[];
+  /** What the call is named, so the log and the button can say it. */
+  callName: string;
+  /**
+   * Safety bound, the same idea as War's `roundCap`: with the wrong table of bots, or a human
+   * table that simply refuses to call, a round has no other way to end. After this many turns
+   * with nobody calling, the round ends on its own and the lowest total — actual, not known —
+   * still wins. Nobody is penalised; it is a fallback, not a rules interaction.
+   */
+  turnCap?: number;
+  /**
+   * What it costs to call and not actually be lowest.
+   *
+   * Without a penalty the call is free and the right move is to make it on turn one every time,
+   * which is not a game. With one, calling is a claim you have to be able to back.
+   */
+  callPenalty: number;
 }
 
 export interface KentConfig {
@@ -898,6 +942,23 @@ export interface MatchState {
   tradesCompleted: Record<string, number>; // pit: trades each player has made, either side counted
   // kent: the tell currently showing, and how many letters each pair has spelt.
   kentTell: { player: string; ply: number } | null;
+  /**
+   * Swap: which cards each player has actually SEEN.
+   *
+   * The one piece of state in the engine that is per-person rather than per-zone. Redaction
+   * reads it to decide what to show, so a card is face up to you and face down to the table at
+   * the same moment, which is the whole game.
+   */
+  seen: Record<string, string[]>;
+  /** Swap: the card picked up this turn, not yet placed or thrown. */
+  held: { player: string; card: Card; from: 'stock' | 'discard' } | null;
+  /** Swap: a power that has been thrown and is waiting to be aimed. */
+  pendingPower: { player: string; kind: 'peekSelf' | 'peekOther' | 'blindSwap'; firstSlot?: number } | null;
+  /** Swap: who called, and how many turns the rest of the table has left. */
+  caller: string | null;
+  callTurnsLeft: number;
+  /** Swap: turns played this round, toward the safety cap. */
+  swapTurns: number;
   /** Layout: the seat that has already taken its one card this turn. */
   layoutDrew: string | null;
   /**
@@ -946,6 +1007,8 @@ export interface Move {
   level?: number;          // numeric auction: bid level 1..7
   strain?: string;         // numeric auction: bid strain
   poolId?: string;         // kent: which face-up card to take from the middle
+  slot?: number;           // swap: which of your four face-down cards
+  targetSlot?: number;     // swap: which of THEIR four, for a sight-unseen trade
 }
 
 // ---------- Redacted (per-player) view ----------
@@ -976,7 +1039,7 @@ export interface RedactedState {
   log: LogEntry[];
   // family-specific view
   mode: 'shedding' | 'trick' | 'climb' | 'fish' | 'rummy' | 'war' | 'solitaire'
-    | 'bluff' | 'reflex' | 'poker' | 'pit' | 'set' | 'kent' | 'layout';
+    | 'bluff' | 'reflex' | 'poker' | 'pit' | 'set' | 'kent' | 'layout' | 'swap';
   // solitaire
   tableau?: { id: string; cards: Card[]; faceDown: number }[];
   foundations?: { id: string; cards: Card[] }[];
@@ -1068,6 +1131,15 @@ export interface RedactedState {
   kentPool?: Card[];
   kentTell?: { player: string } | null;
   layoutDrew?: string | null;
+  /**
+   * Swap: your own four, with a card where you know what it is and null where you do not.
+   * Everyone else's is a count and a list of the ones YOU have been shown.
+   */
+  grids?: { player: string; slots: (Card | null)[] }[];
+  held?: Card | null;
+  heldFrom?: 'stock' | 'discard' | null;
+  power?: 'peekSelf' | 'peekOther' | 'blindSwap' | null;
+  caller?: string | null;
   kentLetters?: Record<string, number>;
   kentWord?: string;
   /** kent: true when your own hand is four of a kind, so the table can offer the signal. */

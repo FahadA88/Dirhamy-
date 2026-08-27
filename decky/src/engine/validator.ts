@@ -51,8 +51,9 @@ export function validate(def: GameDefinition): ValidationResult {
   const isKent = !!def.kent;
   const isSet = !!def.set;
   const isLayout = !!def.layout;
+  const isSwap = !!def.swap;
   const isSpecial = isTrick || isClimb || isFish || isRummy || isWar || isSolitaire
-    || isBluff || isReflex || isPoker || isPit || isSet || isKent || isLayout;
+    || isBluff || isReflex || isPoker || isPit || isSet || isKent || isLayout || isSwap;
 
   // --- players ---
   // Patience is played alone, and spotting sets on a shared board works just as well solo, so
@@ -69,9 +70,10 @@ export function validate(def: GameDefinition): ValidationResult {
 
   // --- zones: engine expectations ---
   // Solitaire's board — columns, foundations, cells, stock — is synthesised from its config, and
-  // a set game's board and deck likewise. Neither declares zones of its own, so a missing hand
-  // or draw pile is the correct shape rather than a mistake.
-  if (!isSolitaire && !isSet) {
+  // a set game's board and deck likewise. Swap's per-player grid is the same story: `grid:<id>`
+  // zones are created from `swap.slots`, not declared. None of the three should be asked for a
+  // hand zone that was never meant to exist.
+  if (!isSolitaire && !isSet && !isSwap) {
     const sharedPile = def.zones.find((z) => z.shared && z.type === 'pile');
     if (!sharedPile) err('zones.deck', 'Need a shared pile to hold the deck (e.g. a "draw" pile).');
     const handZone = def.zones.find((z) => z.type === 'hand' && z.perPlayer);
@@ -160,6 +162,27 @@ export function validate(def: GameDefinition): ValidationResult {
       err('layout.deal',
         `Dealing ${cfg.handSize} each to ${def.meta.players.max} players plus ${cfg.piles} piles `
         + `needs ${need} cards, and the deck has ${deckSize}.`);
+    }
+  }
+
+  // --- swap ---
+  if (isSwap) {
+    const cfg = def.swap!;
+    if (cfg.slots < 2) err('swap.slots', 'A memory game needs at least two cards in front of you.');
+    if (cfg.peekAtStart > cfg.slots) {
+      err('swap.peek', `Looking at ${cfg.peekAtStart} of ${cfg.slots} is looking at more than you have.`);
+    }
+    // Seeing all of them is not a memory game, it is arithmetic.
+    if (cfg.peekAtStart >= cfg.slots) {
+      warn('swap.peekall', 'Players see every card they hold at the start, so nothing is hidden.');
+    }
+    if (cfg.callPenalty <= 0) {
+      warn('swap.penalty',
+        'Calling costs nothing when you are wrong, so calling on the first turn is always correct.');
+    }
+    const need = cfg.slots * def.meta.players.max + 1;
+    if (need > deckSize) {
+      err('swap.deal', `${cfg.slots} each to ${def.meta.players.max} players needs ${need} cards; the deck has ${deckSize}.`);
     }
   }
 

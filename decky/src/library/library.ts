@@ -415,6 +415,7 @@ export const KINDS: { id: string; label: string; mark: string }[] = [
   { id: 'set', label: 'Spotting', mark: '🂪' },
   { id: 'kent', label: 'Signalling', mark: '🂹' },
   { id: 'layout', label: 'Laying out', mark: '🃎' },
+  { id: 'swap', label: 'Remembering', mark: '🂠' },
   { id: 'solitaire', label: 'Patience', mark: '🂨' },
 ];
 
@@ -440,6 +441,7 @@ export function kindOf(def: GameDefinition): string {
   if (def.set) return 'set';
   if (def.kent) return 'kent';
   if (def.layout) return 'layout';
+  if (def.swap) return 'swap';
   return 'shedding';
 }
 

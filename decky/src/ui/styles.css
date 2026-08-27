@@ -6622,3 +6622,108 @@ h2 { font-size: 30px; }
   .lay-pile { width: var(--bw); height: var(--bh); }
   .lay-empty { font-size: 19px; }
 }
+
+/* ------------------------------------------------------------------
+   15 · THE SWAP TABLE (Dutch)
+
+   The one place on the site where the same slot means something
+   different to every person looking at it. Every row is drawn from
+   THIS viewer's own copy of the board, so a card face-up here and
+   face-down on the next screen over is not a bug rendering — it is
+   the whole game.
+   ------------------------------------------------------------------ */
+.swap-center { display: flex; flex-direction: column; align-items: center; gap: 22px; width: 100%; }
+
+.swap-rows {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  justify-content: center;
+  width: 100%;
+}
+
+.swap-row {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: var(--r-lg);
+  border: 1px solid transparent;
+}
+.swap-row-name {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--t-muted, var(--muted));
+}
+.swap-row.mine .swap-row-name { color: var(--t-ink, var(--ink)); }
+/* Whoever's turn it is, the same brass breathing glow the rest of the room spends on live
+   state — nowhere else in this family did it make sense to add a border, so this is the one
+   surface that gets it. */
+.swap-row.active {
+  animation: lux-breathe 3.4s var(--ease) infinite;
+  border-color: var(--brass);
+}
+
+.swap-slots { display: flex; gap: 8px; }
+.swap-slot {
+  width: calc(var(--bw) * 0.86);
+  height: calc(var(--bh) * 0.86);
+  padding: 0;
+  border-radius: 8px;
+  border: none;
+  background: none;
+  cursor: default;
+  display: grid;
+  place-items: center;
+  transition: transform var(--t-fast) var(--ease);
+}
+.swap-slot.live { cursor: pointer; box-shadow: 0 0 0 2px var(--brass-hi), 0 0 20px -4px var(--lit); border-radius: 9px; }
+.swap-slot.live:hover { transform: translateY(-3px); }
+.swap-slot:disabled { cursor: default; }
+
+.swap-middle {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+.swap-middle .card-btn.live, .swap-middle .live.card {
+  box-shadow: 0 0 0 2px var(--brass-hi), 0 0 20px -4px var(--lit);
+  cursor: pointer;
+}
+.swap-middle .dim { opacity: 0.5; cursor: default; }
+
+.swap-held { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+
+/*
+   A flat, untransformed hit target wrapping a tilted `.card.back.big`/`.card.face.big`
+   decoration. See the long comment beside where this is used in Table.tsx: the pile graphic
+   carries a permanent rotateX(14deg), and making that rotated element itself the click target
+   is unreliable — a 3D-rotated quad under `perspective` does not dependably fill its own
+   axis-aligned bounding box, so clicks near the visual edge can miss. The button stays flat;
+   the card inside it is decoration only.
+*/
+.swap-pile-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: default;
+  width: var(--cw);
+  height: var(--ch);
+  display: grid;
+  place-items: center;
+}
+.swap-pile-btn > * { pointer-events: none; }
+.swap-pile-btn.live { cursor: pointer; }
+.swap-pile-btn.live .card { box-shadow: 0 0 0 2px var(--brass-hi), 0 0 20px -4px var(--lit), 0 1px 0 var(--card-edge), 0 3px 0 color-mix(in srgb, var(--card-edge) 84%, #000); }
+.swap-pile-btn.live:hover .card { transform: rotateX(14deg) translateY(-3px); }
+.swap-pile-btn.dim .card, .swap-pile-btn:disabled .card { opacity: 0.55; }
+
+.swap-actions { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; justify-content: center; }
+.swap-called { color: var(--brass-hi); }
+
+@media (max-width: 620px) {
+  .swap-slots { gap: 5px; }
+  .swap-slot { width: calc(var(--bw) * 0.72); height: calc(var(--bh) * 0.72); }
+  .swap-middle { gap: 12px; }
+}

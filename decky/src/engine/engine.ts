@@ -133,6 +133,12 @@ export function createMatch(
     kentTell: null,
     layoutDrew: null,
     layoutIdle: 0,
+    seen: {},
+    held: null,
+    pendingPower: null,
+    caller: null,
+    callTurnsLeft: 0,
+    swapTurns: 0,
     kentLetters: {},
     nextOfferId: 1,
     highBid: null,
@@ -376,6 +382,28 @@ export function createMatch(
   // Kent: four in the middle, face up, after the hands have gone out. The letters already
   // spelt come in with the carry, because a round is one hand but a game is however many
   // rounds it takes a pair to spell the word.
+  if (def.swap) {
+    const cfg = def.swap;
+    const draw = state.zones['draw'] || (state.zones['draw'] = []);
+    for (const p of players) {
+      const grid = (state.zones[swapZones.grid(p)] ||= []);
+      state.seen[p] = [];
+      for (let i = 0; i < cfg.slots; i++) {
+        const c = draw.pop();
+        if (c) { grid.push(c); state.faceUp[c.id] = false; }
+      }
+      // Your one look, and it is the only one you get for free. The outer two by convention —
+      // which two hardly matters, but that they are always the same two does: everyone at the
+      // table knows which of your cards you know.
+      for (let i = 0; i < Math.min(cfg.peekAtStart, grid.length); i++) {
+        state.seen[p].push(grid[i].id);
+      }
+    }
+    const up = draw.pop();
+    if (up) { (state.zones['discard'] ||= []).push(up); state.faceUp[up.id] = true; }
+    log(state, null, `${cfg.slots} face down each. You saw ${cfg.peekAtStart} of yours — remember them.`);
+  }
+
   if (def.layout) {
     const cfg = def.layout;
     const draw = state.zones['draw'] || (state.zones['draw'] = []);
@@ -677,6 +705,7 @@ function familyLegalMoves(state: MatchState, playerId: string): Move[] {
   if (state.definition.pit) return pitLegalMoves(state, playerId);
   if (state.definition.kent) return kentLegalMoves(state, playerId);
   if (state.definition.layout) return layoutLegalMoves(state, playerId);
+  if (state.definition.swap) return swapLegalMoves(state, playerId);
   if (state.definition.set) return setLegalMoves(state);
 
   // Resolve a pending choice first (e.g. pick a suit after a wild).
@@ -1001,6 +1030,7 @@ export function applyMove(state: MatchState, playerId: string, move: Move): Matc
   if (def.pit) return afterFamilyMove(applyPitMove(s, playerId, move), playerId, handBefore);
   if (def.kent) return afterFamilyMove(applyKentMove(s, playerId, move), playerId, handBefore);
   if (def.layout) return afterFamilyMove(applyLayoutMove(s, playerId, move), playerId, handBefore);
+  if (def.swap) return afterFamilyMove(applySwapMove(s, playerId, move), playerId, handBefore);
   if (def.set) return afterFamilyMove(applySetMove(s, playerId, move), playerId, handBefore);
 
   // Resolve a pending suit choice.
@@ -1343,7 +1373,7 @@ function computeWinner(state: MatchState, winnerHint?: string): string {
  * both of which the TRICK scorer had understood for as long as it has existed — were
  * inexpressible the moment a game counted points in hand instead of in tricks.
  */
-function cardPoints(s: ScoringDef, card: Card): number {
+export function cardPoints(s: ScoringDef, card: Card): number {
   const cp = s.cardPoints || {};
   const resolve = (v: number | 'rankValue' | undefined): number | null => {
     if (v === 'rankValue') return rankValue(card.rank);
@@ -3926,6 +3956,265 @@ function pitCheckWin(s: MatchState): boolean {
 // moves, and being able to do that is the one property every rule in here has to keep.
 
 
+// ---------- swap family (Dutch) ----------
+//
+// The first family where two people looking at the same card see different things. Everything
+// else is hidden by zone; this is hidden per person, and `state.seen` is the record of who has
+// looked at what.
+
+export const swapZones = { grid: (p: string) => `grid:${p}` };
+
+function swapGrid(s: MatchState, p: string): Card[] {
+  return (s.zones[swapZones.grid(p)] ||= []);
+}
+
+/** Has this player been shown this card? */
+export function hasSeen(s: MatchState, viewer: string, cardId: string): boolean {
+  return (s.seen[viewer] || []).includes(cardId);
+}
+
+function markSeen(s: MatchState, viewer: string, cardId: string): void {
+  const list = (s.seen[viewer] ||= []);
+  if (!list.includes(cardId)) list.push(cardId);
+}
+
+/** Forget a card that has left the table, so `seen` does not grow for the whole match. */
+function forget(s: MatchState, cardId: string): void {
+  for (const p of Object.keys(s.seen)) s.seen[p] = s.seen[p].filter((id) => id !== cardId);
+}
+
+function powerOf(cfg: NonNullable<GameDefinition['swap']>, rank: string): 'peekSelf' | 'peekOther' | 'blindSwap' | null {
+  if ((cfg.peekSelfRanks ?? []).includes(rank as never)) return 'peekSelf';
+  if ((cfg.peekOtherRanks ?? []).includes(rank as never)) return 'peekOther';
+  if ((cfg.blindSwapRanks ?? []).includes(rank as never)) return 'blindSwap';
+  return null;
+}
+
+function swapLegalMoves(state: MatchState, playerId: string): Move[] {
+  if (state.phase !== 'playing') return [];
+  if (state.players[state.turnIndex] !== playerId) return [];
+  const moves: Move[] = [];
+
+  // A power that has been thrown and now has to be aimed.
+  const power = state.pendingPower;
+  if (power) {
+    if (power.player !== playerId) return [];
+    const mine = swapGrid(state, playerId);
+    if (power.kind === 'peekSelf') {
+      for (let i = 0; i < mine.length; i++) moves.push({ actionId: 'swapPeekSelf', slot: i });
+      return moves;
+    }
+    if (power.kind === 'peekOther') {
+      for (const p of state.players) {
+        if (p === playerId) continue;
+        const g = swapGrid(state, p);
+        for (let i = 0; i < g.length; i++) moves.push({ actionId: 'swapPeekOther', target: p, slot: i });
+      }
+      return moves;
+    }
+    // blindSwap: one of mine for one of theirs, neither of us looking.
+    for (let i = 0; i < mine.length; i++) {
+      for (const p of state.players) {
+        if (p === playerId) continue;
+        const g = swapGrid(state, p);
+        for (let j = 0; j < g.length; j++) {
+          moves.push({ actionId: 'swapBlind', slot: i, target: p, targetSlot: j });
+        }
+      }
+    }
+    return moves;
+  }
+
+  const held = state.held;
+  if (held && held.player === playerId) {
+    // Put it in your row, throwing out whatever was there.
+    for (let i = 0; i < swapGrid(state, playerId).length; i++) {
+      moves.push({ actionId: 'swapPlace', slot: i });
+    }
+    // Or throw it away — but only a card off the stock, because taking the discard and putting
+    // it straight back would be a turn that changed nothing and could be repeated for ever.
+    if (held.from === 'stock') moves.push({ actionId: 'swapThrow' });
+    return moves;
+  }
+
+  const draw = state.zones['draw'] || [];
+  const discard = state.zones['discard'] || [];
+  if (draw.length > 0 || discard.length > 1) moves.push({ actionId: 'swapDrawStock' });
+  if (discard.length > 0) moves.push({ actionId: 'swapTakeDiscard' });
+  // Calling is a claim that you are lowest, and it costs you if you are not.
+  if (!state.caller) moves.push({ actionId: 'swapCall' });
+  return moves;
+}
+
+function applySwapMove(s: MatchState, playerId: string, move: Move): MatchState {
+  const cfg = s.definition.swap!;
+  const grid = swapGrid(s, playerId);
+  const discard = (s.zones['discard'] ||= []);
+
+  if (move.actionId === 'swapDrawStock') {
+    const draw = (s.zones['draw'] ||= []);
+    if (draw.length === 0) {
+      // The stock is gone. Everything thrown away except the top card is shuffled and becomes
+      // the stock again, the way it is at a real table.
+      const top = discard.pop();
+      const back = discard.splice(0);
+      for (const c of back) { forget(s, c.id); s.faceUp[c.id] = false; }
+      const { result, rngState } = seededShuffle(back, s.rngState);
+      s.rngState = rngState;
+      draw.push(...result);
+      if (top) discard.push(top);
+    }
+    const c = draw.pop();
+    if (!c) return s;
+    s.held = { player: playerId, card: c, from: 'stock' };
+    // You looked at it; nobody else did.
+    markSeen(s, playerId, c.id);
+    log(s, playerId, `${short(playerId)} draws.`);
+    return s;
+  }
+
+  if (move.actionId === 'swapTakeDiscard') {
+    const c = discard.pop();
+    if (!c) return s;
+    s.held = { player: playerId, card: c, from: 'discard' };
+    // Taken face up, so the whole table saw it.
+    for (const p of s.players) markSeen(s, p, c.id);
+    log(s, playerId, `${short(playerId)} takes ${cardLabel(c)} from the pile.`);
+    return s;
+  }
+
+  if (move.actionId === 'swapPlace') {
+    const held = s.held;
+    if (!held || held.player !== playerId) return s;
+    const i = move.slot ?? 0;
+    if (i < 0 || i >= grid.length) return s;
+    const out = grid[i];
+    grid[i] = held.card;
+    s.held = null;
+    // Whatever you put in, you know. Whatever comes out, everybody now knows — and forgetting
+    // it keeps `seen` from growing for the whole match.
+    markSeen(s, playerId, held.card.id);
+    forget(s, out.id);
+    s.faceUp[out.id] = true;
+    s.faceUp[held.card.id] = false;
+    discard.push(out);
+    log(s, playerId, `${short(playerId)} swaps one out — ${cardLabel(out)}.`);
+    return swapEndTurn(s, playerId);
+  }
+
+  if (move.actionId === 'swapThrow') {
+    const held = s.held;
+    if (!held || held.player !== playerId) return s;
+    s.held = null;
+    forget(s, held.card.id);
+    s.faceUp[held.card.id] = true;
+    discard.push(held.card);
+    const power = powerOf(cfg, held.card.rank);
+    log(s, playerId, `${short(playerId)} throws ${cardLabel(held.card)}.`);
+    if (power) {
+      // A card with a power is worth throwing for the power alone, which is what makes the
+      // small cards interesting rather than merely small.
+      s.pendingPower = { player: playerId, kind: power };
+      return s;
+    }
+    return swapEndTurn(s, playerId);
+  }
+
+  if (move.actionId === 'swapPeekSelf') {
+    const c = grid[move.slot ?? 0];
+    if (c) { markSeen(s, playerId, c.id); log(s, playerId, `${short(playerId)} looks at one of their own.`); }
+    s.pendingPower = null;
+    return swapEndTurn(s, playerId);
+  }
+
+  if (move.actionId === 'swapPeekOther') {
+    const g = swapGrid(s, move.target ?? '');
+    const c = g[move.slot ?? 0];
+    if (c) { markSeen(s, playerId, c.id); log(s, playerId, `${short(playerId)} looks at one of ${short(move.target ?? '')}'s.`); }
+    s.pendingPower = null;
+    return swapEndTurn(s, playerId);
+  }
+
+  if (move.actionId === 'swapBlind') {
+    const theirs = swapGrid(s, move.target ?? '');
+    const i = move.slot ?? 0;
+    const j = move.targetSlot ?? 0;
+    if (grid[i] && theirs[j]) {
+      const a = grid[i];
+      const b = theirs[j];
+      grid[i] = b;
+      theirs[j] = a;
+      // Neither of you looked, so what either of you knew about those two cards is now wrong —
+      // and being wrong about your own row is the funniest thing in the game.
+      forget(s, a.id);
+      forget(s, b.id);
+      log(s, playerId, `${short(playerId)} trades one of theirs with ${short(move.target ?? '')}, sight unseen.`);
+    }
+    s.pendingPower = null;
+    return swapEndTurn(s, playerId);
+  }
+
+  if (move.actionId === 'swapCall') {
+    s.caller = playerId;
+    // Everybody else gets exactly one more turn, and then the cards come over.
+    s.callTurnsLeft = s.players.length - 1;
+    log(s, playerId, `${short(playerId)} calls ${cfg.callName}! One turn each, then cards down.`);
+    return swapEndTurn(s, playerId);
+  }
+
+  return s;
+}
+
+/** Total of what a player is actually holding, whether or not they know it. */
+function swapTotal(s: MatchState, p: string): number {
+  return swapGrid(s, p).reduce((a, c) => a + (cardPoints(s.definition.scoring, c) ?? 0), 0);
+}
+
+function swapEndTurn(s: MatchState, playerId: string): MatchState {
+  void playerId;
+  if (s.caller) {
+    s.callTurnsLeft -= 1;
+    if (s.callTurnsLeft <= 0) return endSwapRound(s);
+  }
+  s.swapTurns += 1;
+  const cap = s.definition.swap!.turnCap ?? 60;
+  if (s.swapTurns >= cap) {
+    log(s, null, `Nobody called after ${cap} turns — cards down.`);
+    return endSwapRound(s);
+  }
+  advanceTurn(s);
+  return s;
+}
+
+function endSwapRound(s: MatchState): MatchState {
+  const cfg = s.definition.swap!;
+  s.phase = 'roundOver';
+  for (const p of s.players) {
+    for (const c of swapGrid(s, p)) s.faceUp[c.id] = true;
+    s.scores[p] = swapTotal(s, p);
+  }
+  let best = s.players[0];
+  for (const p of s.players) if (s.scores[p] < s.scores[best]) best = p;
+
+  /*
+    The call has to be worth being right about.
+
+    Calling when you are lowest is the whole skill; calling when you are not has to cost, or the
+    correct play is to call on turn one every time and the game disappears. A caller who is not
+    lowest takes the penalty and the round goes to whoever actually was.
+  */
+  const caller = s.caller;
+  if (caller && s.scores[caller] > s.scores[best]) {
+    s.scores[caller] += cfg.callPenalty;
+    log(s, null, `${short(caller)} called ${cfg.callName} and was not lowest — ${cfg.callPenalty} against.`);
+  }
+  for (const p of s.players) if (s.scores[p] < s.scores[best]) best = p;
+  s.winner = best;
+  log(s, null, `Cards down. ${short(best)} is lowest on ${s.scores[best]}.`);
+  finalizeMatchProgress(s);
+  return s;
+}
+
 // ---------- layout family (Kings Corner) ----------
 //
 // A shared tableau. Everybody builds on the same piles, so a card you cannot use is a card you
@@ -4413,7 +4702,7 @@ export function redact(state: MatchState, viewer: string): RedactedState {
     scores: { ...state.scores },
     log: state.log.slice(-40),
     mode: state.definition.solitaire ? 'solitaire' : state.definition.trick ? 'trick' : state.definition.climb ? 'climb' : state.definition.fish ? 'fish' : state.definition.rummy ? 'rummy' : state.definition.war ? 'war'
-      : state.definition.bluff ? 'bluff' : state.definition.reflex ? 'reflex' : state.definition.poker ? 'poker' : state.definition.pit ? 'pit' : state.definition.kent ? 'kent' : state.definition.set ? 'set' : state.definition.layout ? 'layout' : 'shedding',
+      : state.definition.bluff ? 'bluff' : state.definition.reflex ? 'reflex' : state.definition.poker ? 'poker' : state.definition.pit ? 'pit' : state.definition.kent ? 'kent' : state.definition.set ? 'set' : state.definition.layout ? 'layout' : state.definition.swap ? 'swap' : 'shedding',
     ...(state.definition.solitaire ? solitaireView(state) : {}),
     layoutPiles: state.definition.layout
       ? layoutPileIds(state.definition).map((id, i) => ({
@@ -4424,6 +4713,27 @@ export function redact(state: MatchState, viewer: string): RedactedState {
       }))
       : undefined,
     layoutDrawn: state.definition.layout ? state.layoutDrew === viewer : undefined,
+    /*
+      Every row on the table, told to ONE person.
+
+      A slot holds a card where this viewer has been shown it and null where they have not —
+      and that is true of their own row as much as anybody's. The whole game is that your four
+      are as hidden from you as everyone else's, apart from the ones you have looked at, so
+      there is deliberately no special case here for the viewer's own cards.
+    */
+    grids: state.definition.swap
+      ? state.players.map((p) => ({
+        player: p,
+        slots: (state.zones[swapZones.grid(p)] || []).map(
+          (c) => (state.phase !== 'playing' || hasSeen(state, viewer, c.id) ? c : null),
+        ),
+      }))
+      : undefined,
+    held: state.definition.swap && state.held?.player === viewer ? state.held.card : undefined,
+    heldFrom: state.definition.swap && state.held?.player === viewer ? state.held.from : undefined,
+    power: state.definition.swap && state.pendingPower?.player === viewer
+      ? state.pendingPower.kind : undefined,
+    caller: state.definition.swap ? state.caller : undefined,
     battle: state.definition.war ? (state.lastBattle ?? []).map((b) => b.card) : undefined,
     warsCount: state.definition.war ? state.warsCount : undefined,
     shotMoon: state.definition.trick?.shootTheMoon ? (state.shotMoon ?? null) : undefined,

@@ -1,5 +1,5 @@
 import { MatchState, Move } from '../engine/types';
-import { legalMoves, handDeadwood, pitCorner, trickTeams, trickValueOf } from '../engine/engine';
+import { legalMoves, handDeadwood, pitCorner, trickTeams, trickValueOf, cardPoints } from '../engine/engine';
 import { nextRandom } from '../engine/rng';
 
 // Because the engine enumerates legal moves, a bot works for ANY valid game for free.
@@ -538,6 +538,101 @@ export function chooseMove(
     Stopping is last, and only when there is nothing else, because every card left in hand is a
     card somebody else is going to go out ahead of you with.
   */
+  /*
+    Dutch. The bot is held to the same knowledge a person would have: it only trusts
+    `state.seen[playerId]`, never the raw grid, because the engine state handed to a bot is the
+    unredacted truth and reading straight off it would be the bot cheating at its own memory
+    game. An unseen slot is scored at the deck's average value — about seven — which is what
+    "I have no idea" is worth in expectation.
+  */
+  if (moves.some((m) => m.actionId?.startsWith('swap'))) {
+    const cfg = state.definition.swap;
+    if (cfg) {
+      const seen = new Set(state.seen?.[playerId] ?? []);
+      const myGrid = state.zones[`grid:${playerId}`] || [];
+      const valueOf = (c: import('../engine/types').Card | undefined): number => {
+        if (!c) return 7;
+        if (!seen.has(c.id)) return 7;
+        return cardPoints(state.definition.scoring, c);
+      };
+      const known = (grid: import('../engine/types').Card[]) =>
+        grid.reduce((a, c) => a + (seen.has(c.id) ? valueOf(c) : 0), 0);
+      const myKnownTotal = myGrid.reduce((a, c) => a + valueOf(c), 0);
+
+      const power = moves.find((m) => m.actionId === 'swapPeekSelf'
+        || m.actionId === 'swapPeekOther' || m.actionId === 'swapBlind');
+      if (power) {
+        if (power.actionId === 'swapPeekSelf') {
+          // Look at the slot you know least about.
+          const unseen = moves.filter((m) => m.actionId === 'swapPeekSelf'
+            && !seen.has(myGrid[m.slot ?? 0]?.id));
+          return { move: (unseen[0] ?? power), botSeed };
+        }
+        /*
+          Which opponent gets peeked or swapped is picked at random, not "the first name in the
+          seat list that is not me" — which is what `moves.find`/`moves[0]` would have done,
+          because `swapLegalMoves` builds the option list by walking `state.players` in order.
+          Taking the first option every time meant one seat (whichever is NOT early in that
+          array relative to most other seats) was targeted far less often than the others: self-
+          play at three seats showed it winning two-thirds of matches on a genuinely lower
+          average score, purely because it was left alone far more than it was attacked.
+        */
+        if (power.actionId === 'swapPeekOther') {
+          const options = moves.filter((m) => m.actionId === 'swapPeekOther');
+          const r = nextRandom(botSeed);
+          botSeed = r.state;
+          return { move: options[Math.floor(r.value * options.length)] ?? power, botSeed };
+        }
+        // A blind swap: give away the worst of what you know. Which opponent and which of
+        // their slots comes back is picked at random for the same reason — neither side can
+        // see it, so no target is strategically better, and picking one consistently is a bug
+        // dressed up as a decision.
+        const worstMineIdx = myGrid.reduce((best, c, i) =>
+          valueOf(c) > valueOf(myGrid[best]) ? i : best, 0);
+        const targets = moves.filter((m) => m.actionId === 'swapBlind' && m.slot === worstMineIdx);
+        const r = nextRandom(botSeed);
+        botSeed = r.state;
+        return { move: targets[Math.floor(r.value * targets.length)] ?? power, botSeed };
+      }
+
+      const place = moves.filter((m) => m.actionId === 'swapPlace');
+      if (place.length > 0 && state.held) {
+        const heldVal = cardPoints(state.definition.scoring, state.held.card);
+        // Only worth placing where it beats what might already be there — trade in for the
+        // worst KNOWN card first, and treat an unseen slot as an average card, not a safe one.
+        let best = place[0];
+        let bestGain = -Infinity;
+        for (const m of place) {
+          const there = myGrid[m.slot ?? 0];
+          const gain = valueOf(there) - heldVal;
+          if (gain > bestGain) { bestGain = gain; best = m; }
+        }
+        if (bestGain > 0) return { move: best, botSeed };
+        const throwIt = moves.find((m) => m.actionId === 'swapThrow');
+        if (throwIt) return { move: throwIt, botSeed };
+        return { move: best, botSeed };
+      }
+
+      const take = moves.find((m) => m.actionId === 'swapTakeDiscard');
+      const drawStock = moves.find((m) => m.actionId === 'swapDrawStock');
+      const call = moves.find((m) => m.actionId === 'swapCall');
+
+      // Calling: worth it once the hand you actually know about is cheap and there is not much
+      // of the round left to improve it.
+      if (call && known(myGrid) <= 6 && myKnownTotal <= cfg.slots * 4) {
+        return { move: call, botSeed };
+      }
+
+      const discardTop = (state.zones['discard'] || []).slice(-1)[0];
+      if (take && discardTop && cardPoints(state.definition.scoring, discardTop) <= 3) {
+        return { move: take, botSeed };
+      }
+      if (drawStock) return { move: drawStock, botSeed };
+      if (take) return { move: take, botSeed };
+      if (call) return { move: call, botSeed };
+    }
+  }
+
   if (moves.some((m) => m.actionId === 'layoutPlay' || m.actionId === 'layoutDone'
     || m.actionId === 'layoutDraw')) {
     const draw = moves.find((m) => m.actionId === 'layoutDraw');

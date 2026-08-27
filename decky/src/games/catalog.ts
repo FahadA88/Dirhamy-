@@ -25,6 +25,7 @@ import { fortyThieves } from './fortyThieves';
 import { triPeaks } from './triPeaks';
 import { threeThirteen } from './threeThirteen';
 import { handAndFoot } from './handAndFoot';
+import { dutch } from './dutch';
 import { kingsCorner } from './kingsCorner';
 import { spiderOneSuit } from './spiderOneSuit';
 import { spiderTwoSuits } from './spiderTwoSuits';
@@ -55,7 +56,7 @@ export const catalog: GameDefinition[] = [
   tradeWinds, undertow, klondike, freecell, spider, spiderOneSuit, spiderTwoSuits,
   scorpion, fortyThieves, triPeaks,
   whist, briscola, napoleon, sixtySix, snap, palace, threeThirteen, handAndFoot,
-  kingsCorner, bluff, slapjack, showdownPoker, pit,
+  kingsCorner, dutch, bluff, slapjack, showdownPoker, pit,
   contractWhist, trio, kent,
   // Added once the engine could express them: a joker that wins tricks (Five Hundred), a deal
   // that changes with the table (Oh Hell), individually priced cards (Black Maria), wild melds
