@@ -1630,7 +1630,7 @@ export function nextHand(state: MatchState, seed: number): MatchState {
  * `bonus` channel author-written rules use, so it folds into the hand score wherever that is
  * finally worked out rather than needing its own path through every family's scorer.
  */
-function scoreMelds(s: MatchState): void {
+export function scoreMelds(s: MatchState): void {
   const literal = s.definition.trick?.melds ?? [];
   const patterns = s.definition.trick?.meldPatterns ?? [];
   if (literal.length === 0 && patterns.length === 0) return;

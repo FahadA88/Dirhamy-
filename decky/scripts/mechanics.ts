@@ -9,8 +9,9 @@ import { klondike } from '../src/games/klondike';
 import { freecell } from '../src/games/freecell';
 import { spider } from '../src/games/spider';
 import { kent } from '../src/games/kent';
+import { pinochle } from '../src/games/pinochle';
 import { catalog } from '../src/games/catalog';
-import { createMatch, legalMoves, applyMove, actingPlayers, redact, nextHand } from '../src/engine/engine';
+import { createMatch, legalMoves, applyMove, actingPlayers, redact, nextHand, scoreMelds } from '../src/engine/engine';
 import { chooseMove } from '../src/bots/randomBot';
 import { Card, MatchState } from '../src/engine/types';
 
@@ -860,6 +861,32 @@ section("Schema coverage: 'dealerLeft' rotates the opener, hand over hand");
     const expectDistinct = !g.trick;
     check(`${g.meta.name}: the opener moves round the table`,
       !expectDistinct || openers.size === n, [...openers]);
+  }
+}
+
+// ---------- meldPatterns: a marriage scores in every suit, not just the one every hand-built
+// test happens to reach for (item 91 of the site-audit pass) ----------
+//
+// scoreMelds() expands `trick.meldPatterns` generically over every suit actually in the deck
+// (see engine.ts), but nothing exercised more than whichever suit a random deal or a
+// hand-written test scenario happened to land on — Hearts, almost always, because it is the
+// suit every example in this codebase reaches for first. This pins down all four at once,
+// including that trump (Spades, for Pinochle) is the one that doubles.
+section('Schema coverage: a meldPatterns entry scores correctly in every suit, not just Hearts');
+{
+  const mk = (suit: string, rank: string) => ({ id: `${suit}${rank}#t`, rank, suit }) as Card;
+  // One suit's marriage at a time, in isolation — a hand holding K+Q in every suit at once would
+  // also complete Pinochle's literal "eighty kings"/"sixty queens" melds and confound the total,
+  // so each suit gets scored on its own. Spades is Pinochle's fixed trump: it alone should double
+  // (20 -> 40); the other three should each score the plain 20.
+  for (const [suit, expected] of [['C', 20], ['D', 20], ['H', 20], ['S', 40]] as const) {
+    const s = createMatch(pinochle, ['A', 'B', 'C', 'D'], 7);
+    s.zones['hand:A'] = [mk(suit, 'K'), mk(suit, 'Q')];
+    s.zones['hand:B'] = []; s.zones['hand:C'] = []; s.zones['hand:D'] = [];
+    s.bonus = {};
+    scoreMelds(s);
+    check(`a marriage in ${suit} scores ${expected}${suit === 'S' ? ' (trump, doubled)' : ''}`,
+      s.bonus['A'] === expected, s.bonus);
   }
 }
 
