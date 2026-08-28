@@ -1103,14 +1103,17 @@ section('Hokm: scoring — made and failed contracts both score by tricks actual
   }
 }
 
-section('Hokm: the colored and plain jokers cannot ever be forced into the same trick');
+section('Hokm: neither joker can lead a trick, and the two never collide in the same one');
 {
   const base = createMatch(hokm, ['P1', 'P2', 'P3', 'P4'], 3);
   const coloredJoker: Card = { id: 'JOKER1', rank: 'JOKER', suit: 'JOKER' };
   const plainJoker: Card = { id: 'JOKER2', rank: 'JOKER', suit: 'JOKER' };
   const spadeAce: Card = { id: 'SA', rank: 'A', suit: 'S' };
+  const heartSix: Card = { id: 'H6', rank: '6', suit: 'H' };
 
-  function midTrick(tricksPlayed: number, hand: Card[]): MatchState {
+  // leading=true: P1 is first to act this trick (state.trickPlays is empty). leading=false:
+  // someone already led (a card is already down), so P1 is following, not opening.
+  function midTrick(tricksPlayed: number, leading: boolean, hand: Card[]): MatchState {
     const s: MatchState = structuredClone(base);
     s.phase = 'playing';
     s.auctionRound = 0;
@@ -1118,32 +1121,53 @@ section('Hokm: the colored and plain jokers cannot ever be forced into the same 
     s.trumpSuit = 'S';
     s.maker = 'P1';
     s.turnIndex = s.players.indexOf('P1');
-    s.trickPlays = [];
-    s.lead = null;
+    s.trickPlays = leading ? [] : [{ player: 'P2', card: heartSix }];
+    s.lead = leading ? null : 'H';
     s.zones['hand:P1'] = hand;
     s.vars.tricksPlayed = String(tricksPlayed);
+    s.vars.trickStarted = leading ? '0' : '1';
     return s;
   }
 
   const playCardIds = (s: MatchState) => legalMoves(s, 'P1').filter((m) => m.actionId === 'playToTrick').map((m) => m.cardId);
 
+  // Timing (following, so the lead restriction is out of the way): unchanged from before.
   {
-    const ids = playCardIds(midTrick(0, [coloredJoker, plainJoker, spadeAce]));
-    check('trick 1: the colored joker is not a legal play yet', !ids.includes('JOKER1'), ids);
-    check('trick 1: the plain joker is legal but not the only option', ids.includes('JOKER2') && ids.includes('SA'), ids);
+    const ids = playCardIds(midTrick(0, false, [coloredJoker, plainJoker, spadeAce]));
+    check('trick 1, following: the colored joker is not legal yet (timing)', !ids.includes('JOKER1'), ids);
+    check('trick 1, following: the plain joker is legal but not the only option', ids.includes('JOKER2') && ids.includes('SA'), ids);
   }
   {
-    const ids = playCardIds(midTrick(2, [coloredJoker, plainJoker, spadeAce]));
-    check('trick 3: still holding it, the plain joker becomes the ONLY legal play', ids.length === 1 && ids[0] === 'JOKER2', ids);
+    const ids = playCardIds(midTrick(3, false, [coloredJoker, spadeAce]));
+    check('trick 4, following: the colored joker is legal (timing has lifted)', ids.includes('JOKER1'), ids);
+  }
+
+  // Leading: neither joker may open a trick, at any point in the timing window.
+  {
+    const ids = playCardIds(midTrick(0, true, [coloredJoker, plainJoker, spadeAce]));
+    check('trick 1, leading: the colored joker is blocked (cannot lead)', !ids.includes('JOKER1'), ids);
+    check('trick 1, leading: the plain joker is blocked too (cannot lead, not yet forced)', !ids.includes('JOKER2'), ids);
+    check('trick 1, leading: an ordinary card is still legal to lead', ids.includes('SA'), ids);
   }
   {
-    const ids = playCardIds(midTrick(2, [coloredJoker, spadeAce]));
+    const ids = playCardIds(midTrick(3, true, [coloredJoker, spadeAce]));
+    check('trick 4, leading: the colored joker is blocked by the lead rule even though timing allows it', !ids.includes('JOKER1'), ids);
+  }
+
+  // The forced-out trick (3rd) is the one deliberate exception: the discard deadline overrides
+  // the no-lead rule, in both directions — following, and leading.
+  {
+    const ids = playCardIds(midTrick(2, false, [coloredJoker, plainJoker, spadeAce]));
+    check('trick 3, following: still holding it, the plain joker becomes the ONLY legal play', ids.length === 1 && ids[0] === 'JOKER2', ids);
+  }
+  {
+    const ids = playCardIds(midTrick(2, true, [coloredJoker, plainJoker, spadeAce]));
+    check('trick 3, LEADING: still holding it, the plain joker is still forced — the deadline overrides the no-lead rule', ids.length === 1 && ids[0] === 'JOKER2', ids);
+  }
+  {
+    const ids = playCardIds(midTrick(2, false, [coloredJoker, spadeAce]));
     check('trick 3 without the plain joker in hand: no lockout, ordinary cards stay legal', ids.includes('SA'), ids);
-    check('trick 3 without the plain joker in hand: the colored joker is still blocked', !ids.includes('JOKER1'), ids);
-  }
-  {
-    const ids = playCardIds(midTrick(3, [coloredJoker, spadeAce]));
-    check('trick 4: the colored joker becomes legal', ids.includes('JOKER1'), ids);
+    check('trick 3 without the plain joker in hand: the colored joker is still blocked (timing)', !ids.includes('JOKER1'), ids);
   }
 }
 

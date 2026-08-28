@@ -21,6 +21,12 @@ import { GameDefinition } from '../engine/types';
 // whoever has it is forced to spend it there, no matter how the trick is running. Because the
 // two windows never overlap, the two jokers can never actually be compared against each other in
 // the same trick, which is what "the colored one beats the plain one" would mean.
+//
+// Neither joker may OPEN a trick, either — a joker only ever comes in on somebody else's lead,
+// never as the first card down. The one exception is the plain joker's own forced-out trick: if
+// its holder is the one leading when the third trick comes due, the deadline wins and they lead
+// it anyway, because the alternative is holding a card the rules say they can neither play nor
+// keep.
 export const hokm: GameDefinition = {
   schemaVersion: '1.0',
   meta: {
@@ -33,9 +39,10 @@ export const hokm: GameDefinition = {
       + 'around and nobody bids? The dealer’s side is stuck with 5 and the dealer names trump, '
       + 'so a hand is never wasted. Play out all nine tricks: whichever side ends up with more of '
       + 'them — the bidders if they reached their number, the defence if they didn’t — '
-      + 'scores one point per trick THAT side actually took. Both jokers beat every other card. '
-      + 'The colored joker cannot be played before the fourth trick; the plain joker cannot be '
-      + 'held past the third — whoever has it must play it there.',
+      + 'scores one point per trick THAT side actually took. Both jokers beat every other card, '
+      + 'and neither may open a trick — they can only come in on somebody else’s lead. '
+      + 'The colored joker also cannot be played before the fourth trick; the plain joker cannot '
+      + 'be held past the third — whoever has it must play it there, lead or not.',
     players: { min: 4, max: 4, step: 2 },
     family: 'trick-taking',
   },
@@ -100,28 +107,57 @@ export const hokm: GameDefinition = {
   rules: [
     {
       id: 'init-joker-clock',
-      name: 'Start the joker-timing clock at zero each hand',
+      name: 'Start the joker-timing clock at zero each hand, with the first trick open to lead',
       when: 'handStart',
-      then: [{ op: 'setVarNum', var: 'tricksPlayed', value: { lit: 0 } }],
+      then: [
+        { op: 'setVarNum', var: 'tricksPlayed', value: { lit: 0 } },
+        { op: 'setVarNum', var: 'trickStarted', value: { lit: 0 } },
+      ],
     },
     {
       id: 'advance-joker-clock',
-      name: 'Advance the joker-timing clock as tricks complete',
+      name: 'Advance the joker-timing clock as tricks complete, and reopen the lead for the next one',
       when: 'trickWon',
-      then: [{ op: 'setVarNum', var: 'tricksPlayed', value: { add: [{ stateVar: 'tricksPlayed' }, { lit: 1 }] } }],
+      then: [
+        { op: 'setVarNum', var: 'tricksPlayed', value: { add: [{ stateVar: 'tricksPlayed' }, { lit: 1 }] } },
+        { op: 'setVarNum', var: 'trickStarted', value: { lit: 0 } },
+      ],
+    },
+    {
+      id: 'mark-trick-started',
+      name: 'A trick is no longer open for lead once its first card lands',
+      when: 'cardPlayed',
+      then: [{ op: 'setVarNum', var: 'trickStarted', value: { lit: 1 } }],
     },
   ],
   playRestrictions: [
     {
       id: 'colored-joker-waits',
-      name: 'The colored joker cannot be played before the fourth trick',
+      name: 'The colored joker cannot be played before the fourth trick, or to lead a trick',
       if: {
         all: [
           { cardHasTag: 'coloredJoker' },
-          { cmp: { left: { stateVar: 'tricksPlayed' }, op: '<', right: { lit: 3 } } },
+          {
+            any: [
+              { cmp: { left: { stateVar: 'tricksPlayed' }, op: '<', right: { lit: 3 } } },
+              { cmp: { left: { stateVar: 'trickStarted' }, op: '==', right: { lit: 0 } } },
+            ],
+          },
         ],
       },
-      note: 'Playing it early would just burn the game’s one guaranteed late winner for nothing.',
+      note: 'Playing it early would just burn the game’s one guaranteed late winner for nothing — and, timing aside, it can only ever come in on somebody else’s lead.',
+    },
+    {
+      id: 'plain-joker-cannot-lead',
+      name: 'The plain joker cannot open a trick, except the third trick when it is being forced out',
+      if: {
+        all: [
+          { cardHasTag: 'plainJoker' },
+          { cmp: { left: { stateVar: 'trickStarted' }, op: '==', right: { lit: 0 } } },
+          { not: { cmp: { left: { stateVar: 'tricksPlayed' }, op: '==', right: { lit: 2 } } } },
+        ],
+      },
+      note: 'Same as the colored joker — it can only come in on somebody else’s lead — except the one trick it is forced out no matter what.',
     },
     {
       id: 'plain-joker-forced',
@@ -133,7 +169,7 @@ export const hokm: GameDefinition = {
           { handHas: { tag: 'plainJoker', minCount: 1 } },
         ],
       },
-      note: 'Whoever is holding it has to spend it on the third trick, win or lose that trick.',
+      note: 'Whoever is holding it has to spend it on the third trick, win or lose that trick — even if that means leading with it.',
     },
   ],
 };
