@@ -20,7 +20,7 @@ import { checkName, checkText } from '../social/safety';
 import { useSettings } from '../settings/SettingsContext';
 import { DescribeGame } from './DescribeGame';
 
-type RankArrayKey = 'wildRanks' | 'skipRanks' | 'reverseRanks' | 'drawRanks' | 'extraTurnRanks' | 'wildDrawRanks' | 'excludeRanks' | 'passRanks' | 'reflexSlapRanks' | 'bluffClaimRanks';
+type RankArrayKey = 'wildRanks' | 'skipRanks' | 'reverseRanks' | 'drawRanks' | 'extraTurnRanks' | 'wildDrawRanks' | 'excludeRanks' | 'passRanks' | 'reflexSlapRanks' | 'bluffClaimRanks' | 'swapPeekSelfRanks' | 'swapPeekOtherRanks' | 'swapBlindRanks';
 
 // The builder is a guided flow, not a wall of dials: pick a starting point, shape the game,
 // write your own twists, prove it works, publish it. Every step keeps the live preview on
@@ -362,6 +362,9 @@ export function CreateView({ onPlay }: { onPlay?: (def: GameDefinition) => void 
               <button className={knobs.family === 'pit' ? 'on' : ''} onClick={() => set('family', 'pit')}>Trading</button>
               <button className={knobs.family === 'kent' ? 'on' : ''} onClick={() => set('family', 'kent')}>Signalling</button>
               <button className={knobs.family === 'set' ? 'on' : ''} onClick={() => set('family', 'set')}>Spotting</button>
+              <button className={knobs.family === 'maid' ? 'on' : ''} onClick={() => set('family', 'maid')}>Matching</button>
+              <button className={knobs.family === 'layout' ? 'on' : ''} onClick={() => set('family', 'layout')}>Layout</button>
+              <button className={knobs.family === 'swap' ? 'on' : ''} onClick={() => set('family', 'swap')}>Swap</button>
             </div>
           </div>
 
@@ -406,6 +409,10 @@ export function CreateView({ onPlay }: { onPlay?: (def: GameDefinition) => void 
               </span>
             ) : knobs.family === 'solitaire' ? (
               <span className="mini-label">Patience deals a fixed board, so its deck count lives in “The board” above and jokers have no foundation to go to.</span>
+            ) : knobs.family === 'layout' ? (
+              <span className="mini-label">One deck only, and no jokers — a joker has no colour to alternate against, so it could never be placed at all.</span>
+            ) : knobs.family === 'swap' ? (
+              <span className="mini-label">One deck only, and no jokers — every slot holds one specific card, so a second copy would have nowhere unambiguous to go.</span>
             ) : (
               <>
                 <div className="field"><span>Number of decks</span>
@@ -512,6 +519,12 @@ export function CreateView({ onPlay }: { onPlay?: (def: GameDefinition) => void 
                 <span aria-hidden="true">Ace is the highest card</span></div>
                 <div className="field row"><Switch on={knobs.trickBidding} onChange={(v) => set('trickBidding', v)} aria-label="Players bid tricks before play" />
                 <span aria-hidden="true">Players bid tricks before play</span></div>
+                {/* All four jacks out of their printed suits and into trump, ranked above every
+                    other trump card — the rule a Skat player would name first. bowers only
+                    promotes two jacks and leaves the printed suit alone for the other two, so
+                    the two knobs are alternatives, not layers. */}
+                <div className="field row"><Switch on={knobs.jacksAreTrumps} onChange={(v) => set('jacksAreTrumps', v)} aria-label="Every jack is a trump, ranked above every other trump card" />
+                <span aria-hidden="true">Every jack is a trump, ranked above every other trump card{knobs.bowers ? ' (turns bowers off — a jack cannot be both)' : ''}</span></div>
                 {knobs.minPlayers <= 4 && knobs.maxPlayers >= 4 && (
                   <div className="field row"><Switch on={knobs.trickPartnerships} onChange={(v) => set('trickPartnerships', v)} aria-label="Partnerships (4 players: seats 1&3 vs 2&4)" />
                 <span aria-hidden="true">Partnerships (4 players: seats 1&3 vs 2&4)</span></div>
@@ -532,16 +545,24 @@ export function CreateView({ onPlay }: { onPlay?: (def: GameDefinition) => void 
                   so the only way to build a Bridge-shaped game was to hand-edit JSON. */}
               <Section title="Auction">
                 <div className="field"><span>How trump is decided</span>
-                  <Seg options={[['fixed', 'Fixed by the game'], ['turnup', 'Turn a card up'], ['contract', 'Bid a level and a suit']] as ['fixed' | 'turnup' | 'contract', string][]}
-                    value={knobs.contractAuction ? 'contract' : knobs.trumpAuction ? 'turnup' : 'fixed'}
+                  <Seg options={[['fixed', 'Fixed by the game'], ['turned', 'The last card dealt'], ['turnup', 'Turn a card up'], ['contract', 'Bid a level and a suit']] as ['fixed' | 'turned' | 'turnup' | 'contract', string][]}
+                    value={knobs.contractAuction ? 'contract' : knobs.trumpAuction ? 'turnup' : knobs.turnedTrump ? 'turned' : 'fixed'}
                     onChange={(v) => {
                       set('trumpAuction', v === 'turnup');
                       set('contractAuction', v === 'contract');
+                      set('turnedTrump', v === 'turned');
                     }} /></div>
+                {knobs.turnedTrump && (
+                  <span className="mini-label">Whatever suit the last card dealt turns out to be, shown to the table and left in that hand — nobody names it, nobody bids for it.</span>
+                )}
                 {knobs.contractAuction && <>
                   <span className="mini-label">Each bid must beat the last on level first, then on strain — clubs, diamonds, hearts, spades, no-trump. Three passes settle it, and the winning side has promised that many tricks.</span>
-                  <label className="field"><span>Highest level biddable: <b>{knobs.contractMaxLevel}</b></span>
-                    <input type="range" min={1} max={7} value={knobs.contractMaxLevel} onChange={(e) => set('contractMaxLevel', +e.target.value)} /></label>
+                  <div className="two">
+                    <label className="field"><span>Lowest level biddable: <b>{knobs.contractMinLevel}</b></span>
+                      <input type="range" min={1} max={knobs.contractMaxLevel} value={knobs.contractMinLevel} onChange={(e) => set('contractMinLevel', +e.target.value)} /></label>
+                    <label className="field"><span>Highest level biddable: <b>{knobs.contractMaxLevel}</b></span>
+                      <input type="range" min={knobs.contractMinLevel} max={40} value={knobs.contractMaxLevel} onChange={(e) => set('contractMaxLevel', +e.target.value)} /></label>
+                  </div>
                   <label className="field"><span>Tricks the level sits on top of: <b>{knobs.contractBook}</b></span>
                     <input type="range" min={0} max={6} value={knobs.contractBook} onChange={(e) => set('contractBook', +e.target.value)} /></label>
                   <span className="mini-label">
@@ -549,6 +570,34 @@ export function CreateView({ onPlay }: { onPlay?: (def: GameDefinition) => void 
                       ? 'Bridge’s book: a bid of 3 promises 9 tricks.'
                       : `A bid of 3 promises ${3 + knobs.contractBook} tricks.`}
                   </span>
+                  <div className="field row"><Switch on={knobs.contractNoTrump} onChange={(v) => set('contractNoTrump', v)} aria-label="No-trump is a biddable strain" />
+                <span aria-hidden="true">No-trump is a biddable strain</span></div>
+                  <div className="field row"><Switch on={knobs.contractOnCardPoints} onChange={(v) => set('contractOnCardPoints', v)} aria-label="Settle the contract on card points taken, not tricks (Skat)" />
+                <span aria-hidden="true">Settle the contract on card points taken, not tricks (Skat)</span></div>
+                  {knobs.contractOnCardPoints ? (
+                    <NumField label="Card points needed to make it (of however many the pack carries)" value={knobs.contractCardPointsTarget} onChange={(v) => set('contractCardPointsTarget', v)} />
+                  ) : (
+                    <div className="two">
+                      <NumField label="Points per trick bid, once made" value={knobs.contractTrickValue} onChange={(v) => set('contractTrickValue', v)} />
+                      <NumField label="Points per trick over the contract" value={knobs.contractOvertrickValue} onChange={(v) => set('contractOvertrickValue', v)} />
+                    </div>
+                  )}
+                  <div className="field row"><Switch on={knobs.contractDefendersScoreOwnTricks} onChange={(v) => set('contractDefendersScoreOwnTricks', v)} aria-label="A failed contract scores the defence by the tricks they actually took" />
+                <span aria-hidden="true">A failed contract scores the defence by the tricks they actually took, not by how far short it fell</span></div>
+                  {!knobs.contractDefendersScoreOwnTricks && !knobs.contractOnCardPoints && (
+                    <NumField label="Points the defence takes per trick the contract falls short by" value={knobs.contractUndertrickValue} onChange={(v) => set('contractUndertrickValue', v)} />
+                  )}
+                  {!knobs.contractOnCardPoints && (
+                    <NumField label="Bonus for bidding and making the top level (0 = none)" value={knobs.contractSlamBonus} onChange={(v) => set('contractSlamBonus', v)} />
+                  )}
+                  <div className="field row"><Switch on={knobs.contractDealerMustBid} onChange={(v) => set('contractDealerMustBid', v)} aria-label="Stick the dealer — an all-pass auction is not thrown in, it hands the dealer a mandatory contract" />
+                <span aria-hidden="true">Stick the dealer — an all-pass auction is not thrown in, it hands the dealer a mandatory contract</span></div>
+                  {knobs.contractDealerMustBid && (
+                    <label className="field"><span>The dealer's mandatory level: <b>{knobs.contractDealerMustBidLevel}</b></span>
+                      <input type="range" min={1} max={knobs.contractMaxLevel} value={knobs.contractDealerMustBidLevel} onChange={(e) => set('contractDealerMustBidLevel', +e.target.value)} /></label>
+                  )}
+                  <div className="field row"><Switch on={knobs.bowers} onChange={(v) => set('bowers', v)} aria-label="Bowers — trump's jack is highest, and the other jack of the same colour becomes trump just under it" />
+                <span aria-hidden="true">Bowers — trump's jack is highest, and the other jack of the same colour becomes trump just under it{knobs.jacksAreTrumps ? ' (needs jacksAreTrumps off, above)' : ''}</span></div>
                 </>}
                 {knobs.trumpAuction && <>
                   <div className="field row"><Switch on={knobs.bowers} onChange={(v) => set('bowers', v)} aria-label="Bowers — trump's jack is highest, and the other jack of the same colour becomes trump just under it" />
@@ -561,6 +610,10 @@ export function CreateView({ onPlay }: { onPlay?: (def: GameDefinition) => void 
                       : 'Turn partnerships on to get Euchre scoring (make it / march / euchred).'}
                   </span>
                 </>}
+                {(knobs.trumpAuction || knobs.contractAuction) && knobs.trickPartnerships && (
+                  <div className="field row"><Switch on={knobs.soloDeclarer} onChange={(v) => set('soloDeclarer', v)} aria-label="The auction winner plays alone against the rest of the table, not with a partner" />
+                <span aria-hidden="true">The auction winner plays alone against the rest of the table, not with a partner</span></div>
+                )}
               </Section>
               <Section title="Scoring" defaultOpen>
                 <div className="field"><span>Winner is</span>
@@ -617,6 +670,14 @@ export function CreateView({ onPlay }: { onPlay?: (def: GameDefinition) => void 
                       <span className="mini-label warn-text">That card is not in this deck, so nobody can be made to lead it.</span>
                     )}
                   </div>
+                )}
+              </Section>
+              <Section title="Melds">
+                <span className="mini-label">A king and queen of the same suit, held in hand, score once as the hand is dealt — before anyone plays a card. Doubled when that suit is also trump.</span>
+                <div className="field row"><Switch on={knobs.meldMarriage} onChange={(v) => set('meldMarriage', v)} aria-label="A king-queen marriage scores on the deal" />
+                <span aria-hidden="true">A king-queen marriage scores on the deal</span></div>
+                {knobs.meldMarriage && (
+                  <NumField label="Points for a marriage (doubled in trump)" value={knobs.meldMarriagePoints} onChange={(v) => set('meldMarriagePoints', v)} />
                 )}
               </Section>
               <Section title="Passing">
@@ -823,6 +884,66 @@ export function CreateView({ onPlay }: { onPlay?: (def: GameDefinition) => void 
             </Section>
           )}
 
+          {knobs.family === 'maid' && (
+            <Section title="Matching rules" defaultOpen>
+              <span className="mini-label">No turns spent on your own hand — you draw blind from whoever goes next after you, they draw blind from the one after that. Every pair falls out the instant it forms. One rank is short a partner; whoever is stuck holding it once everyone else is empty-handed loses.</span>
+              <div className="field"><span>The odd rank</span>
+                <select value={knobs.maidOddRank} onChange={(e) => set('maidOddRank', e.target.value as Rank)}>
+                  {RANKS_13.map((r) => <option key={r} value={r}>{r}</option>)}
+                </select></div>
+              <span className="mini-label">Three of the four {rankLabel(knobs.maidOddRank)}s come out of the deck before the deal, so the fourth has no match.</span>
+            </Section>
+          )}
+
+          {knobs.family === 'layout' && (
+            <Section title="Layout rules" defaultOpen>
+              <span className="mini-label">A shared board, not a private tableau — every pile is open to whoever's turn it is. Draw one card, then place as many as you can.</span>
+              <div className="two">
+                <label className="field"><span>Piles: <b>{knobs.layoutPiles}</b></span>
+                  <input type="range" min={1} max={8} value={knobs.layoutPiles} onChange={(e) => set('layoutPiles', +e.target.value)} /></label>
+                <label className="field"><span>Corners: <b>{knobs.layoutCornerPiles}</b></span>
+                  <input type="range" min={0} max={8} value={knobs.layoutCornerPiles} onChange={(e) => set('layoutCornerPiles', +e.target.value)} /></label>
+              </div>
+              <label className="field"><span>Cards dealt each: <b>{knobs.handSize}</b></span>
+                <input type="range" min={1} max={13} value={knobs.handSize} onChange={(e) => set('handSize', +e.target.value)} /></label>
+              {knobs.layoutCornerPiles > 0 && (
+                <div className="field"><span>The rank that opens a corner</span>
+                  <select value={knobs.layoutCornerRank} onChange={(e) => set('layoutCornerRank', e.target.value as Rank)}>
+                    {RANKS_13.map((r) => <option key={r} value={r}>{r}</option>)}
+                  </select></div>
+              )}
+              <div className="field"><span>Building a pile</span>
+                <Seg options={[['alt-color', 'Alternating colours'], ['same-suit', 'Same suit'], ['down-any', 'Descending, any suit']] as ['alt-color' | 'same-suit' | 'down-any', string][]}
+                  value={knobs.layoutBuild} onChange={(v) => set('layoutBuild', v)} /></div>
+              <div className="field row"><Switch on={knobs.layoutMovePiles} onChange={(v) => set('layoutMovePiles', v)} aria-label="A whole pile may be picked up and moved onto another it continues" />
+                <span aria-hidden="true">A whole pile may be picked up and moved onto another it continues</span></div>
+            </Section>
+          )}
+
+          {knobs.family === 'swap' && (
+            <Section title="Swap rules" defaultOpen>
+              <span className="mini-label">Cards face down in front of each player, never looked at except through the ranks below. Draw, then slide it into your row (throwing out whatever was there) or throw it away — and a thrown card with a power resolves at once.</span>
+              <div className="two">
+                <label className="field"><span>Cards each: <b>{knobs.swapSlots}</b></span>
+                  <input type="range" min={3} max={6} value={knobs.swapSlots} onChange={(e) => set('swapSlots', +e.target.value)} /></label>
+                <label className="field"><span>Looked at before play: <b>{knobs.swapPeekAtStart}</b></span>
+                  <input type="range" min={0} max={knobs.swapSlots} value={knobs.swapPeekAtStart} onChange={(e) => set('swapPeekAtStart', +e.target.value)} /></label>
+              </div>
+              <div className="mini-label">Ranks that buy a look at one of your own</div>
+              <RankGrid ranks={RANKS_13} selected={knobs.swapPeekSelfRanks} onToggle={(r) => toggleRank('swapPeekSelfRanks', r)} />
+              <div className="mini-label">Ranks that buy a look at one of somebody else's</div>
+              <RankGrid ranks={RANKS_13} selected={knobs.swapPeekOtherRanks} onToggle={(r) => toggleRank('swapPeekOtherRanks', r)} />
+              <div className="mini-label">Ranks that trade one of yours for one of theirs, neither of you looking</div>
+              <RankGrid ranks={RANKS_13} selected={knobs.swapBlindRanks} onToggle={(r) => toggleRank('swapBlindRanks', r)} />
+              <label className="field"><span>What the call is named</span>
+                <input value={knobs.swapCallName} onChange={(e) => set('swapCallName', e.target.value)} /></label>
+              <div className="two">
+                <NumField label="Cost of calling and being wrong" value={knobs.swapCallPenalty} onChange={(v) => set('swapCallPenalty', v)} />
+                <NumField label="Turn safety cap (nobody calls)" value={knobs.swapTurnCap} onChange={(v) => set('swapTurnCap', v)} />
+              </div>
+            </Section>
+          )}
+
           {knobs.family === 'bluff' && (
             <Section title="Bluffing rules" defaultOpen>
               <span className="mini-label">Play cards face down claiming a rank — true or not. Anyone may call it; whoever is wrong takes the pile. First to empty their hand wins.</span>
@@ -841,6 +962,11 @@ export function CreateView({ onPlay }: { onPlay?: (def: GameDefinition) => void 
                 <span aria-hidden="true">…or whenever the top two cards match rank (Snap)</span></div>
               {knobs.reflexSlapRanks.length === 0 && !knobs.reflexSlapMatch && (
                 <span className="mini-label warn-text">Nothing triggers a slap, so nobody can ever take the pile. Pick a rank or turn on matching.</span>
+              )}
+              <div className="field row"><Switch on={knobs.reflexFlipCap > 0} onChange={(v) => set('reflexFlipCap', v ? 600 : 0)} aria-label="Safety cap — after this many flips, whoever holds the most cards wins outright" />
+                <span aria-hidden="true">Safety cap — after this many flips, whoever holds the most cards wins outright</span></div>
+              {knobs.reflexFlipCap > 0 && (
+                <NumField label="Flips before the cap fires" value={knobs.reflexFlipCap} onChange={(v) => set('reflexFlipCap', v)} />
               )}
             </Section>
           )}
@@ -1309,7 +1435,7 @@ function seatsAllowed(k: Knobs): number[] {
 
 /** How many copies of the pack a family can honestly shuffle together. */
 function maxDecksFor(family: Knobs['family']): number {
-  if (family === 'war' || family === 'poker') return 1;
+  if (family === 'war' || family === 'poker' || family === 'maid' || family === 'layout' || family === 'swap') return 1;
   if (family === 'shedding') return 3;
   return 2;
 }

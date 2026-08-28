@@ -10,7 +10,7 @@ export const RANKS_13: Rank[] = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '1
 
 export interface Knobs {
   family: 'shedding' | 'trick' | 'climb' | 'fish' | 'rummy' | 'war' | 'solitaire'
-    | 'bluff' | 'reflex' | 'poker' | 'pit' | 'kent' | 'set';
+    | 'bluff' | 'reflex' | 'poker' | 'pit' | 'kent' | 'set' | 'maid' | 'layout' | 'swap';
   // Author-written conditional rules. Kept as drafts (ingredient ids + parameters) so the
   // builder can re-open them; compiled into definition.rules on every build.
   customRules: RuleDraft[];
@@ -49,8 +49,32 @@ export interface Knobs {
    * has one auction or the other.
    */
   contractAuction: boolean;
+  contractMinLevel: number;  // how low the bidding may open (Skat's minimum bid is nowhere near 1)
   contractMaxLevel: number;  // how high the bidding may go
   contractBook: number;      // tricks the level sits on top of (Bridge's six; 0 for a short deal)
+  contractNoTrump: boolean;  // NT is a biddable strain, alongside the four suits
+  contractTrickValue: number;      // points per trick bid, once made
+  contractOvertrickValue: number;  // points per trick over the contract
+  contractUndertrickValue: number; // points the defence takes per trick the contract falls short
+  contractSlamBonus: number;       // bonus for bidding and making the top level (0 = none)
+  /**
+   * Score on card points taken (Skat) rather than on tricks — the contract is made once the
+   * declaring side holds this many of the pack's own penalty points, whatever that took.
+   */
+  contractOnCardPoints: boolean;
+  contractCardPointsTarget: number;
+  /**
+   * If the auction would otherwise pass out with nobody ever bidding, the dealer is stuck with a
+   * mandatory contract at this level instead of the hand being thrown in.
+   */
+  contractDealerMustBid: boolean;
+  contractDealerMustBidLevel: number;
+  /**
+   * A failed contract is scored by the tricks the DEFENCE actually took, not by how far short
+   * the contract fell — the whole hand is one contest for the tricks rather than a priced
+   * shortfall.
+   */
+  contractDefendersScoreOwnTricks: boolean;
   bowers: boolean;           // trump jack, then the same-colour jack, top the trump suit
   goAlone: boolean;          // the maker may cut their partner out of the hand
   shootTheMoon: boolean;     // sweeping every penalty point scores you 0 and everyone else the pot
@@ -59,6 +83,22 @@ export interface Knobs {
   forceOpeningLead: boolean; // one named card leads trick 1, and no points may fall on it
   openingLeadCard: string;   // which card, by suit+rank key. 2♣ is the Hearts convention.
   handPassCount: number;     // cards exchanged before each hand (0 = no exchange)
+  // Every jack promoted out of its printed suit into trump (Skat), rather than just the two
+  // bowers `bowers` already gives. Mutually exclusive with bowers — a jack is either special or
+  // it isn't; a game does not promote it twice over.
+  jacksAreTrumps: boolean;
+  // The auction (or contract) winner plays alone against the rest of the table instead of with
+  // a partner. Only means anything alongside partnerships and an auction of some kind.
+  soloDeclarer: boolean;
+  // Trump is whatever suit the last card dealt happens to be, rather than fixed or auctioned.
+  // Mutually exclusive with both auction knobs — a hand has exactly one way to settle trump.
+  turnedTrump: boolean;
+  // A king-and-queen-of-one-suit marriage, scored once as the hand is dealt, before anyone
+  // plays — the one meldPatterns shape every shipped meld game actually uses (Pinochle, Sixty-
+  // Six). A fully generic pattern editor is a bigger authoring surface than one marriage is
+  // worth; an author who needs something stranger still has the JSON override.
+  meldMarriage: boolean;
+  meldMarriagePoints: number;
   // climbing
   climbTwosHigh: boolean; // President order: 3 low … 2 high (else Ace high)
   climbCombos: boolean;   // allow playing pairs/triples as a unit (Big Two-style)
@@ -83,6 +123,7 @@ export interface Knobs {
   // reflex
   reflexSlapRanks: Rank[];
   reflexSlapMatch: boolean;
+  reflexFlipCap: number; // safety valve — after this many flips, most cards held wins outright
   // poker
   pokerHandSize: number;
   pokerStartingChips: number;
@@ -98,6 +139,23 @@ export interface Knobs {
   kentPoolSize: number;
   kentTellPlies: number;   // how long a tell stays up, in moves (the engine has no clock)
   kentLetters: string;     // spell this and the pair is out
+  // maid — draw blind from a neighbour's fan; every rank pairs off except one
+  maidOddRank: Rank;
+  // layout — a shared board everybody plays into (Kings Corner)
+  layoutPiles: number;
+  layoutCornerPiles: number;
+  layoutCornerRank: Rank;
+  layoutBuild: 'alt-color' | 'same-suit' | 'down-any';
+  layoutMovePiles: boolean;
+  // swap — four cards face down in front of you that you are not allowed to look at (Dutch)
+  swapSlots: number;
+  swapPeekAtStart: number;
+  swapPeekSelfRanks: Rank[];
+  swapPeekOtherRanks: Rank[];
+  swapBlindRanks: Rank[];
+  swapCallName: string;
+  swapTurnCap: number;
+  swapCallPenalty: number;
   // set — the one family whose deck is properties rather than ranks and suits
   setProperties: { name: string; values: string[] }[];
   setSize: number;
@@ -234,8 +292,19 @@ export const defaultKnobs: Knobs = {
   penaltyCards: {},
   trumpAuction: false,
   contractAuction: false,
+  contractMinLevel: 1,
   contractMaxLevel: 7,
   contractBook: 0,
+  contractNoTrump: true,
+  contractTrickValue: 10,
+  contractOvertrickValue: 3,
+  contractUndertrickValue: 12,
+  contractSlamBonus: 30,
+  contractOnCardPoints: false,
+  contractCardPointsTarget: 61,
+  contractDealerMustBid: false,
+  contractDealerMustBidLevel: 1,
+  contractDefendersScoreOwnTricks: false,
   bowers: false,
   goAlone: false,
   shootTheMoon: false,
@@ -244,6 +313,11 @@ export const defaultKnobs: Knobs = {
   forceOpeningLead: false,
   openingLeadCard: 'C2',
   handPassCount: 0,
+  jacksAreTrumps: false,
+  soloDeclarer: false,
+  turnedTrump: false,
+  meldMarriage: false,
+  meldMarriagePoints: 20,
   climbTwosHigh: true,
   climbCombos: false,
   climbBombSize: 0,
@@ -261,6 +335,7 @@ export const defaultKnobs: Knobs = {
   bluffClaimRanks: [],
   reflexSlapRanks: ['J'],
   reflexSlapMatch: false,
+  reflexFlipCap: 0,
   pokerHandSize: 5,
   pokerStartingChips: 200,
   pokerAnte: 0,
@@ -273,6 +348,20 @@ export const defaultKnobs: Knobs = {
   kentPoolSize: 4,
   kentTellPlies: 3,
   kentLetters: 'KENT',
+  maidOddRank: 'Q',
+  layoutPiles: 4,
+  layoutCornerPiles: 4,
+  layoutCornerRank: 'K',
+  layoutBuild: 'alt-color',
+  layoutMovePiles: true,
+  swapSlots: 4,
+  swapPeekAtStart: 2,
+  swapPeekSelfRanks: ['7', '8'],
+  swapPeekOtherRanks: ['9', '10'],
+  swapBlindRanks: ['J', 'Q'],
+  swapCallName: 'Dutch',
+  swapTurnCap: 40,
+  swapCallPenalty: 10,
   setProperties: [
     { name: 'colour', values: ['red', 'green', 'violet'] },
     { name: 'shape', values: ['oval', 'diamond', 'squiggle'] },
@@ -442,7 +531,137 @@ function buildFamilyDefinition(knobs: Knobs, id: string): GameDefinition {
   if (knobs.family === 'pit') return buildPitDefinition(knobs, id);
   if (knobs.family === 'kent') return buildKentDefinition(knobs, id);
   if (knobs.family === 'set') return buildSetDefinition(knobs, id);
+  if (knobs.family === 'maid') return buildMaidDefinition(knobs, id);
+  if (knobs.family === 'layout') return buildLayoutDefinition(knobs, id);
+  if (knobs.family === 'swap') return buildSwapDefinition(knobs, id);
   return buildSheddingDefinition(knobs, id);
+}
+
+// Dutch: four cards face down in front of each player that they may look at only once, at the
+// start. From there the only way to learn more is the ranks that buy a look — at your own row,
+// at somebody else's, or a sight-unseen trade with them, all three separately configurable
+// ranks rather than fixed to sevens-and-eights the way the shipped game happens to use.
+function buildSwapDefinition(knobs: Knobs, id: string): GameDefinition {
+  const callName = knobs.swapCallName.trim() || 'Call';
+  return {
+    schemaVersion: CURRENT_SCHEMA,
+    meta: {
+      id, name: knobs.name,
+      description: knobs.description
+        || `${knobs.swapSlots} cards each, face down, and you may look at ${knobs.swapPeekAtStart} `
+        + `of them once. Then take a card from the stock or the pile and either slide it into `
+        + `your row — throwing out whatever was there — or throw it away.`
+        + (knobs.swapPeekSelfRanks.length ? ` ${knobs.swapPeekSelfRanks.map(rankLabel).join('/')} buy a look at one of your own.` : '')
+        + (knobs.swapPeekOtherRanks.length ? ` ${knobs.swapPeekOtherRanks.map(rankLabel).join('/')} buy a look at somebody else's.` : '')
+        + (knobs.swapBlindRanks.length ? ` ${knobs.swapBlindRanks.map(rankLabel).join('/')} trade one of yours for one of theirs, neither of you looking.` : '')
+        + ` Call "${callName}" when you think you are lowest — everyone gets one more turn, then `
+        + `the cards come over. Be wrong and it costs you ${knobs.swapCallPenalty}.`,
+      players: { min: clampInt(knobs.minPlayers, 2, 8), max: clampInt(knobs.maxPlayers, knobs.minPlayers, 8) },
+      family: 'swap',
+    },
+    deck: deckOf(knobs, { maxDecks: 1, noJokers: true, rankOrder: RANKS_13 }),
+    zones: [
+      { id: 'draw', type: 'pile', ordered: true, faceDown: true, visibility: 'none', shared: true },
+      { id: 'discard', type: 'pile', ordered: true, faceDown: false, visibility: 'top-public', shared: true },
+    ],
+    setup: [{ op: 'shuffle', zone: 'draw' }],
+    turnFlow: { order: 'clockwise', startPlayer: 'dealerLeft', actionsPerTurn: { min: 1, max: 1 } },
+    actions: [], triggers: [], endConditions: [],
+    scoring: {
+      mode: 'lowestPoints', winner: 'lowestTotal',
+      cardPoints: Object.fromEntries(RANKS_13.map((r) => [r, knobs.perRankPoints[r] ?? defaultPoints[r] ?? 0])),
+      target: matchTarget(knobs),
+    },
+    swap: {
+      slots: clampInt(knobs.swapSlots, 3, 6),
+      peekAtStart: clampInt(knobs.swapPeekAtStart, 0, knobs.swapSlots),
+      ...(knobs.swapPeekSelfRanks.length ? { peekSelfRanks: [...knobs.swapPeekSelfRanks] } : {}),
+      ...(knobs.swapPeekOtherRanks.length ? { peekOtherRanks: [...knobs.swapPeekOtherRanks] } : {}),
+      ...(knobs.swapBlindRanks.length ? { blindSwapRanks: [...knobs.swapBlindRanks] } : {}),
+      callName,
+      turnCap: clampInt(knobs.swapTurnCap, 10, 200),
+      callPenalty: clampInt(knobs.swapCallPenalty, 0, 100),
+    },
+  };
+}
+
+// Kings Corner: a shared board everybody plays into rather than a private tableau — the piles
+// and corners are synthesised by the engine from this config the same way solitaire's board is,
+// so the definition only carries the deck and the dials. Jokers have no colour to alternate
+// against (cardColor() returns 'none' for them), so unlike every other family here they would
+// be an unplaceable, permanently stuck card rather than a wild one — left out entirely instead
+// of offered as a knob that quietly breaks the game the moment it's turned on.
+function buildLayoutDefinition(knobs: Knobs, id: string): GameDefinition {
+  const buildWord = knobs.layoutBuild === 'alt-color' ? 'in alternating colours, red on black, black on red'
+    : knobs.layoutBuild === 'same-suit' ? 'in one suit' : 'down, any suit';
+  return {
+    schemaVersion: CURRENT_SCHEMA,
+    meta: {
+      id, name: knobs.name,
+      description: knobs.description
+        || `Draw one card, then place as many as you like: build down ${buildWord}. Only a `
+        + `${rankLabel(knobs.layoutCornerRank)} may open a corner, which is why it's the best `
+        + `card in the game.`
+        + (knobs.layoutMovePiles
+          ? ' You can also lift a whole pile and drop it on another it continues, freeing a space.'
+          : '')
+        + ' First to empty their hand wins.',
+      players: { min: clampInt(knobs.minPlayers, 2, 8), max: clampInt(knobs.maxPlayers, knobs.minPlayers, 8) },
+      family: 'layout',
+    },
+    deck: deckOf(knobs, { maxDecks: 1, noJokers: true, rankOrder: RANKS_13 }),
+    zones: [
+      { id: 'draw', type: 'pile', ordered: true, faceDown: true, visibility: 'none', shared: true },
+      { id: 'hand', type: 'hand', ordered: false, faceDown: true, visibility: 'owner', perPlayer: true },
+    ],
+    setup: [{ op: 'shuffle', zone: 'draw' }],
+    turnFlow: { order: 'clockwise', startPlayer: 'dealerLeft', actionsPerTurn: { min: 1, max: 1 } },
+    actions: [], triggers: [], endConditions: [],
+    scoring: { mode: 'lowestPoints', winner: 'firstOut', cardPoints: {}, target: null },
+    layout: {
+      piles: clampInt(knobs.layoutPiles, 1, 8),
+      cornerPiles: clampInt(knobs.layoutCornerPiles, 0, 8),
+      cornerRank: knobs.layoutCornerRank || 'K',
+      build: knobs.layoutBuild,
+      handSize: clampInt(knobs.handSize, 1, 13),
+      movePiles: knobs.layoutMovePiles,
+    },
+  };
+}
+
+// Old Maid: take every suited copy but one of a single rank out of the pack, so the survivor
+// has nothing left to pair with, then deal out the rest. The odd rank is a knob, not fixed to
+// the queen — buildMaidDefinition computes which three suit-copies to drop from whichever rank
+// the author chose, the same arithmetic src/games/oldMaid.ts does by hand for the queen.
+function buildMaidDefinition(knobs: Knobs, id: string): GameDefinition {
+  const oddRank = knobs.maidOddRank || 'Q';
+  const dropped = (['S', 'H', 'D'] as const).map((suit) => `${suit}${oddRank}`);
+  const deck = deckOf(knobs, { maxDecks: 1, noJokers: true, rankOrder: RANKS_13 });
+  return {
+    schemaVersion: CURRENT_SCHEMA,
+    meta: {
+      id, name: knobs.name,
+      description: knobs.description
+        || `Take three ${rankLabel(oddRank)}s out of the pack, so one is left with no partner, `
+        + `and deal out everything else. Any pair in your hand falls out of it at once. On your `
+        + `turn, draw one card — sight unseen — from whoever draws next after you: you pick where `
+        + `in their fan, not what it is. Whoever is holding the odd ${rankLabel(oddRank)} once `
+        + `everyone else is empty-handed loses.`,
+      players: { min: clampInt(knobs.minPlayers, 3, 8), max: clampInt(knobs.maxPlayers, knobs.minPlayers, 8) },
+      family: 'maid',
+    },
+    deck: { ...deck, excludeCards: Array.from(new Set([...dropped, ...(deck.excludeCards ?? [])])) },
+    zones: [
+      { id: 'draw', type: 'pile', ordered: true, faceDown: true, visibility: 'none', shared: true },
+      { id: 'void', type: 'pile', ordered: false, faceDown: true, visibility: 'none', shared: true },
+      { id: 'hand', type: 'hand', ordered: false, faceDown: true, visibility: 'owner', perPlayer: true },
+    ],
+    setup: [{ op: 'shuffle', zone: 'draw' }, { op: 'dealAll', from: 'draw', to: 'hand' }],
+    turnFlow: { order: 'clockwise', startPlayer: 'dealerLeft', actionsPerTurn: { min: 1, max: 1 } },
+    actions: [], triggers: [], endConditions: [],
+    scoring: { mode: 'lowestPoints', winner: 'lowestTotal', cardPoints: {}, target: null },
+    maid: { oddRank },
+  };
 }
 
 // Patience: the engine synthesises the whole board from this config, so the definition only
@@ -609,7 +828,10 @@ function buildReflexDefinition(knobs: Knobs, id: string): GameDefinition {
     turnFlow: { order: 'clockwise', startPlayer: 'first', actionsPerTurn: { min: 1, max: 1 } },
     actions: [], triggers: [], endConditions: [],
     scoring: { mode: 'lowestPoints', winner: 'highestTotal', cardPoints: {}, target: null },
-    reflex: { slapRanks: knobs.reflexSlapRanks, slapMatch: knobs.reflexSlapMatch },
+    reflex: {
+      slapRanks: knobs.reflexSlapRanks, slapMatch: knobs.reflexSlapMatch,
+      ...(knobs.reflexFlipCap > 0 ? { flipCap: clampInt(knobs.reflexFlipCap, 50, 5000) } : {}),
+    },
   };
 }
 
@@ -814,7 +1036,10 @@ function buildTrickDefinition(knobs: Knobs, id: string): GameDefinition {
       bust: knobs.trickBidding && knobs.matchPlay && knobs.bustEnabled ? -Math.abs(clampInt(knobs.bustScore, 10, 2000)) : null,
     },
     trick: {
-      trump: knobs.trump, mustFollowSuit: knobs.mustFollowSuit, aceHigh: knobs.aceHigh,
+      // Turned trump overrides the fixed-trump knob outright — the definition's own trump field
+      // is meaningless once the last card dealt decides it instead.
+      trump: knobs.turnedTrump && !knobs.trumpAuction && !knobs.contractAuction ? 'none' : knobs.trump,
+      mustFollowSuit: knobs.mustFollowSuit, aceHigh: knobs.aceHigh,
       scoreBy: knobs.trickScoreBy,
       penaltyPoints: knobs.trickScoreBy === 'penalty'
         ? {
@@ -831,18 +1056,32 @@ function buildTrickDefinition(knobs: Knobs, id: string): GameDefinition {
         ? { upcardZone: 'kitty', dealerDiscards: true, rounds: 2 as const } : undefined,
       // A contract auction replaces the trump auction rather than stacking on it.
       numericAuction: knobs.contractAuction ? {
-        minLevel: 1,
-        maxLevel: Math.max(1, Math.min(7, knobs.contractMaxLevel)),
-        strains: ['C', 'D', 'H', 'S', 'NT'] as const as Strain[],
+        minLevel: Math.max(1, Math.min(knobs.contractMinLevel, knobs.contractMaxLevel)),
+        maxLevel: Math.max(1, knobs.contractMaxLevel),
+        strains: (knobs.contractNoTrump ? ['C', 'D', 'H', 'S', 'NT'] : ['C', 'D', 'H', 'S']) as Strain[],
         book: Math.max(0, knobs.contractBook),
-        trickValue: 10,
-        overtrickValue: 3,
-        undertrickValue: 12,
-        slamBonus: 30,
+        trickValue: Math.max(1, knobs.contractTrickValue),
+        overtrickValue: Math.max(0, knobs.contractOvertrickValue),
+        undertrickValue: Math.max(0, knobs.contractUndertrickValue),
+        ...(knobs.contractSlamBonus > 0 ? { slamBonus: knobs.contractSlamBonus } : {}),
+        ...(knobs.contractOnCardPoints ? { makeOnCardPoints: clampInt(knobs.contractCardPointsTarget, 1, 1000) } : {}),
+        ...(knobs.contractDealerMustBid
+          ? { dealerMustBid: Math.max(1, Math.min(knobs.contractDealerMustBidLevel, knobs.contractMaxLevel)) }
+          : {}),
+        ...(knobs.contractDefendersScoreOwnTricks ? { defendersScoreOwnTricks: true } : {}),
       } : undefined,
-      bowers: knobs.trumpAuction && knobs.bowers ? true : undefined,
+      // jacksAreTrumps promotes all four jacks out of their printed suits; bowers only promotes
+      // two while leaving the other two where they are printed — a jack cannot be both at once.
+      // Works with either auction shape — Five Hundred pairs it with a numeric contract, not a
+      // turn-up trump auction.
+      bowers: (knobs.trumpAuction || knobs.contractAuction) && knobs.bowers && !knobs.jacksAreTrumps ? true : undefined,
+      jacksAreTrumps: knobs.jacksAreTrumps || undefined,
       goAlone: knobs.trumpAuction && knobs.goAlone && knobs.trickPartnerships ? true : undefined,
       euchreScoring: knobs.trumpAuction && knobs.trickPartnerships ? true : undefined,
+      // Needs some way to decide who the declarer is, but not partnerships — Napoleon has no
+      // partner to sit out at all; the auction winner plays alone against the whole table.
+      soloDeclarer: knobs.soloDeclarer && (knobs.trumpAuction || knobs.contractAuction) ? true : undefined,
+      turnedTrump: knobs.turnedTrump && !knobs.trumpAuction && !knobs.contractAuction ? true : undefined,
       // Hearts rules only make sense alongside penalty scoring.
       shootTheMoon: knobs.trickScoreBy === 'penalty' && knobs.shootTheMoon ? true : undefined,
       brokenSuit: knobs.trickScoreBy === 'penalty' && knobs.brokenSuitLead ? knobs.brokenSuit : undefined,
@@ -850,6 +1089,9 @@ function buildTrickDefinition(knobs: Knobs, id: string): GameDefinition {
       // Only worth writing when there are jokers to rank, and only when it changes anything.
       jokerRank: knobs.includeJokers && knobs.jokerRank !== 'low' ? knobs.jokerRank : undefined,
       noPenaltyFirstTrick: knobs.trickScoreBy === 'penalty' && knobs.forceOpeningLead ? true : undefined,
+      meldPatterns: knobs.meldMarriage
+        ? [{ name: 'Marriage', ranks: ['K', 'Q'], points: clampInt(knobs.meldMarriagePoints, 1, 200), doubleInTrump: true }]
+        : undefined,
     },
     handPass: knobs.handPassCount > 0
       ? { count: clampInt(knobs.handPassCount, 1, 4), rotation: ['left', 'right', 'across', 'hold'] }
@@ -968,7 +1210,7 @@ export function knobsFromDefinition(def: GameDefinition): Knobs {
   return {
     family: def.solitaire ? 'solitaire' : def.war ? 'war' : def.rummy ? 'rummy' : def.fish ? 'fish' : def.climb ? 'climb' : def.trick ? 'trick'
       : def.bluff ? 'bluff' : def.reflex ? 'reflex' : def.poker ? 'poker' : def.pit ? 'pit'
-      : def.kent ? 'kent' : def.set ? 'set' : 'shedding',
+      : def.kent ? 'kent' : def.set ? 'set' : def.maid ? 'maid' : def.layout ? 'layout' : def.swap ? 'swap' : 'shedding',
     /*
       Twists and restrictions survive a round trip now.
 
@@ -988,15 +1230,30 @@ export function knobsFromDefinition(def: GameDefinition): Knobs {
     seatStep: def.meta.players.step ?? 1,
     bustEnabled: def.scoring.bust != null,
     bustScore: def.scoring.bust != null ? Math.abs(def.scoring.bust) : 200,
-    heartsValue: (def.trick?.penaltyPoints?.H as number) ?? 1,
-    queenSpadesValue: (def.trick?.penaltyPoints?.SQ as number) ?? 13,
+    // 0, not defaultKnobs' 1/13 — a shipped penalty game that never mentions H or SQ at all
+    // (Briscola, Sixty-Six) means neither card carries a penalty, not "Hearts' own default value
+    // happened to apply here too." The 1/13 defaults are for a fresh build with nothing to
+    // reconstruct from, which is a different knob's job (see `defaultKnobs` above).
+    heartsValue: (def.trick?.penaltyPoints?.H as number) ?? 0,
+    queenSpadesValue: (def.trick?.penaltyPoints?.SQ as number) ?? 0,
     penaltyCards: Object.fromEntries(
       Object.entries(def.trick?.penaltyPoints ?? {}).filter(([k]) => k !== 'H' && k !== 'SQ'),
     ),
     trumpAuction: !!def.trick?.auction,
     contractAuction: !!def.trick?.numericAuction,
+    contractMinLevel: def.trick?.numericAuction?.minLevel ?? 1,
     contractMaxLevel: def.trick?.numericAuction?.maxLevel ?? 7,
     contractBook: def.trick?.numericAuction?.book ?? 0,
+    contractNoTrump: def.trick?.numericAuction ? def.trick.numericAuction.strains.includes('NT') : true,
+    contractTrickValue: def.trick?.numericAuction?.trickValue ?? 10,
+    contractOvertrickValue: def.trick?.numericAuction?.overtrickValue ?? 3,
+    contractUndertrickValue: def.trick?.numericAuction?.undertrickValue ?? 12,
+    contractSlamBonus: def.trick?.numericAuction?.slamBonus ?? 0,
+    contractOnCardPoints: def.trick?.numericAuction?.makeOnCardPoints !== undefined,
+    contractCardPointsTarget: def.trick?.numericAuction?.makeOnCardPoints ?? 61,
+    contractDealerMustBid: def.trick?.numericAuction?.dealerMustBid !== undefined,
+    contractDealerMustBidLevel: def.trick?.numericAuction?.dealerMustBid ?? 1,
+    contractDefendersScoreOwnTricks: !!def.trick?.numericAuction?.defendersScoreOwnTricks,
     bowers: !!def.trick?.bowers,
     goAlone: !!def.trick?.goAlone,
     shootTheMoon: !!def.trick?.shootTheMoon,
@@ -1005,6 +1262,11 @@ export function knobsFromDefinition(def: GameDefinition): Knobs {
     forceOpeningLead: !!def.trick?.leadCard,
     openingLeadCard: def.trick?.leadCard ?? 'C2',
     handPassCount: def.handPass?.count ?? 0,
+    jacksAreTrumps: !!def.trick?.jacksAreTrumps,
+    soloDeclarer: !!def.trick?.soloDeclarer,
+    turnedTrump: !!def.trick?.turnedTrump,
+    meldMarriage: !!def.trick?.meldPatterns?.length,
+    meldMarriagePoints: def.trick?.meldPatterns?.[0]?.points ?? 20,
     bookSize: def.fish?.bookSize ?? 4,
     solColumns: def.solitaire?.columns ?? 7,
     solDeal: def.solitaire?.deal ?? 'triangle',
@@ -1046,7 +1308,9 @@ export function knobsFromDefinition(def: GameDefinition): Knobs {
       .filter((z) => z.shared && z.type === 'pile'
         && !['draw', 'discard', 'melds', 'ocean', 'center', 'pile', 'battle', 'kitty', 'stock'].includes(z.id))
       .map((z) => ({ id: z.id, faceUp: !z.faceDown })),
-    handSize: deal?.countPerPlayer ?? 5,
+    // Kings Corner has no `deal` setup step — the engine synthesises its opening hand straight
+    // from layout.handSize, so that's the one other place a real hand size can come from.
+    handSize: deal?.countPerPlayer ?? def.layout?.handSize ?? 5,
     handSizeBySeats: (def.setup.find((x) => x.op === 'deal') as { countByPlayers?: Record<string, number> } | undefined)?.countByPlayers ?? {},
     deckCount: def.deck.deckCount ?? 1,
     excludeRanks: def.deck.excludeRanks ?? [],
@@ -1087,6 +1351,7 @@ export function knobsFromDefinition(def: GameDefinition): Knobs {
     unpricedScoreRankValue: cp.default === 'rankValue',
     reflexSlapRanks: def.reflex?.slapRanks ?? ['J'],
     reflexSlapMatch: def.reflex?.slapMatch ?? false,
+    reflexFlipCap: def.reflex?.flipCap ?? 0,
     pokerHandSize: def.poker?.handSize ?? 5,
     pokerStartingChips: def.poker?.startingChips ?? 200,
     pokerAnte: def.poker?.ante ?? 0,
@@ -1100,6 +1365,20 @@ export function knobsFromDefinition(def: GameDefinition): Knobs {
     kentPoolSize: def.kent?.poolSize ?? 4,
     kentTellPlies: def.kent?.tellPlies ?? 3,
     kentLetters: def.kent?.letters ?? 'KENT',
+    maidOddRank: def.maid?.oddRank ?? 'Q',
+    layoutPiles: def.layout?.piles ?? 4,
+    layoutCornerPiles: def.layout?.cornerPiles ?? 4,
+    layoutCornerRank: def.layout?.cornerRank ?? 'K',
+    layoutBuild: def.layout?.build ?? 'alt-color',
+    layoutMovePiles: def.layout?.movePiles ?? true,
+    swapSlots: def.swap?.slots ?? 4,
+    swapPeekAtStart: def.swap?.peekAtStart ?? 2,
+    swapPeekSelfRanks: def.swap?.peekSelfRanks ?? [],
+    swapPeekOtherRanks: def.swap?.peekOtherRanks ?? [],
+    swapBlindRanks: def.swap?.blindSwapRanks ?? [],
+    swapCallName: def.swap?.callName ?? 'Dutch',
+    swapTurnCap: def.swap?.turnCap ?? 40,
+    swapCallPenalty: def.swap?.callPenalty ?? 10,
     setProperties: def.deck.attributes ?? defaultKnobs.setProperties,
     setSize: def.set?.size ?? 3,
     setBoardSize: def.set?.boardSize ?? 12,
