@@ -620,6 +620,21 @@ export interface NumericAuctionConfig {
   makeOnCardPoints?: number;
   /** How many consecutive passes end the auction once somebody has bid. Usually all but one. */
   passesToClose?: number;
+  /**
+   * If the auction would otherwise pass out with nobody ever bidding, the dealer is stuck with
+   * a mandatory contract at exactly this level instead of the hand being thrown in — "stick the
+   * dealer," the same idea `auction`'s last-call rule already gives the trump-auction family,
+   * carried over to a numeric contract where somebody still has to name trump.
+   */
+  dealerMustBid?: number;
+  /**
+   * Score a failed contract by the tricks the DEFENDERS actually took, not by how far short the
+   * contract fell. Bridge-style undertrickValue prices the shortfall; some games instead treat
+   * the whole hand as one contest for the tricks — whichever side ends up with more of them
+   * scores a point per trick they hold, win or lose, so a defense that barely stopped the
+   * contract scores about the same as a contract that barely failed.
+   */
+  defendersScoreOwnTricks?: boolean;
 }
 
 /**
@@ -715,6 +730,9 @@ export interface HandQuery {
   rank?: Rank;
   suit?: Suit;
   color?: 'red' | 'black';
+  /** A `deck.tags` name — for a card rank/suit/color cannot pick out alone, like one specific
+   *  joker out of a pair that are otherwise identical in every field the engine tracks. */
+  tag?: string;
   minCount?: number;               // default 1
 }
 

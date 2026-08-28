@@ -635,12 +635,15 @@ function isNumeric(v: number | string): boolean {
   return typeof v === 'number' || (v !== '' && Number.isFinite(Number(v)));
 }
 
-function handMatches(state: MatchState, q: { rank?: string; suit?: string; color?: string; minCount?: number }, playerId: string): boolean {
+function handMatches(
+  state: MatchState, q: { rank?: string; suit?: string; color?: string; tag?: string; minCount?: number }, playerId: string,
+): boolean {
   const hand = state.zones[`hand:${playerId}`] || [];
   const hits = hand.filter((c) => {
     if (q.rank && c.rank !== q.rank) return false;
     if (q.suit && c.suit !== q.suit) return false;
     if (q.color && cardColor(c) !== q.color) return false;
+    if (q.tag && !cardTags(state.definition, c).includes(q.tag)) return false;
     return true;
   });
   return hits.length >= (q.minCount ?? 1);
@@ -2064,6 +2067,16 @@ function bidRank(cfg: NumericAuctionConfig, level: number, strain: Strain): numb
 
 function contractBidMoves(state: MatchState): Move[] {
   const cfg = state.definition.trick!.numericAuction!;
+  const n = state.players.length;
+
+  // Stick the dealer: everybody else has passed and nobody has bid yet, so this is the
+  // dealer's last chance — if the game forces a floor here, passing is not one of the options
+  // and the only decision left is which suit becomes trump at that fixed level.
+  if (cfg.dealerMustBid && !state.highBid && state.auctionPasses === n - 1
+    && state.players[state.turnIndex] === state.players[state.dealerIndex]) {
+    return cfg.strains.map((strain) => ({ actionId: 'contractBid', level: cfg.dealerMustBid, strain }));
+  }
+
   const moves: Move[] = [];
   const floor = state.highBid ? bidRank(cfg, state.highBid.level, state.highBid.strain) : -1;
   for (let level = cfg.minLevel; level <= cfg.maxLevel; level++) {
@@ -2140,7 +2153,7 @@ function settleContract(s: MatchState): MatchState {
  * falling short pays the other side instead. Partnerships share a contract, as they share a
  * hand — which is why this reads teams rather than players.
  */
-function scoreContract(s: MatchState): void {
+export function scoreContract(s: MatchState): void {
   const cfg = s.definition.trick!.numericAuction!;
   const bid = s.highBid;
   const teams = trickTeams(s);
@@ -2189,6 +2202,9 @@ function scoreContract(s: MatchState): void {
     declarerPts = bid.level * cfg.trickValue + (took - need) * cfg.overtrickValue;
     if (cfg.slamBonus && bid.level === cfg.maxLevel) { declarerPts += cfg.slamBonus; s.roundOutcome = 'slam'; }
     log(s, null, `${short(bid.player)} made ${bid.level}${strainLabel(bid.strain)} with ${took} tricks — ${declarerPts}.`);
+  } else if (cfg.defendersScoreOwnTricks) {
+    defenderPts = defending.reduce((a, p) => a + (s.tricksWon[p] ?? 0), 0);
+    log(s, null, `${short(bid.player)} fell short of ${need} — the defence takes the hand with ${defenderPts}.`);
   } else {
     defenderPts = (need - took) * cfg.undertrickValue;
     log(s, null, `${short(bid.player)} went down ${need - took} — defenders take ${defenderPts}.`);

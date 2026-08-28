@@ -107,7 +107,17 @@ export function chooseMove(
     // case the level IS the promise. Assuming six here made every bot pass on every hand.
     const book = state.definition.trick?.numericAuction?.book ?? 0;
     const auction = state.definition.trick?.numericAuction;
-    const pass = moves.find((m) => m.actionId === 'passBid')!;
+    const pass = moves.find((m) => m.actionId === 'passBid');
+    const allBids = moves.filter((m) => m.actionId === 'contractBid');
+    // Passing is not always on offer — a stuck dealer (numericAuction.dealerMustBid) has nothing
+    // but bids to choose from, however weak the hand. Falling back to `pass` here would hand
+    // applyMove an undefined move and freeze the whole match, so a bot with no real choice picks
+    // whatever it's given rather than the estimate it would otherwise have walked away from.
+    const giveUp = (): { move: Move; botSeed: number } => {
+      if (pass) return { move: pass, botSeed };
+      const inSuit = allBids.filter((m) => m.strain === best);
+      return { move: (inSuit.length ? inSuit : allBids)[0], botSeed };
+    };
 
     /*
       A level is not always a number of tricks.
@@ -129,21 +139,21 @@ export function chooseMove(
       // A hand carrying about a third of the pack's points is worth opening on; one carrying
       // half is worth pushing.
       const share = Math.max(0, Math.min(1, (strength - 25) / 35));
-      if (share <= 0) return { move: pass, botSeed };
+      if (share <= 0) return giveUp();
       const span = auction.maxLevel - auction.minLevel;
       const ceiling = auction.minLevel + Math.round(share * span);
       const canBid = moves.filter((m) => m.actionId === 'contractBid' && (m.level ?? 0) <= ceiling);
-      if (canBid.length === 0) return { move: pass, botSeed };
+      if (canBid.length === 0) return giveUp();
       // The highest affordable bid, in the suit the hand is longest in.
       const inSuit = canBid.filter((m) => m.strain === best);
       return { move: (inSuit.length ? inSuit : canBid).slice(-1)[0], botSeed };
     }
 
     const wantLevel = canTake - book;
-    if (wantLevel < 1) return { move: pass, botSeed };
+    if (wantLevel < 1) return giveUp();
     // The strongest bid at or below what the hand is worth, preferring the long suit.
     const affordable = moves.filter((m) => m.actionId === 'contractBid' && (m.level ?? 9) <= wantLevel);
-    if (affordable.length === 0) return { move: pass, botSeed };
+    if (affordable.length === 0) return giveUp();
     const inBest = affordable.filter((m) => m.strain === best);
     const pick = (inBest.length ? inBest : affordable).slice(-1)[0];
     return { move: pick, botSeed };

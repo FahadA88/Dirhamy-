@@ -35,10 +35,15 @@ export function CardFace({ card }: { card: Card }) {
   const red = card.suit === 'H' || card.suit === 'D';
   const label = card.rank === 'JOKER' ? '★' : card.rank;
   const face = settings.cardFace;
+  // A real pack's two jokers are not identical: one is printed in colour, the other plain. The
+  // first joker built per deck copy (deck.ts's `JOKER1`) is that colour one — every other joker
+  // stays the plain black it always was. A game does not have to care which is which for this to
+  // be true; it only matters once one does (Hokm's joker-timing rule needs the two told apart).
+  const coloredJoker = card.rank === 'JOKER' && card.id.startsWith('JOKER1');
   // Four-colour and letter-coded both recolour the suits; letters additionally spell them out.
   // Faces that give every suit its own colour rather than the traditional two.
   const FOUR = face === 'four-color' || face === 'letters' || face === 'shapes';
-  const style = FOUR ? { color: FOUR_COLOR[card.suit] } : undefined;
+  const style = FOUR ? { color: FOUR_COLOR[card.suit] } : coloredJoker ? { color: FOUR_COLOR.JOKER } : undefined;
   const pips = PIPS[card.rank];
   const isCourt = card.rank === 'J' || card.rank === 'Q' || card.rank === 'K';
 
@@ -52,7 +57,7 @@ export function CardFace({ card }: { card: Card }) {
     <div className={`card face f-${face} ${red ? 'red' : 'black'} ${isCourt ? 'court' : ''}`} style={style}
       data-flight={card.id}
       role="img"
-      aria-label={card.rank === 'JOKER' ? 'Joker' : `${LONG_RANK[card.rank] ?? card.rank} of ${LONG_SUIT[card.suit] ?? card.suit}`}>
+      aria-label={card.rank === 'JOKER' ? (coloredJoker ? 'Colored joker' : 'Joker') : `${LONG_RANK[card.rank] ?? card.rank} of ${LONG_SUIT[card.suit] ?? card.suit}`}>
       <div className="holo" />
       {/* A hairline frame inside the trim, the way a printed deck is cut. */}
       <div className="face-frame" aria-hidden="true" />

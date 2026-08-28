@@ -50,6 +50,7 @@ import { continental } from './continental';
 import { canfield } from './canfield';
 import { pinochle } from './pinochle';
 import { skat } from './skat';
+import { hokm } from './hokm';
 
 // The classics library. Each entry is a hand-authored game, expressed purely as data.
 export const catalog: GameDefinition[] = [
@@ -72,4 +73,8 @@ export const catalog: GameDefinition[] = [
   // Skat needed all four jacks promoted out of their suits into trump, a declarer playing alone
   // against the rest, and a contract settled on card points rather than tricks.
   skat,
+  // Hokm needed a numeric contract that can stick the dealer instead of throwing the hand in,
+  // a failed contract scored by the tricks the defence actually holds rather than by how far
+  // short it fell, and two jokers that are the same rank and suit but not interchangeable.
+  hokm,
 ];

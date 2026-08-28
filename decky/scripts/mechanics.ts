@@ -17,10 +17,13 @@ import { whist } from '../src/games/whist';
 import { spadesLite } from '../src/games/spades';
 import { ohHell } from '../src/games/ohHell';
 import { catalog } from '../src/games/catalog';
-import { createMatch, legalMoves, applyMove, actingPlayers, redact, nextHand, scoreMelds, bestBy, swapZones } from '../src/engine/engine';
+import {
+  createMatch, legalMoves, applyMove, actingPlayers, redact, nextHand, scoreMelds, bestBy, swapZones, scoreContract,
+} from '../src/engine/engine';
 import { chooseMove } from '../src/bots/randomBot';
 import { Card, MatchState, Move } from '../src/engine/types';
 import { dutch } from '../src/games/dutch';
+import { hokm } from '../src/games/hokm';
 import { MatchService } from '../src/server/matchService';
 import { LocalMatchStore } from '../src/server/localStore';
 
@@ -1028,6 +1031,119 @@ section('Regression: sameMove() matches on slot/targetSlot/poolId, not just acti
       myGridAfter[0]?.id === myGridBefore[0]?.id);
     check('their slot 0 was left untouched (the old bug\'s always-picked slot)',
       theirGridAfter[0]?.id === theirGridBefore[0]?.id);
+  }
+}
+
+// ---------- Hokm: a new game, exercising three pieces of engine capability it needed and
+// nothing else in the catalog uses yet — stick-the-dealer on a numeric contract,
+// defendersScoreOwnTricks, and two jokers distinguished by tag rather than rank/suit ----------
+
+section('Hokm: deck composition');
+{
+  const s = createMatch(hokm, ['P1', 'P2', 'P3', 'P4'], 7);
+  for (const p of s.players) {
+    check(`${p} is dealt 9 cards`, (s.zones[`hand:${p}`] || []).length === 9);
+  }
+  const all = s.players.flatMap((p) => s.zones[`hand:${p}`] || []);
+  check('36 cards total are in play', all.length === 36, all.length);
+  check('no 2s, 3s, 4s or 5s were dealt', !all.some((c) => (['2', '3', '4', '5'] as const).includes(c.rank as never)));
+  check('no 6 of diamonds or clubs was dealt', !all.some((c) => c.id === 'D6' || c.id === 'C6'));
+  check('both jokers are in play', all.filter((c) => c.rank === 'JOKER').length === 2);
+}
+
+section('Hokm: an all-pass auction sticks the dealer with a mandatory 5, not a thrown-in hand');
+{
+  let s = createMatch(hokm, ['P1', 'P2', 'P3', 'P4'], 11);
+  const dealer = s.players[s.dealerIndex];
+  for (let i = 0; i < 3; i++) {
+    const seat = s.players[s.turnIndex];
+    check(`pass ${i + 1}: the dealer is not acting yet`, seat !== dealer, { seat, dealer });
+    s = applyMove(s, seat, { actionId: 'passBid' });
+  }
+  check('it is now the dealer\'s turn', s.players[s.turnIndex] === dealer);
+  const forced = legalMoves(s, dealer);
+  check('the dealer cannot pass', !forced.some((m) => m.actionId === 'passBid'), forced);
+  check('every option left is a level-5 bid', forced.length > 0 && forced.every((m) => m.actionId === 'contractBid' && m.level === 5), forced);
+  s = applyMove(s, dealer, forced[0]);
+  check('the contract settled at level 5 with the dealer as maker', s.highBid?.level === 5 && s.highBid?.player === dealer, s.highBid);
+}
+
+section('Hokm: scoring — made and failed contracts both score by tricks actually taken');
+{
+  const base = createMatch(hokm, ['P1', 'P2', 'P3', 'P4'], 3);
+
+  // Made contract: P1's side (seats 0&2, so P1+P3) bid 6 and took 8 — should score exactly 8,
+  // their own actual trick count, not bid*trickValue+overtricks computed as a separate sum
+  // (which happens to equal the same number here only because book is 0 and both values are 1).
+  {
+    const s: MatchState = { ...structuredClone(base), highBid: { player: 'P1', level: 6, strain: 'S' }, tricksWon: { P1: 5, P2: 1, P3: 3, P4: 0 } };
+    scoreContract(s);
+    check('made contract: declaring side scores their own actual trick total', s.scores.P1 === 8 && s.scores.P3 === 8, s.scores);
+    check('made contract: defending side scores 0', s.scores.P2 === 0 && s.scores.P4 === 0, s.scores);
+  }
+
+  // Failed contract: P1's side bid 9 (all of them) and took only 4 — the DEFENCE actually took
+  // 5, and defendersScoreOwnTricks means they score exactly that, not a bridge-style shortfall
+  // penalty of (9-4)*undertrickValue (which would have been 5 here too by coincidence at this
+  // exact level — the next check pins the real distinguishing case).
+  {
+    const s: MatchState = { ...structuredClone(base), highBid: { player: 'P1', level: 9, strain: 'S' }, tricksWon: { P1: 2, P2: 3, P3: 2, P4: 2 } };
+    scoreContract(s);
+    check('failed contract: defending side scores their own actual trick total', s.scores.P2 === 5 && s.scores.P4 === 5, s.scores);
+    check('failed contract: declaring side scores 0', s.scores.P1 === 0 && s.scores.P3 === 0, s.scores);
+  }
+
+  // The distinguishing case: bid 6, took only 2. Shortfall would be (6-2)*undertrickValue = 4.
+  // The defence's ACTUAL tricks are 9-2 = 7. These are different numbers — this is the check
+  // that would fail if defendersScoreOwnTricks silently fell back to the shortfall formula.
+  {
+    const s: MatchState = { ...structuredClone(base), highBid: { player: 'P1', level: 6, strain: 'S' }, tricksWon: { P1: 1, P2: 4, P3: 1, P4: 3 } };
+    scoreContract(s);
+    check('failed contract scores the defence\'s real trick count (7), not the shortfall (4)', s.scores.P2 === 7 && s.scores.P4 === 7, s.scores);
+  }
+}
+
+section('Hokm: the colored and plain jokers cannot ever be forced into the same trick');
+{
+  const base = createMatch(hokm, ['P1', 'P2', 'P3', 'P4'], 3);
+  const coloredJoker: Card = { id: 'JOKER1', rank: 'JOKER', suit: 'JOKER' };
+  const plainJoker: Card = { id: 'JOKER2', rank: 'JOKER', suit: 'JOKER' };
+  const spadeAce: Card = { id: 'SA', rank: 'A', suit: 'S' };
+
+  function midTrick(tricksPlayed: number, hand: Card[]): MatchState {
+    const s: MatchState = structuredClone(base);
+    s.phase = 'playing';
+    s.auctionRound = 0;
+    s.highBid = { player: 'P1', level: 6, strain: 'S' };
+    s.trumpSuit = 'S';
+    s.maker = 'P1';
+    s.turnIndex = s.players.indexOf('P1');
+    s.trickPlays = [];
+    s.lead = null;
+    s.zones['hand:P1'] = hand;
+    s.vars.tricksPlayed = String(tricksPlayed);
+    return s;
+  }
+
+  const playCardIds = (s: MatchState) => legalMoves(s, 'P1').filter((m) => m.actionId === 'playToTrick').map((m) => m.cardId);
+
+  {
+    const ids = playCardIds(midTrick(0, [coloredJoker, plainJoker, spadeAce]));
+    check('trick 1: the colored joker is not a legal play yet', !ids.includes('JOKER1'), ids);
+    check('trick 1: the plain joker is legal but not the only option', ids.includes('JOKER2') && ids.includes('SA'), ids);
+  }
+  {
+    const ids = playCardIds(midTrick(2, [coloredJoker, plainJoker, spadeAce]));
+    check('trick 3: still holding it, the plain joker becomes the ONLY legal play', ids.length === 1 && ids[0] === 'JOKER2', ids);
+  }
+  {
+    const ids = playCardIds(midTrick(2, [coloredJoker, spadeAce]));
+    check('trick 3 without the plain joker in hand: no lockout, ordinary cards stay legal', ids.includes('SA'), ids);
+    check('trick 3 without the plain joker in hand: the colored joker is still blocked', !ids.includes('JOKER1'), ids);
+  }
+  {
+    const ids = playCardIds(midTrick(3, [coloredJoker, spadeAce]));
+    check('trick 4: the colored joker becomes legal', ids.includes('JOKER1'), ids);
   }
 }
 

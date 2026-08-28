@@ -67,7 +67,10 @@ export function cardTags(def: GameDefinition, card: Card): string[] {
   const tags: string[] = [];
   const key = cardKey(card);
   for (const [tag, spec] of Object.entries(def.deck.tags)) {
-    if (spec.ranks.includes(card.rank) || spec.cards?.includes(key)) tags.push(tag);
+    // `cards` mostly names a suit+rank so every physical copy across a multi-deck shoe gets the
+    // tag together — but two jokers share that same suit+rank and have nothing else to tell
+    // them apart by, so a tag naming a card's own unique id reaches the one copy, not the pair.
+    if (spec.ranks.includes(card.rank) || spec.cards?.includes(key) || spec.cards?.includes(card.id)) tags.push(tag);
   }
   return tags;
 }
