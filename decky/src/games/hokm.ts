@@ -15,12 +15,22 @@ import { GameDefinition } from '../engine/types';
 // the dealer names trump, so a hand is never wasted for want of anyone willing to commit.
 //
 // Both jokers beat everything, dealt with by the same `jokerRank: 'trump'` Five Hundred already
-// proved. What makes them a pair rather than one card twice is timing: the colored joker (the
-// first one built per deck, see src/ui/Card.tsx) cannot be played before the fourth trick — play
-// it early and it is just a wasted top card — and the plain joker cannot be HELD past the third:
-// whoever has it is forced to spend it there, no matter how the trick is running. Because the
-// two windows never overlap, the two jokers can never actually be compared against each other in
-// the same trick, which is what "the colored one beats the plain one" would mean.
+// proved — and, like Five Hundred's, a joker is never bound by the led suit: it can be played
+// on top of any suit, whether or not its holder could have followed. What makes the two jokers
+// a pair rather than one card twice is timing: the colored joker (the first one built per deck,
+// see src/ui/Card.tsx) cannot be played before the fourth trick — play it early and it is just
+// a wasted top card — and the plain joker cannot be HELD past the third: whoever has it is
+// forced to spend it there, no matter how the trick is running. That forcing is the "or it's
+// burned" deadline made airtight — the rule guarantees the card is gone from its holder's hand
+// by trick 3, so the burn it stands in for never has a chance to happen. A literal version, where
+// the card just vanishes from a hand mid-hand if nobody plays it in time, was tried and reverted:
+// it leaves that one player short a card relative to the rest of the table, and this engine's
+// trick resolver waits for exactly one play from every seat still in the hand before it will
+// close a trick — a genuine short seat stalls the very last trick outright rather than "burning"
+// anything. Forcing the discard early gets the same outcome (the card is spent and gone well
+// before the colored joker is even legal) without that risk. Because the two windows never
+// overlap, the two jokers can never actually be compared against each other in the same trick,
+// which is what "the plain one has to go before the colored one" means here.
 //
 // Neither joker may OPEN a trick, either — a joker only ever comes in on somebody else's lead,
 // never as the first card down. The one exception is the plain joker's own forced-out trick: if
@@ -39,10 +49,11 @@ export const hokm: GameDefinition = {
       + 'around and nobody bids? The dealer’s side is stuck with 5 and the dealer names trump, '
       + 'so a hand is never wasted. Play out all nine tricks: whichever side ends up with more of '
       + 'them — the bidders if they reached their number, the defence if they didn’t — '
-      + 'scores one point per trick THAT side actually took. Both jokers beat every other card, '
-      + 'and neither may open a trick — they can only come in on somebody else’s lead. '
-      + 'The colored joker also cannot be played before the fourth trick; the plain joker cannot '
-      + 'be held past the third — whoever has it must play it there, lead or not.',
+      + 'scores one point per trick THAT side actually took. Both jokers beat every other card '
+      + 'and can be played over any suit, but neither may open a trick — they can only come in '
+      + 'on somebody else’s lead. The colored joker also cannot be played before the fourth '
+      + 'trick; the plain joker cannot be held past the third — whoever has it must play it '
+      + 'there, lead or not, so it is always spent well before the colored one is even legal.',
     players: { min: 4, max: 4, step: 2 },
     family: 'trick-taking',
   },

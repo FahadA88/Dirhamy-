@@ -1791,6 +1791,14 @@ function trickLegalMoves(state: MatchState, playerId: string): Move[] {
   if (cfg.mustFollowSuit && state.lead) {
     const following = hand.filter((c) => suitOf(state, c) === state.lead);
     if (following.length) playable = following;
+    // A ranking joker (jokerRank 'trump' or 'high') is never bound by follow-suit: it can beat
+    // any trick regardless of what was led, so holding the led suit doesn't lock it out. Without
+    // this it would silently vanish from `playable` whenever suitOf() reports it as trump rather
+    // than the led suit and the hand also holds a card of that led suit.
+    if (cfg.jokerRank && cfg.jokerRank !== 'low') {
+      const rankingJokers = hand.filter((c) => c.rank === 'JOKER' && !playable.includes(c));
+      if (rankingJokers.length) playable = [...playable, ...rankingJokers];
+    }
   }
 
   // Leading the "broken" suit is barred until it has shown up in a trick — unless it's all

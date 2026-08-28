@@ -1,7 +1,7 @@
 import { Card } from '../engine/types';
 import { useSettings } from '../settings/SettingsContext';
 import { Suit, SuitId } from './Suit';
-import { CourtFigure } from './Court';
+import { CourtFigure, JokerFigure } from './Court';
 
 // Four-color deck (a common accessibility option): clubs green, diamonds blue, hearts red,
 // spades black. Classic mode: red for hearts/diamonds, black for the rest.
@@ -45,7 +45,9 @@ export function CardFace({ card }: { card: Card }) {
   const FOUR = face === 'four-color' || face === 'letters' || face === 'shapes';
   const style = FOUR ? { color: FOUR_COLOR[card.suit] } : coloredJoker ? { color: FOUR_COLOR.JOKER } : undefined;
   const pips = PIPS[card.rank];
-  const isCourt = card.rank === 'J' || card.rank === 'Q' || card.rank === 'K';
+  // The joker sits in the same framed panel a court figure does — it earns one too, now that it
+  // is a figure rather than a bare star standing in for a face nobody drew.
+  const isCourt = card.rank === 'J' || card.rank === 'Q' || card.rank === 'K' || card.rank === 'JOKER';
 
   const suit = card.suit as SuitId;
 
@@ -80,6 +82,8 @@ export function CardFace({ card }: { card: Card }) {
             </span>
           ))}
         </div>
+      ) : card.rank === 'JOKER' ? (
+        <div className="court-art" aria-hidden="true"><JokerFigure /></div>
       ) : isCourt ? (
         <div className="court-art" aria-hidden="true"><CourtFigure rank={label as 'J' | 'Q' | 'K'} suit={suit} /></div>
       ) : (

@@ -1169,6 +1169,19 @@ section('Hokm: neither joker can lead a trick, and the two never collide in the 
     check('trick 3 without the plain joker in hand: no lockout, ordinary cards stay legal', ids.includes('SA'), ids);
     check('trick 3 without the plain joker in hand: the colored joker is still blocked (timing)', !ids.includes('JOKER1'), ids);
   }
+
+  // A ranking joker (jokerRank 'trump') is never bound by follow-suit — it stays legal even when
+  // the hand also holds a card of the actual led suit, which is exactly the case suitOf()'s
+  // "report the joker as trump, not the led suit" branch used to silently filter out of
+  // `playable` whenever trump and the led suit differed. Trick 4 so the colored-joker timing
+  // lock is out of the way too.
+  {
+    // midTrick leads with a heart (heartSix) while trump is spades — a led suit that differs
+    // from trump, which is the exact condition the bug needed.
+    const heartKing: Card = { id: 'HK', rank: 'K', suit: 'H' };
+    const ids = playCardIds(midTrick(3, false, [coloredJoker, heartKing]));
+    check('holding the led suit does not lock the colored joker out of a differently-trumped trick', ids.includes('JOKER1') && ids.includes('HK'), ids);
+  }
 }
 
 console.log(failed ? '\nMECHANICS: FAILED' : '\nMECHANICS: all checks passed');

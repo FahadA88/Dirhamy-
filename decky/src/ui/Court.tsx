@@ -101,3 +101,60 @@ export function CourtFigure({ rank, suit }: { rank: 'J' | 'Q' | 'K'; suit: SuitI
     </svg>
   );
 }
+
+// The joker's own half-figure, same construction as a court card — mirrored top and bottom
+// about the panel centre — but its own character rather than a fourth rank grafted onto the
+// same body. A three-point cap stands in for the crown, a grin for the court cards' flat
+// mouth, and the one prop every court figure holds out to the side becomes a bauble on a
+// stick — a jester's own mock-sceptre — in exactly the king's sceptre position.
+//
+// Built at the same weight as the crown on purpose: one bold zigzag silhouette rather than a
+// woven, curling one. An earlier draft drew the cap as a looping curved ribbon and tiled three
+// small diamonds across the collar — striking at card size, mud at thumbnail size, which is
+// the one failure mode this whole file exists to avoid (see the header comment above).
+function JokerHalf() {
+  return (
+    <g>
+      {/* the collar, scalloped into points rather than the court robe's plain shoulder line */}
+      <path d="M19 75V64c0-2 1-4 3-5l7 9 8-10 8 10 8-10 7 9c2 1 3 3 3 5v11z" fill="currentColor" />
+      {/* one gold notch at the collar's centre point, the single "motley" accent this palette
+          allows rather than a pattern tiled across it */}
+      <path d="M46 62l4 6 4-6" fill="none" stroke={GOLD} strokeWidth="1.4" strokeLinecap="round" />
+      <path d="M22 75c1-9 7-14 17-16M78 75c-1-9-7-14-17-16" fill="none" stroke={GOLD}
+        strokeWidth="1.3" opacity=".9" />
+
+      {/* head */}
+      <circle cx="50" cy="34" r="11" fill="var(--card-bg,#fdfcf7)" stroke="currentColor" strokeWidth="1.8" />
+      <circle cx="46" cy="33" r="1.4" fill="currentColor" />
+      <circle cx="54" cy="33" r="1.4" fill="currentColor" />
+      {/* a grin, curved rather than the court cards' flat mouth — the one expression the size
+          allows, and enough to read as "amused" rather than the court cards' level gaze */}
+      <path d="M44.5 38c3 3.5 8 3.5 11 0" stroke="currentColor" strokeWidth="1.3"
+        strokeLinecap="round" fill="none" />
+
+      {/* the three-point cap, built exactly like the crown's zigzag ribbon — same technique,
+          three peaks instead of the crown's implied four, a bell at each tip instead of a band */}
+      <path d="M35 25l4-13 6 8 5-11 5 11 6-8 4 13z" fill="currentColor" />
+      <circle cx="39" cy="12" r="2.6" fill={GOLD} stroke={GOLD_HI} strokeWidth=".8" />
+      <circle cx="50" cy="9" r="2.6" fill={GOLD} stroke={GOLD_HI} strokeWidth=".8" />
+      <circle cx="61" cy="12" r="2.6" fill={GOLD} stroke={GOLD_HI} strokeWidth=".8" />
+
+      {/* the marotte, held out where every other court figure's one prop goes */}
+      <rect x="82" y="40" width="2.6" height="35" rx="1.3" fill={GOLD} />
+      <circle cx="83.3" cy="36" r="4" fill="var(--card-bg,#fdfcf7)" stroke={GOLD} strokeWidth="1.1" />
+    </g>
+  );
+}
+
+export function JokerFigure() {
+  return (
+    <svg className="court-svg" viewBox="0 0 100 150" aria-hidden="true" focusable="false"
+      preserveAspectRatio="xMidYMid meet">
+      <JokerHalf />
+      <g transform="rotate(180 50 75)"><JokerHalf /></g>
+      <g stroke={GOLD} strokeWidth="1" opacity=".65">
+        <path d="M6 73.5h88M6 76.5h88" />
+      </g>
+    </svg>
+  );
+}
