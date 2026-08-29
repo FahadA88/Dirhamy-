@@ -80,6 +80,11 @@ export interface Knobs {
    * credit whichever side is already guaranteed with the tricks nobody's fate depends on anymore.
    */
   contractConcedeWhenDecided: boolean;
+  /**
+   * A bid names a level only — nobody commits to a strain while the auction is still running.
+   * Whoever's bid stands when it closes names trump as a separate decision afterward.
+   */
+  contractChooseTrumpAfter: boolean;
   bowers: boolean;           // trump jack, then the same-colour jack, top the trump suit
   goAlone: boolean;          // the maker may cut their partner out of the hand
   shootTheMoon: boolean;     // sweeping every penalty point scores you 0 and everyone else the pot
@@ -311,6 +316,7 @@ export const defaultKnobs: Knobs = {
   contractDealerMustBidLevel: 1,
   contractDefendersScoreOwnTricks: false,
   contractConcedeWhenDecided: false,
+  contractChooseTrumpAfter: false,
   bowers: false,
   goAlone: false,
   shootTheMoon: false,
@@ -1076,6 +1082,7 @@ function buildTrickDefinition(knobs: Knobs, id: string): GameDefinition {
           : {}),
         ...(knobs.contractDefendersScoreOwnTricks ? { defendersScoreOwnTricks: true } : {}),
         ...(knobs.contractConcedeWhenDecided ? { concedeWhenDecided: true } : {}),
+        ...(knobs.contractChooseTrumpAfter ? { chooseTrumpAfter: true } : {}),
       } : undefined,
       // jacksAreTrumps promotes all four jacks out of their printed suits; bowers only promotes
       // two while leaving the other two where they are printed — a jack cannot be both at once.
@@ -1262,6 +1269,7 @@ export function knobsFromDefinition(def: GameDefinition): Knobs {
     contractDealerMustBidLevel: def.trick?.numericAuction?.dealerMustBid ?? 1,
     contractDefendersScoreOwnTricks: !!def.trick?.numericAuction?.defendersScoreOwnTricks,
     contractConcedeWhenDecided: !!def.trick?.numericAuction?.concedeWhenDecided,
+    contractChooseTrumpAfter: !!def.trick?.numericAuction?.chooseTrumpAfter,
     bowers: !!def.trick?.bowers,
     goAlone: !!def.trick?.goAlone,
     shootTheMoon: !!def.trick?.shootTheMoon,

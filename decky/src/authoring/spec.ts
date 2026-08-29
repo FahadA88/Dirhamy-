@@ -37,7 +37,7 @@ const BY_FAMILY: Record<Knobs['family'], (keyof Knobs)[]> = {
     'contractAuction', 'contractMinLevel', 'contractMaxLevel', 'contractBook', 'contractNoTrump',
     'contractTrickValue', 'contractOvertrickValue', 'contractUndertrickValue', 'contractSlamBonus',
     'contractOnCardPoints', 'contractCardPointsTarget', 'contractDealerMustBid', 'contractDealerMustBidLevel',
-    'contractDefendersScoreOwnTricks', 'contractConcedeWhenDecided',
+    'contractDefendersScoreOwnTricks', 'contractConcedeWhenDecided', 'contractChooseTrumpAfter',
     'jokerRank', 'penaltyCards', 'seatStep', 'handSizeBySeats',
     'handPassCount', 'jacksAreTrumps', 'soloDeclarer', 'turnedTrump', 'meldMarriage', 'meldMarriagePoints'],
   climb: ['handSize', 'climbTwosHigh', 'climbCombos', 'climbBombSize', 'direction'],

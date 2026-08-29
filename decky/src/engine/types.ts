@@ -644,6 +644,14 @@ export interface NumericAuctionConfig {
    * out cards nobody's contest depends on anymore), and the hand is scored immediately.
    */
   concedeWhenDecided?: boolean;
+  /**
+   * The bid itself is just a number — nobody names a strain while the auction is still running.
+   * Whoever's bid stands when the auction closes then picks trump, as a separate decision made
+   * with full knowledge of what they actually won the right to declare. `strains` still governs
+   * what they're allowed to name (minus any bookkeeping meaning for outbidding, since a level-only
+   * auction has nothing else to break a tie on).
+   */
+  chooseTrumpAfter?: boolean;
 }
 
 /**
@@ -982,7 +990,7 @@ export interface MatchState {
   handNumber: number;                  // 1-indexed
   matchOver: boolean;
   matchWinner: string | null;
-  pendingChoice: { type: 'suit'; player: string; setState: string } | null;
+  pendingChoice: { type: 'suit'; player: string; setState: string; purpose?: 'contractTrump' } | null;
   // A simultaneous card pass in progress (e.g. "everyone passes a card left"), triggered by
   // the passCards effect. While set, EVERY player (not just whoever's turn it is) may submit
   // a `choosePass` move; once all have chosen, the swap resolves atomically and turn flow
@@ -1054,8 +1062,10 @@ export interface MatchState {
    */
   layoutIdle: number;
   kentLetters: Record<string, number>;
-  // numeric (Bridge-style) contract auction: the standing high bid, if any.
-  highBid: { player: string; level: number; strain: Strain } | null;
+  // numeric (Bridge-style) contract auction: the standing high bid, if any. `strain` is absent
+  // between winning the bid and actually naming trump when `chooseTrumpAfter` is on — see that
+  // flag on NumericAuctionConfig.
+  highBid: { player: string; level: number; strain?: Strain } | null;
   // rummy: the shared melds zone is one flat pile of cards with no separators, so this is the
   // record of where each group actually starts and ends — the length of each meld, in order.
   // Without it, re-deriving groups from the flat array by "same rank or same suit" adjacency is
@@ -1236,7 +1246,7 @@ export interface RedactedState {
   /** How many valid trios are actually on the board right now — not which ones. */
   setsAvailable?: number;
   // numeric (Bridge-style) auction
-  highBid?: { player: string; level: number; strain: Strain } | null;
+  highBid?: { player: string; level: number; strain?: Strain } | null;
   /** True while a contract auction is still running. */
   contractAuction?: boolean;
   /** How many tricks the standing contract promises, once there is one. */

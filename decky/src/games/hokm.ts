@@ -10,9 +10,12 @@ import { GameDefinition } from '../engine/types';
 // 2 jokers = 36, which splits into four hands of nine with nothing left over.
 //
 // The auction is a number, not a level-and-strain pair with a book added on: a bid of 6 promises
-// six tricks, not six-plus-some-fixed-extra. Whoever wins the auction names trump. If everybody
-// passes, the deal is not thrown in — the dealer's side is stuck with a mandatory bid of five and
-// the dealer names trump, so a hand is never wasted for want of anyone willing to commit.
+// six tricks, not six-plus-some-fixed-extra, and nobody names a suit while it's still running —
+// `chooseTrumpAfter` means a bid is nothing but that number. Trump gets named once, by whoever's
+// bid stands when the auction closes, as its own separate decision rather than baked into the
+// bid itself. If everybody passes, the deal is not thrown in — the dealer's side is stuck with a
+// mandatory bid of five and the dealer names trump, so a hand is never wasted for want of anyone
+// willing to commit.
 //
 // A hand does not play itself out once its fate no longer depends on it. Bid 7 and the defence
 // alone has already taken enough tricks that the other six left in play cannot add up to 7
@@ -51,7 +54,8 @@ export const hokm: GameDefinition = {
     description:
       'Partners, a 36-card deck (no 2s through 5s, and the 6 of diamonds and clubs are out too), '
       + 'and trump chosen by bid rather than fixed by the dealer. Nine cards each. Bid a number of '
-      + 'tricks from 6 to 9 — each bid must beat the last — and whoever wins names trump. Pass it '
+      + 'tricks from 6 to 9 — each bid must beat the last, and a bid is just that number, no suit '
+      + 'attached. Whoever’s bid stands then names trump, once the auction is actually over. Pass it '
       + 'around and nobody bids? The dealer’s side is stuck with 5 and the dealer names trump, '
       + 'so a hand is never wasted. Play out all nine tricks: whichever side ends up with more of '
       + 'them — the bidders if they reached their number, the defence if they didn’t — '
@@ -125,6 +129,10 @@ export const hokm: GameDefinition = {
       // fate still turns on, the hand ends the moment either side's outcome is locked in, and
       // whichever side is already guaranteed the win is credited the rest of the tricks.
       concedeWhenDecided: true,
+      // A bid is a number, not a number-and-suit — nobody commits to a strain while the auction
+      // is still live, the way the traditional game works. Only the player who actually wins the
+      // bid ever names trump, once the auction is over and it is genuinely theirs to call.
+      chooseTrumpAfter: true,
     },
     // Both jokers rank above every trump — this is the exact mechanism Five Hundred uses for its
     // one joker; Hokm's timing restrictions below are what turn a single top card into a pair.

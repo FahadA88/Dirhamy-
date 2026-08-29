@@ -1068,6 +1068,39 @@ section('Hokm: an all-pass auction sticks the dealer with a mandatory 5, not a t
   check('the contract settled at level 5 with the dealer as maker', s.highBid?.level === 5 && s.highBid?.player === dealer, s.highBid);
 }
 
+// Regression: trickLegalMoves() is its own function, reached directly from the family dispatch
+// in both legalMoves() and applyMove() — it never falls through to the generic pendingChoice
+// handling those two functions already had for other families. Adding chooseTrumpAfter (a
+// pendingChoice pause inside a trick game) exposed both gaps at once: the winning bidder had
+// zero legal moves (trickLegalMoves didn't know to offer resolveChoice), and even a hand-built
+// resolveChoice move got swallowed by applyTrickMove instead of the intended handler (def.trick
+// was dispatched before the resolveChoice check in applyMove). Both are fixed at the engine
+// level, not just for Hokm, but this hand is what actually exercises the path.
+section('Hokm: the bid is a number only — trump is named separately once the auction is won');
+{
+  let s = createMatch(hokm, ['P1', 'P2', 'P3', 'P4'], 5);
+  for (let i = 0; i < 3; i++) s = applyMove(s, s.players[s.turnIndex], { actionId: 'passBid' });
+  const bidder = s.players[s.turnIndex];
+  const bidMoves = legalMoves(s, bidder).filter((m) => m.actionId === 'contractBid');
+  check('every bid on offer is a bare level with no strain attached', bidMoves.length > 0 && bidMoves.every((m) => m.strain === undefined), bidMoves);
+  s = applyMove(s, bidder, bidMoves[0]);
+  for (let i = 0; i < 3; i++) s = applyMove(s, s.players[s.turnIndex], { actionId: 'passBid' });
+
+  check('winning the bid does not name trump by itself', s.highBid?.level === bidMoves[0].level && s.highBid?.strain === undefined, s.highBid);
+  check('the auction winner now has a suit to choose from, not a card to play', s.pendingChoice?.player === bidder, s.pendingChoice);
+  const others = s.players.filter((p) => p !== bidder);
+  check('nobody else gets a say in what trump becomes', others.every((p) => legalMoves(s, p).length === 0), others.map((p) => legalMoves(s, p)));
+  const choiceMoves = legalMoves(s, bidder);
+  check('the winner is offered all four suits to name', choiceMoves.length === 4 && choiceMoves.every((m) => m.actionId === 'resolveChoice'), choiceMoves);
+
+  s = applyMove(s, bidder, { actionId: 'resolveChoice', choice: 'H' });
+  check('naming trump fills in the bid\'s strain', s.highBid?.strain === 'H', s.highBid);
+  check('naming trump sets the actual trump suit', s.trumpSuit === 'H', s.trumpSuit);
+  check('the pending choice is cleared', s.pendingChoice === null, s.pendingChoice);
+  check('play opens with the seat to the bidder\'s left', s.players[s.turnIndex] === s.players[(s.players.indexOf(bidder) + 1) % 4], s.turnIndex);
+  check('trick play is actually live now', legalMoves(s, s.players[s.turnIndex]).every((m) => m.actionId === 'playToTrick'), legalMoves(s, s.players[s.turnIndex]));
+}
+
 section('Hokm: scoring — made and failed contracts both score by tricks actually taken');
 {
   const base = createMatch(hokm, ['P1', 'P2', 'P3', 'P4'], 3);

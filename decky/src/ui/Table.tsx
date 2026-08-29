@@ -1306,7 +1306,10 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
             </span>
             <p className="bid-line">
               {view.highBid
-                ? <>Standing bid <b>{view.highBid.level}{view.highBid.strain === 'NT' ? 'NT' : SUIT_SYMBOLS[view.highBid.strain]}</b> by {nameOf(view.highBid.player)}</>
+                ? view.highBid.strain
+                  ? <>Standing bid <b>{view.highBid.level}{view.highBid.strain === 'NT' ? 'NT' : SUIT_SYMBOLS[view.highBid.strain]}</b> by {nameOf(view.highBid.player)}</>
+                  // Trump isn't named until the auction closes — the standing bid is just a number.
+                  : <>Standing bid <b>{view.highBid.level}</b> by {nameOf(view.highBid.player)} — trump named once the auction closes</>
                 : 'Nobody has bid yet.'}
             </p>
             {view.isYourTurn ? (
@@ -1319,7 +1322,12 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
                         <span className="cr-level">{level}</span>
                         {myLegal
                           .filter((m) => m.actionId === 'contractBid' && m.level === level)
-                          .map((m) => (
+                          .map((m) => m.strain === undefined ? (
+                            // A level-only auction: one bid per level, trump comes later.
+                            <button key={level} className="cr-bid cr-bid-level" aria-label={`Bid ${level}`} onClick={() => submit(m)}>
+                              {level}
+                            </button>
+                          ) : (
                             <button key={`${level}-${m.strain}`} className={`cr-bid s-${m.strain}`}
                               aria-label={`Bid ${level} ${m.strain === 'NT' ? 'no trump' : SUIT_NAMES[m.strain as string] ?? m.strain}`}
                               onClick={() => submit(m)}>
@@ -2300,7 +2308,7 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
       {suitPickerOpen && (
         <div className="modal">
           <div className="modal-box" ref={suitRef} role="dialog" aria-modal="true" aria-label="Choose a suit">
-            <h3>Wild card — choose a suit</h3>
+            <h3>{view.pendingChoice?.purpose === 'contractTrump' ? 'You won the bid — name trump' : 'Wild card — choose a suit'}</h3>
             <div className="suit-choices">
               {(['C', 'D', 'H', 'S'] as const).map((s) => (
                 <button key={s} className={`suit-btn s-${s}`} aria-label={SUIT_NAMES[s]} onClick={() => submit({ actionId: 'resolveChoice', choice: s })}>{SUIT_SYMBOLS[s]}</button>

@@ -1054,6 +1054,33 @@ export function applyMove(state: MatchState, playerId: string, move: Move): Matc
 
   if (move.actionId === 'choosePass') return applyChoosePass(s, playerId, move);
 
+  // Resolve a pending suit choice. Generic across every family — some (trick games, via
+  // chooseTrumpAfter) route their own moves through a family-specific apply function below, so
+  // this has to be handled before that dispatch, not after it, or a resolveChoice move for one
+  // of those families would be handed to a family handler that has never heard of it.
+  if (move.actionId === 'resolveChoice') {
+    if (!s.pendingChoice || s.pendingChoice.player !== playerId) return s;
+    // Naming trump after winning a level-only contract auction is its own kind of choice: it
+    // finishes settling the contract (see settleContract's chooseTrumpAfter branch) rather than
+    // just stashing a var and handing the turn on, so it gets its own resolution here instead of
+    // falling into the generic path below.
+    if (s.pendingChoice.purpose === 'contractTrump') {
+      const bid = s.highBid!;
+      bid.strain = move.choice as Strain;
+      s.trumpSuit = move.choice as Suit;
+      const need = bid.level + s.definition.trick!.numericAuction!.book;
+      log(s, playerId, `${short(playerId)} names ${suitWord(move.choice!)} trump — ${need} tricks to make ${bid.level}.`);
+      s.pendingChoice = null;
+      s.turnIndex = (s.players.indexOf(bid.player) + 1) % s.players.length;
+      return s;
+    }
+    s.vars[s.pendingChoice.setState] = move.choice!;
+    log(s, playerId, `${short(playerId)} chose ${suitWord(move.choice!)}.`);
+    s.pendingChoice = null;
+    advanceAndCheck(s);
+    return s;
+  }
+
   // Every family gets the same rule hooks. The handlers below own the mechanics; this wrapper
   // owns the author's layer, so a rule behaves identically whichever family it rides on.
   const handBefore = (s.zones[`hand:${playerId}`] || []).slice();
@@ -1072,16 +1099,6 @@ export function applyMove(state: MatchState, playerId: string, move: Move): Matc
   if (def.swap) return afterFamilyMove(applySwapMove(s, playerId, move), playerId, handBefore);
   if (def.maid) return afterFamilyMove(applyMaidMove(s, playerId, move), playerId, handBefore);
   if (def.set) return afterFamilyMove(applySetMove(s, playerId, move), playerId, handBefore);
-
-  // Resolve a pending suit choice.
-  if (move.actionId === 'resolveChoice') {
-    if (!s.pendingChoice || s.pendingChoice.player !== playerId) return s;
-    s.vars[s.pendingChoice.setState] = move.choice!;
-    log(s, playerId, `${short(playerId)} chose ${suitWord(move.choice!)}.`);
-    s.pendingChoice = null;
-    advanceAndCheck(s);
-    return s;
-  }
 
   // Validate the move is currently legal.
   const legal = legalMoves(s, playerId);
@@ -1733,6 +1750,15 @@ export function trickStrength(s: MatchState, card: Card): number {
 function trickLegalMoves(state: MatchState, playerId: string): Move[] {
   const cfgEarly = state.definition.trick!;
 
+  // Naming trump after winning a chooseTrumpAfter auction (see settleContract) is the trick
+  // family's own use of the engine-wide pendingChoice pause. Trick games route here directly
+  // rather than through the generic dispatcher that already checks this, so it needs its own
+  // check — without it, the winning bidder had zero legal moves and the hand stalled forever.
+  if (state.pendingChoice) {
+    if (state.pendingChoice.player !== playerId) return [];
+    return (['C', 'D', 'H', 'S'] as const).map((suit) => ({ actionId: 'resolveChoice', choice: suit }));
+  }
+
   // The dealer owes a discard after taking the upcard — nothing else can happen until they do.
   if (state.discarding) {
     if (state.discarding !== playerId) return [];
@@ -2111,6 +2137,22 @@ function contractBidMoves(state: MatchState): Move[] {
   const cfg = state.definition.trick!.numericAuction!;
   const n = state.players.length;
 
+  // A level-only auction: nobody names a strain until they've actually won the right to, so a
+  // bid is just a number to beat, and there's nothing else to rank it against.
+  if (cfg.chooseTrumpAfter) {
+    if (cfg.dealerMustBid && !state.highBid && state.auctionPasses === n - 1
+      && state.players[state.turnIndex] === state.players[state.dealerIndex]) {
+      return [{ actionId: 'contractBid', level: cfg.dealerMustBid }];
+    }
+    const moves: Move[] = [];
+    const floorLevel = state.highBid ? state.highBid.level : cfg.minLevel - 1;
+    for (let level = Math.max(cfg.minLevel, floorLevel + 1); level <= cfg.maxLevel; level++) {
+      moves.push({ actionId: 'contractBid', level });
+    }
+    moves.push({ actionId: 'passBid' });
+    return moves;
+  }
+
   // Stick the dealer: everybody else has passed and nobody has bid yet, so this is the
   // dealer's last chance — if the game forces a floor here, passing is not one of the options
   // and the only decision left is which suit becomes trump at that fixed level.
@@ -2120,7 +2162,7 @@ function contractBidMoves(state: MatchState): Move[] {
   }
 
   const moves: Move[] = [];
-  const floor = state.highBid ? bidRank(cfg, state.highBid.level, state.highBid.strain) : -1;
+  const floor = state.highBid ? bidRank(cfg, state.highBid.level, state.highBid.strain!) : -1;
   for (let level = cfg.minLevel; level <= cfg.maxLevel; level++) {
     for (const strain of cfg.strains) {
       if (bidRank(cfg, level, strain) > floor) {
@@ -2158,6 +2200,10 @@ function applyContractBid(s: MatchState, playerId: string, move: Move): MatchSta
       return s;
     }
     if (s.highBid && s.auctionPasses >= closeAfter) return settleContract(s);
+  } else if (cfg.chooseTrumpAfter) {
+    s.highBid = { player: playerId, level: move.level! };
+    s.auctionPasses = 0;
+    log(s, playerId, `${short(playerId)} bids ${move.level}.`);
   } else {
     s.highBid = { player: playerId, level: move.level!, strain: move.strain as Strain };
     s.auctionPasses = 0;
@@ -2174,17 +2220,28 @@ function strainLabel(strain: Strain): string {
 
 const SUIT_GLYPH: Record<string, string> = { C: '\u2663', D: '\u2666', H: '\u2665', S: '\u2660' };
 
-/** The auction is over: the high bid becomes the contract, and its strain becomes trump. */
+/**
+ * The auction is over. Ordinarily the high bid already names its strain and that becomes trump
+ * immediately; with `chooseTrumpAfter`, the bid is still just a number, and the winner is now
+ * asked — trick play does not begin until they answer (see `resolveChoice`'s
+ * `purpose === 'contractTrump'` branch, which finishes what this function starts here).
+ */
 function settleContract(s: MatchState): MatchState {
   const bid = s.highBid!;
   s.auctionRound = 0;
   s.auctionPasses = 0;
+  s.maker = bid.player;
+  const cfg = s.definition.trick!.numericAuction!;
+  if (cfg.chooseTrumpAfter) {
+    log(s, null, `${short(bid.player)} won the bid at ${bid.level} — naming trump.`);
+    s.pendingChoice = { type: 'suit', player: bid.player, setState: '__contractTrump', purpose: 'contractTrump' };
+    return s;
+  }
   // No-trump is exactly that: the suit stays null and the engine's ordinary high-card-of-the-
   // led-suit rule decides every trick.
   s.trumpSuit = bid.strain === 'NT' ? null : (bid.strain as Suit);
-  s.maker = bid.player;
-  const need = bid.level + s.definition.trick!.numericAuction!.book;
-  log(s, null, `${short(bid.player)} plays ${bid.level}${strainLabel(bid.strain)} — ${need} tricks to make it.`);
+  const need = bid.level + cfg.book;
+  log(s, null, `${short(bid.player)} plays ${bid.level}${strainLabel(bid.strain!)} — ${need} tricks to make it.`);
   // The lead is to the declarer's left, as it is in the real game.
   s.turnIndex = (s.players.indexOf(bid.player) + 1) % s.players.length;
   return s;
@@ -2243,7 +2300,7 @@ export function scoreContract(s: MatchState): void {
   if (took >= need) {
     declarerPts = bid.level * cfg.trickValue + (took - need) * cfg.overtrickValue;
     if (cfg.slamBonus && bid.level === cfg.maxLevel) { declarerPts += cfg.slamBonus; s.roundOutcome = 'slam'; }
-    log(s, null, `${short(bid.player)} made ${bid.level}${strainLabel(bid.strain)} with ${took} tricks — ${declarerPts}.`);
+    log(s, null, `${short(bid.player)} made ${bid.level}${strainLabel(bid.strain!)} with ${took} tricks — ${declarerPts}.`);
   } else if (cfg.defendersScoreOwnTricks) {
     defenderPts = defending.reduce((a, p) => a + (s.tricksWon[p] ?? 0), 0);
     log(s, null, `${short(bid.player)} fell short of ${need} — the defence takes the hand with ${defenderPts}.`);
