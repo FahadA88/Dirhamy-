@@ -3,7 +3,8 @@ import { Card, GameDefinition, Move, RedactedState } from '../engine/types';
 import { SUIT_SYMBOLS, buildDeck } from '../engine/deck';
 import { CardFace } from './Card';
 import { AttrCard, describeAttrs } from './AttrCard';
-import { TableDressing, TableRail } from './TableDressing';
+import { TableDressing, TableRail, FeltDust } from './TableDressing';
+import { CountUp } from './CountUp';
 import { DealMotion } from './DealMotion';
 import { ScorePad } from './ScorePad';
 import { Confetti } from './Confetti';
@@ -860,6 +861,7 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
       playSound('ui', settings);
       haptic('refusal', settings.haptics);
       setSelected(null);
+      if (move.cardId) setShakeCard(move.cardId);
       return;
     }
     if (move.actionId === 'playCard' || move.actionId === 'playToTrick' || move.actionId === 'climbPlay' || move.actionId === 'climbBomb') playSound('play', settings);
@@ -959,6 +961,26 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
   );
 
   const hand = useMemo(() => sortHand(view.hand, def, settings.sort), [view.hand, def, settings.sort]);
+
+  // How close the hand is to running out, as a fraction — the vignette at the table's edge
+  // warms toward it. Tracked against the fullest the hand has been *this* deal rather than a
+  // fixed number, so it reads the same whether seven cards were dealt or thirteen.
+  const maxHandSize = useRef(0);
+  useEffect(() => { maxHandSize.current = 0; }, [view.handNumber]);
+  useEffect(() => { maxHandSize.current = Math.max(maxHandSize.current, hand.length); }, [hand.length]);
+  const tension = view.mode === 'trick' && maxHandSize.current > 1
+    ? Math.max(0, 1 - hand.length / maxHandSize.current)
+    : 0;
+
+  // A card that was tapped and refused shakes where it sits, rather than only saying so down
+  // in the toast — the toast can be missed if you are looking at your hand, which is exactly
+  // where this puts the answer.
+  const [shakeCard, setShakeCard] = useState<string | null>(null);
+  useEffect(() => {
+    if (!shakeCard) return;
+    const t = setTimeout(() => setShakeCard(null), 460);
+    return () => clearTimeout(t);
+  }, [shakeCard]);
 
   // Worklist #56: you can already see whose turn it is; the thing missing was who is after
   // them, which is what planning a discard actually needs. Pit, Kent, Set and Reflex have no
@@ -1187,10 +1209,11 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
 
   return (
     <div className="table-wrap">
-    <div className="table" data-felt={settings.tableFelt} ref={tableRef}>
+    <div className="table" data-felt={settings.tableFelt} ref={tableRef} style={{ '--tension': tension } as React.CSSProperties}>
       <TableRail felt={settings.tableFelt} />
       <div className={`felt ${dealing ? 'dealing' : ''}`}>
       <TableDressing felt={settings.tableFelt} title={def.meta.name} />
+      <FeltDust />
       {/* Nothing is dealt to anybody in a set game — the cards go face up on a shared board —
           so a deal animation would be showing something that does not happen. */}
       {!isSet && <DealMotion
@@ -1253,7 +1276,7 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
               )}
               <div className="seat-stats">
                 {isSet ? (
-                  <span className="seat-stat">{view.scores?.[p.id] ?? 0}<i>{(view.scores?.[p.id] ?? 0) === 1 ? 'set' : 'sets'}</i></span>
+                  <span className="seat-stat"><CountUp value={view.scores?.[p.id] ?? 0} /><i>{(view.scores?.[p.id] ?? 0) === 1 ? 'set' : 'sets'}</i></span>
                 ) : isLayout || isSwap ? (
                   // Both families sit somebody's whole holding on the table for the length of
                   // the round — a shared layout, or a face-down row everyone can see the BACKS
@@ -1265,12 +1288,12 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
                   </span>
                 )}
                 {view.mode === 'trick' && view.bids?.[p.id] !== undefined && (
-                  <span className="seat-stat">{view.tricksWon?.[p.id] ?? 0}/{view.bids[p.id]}<i>tricks</i></span>
+                  <span className="seat-stat"><CountUp value={view.tricksWon?.[p.id] ?? 0} />/{view.bids[p.id]}<i>tricks</i></span>
                 )}
                 {view.mode === 'trick' && view.bids?.[p.id] === undefined && (view.tricksWon?.[p.id] ?? 0) > 0 && (
-                  <span className="seat-stat">{view.tricksWon?.[p.id]}<i>won</i></span>
+                  <span className="seat-stat"><CountUp value={view.tricksWon?.[p.id] ?? 0} /><i>won</i></span>
                 )}
-                {isFish && <span className="seat-stat">{view.booksWon?.[p.id] ?? 0}<i>books</i></span>}
+                {isFish && <span className="seat-stat"><CountUp value={view.booksWon?.[p.id] ?? 0} /><i>books</i></span>}
                 {view.mode === 'bluff' && (view.bluffCaught?.[p.id] ?? 0) > 0 && (
                   <span className="seat-stat">{view.bluffCaught![p.id]}<i>caught</i></span>
                 )}
@@ -1890,12 +1913,12 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
             : settings.playerName === 'You' ? 'Your hand' : `${settings.playerName}’s hand`}</span>
           {teamOf(me) && <span className="team-tag">{teamOf(me)}</span>}
           {view.mode === 'trick' && view.bids?.[me] !== undefined && (
-            <span className="seat-stat">{view.tricksWon?.[me] ?? 0}/{view.bids[me]}<i>tricks</i></span>
+            <span className="seat-stat"><CountUp value={view.tricksWon?.[me] ?? 0} />/{view.bids[me]}<i>tricks</i></span>
           )}
           {view.mode === 'trick' && view.bids?.[me] === undefined && (view.tricksWon?.[me] ?? 0) > 0 && (
-            <span className="seat-stat">{view.tricksWon?.[me]}<i>won</i></span>
+            <span className="seat-stat"><CountUp value={view.tricksWon?.[me] ?? 0} /><i>won</i></span>
           )}
-          {isFish && <span className="seat-stat">{view.booksWon?.[me] ?? 0}<i>books</i></span>}
+          {isFish && <span className="seat-stat"><CountUp value={view.booksWon?.[me] ?? 0} /><i>books</i></span>}
           {view.needsPassChoice && (
             <span className="turn-badge">
               {view.passCount > 1
@@ -2039,7 +2062,7 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
                 {view.setsAvailable ?? 0} on the board
               </span>
               <span className="chip mine">
-                You · {view.scores?.[me] ?? 0} {(view.scores?.[me] ?? 0) === 1 ? 'set' : 'sets'}
+                You · <CountUp value={view.scores?.[me] ?? 0} /> {(view.scores?.[me] ?? 0) === 1 ? 'set' : 'sets'}
               </span>
             </div>
             <div className="set-board" data-slot="board" role="group" aria-label="The board">
@@ -2289,7 +2312,7 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
                 style={{ '--i': i, '--n': hand.length } as React.CSSProperties}
                 tabIndex={playable ? (isCursor ? 0 : -1) : -1}
                 aria-label={cardLabel(c, playable, staged ? 'picked to pass' : undefined)}
-                className={`card-btn ${playable ? 'playable' : 'dim'} ${staged ? 'staged' : ''} ${hint === c.id ? 'hinted' : ''} ${(isFish ? c.rank === askRank : selected === c.id) ? 'selected' : ''} ${dragGhost?.cardId === c.id ? 'drag-source' : ''}`}
+                className={`card-btn ${playable ? 'playable' : 'dim'} ${staged ? 'staged' : ''} ${hint === c.id ? 'hinted' : ''} ${(isFish ? c.rank === askRank : selected === c.id) ? 'selected' : ''} ${dragGhost?.cardId === c.id ? 'drag-source' : ''} ${shakeCard === c.id ? 'shake' : ''}`}
                 disabled={!playable}
                 onFocus={() => { if (idx >= 0) setCursor(idx); }}
                 onClick={() => clickCard(c.id)}

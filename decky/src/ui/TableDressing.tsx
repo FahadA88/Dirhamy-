@@ -251,6 +251,33 @@ export function TableDressing({ felt, title }: { felt: TableFelt; title: string 
   );
 }
 
+const DUST_N = 12;
+
+// Motes of light, drifting up off the cloth. Purely atmospheric — deterministic per index for
+// the same reason Confetti's positions are, so a re-render does not restart every mote at a
+// new, jarring spot.
+export function FeltDust() {
+  return (
+    <div className="felt-dust" aria-hidden="true">
+      {Array.from({ length: DUST_N }, (_, i) => {
+        const left = (i * 8.3 + (i % 3) * 11) % 100;
+        const delay = (i * 1.7) % 9;
+        const dur = 9 + (i % 5) * 2.2;
+        const size = 2 + (i % 3);
+        return (
+          <span
+            key={i}
+            style={{
+              left: `${left}%`, width: size, height: size,
+              animationDelay: `${delay}s`, animationDuration: `${dur}s`,
+            }}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
 // Chrome drink wells set into the rail — rail furniture, so it sits above the cloth.
 export function TableRail({ felt }: { felt: TableFelt }) {
   if (felt !== 'mahogany') return null;

@@ -3,6 +3,7 @@ import { PlayView } from './PlayView';
 import { ProfileView } from './ProfileView';
 import { Backdrop } from './Backdrop';
 import { startCardSheen } from './cardSheen';
+import { startMagneticButtons, startTableParallax } from './tableFx';
 import { SettingsPanel } from './SettingsPanel';
 import { SiteNav, navStyle } from './SiteNav';
 import { FirstRun } from './FirstRun';
@@ -61,6 +62,9 @@ export function App() {
   const [dailyTrigger, setDailyTrigger] = useState(0);
   // One document-level listener, started once: see cardSheen.ts.
   useEffect(() => startCardSheen(), []);
+  // Two more of the same shape: see tableFx.ts.
+  useEffect(() => startMagneticButtons(), []);
+  useEffect(() => startTableParallax(), []);
   return (
     <div className={`app nav-is-${nav}`}>
       <ColorVisionFilters />

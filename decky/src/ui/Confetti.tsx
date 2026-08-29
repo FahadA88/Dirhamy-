@@ -8,7 +8,12 @@ import { useSettings } from '../settings/SettingsContext';
 // JavaScript. It never takes a pointer event and it disappears on its own, so it cannot get in
 // the way of the button underneath it.
 
-const COLOURS = ['#ff2e88', '#1fe3ff', '#ffc531', '#9b5cff', '#4dffa0', '#ffffff'];
+// Gold leads, the same way it does everywhere else winning is shown; the suits answer it,
+// so a burst reads as "cards", not as a generic app celebration.
+const COLOURS = [
+  'var(--gold-hi)', 'var(--gold)', 'var(--cyan-hi)',
+  'var(--card-red)', 'var(--ink)', 'var(--hot-hi)',
+];
 
 export function Confetti({ pieces = 46, spread = 'burst' }: {
   pieces?: number;

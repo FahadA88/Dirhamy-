@@ -6593,6 +6593,397 @@ h2 { font-size: 30px; }
 }
 
 /* ------------------------------------------------------------------
+   17 · A SEAM OF METAL
+
+   One divider gets to be a strip of brushed brass rather than a flat
+   hairline: the header, because it is the one line on screen in
+   every view, in every game. Everywhere else that wanted the same
+   idea already has its own — the felt's weave, every glass panel's
+   metal-edge border — so a second one moving right underneath it
+   would be a shop window, not a room.
+   ------------------------------------------------------------------ */
+:root {
+  --emboss-hi: rgba(255, 255, 255, 0.12);
+  --emboss-lo: rgba(0, 0, 0, 0.60);
+}
+:root[data-theme="light"] {
+  /* The direction of a press-mark does not change with the light — a heading is still lit
+     from above and shadowed below — but on ivory the highlight has to be the brighter of the
+     two rather than the near-invisible one it can afford to be on a near-black panel. */
+  --emboss-hi: rgba(255, 255, 255, 0.90);
+  --emboss-lo: rgba(90, 70, 34, 0.22);
+}
+
+header { position: relative; padding-bottom: 15px; }
+header::after {
+  content: "";
+  position: absolute; left: 0; right: 0; bottom: 0;
+  height: 1px;
+  background: linear-gradient(90deg,
+    transparent 0%, var(--brass) 22%, var(--brass-hi) 50%, var(--brass) 78%, transparent 100%);
+  background-size: 220% 100%;
+  animation: seam-sheen 9s linear infinite;
+  opacity: 0.6;
+}
+@keyframes seam-sheen {
+  0%   { background-position: 130% 0; }
+  100% { background-position: -130% 0; }
+}
+
+/* ------------------------------------------------------------------
+   18 · PRESSED INTO THE SURFACE
+
+   A section heading reads as engraved rather than printed with two
+   hairline shadows in opposite directions — one shade lighter than
+   the panel just above the letterforms, one shade darker just below.
+   It has to be tuned per theme: on a near-black panel the highlight
+   can be almost nothing and still read, but on ivory the roles nearly
+   swap in strength, or the whole thing washes out to invisible.
+   ------------------------------------------------------------------ */
+h2, .modal-box h3, .panel-head h3, .crumb-title, .game-card h3 {
+  text-shadow: 0 1px 0 var(--emboss-hi), 0 -1px 0 var(--emboss-lo);
+}
+/* The foil headings (see ONE VOICE, "1 · THE VOICE") clip a metal gradient to the letterforms
+   and set the fill transparent — a shadow sitting behind a transparent fill shows straight
+   through it, which would double the letter up rather than press it in. Foil already reads as
+   dimensional on its own; it does not also want to be embossed. */
+.foil, .win-banner h2 { text-shadow: none; }
+
+/* ------------------------------------------------------------------
+   19 · A DECK THAT CATCHES THE LIGHT
+
+   The face's own sheen (see THE DECK, above) is deliberately static —
+   "no per-frame repaint" is the whole point of it, because a hand can
+   have a dozen faces on screen and a fan of an opponent's backs can
+   have several more. Animating that same band on every back on the
+   table would be exactly the mistake that comment was written to
+   avoid.
+
+   The one back that can afford to move is the single card standing
+   in for a pile — the stock, the draw pile — where there is only
+   ever one or two on screen at once. `::before` is already spoken
+   for (the pattern, keyed off `data-back`) and so is `::after` (the
+   sheen, and on two of the eighteen styles a glyph or a picture), so
+   the sweep cannot live on either without fighting whichever back a
+   player actually chose. It rides on `box-shadow` instead — a foil
+   card catches the light as a moving highlight along its own edge
+   full as much as a band across its face, and a shadow layer costs
+   nothing to add without touching the element's own background at
+   all. The card's ordinary thickness shadow (see THREE DIMENSIONS,
+   above) is repeated at every step so the glint never eclipses it.
+   ------------------------------------------------------------------ */
+@keyframes foil-glint {
+  0%, 100% {
+    box-shadow:
+      0 0.5px 0 var(--card-edge), 0 1.5px 0 color-mix(in srgb, var(--card-edge) 66%, #000),
+      0 4px 8px rgba(40, 28, 10, 0.26), 0 10px 20px rgba(40, 28, 10, 0.20), 0 20px 34px rgba(40, 28, 10, 0.12),
+      0 0 0 0 rgba(255, 255, 255, 0);
+  }
+  50% {
+    box-shadow:
+      0 0.5px 0 var(--card-edge), 0 1.5px 0 color-mix(in srgb, var(--card-edge) 66%, #000),
+      0 4px 8px rgba(40, 28, 10, 0.26), 0 10px 20px rgba(40, 28, 10, 0.20), 0 20px 34px rgba(40, 28, 10, 0.12),
+      0 0 20px 1px rgba(255, 255, 255, .38);
+  }
+}
+.card.back.big { animation: foil-glint 3.6s ease-in-out infinite; }
+
+/* ------------------------------------------------------------------
+   20 · A CARD TURNING FACE UP
+
+   The one moment on this table that is genuinely a reveal: an
+   opponent's card was a back a frame ago, in their fan, and is now
+   lying face up in the trick. `card-thrown` (see CARDS IN FLIGHT)
+   already carries it across the felt on `translate`/`rotate`/`scale`;
+   this rides alongside on the plain `transform` property, which
+   composes independently, and turns the face itself through Y rather
+   than merely fading it in. Your own card was already face up in
+   your hand, so it is left alone — a flip there would be showing a
+   reveal that never happened.
+   ------------------------------------------------------------------ */
+@keyframes trick-flip-in {
+  0%   { transform: perspective(700px) rotateY(-110deg); }
+  62%  { transform: perspective(700px) rotateY(8deg); }
+  100% { transform: perspective(700px) rotateY(0deg); }
+}
+.trick-card:not([data-from="me"]) .card.face {
+  animation: trick-flip-in 380ms cubic-bezier(.22, .78, .3, 1.02) both;
+  animation-duration: calc(380ms * var(--anim-scale, 1));
+  backface-visibility: hidden;
+}
+
+/* ------------------------------------------------------------------
+   21 · CHIPS AND DIGITS
+
+   The little badges that carry a trick count or a bid are the closest
+   thing this table has to a poker chip, so they get a chip's own
+   thickness — a bright edge along the top, a dark one along the
+   bottom, and a shadow they throw rather than sit flush with the
+   felt. The number inside gets the same idea turned into type: a
+   two-step text-shadow reads as cut, extruded metal rather than flat
+   ink, and it ticks up in place (CountUp.tsx) instead of swapping.
+   ------------------------------------------------------------------ */
+.seat-stats .seat-stat, .you-head .seat-stat {
+  display: inline-flex; align-items: center; gap: 3px;
+  padding: 2px 9px 2px 8px; border-radius: 999px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, .16), rgba(255, 255, 255, .02));
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, .20) inset,
+    0 -1px 0 rgba(0, 0, 0, .38) inset,
+    0 1px 0 rgba(0, 0, 0, .40),
+    0 3px 6px rgba(0, 0, 0, .30);
+}
+.seat-stats .seat-stat, .you-head .seat-stat, .pd-score, .trump-badge b, .lead-badge b {
+  text-shadow: 0 1px 0 rgba(0, 0, 0, .5), 0 2px 3px rgba(0, 0, 0, .35);
+}
+
+/* ------------------------------------------------------------------
+   22 · A LIFTED CARD CASTS A BIGGER SHADOW
+
+   The playable-card lift already exists (`.card-btn.playable:hover`);
+   what it lacked was a shadow that grows with it. A card an inch off
+   the felt throws a softer, wider shadow than one resting flat — the
+   ordinary contact-shadow rule, just not one this table was drawing.
+   ------------------------------------------------------------------ */
+.card-btn.playable .card.face { transition: box-shadow var(--t-mid) var(--ease); }
+.card-btn.playable:hover .card.face, .card-btn.hinted .card.face {
+  box-shadow: 0 6px 16px rgba(16, 64, 40, 0.18), 0 26px 38px -10px rgba(0, 0, 0, .45);
+}
+.card-btn.selected .card.face {
+  box-shadow: 0 0 0 3px var(--green-d), 0 10px 26px var(--glow), 0 30px 42px -12px rgba(0, 0, 0, .48);
+}
+
+/* ------------------------------------------------------------------
+   23 · THE MARKS ON THE CLOTH DRIFT
+
+   TableDressing's arcs and rings sit a hair further back than the
+   cards on top of them — the ordinary depth cue for a background
+   layer is that it moves less than the foreground when you do. `--px`
+   / `--py` come from tableFx.ts's one pointermove listener; where it
+   is not running (touch, reduced motion) these default to 0 and the
+   marks simply sit still, which is also correct.
+   ------------------------------------------------------------------ */
+.dressing {
+  translate: var(--px, 0px) var(--py, 0px);
+  transition: translate 240ms var(--ease);
+}
+
+/* Faint warm beams crossing the cloth — a material cue, not a light show, so it sits well
+   under the felt's own weave and is left out of the neon table entirely: that felt already
+   spends its whole light budget on the ring around the middle. */
+.table:not([data-felt="neon"]) .felt::before {
+  content: "";
+  position: absolute; inset: 0; z-index: 0; pointer-events: none;
+  border-radius: inherit;
+  background: repeating-linear-gradient(115deg,
+    transparent 0 64px, rgba(255, 244, 214, .05) 64px 68px, transparent 68px 168px);
+  background-size: 340% 340%;
+  mix-blend-mode: soft-light;
+  opacity: 0.55;
+  animation: rays-drift 42s linear infinite;
+}
+@keyframes rays-drift { to { background-position: 200% 200%; } }
+
+/* Motes over the baize — a handful of soft points rising and fading, the way dust shows up in
+   a single shaft of light and nowhere else. */
+.felt-dust { position: absolute; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; border-radius: inherit; }
+.felt-dust span {
+  position: absolute; bottom: -6%; border-radius: 50%;
+  background: rgba(255, 255, 255, .55);
+  opacity: 0;
+  animation: dust-rise linear infinite;
+}
+@keyframes dust-rise {
+  0%   { translate: 0 0; opacity: 0; }
+  8%   { opacity: .32; }
+  90%  { opacity: .12; }
+  100% { translate: 5px -112%; opacity: 0; }
+}
+
+/* ------------------------------------------------------------------
+   24 · TRUMP, NAMED AND LIT
+
+   Trump decides every trick in the games that have one, so the badge
+   that names it gets the one other glow this table spends outside
+   LIVE's three states above — a slow ring, expanding and fading,
+   forever, rather than the one-shot breathe reserved for "your turn"
+   and "you just won this". Continuous and quiet: it should read as
+   "this is always true this hand", not as an alert.
+   ------------------------------------------------------------------ */
+@keyframes trump-pulse {
+  0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--gold) 55%, transparent), 0 0 0 1px rgba(255, 255, 255, .14) inset; }
+  70%  { box-shadow: 0 0 0 9px color-mix(in srgb, var(--gold) 0%, transparent), 0 0 0 1px rgba(255, 255, 255, .14) inset; }
+  100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--gold) 0%, transparent), 0 0 0 1px rgba(255, 255, 255, .14) inset; }
+}
+.trump-badge:not(.none) { animation: trump-pulse 2.6s ease-out infinite; }
+
+/* ------------------------------------------------------------------
+   25 · A LIT PANEL, WHILE IT IS YOURS TO PLAY
+
+   `.your-turn` already breathes (see LIVE, above) — that is shared
+   with the seats and the turn badge, and stays as it is everywhere
+   else. Your own hand, specifically, is the one panel a player's eye
+   should be able to find without reading anything, so on top of the
+   shared breathe it gets a slow two-colour ring travelling its own
+   border — brass answered by verdigris rather than brass alone, the
+   only place on the table those two meet.
+   ------------------------------------------------------------------ */
+.you.your-turn {
+  position: relative;
+  border-radius: var(--r-lg);
+  border: 2px solid transparent !important;
+  /*
+    The padding-box layer has to be opaque or the border-box layer under it — sized to the
+    whole element, not just the ring — shows straight through the middle instead of only at
+    the edge. `--glass-fill` is exactly the token this app already spends on that job (see
+    GLASS, and button.ghost right below it): a translucent tint the felt still shows through,
+    rather than a flat colour that would blank it out.
+  */
+  background-image:
+    linear-gradient(var(--glass-fill), var(--glass-fill)),
+    linear-gradient(120deg, var(--gold), var(--cyan), var(--gold-hi), var(--gold));
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
+  background-size: 100% 100%, 320% 320%;
+  animation: lux-breathe 3.4s var(--ease) infinite, aurora-border 7s linear infinite;
+}
+@keyframes aurora-border { to { background-position: 0 0, 320% 0; } }
+
+/* ------------------------------------------------------------------
+   26 · A REFUSED MOVE, FELT WHERE IT WAS MADE
+
+   The toast already says why (see line ~978); it can go unread if a
+   player is looking at their hand rather than the corner of the
+   screen. The card itself shakes now, and the toast shakes with it —
+   the standard "no" gesture, not just a colour change.
+   ------------------------------------------------------------------ */
+@keyframes refused-shake {
+  10%, 90% { translate: -1px 0; }
+  20%, 80% { translate: 2px 0; }
+  30%, 50%, 70% { translate: -4px 0; }
+  40%, 60% { translate: 4px 0; }
+}
+.refused { animation: refused-in 180ms cubic-bezier(0.2, 0.9, 0.3, 1.3), refused-shake 420ms ease-in-out 180ms; }
+.card-btn.shake { animation: refused-shake 420ms ease-in-out; }
+.card-btn.shake .card.face, .card-btn.shake .card.back {
+  box-shadow: 0 0 0 2px var(--red-text), 0 8px 18px color-mix(in srgb, var(--red) 35%, transparent);
+}
+
+/* ------------------------------------------------------------------
+   27 · GRAIN, WHERE THE BLUR ATE IT
+
+   The whole page already carries a fine grain (see THE ROOM ITSELF,
+   above) — but a glass panel's own `backdrop-filter: blur()` blurs
+   that grain away along with everything else behind it, so every
+   panel on the page is smoother than the page underneath it. Each
+   one gets its own tiny turbulence layer instead, low enough that it
+   is felt rather than seen.
+   ------------------------------------------------------------------ */
+.glass::after, .panel::after, .game-card::after {
+  content: "";
+  position: absolute; inset: 0; z-index: 2; pointer-events: none;
+  border-radius: inherit;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23g)' opacity='0.5'/%3E%3C/svg%3E");
+  background-size: 120px 120px;
+  mix-blend-mode: overlay;
+  opacity: 0.05;
+}
+
+/* ------------------------------------------------------------------
+   28 · A CARD PLAYED SETTLES RATHER THAN STOPS
+
+   cardFlight.ts's landing leg used to end on the same curve it flew
+   on — smooth all the way to a dead stop, which is what a slide does
+   and not what a thrown card does. See the `easing` set on that
+   keyframe's own object for the actual change; nothing here.
+   ------------------------------------------------------------------ */
+
+/* ------------------------------------------------------------------
+   29 · TWO WAYS TO PRESS
+
+   A button already goes down on press (the lip shortens, see
+   MACHINED CONTROLS above) — it did not yet also give a little,
+   the way a real key does. A small non-uniform squash on top of the
+   same press, more in one axis than the other, which is what makes
+   a squash read as give rather than as a scale bug.
+   ------------------------------------------------------------------ */
+button.primary:active { transform: translateY(3px) scale(0.97, 0.93); }
+button.ghost:active { transform: translateY(0) scale(0.96, 0.92); }
+
+/* A single diagonal shine sweeping the one button that is a colour rather than glass — the
+   same object MACHINED CONTROLS already built, just caught by a passing light once per hover. */
+button.primary { position: relative; overflow: hidden; }
+button.primary::after {
+  content: "";
+  position: absolute; top: -60%; left: -60%;
+  width: 34%; height: 220%;
+  background: linear-gradient(115deg, transparent, rgba(255, 255, 255, .55), transparent);
+  transform: skewX(-20deg);
+  transition: left var(--t-slow) var(--ease);
+  pointer-events: none;
+}
+button.primary:hover::after { left: 130%; }
+
+/* Ghost and primary buttons alike drift a few px toward the pointer as it nears (tableFx.ts
+   writes `--mgx`/`--mgy`); `translate` again, so it never fights the hover lift or the press
+   squash above, both of which live on `transform`. */
+button.primary, button.ghost {
+  translate: var(--mgx, 0px) var(--mgy, 0px);
+  transition: translate 200ms var(--ease);
+}
+
+/* ------------------------------------------------------------------
+   30 · TENSION AT THE EDGES
+
+   The vignette on the table itself (see THE ROOM ITSELF for the
+   page's own one) warms toward red as a trick hand thins out — tied
+   to `--tension`, a real fraction of "how much of this hand is
+   gone" that Table.tsx computes from the actual hand size, not a
+   decorative timer.
+   ------------------------------------------------------------------ */
+.table { --tension: 0; }
+.table::after {
+  content: "";
+  position: absolute; inset: 0; z-index: 4; pointer-events: none;
+  border-radius: inherit;
+  background: radial-gradient(140% 100% at 50% 50%,
+    transparent 52%,
+    color-mix(in srgb, var(--red) calc(var(--tension, 0) * 55%), transparent) 100%);
+  transition: background 700ms var(--ease);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  header::after,
+  .card.back.big,
+  .trick-card .card.face,
+  .dressing,
+  .table:not([data-felt="neon"]) .felt::before,
+  .felt-dust span,
+  .trump-badge:not(.none),
+  .you.your-turn,
+  .refused,
+  .card-btn.shake,
+  button.primary::after { animation: none !important; transition: none !important; }
+  .dressing, button.primary, button.ghost { translate: 0 0; }
+  .felt-dust { display: none; }
+}
+:root[data-motion="reduced"] header::after,
+:root[data-motion="reduced"] .card.back.big,
+:root[data-motion="reduced"] .trick-card .card.face,
+:root[data-motion="reduced"] .dressing,
+:root[data-motion="reduced"] .table:not([data-felt="neon"]) .felt::before,
+:root[data-motion="reduced"] .felt-dust span,
+:root[data-motion="reduced"] .trump-badge:not(.none),
+:root[data-motion="reduced"] .you.your-turn,
+:root[data-motion="reduced"] .refused,
+:root[data-motion="reduced"] .card-btn.shake,
+:root[data-motion="reduced"] button.primary::after { animation: none !important; transition: none !important; }
+:root[data-motion="reduced"] .dressing,
+:root[data-motion="reduced"] button.primary,
+:root[data-motion="reduced"] button.ghost { translate: 0 0; }
+:root[data-motion="reduced"] .felt-dust { display: none; }
+
+/* ------------------------------------------------------------------
    14 · THE SHARED LAYOUT (Kings Corner)
 
    Eight places on the cloth: the cross on the top row, the corners on
