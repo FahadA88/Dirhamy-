@@ -124,3 +124,79 @@ export function startTableParallax(): () => void {
     if (frame) cancelAnimationFrame(frame);
   };
 }
+
+/**
+ * A near-invisible spotlight that follows the pointer across the felt — the stylesheet gates it
+ * to `(hover: hover) and (pointer: fine)` so a touch table never pays for it, and this only has
+ * to write the two coordinates a frame actually changed.
+ */
+export function startFeltSpotlight(): () => void {
+  if (typeof window === 'undefined') return () => {};
+  if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return () => {};
+
+  let pending: PointerEvent | null = null;
+  let frame = 0;
+  let lit: HTMLElement | null = null;
+
+  const paint = () => {
+    frame = 0;
+    const e = pending;
+    pending = null;
+    if (!e) return;
+    const felt = document.querySelector<HTMLElement>('.felt');
+    if (!felt) return;
+    const r = felt.getBoundingClientRect();
+    const inside = e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
+    if (!inside) {
+      lit?.classList.remove('spotlit');
+      lit = null;
+      return;
+    }
+    felt.style.setProperty('--sx', `${(((e.clientX - r.left) / r.width) * 100).toFixed(1)}%`);
+    felt.style.setProperty('--sy', `${(((e.clientY - r.top) / r.height) * 100).toFixed(1)}%`);
+    if (lit !== felt) { lit?.classList.remove('spotlit'); felt.classList.add('spotlit'); lit = felt; }
+  };
+
+  const onMove = (e: PointerEvent) => {
+    if (e.pointerType !== 'mouse') return;
+    pending = e;
+    if (!frame) frame = requestAnimationFrame(paint);
+  };
+
+  window.addEventListener('pointermove', onMove, { passive: true });
+  return () => {
+    window.removeEventListener('pointermove', onMove);
+    if (frame) cancelAnimationFrame(frame);
+    lit?.classList.remove('spotlit');
+  };
+}
+
+/**
+ * A ripple born where a primary or ghost button was actually pressed. One short-lived `<span>`
+ * per press, sized to the button it landed on and removed once its animation ends — nothing
+ * kept around between presses.
+ */
+export function startTapRipple(): () => void {
+  if (typeof window === 'undefined') return () => {};
+
+  const reduced = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    || document.documentElement.getAttribute('data-motion') === 'reduced';
+
+  const onDown = (e: PointerEvent) => {
+    if (reduced()) return;
+    const target = (e.target as HTMLElement)?.closest<HTMLButtonElement>('button.primary, button.ghost');
+    if (!target || target.disabled) return;
+    const r = target.getBoundingClientRect();
+    const size = Math.max(r.width, r.height) * 1.6;
+    const span = document.createElement('span');
+    span.className = 'tap-ripple';
+    span.style.setProperty('--rx', `${e.clientX - r.left}px`);
+    span.style.setProperty('--ry', `${e.clientY - r.top}px`);
+    span.style.setProperty('--rr', `${size}px`);
+    target.appendChild(span);
+    span.addEventListener('animationend', () => span.remove(), { once: true });
+  };
+
+  window.addEventListener('pointerdown', onDown);
+  return () => window.removeEventListener('pointerdown', onDown);
+}

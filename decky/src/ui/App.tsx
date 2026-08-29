@@ -3,7 +3,7 @@ import { PlayView } from './PlayView';
 import { ProfileView } from './ProfileView';
 import { Backdrop } from './Backdrop';
 import { startCardSheen } from './cardSheen';
-import { startMagneticButtons, startTableParallax } from './tableFx';
+import { startMagneticButtons, startTableParallax, startFeltSpotlight, startTapRipple } from './tableFx';
 import { SettingsPanel } from './SettingsPanel';
 import { SiteNav, navStyle } from './SiteNav';
 import { FirstRun } from './FirstRun';
@@ -65,6 +65,17 @@ export function App() {
   // Two more of the same shape: see tableFx.ts.
   useEffect(() => startMagneticButtons(), []);
   useEffect(() => startTableParallax(), []);
+  useEffect(() => startFeltSpotlight(), []);
+  useEffect(() => startTapRipple(), []);
+  // An almost-imperceptible day/night warmth: the felt's own haze (see SEVENTY-THREE MORE,
+  // "ambient atmosphere") leans a little warmer at midday, a little cooler overnight. Read once
+  // at mount rather than kept live — nobody sits at one table long enough for the hour to turn
+  // over, and there is nothing here worth a running clock for.
+  useEffect(() => {
+    const h = new Date().getHours();
+    const warmth = h >= 6 && h < 18 ? Math.sin(((h - 6) / 12) * Math.PI) : 0.15;
+    document.documentElement.style.setProperty('--daywarm', warmth.toFixed(2));
+  }, []);
   return (
     <div className={`app nav-is-${nav}`}>
       <ColorVisionFilters />

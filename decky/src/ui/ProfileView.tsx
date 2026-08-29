@@ -198,11 +198,14 @@ export function ProfileView({ onPlay }: { onPlay: () => void }) {
 }
 
 function ProfileHead({ name, avatar, summary }: {
-  name: string; avatar: string; summary: { played: number; won: number };
+  name: string; avatar: string; summary: { played: number; won: number; streak?: number };
 }) {
+  // A run of three or more wins earns the avatar a faint warmth of its own — nothing louder
+  // than that, since this is a badge you carry everywhere, not a trophy you stop to admire.
+  const streak = summary.streak ?? 0;
   return (
     <header className="profile-head">
-      <span className="profile-avatar" aria-hidden="true">{avatar}</span>
+      <span className={`profile-avatar ${streak >= 3 ? 'on-streak' : ''}`} aria-hidden="true">{avatar}</span>
       <div>
         <h2>{name}</h2>
         <p className="muted">

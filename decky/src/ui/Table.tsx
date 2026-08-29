@@ -3,7 +3,7 @@ import { Card, GameDefinition, Move, RedactedState } from '../engine/types';
 import { SUIT_SYMBOLS, buildDeck } from '../engine/deck';
 import { CardFace } from './Card';
 import { AttrCard, describeAttrs } from './AttrCard';
-import { TableDressing, TableRail, FeltDust } from './TableDressing';
+import { TableDressing, TableRail, FeltDust, SeasonalDrift } from './TableDressing';
 import { CountUp } from './CountUp';
 import { DealMotion } from './DealMotion';
 import { ScorePad } from './ScorePad';
@@ -632,6 +632,19 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
     setToast({ text: 'Taken back.', tone: 'info' });
   }
 
+  // ---------- online connection dot ----------
+
+  // Polled rather than pushed: the socket has no "reconnecting" event of its own, only a
+  // readyState a moment can ask about. A live table barely re-renders on this — the state
+  // only actually flips on a drop or a reconnect.
+  const [conn, setConn] = useState<'live' | 'reconnecting'>('live');
+  useEffect(() => {
+    if (!clientRef.current.remote) return;
+    setConn(clientRef.current.connectionState());
+    const tick = setInterval(() => setConn(clientRef.current.connectionState()), 1000);
+    return () => clearInterval(tick);
+  }, [matchId]);
+
   // ---------- the clock ----------
 
   // Counts only while you are actually owed a move. Running out plays a legal move rather than
@@ -664,6 +677,54 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
 
   const lastLine = view.log[view.log.length - 1]?.text ?? '';
 
+  // A one-time gold sweep the first time anybody reaches match point — one hand-win short of
+  // the race target every match-target scored game already carries in the redacted view, so
+  // this reads off data every one of those families already exposes rather than a per-family
+  // notion of "about to win" that would have to be taught to each one separately.
+  const [showMatchPoint, setShowMatchPoint] = useState(false);
+  const matchPointShown = useRef(false);
+  useEffect(() => { matchPointShown.current = false; }, [matchId]);
+  useEffect(() => {
+    if (view.matchTarget == null || matchPointShown.current) return;
+    const scores = view.matchScores ?? view.scores;
+    if (!scores) return;
+    if (Object.values(scores).some((v) => v === view.matchTarget! - 1)) {
+      matchPointShown.current = true;
+      setShowMatchPoint(true);
+      const t = setTimeout(() => setShowMatchPoint(false), 1200);
+      return () => clearTimeout(t);
+    }
+  }, [view.matchTarget, view.matchScores, view.scores, matchId]);
+
+  // A warm flash behind the melds pile the moment it grows — sized to how many cards just
+  // landed rather than the same puff for a pair or a full run.
+  const [meldFlash, setMeldFlash] = useState(0);
+  const prevMeldCount = useRef(view.zones.melds?.cards.length ?? 0);
+  useEffect(() => {
+    const n = view.zones.melds?.cards.length ?? 0;
+    if (n > prevMeldCount.current) {
+      setMeldFlash(n - prevMeldCount.current);
+      const t = setTimeout(() => setMeldFlash(0), 560);
+      prevMeldCount.current = n;
+      return () => clearTimeout(t);
+    }
+    prevMeldCount.current = n;
+  }, [view.zones.melds?.cards.length]);
+
+  // A contract that just failed outright gets one honest tremor through the felt — not a card
+  // shaking (that already means "you tried something the rules refuse"), the whole table taking
+  // the news. Read off the log line rather than a dedicated engine flag, so no scoring code has
+  // to know the UI wants to react to it.
+  const [shaking, setShaking] = useState(false);
+  const shookLine = useRef('');
+  useEffect(() => {
+    if (!lastLine || lastLine === shookLine.current || !/\bwent down\b/i.test(lastLine)) return;
+    shookLine.current = lastLine;
+    setShaking(true);
+    const t = setTimeout(() => setShaking(false), 420);
+    return () => clearTimeout(t);
+  }, [lastLine]);
+
   // Read the table aloud, when asked. The screen-reader region below is separate and always on.
   useEffect(() => {
     speak(lastLine, settings.speak);
@@ -686,6 +747,16 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
     }
     prevYourTurn.current = view.isYourTurn;
   }, [view.isYourTurn, view.phase, isPit, isKent, isSet, settings.haptics]);
+
+  // A ring crossing the felt when your turn begins — decoration only, the badges above already
+  // say whose turn it is. Centred on the felt rather than aimed from the seat that just
+  // finished: a redacted view only ever knows that it is your turn now, not whose it just was.
+  const [rippleKey, setRippleKey] = useState(0);
+  useEffect(() => {
+    if (!isPit && !isKent && !isSet && view.phase === 'playing' && view.isYourTurn && !prevYourTurn.current) {
+      setRippleKey((n) => n + 1);
+    }
+  }, [view.isYourTurn, view.phase, isPit, isKent, isSet]);
 
   // An online table changes because somebody else moved, not because we did. The client tells
   // us the cached position moved; we re-read it for our own seat and render.
@@ -1211,9 +1282,11 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
     <div className="table-wrap">
     <div className="table" data-felt={settings.tableFelt} ref={tableRef} style={{ '--tension': tension } as React.CSSProperties}>
       <TableRail felt={settings.tableFelt} />
-      <div className={`felt ${dealing ? 'dealing' : ''}`}>
+      <div className={`felt ${dealing ? 'dealing' : ''} ${shaking ? 'felt-shake' : ''}`}>
+        {rippleKey > 0 && <span key={rippleKey} className="turn-ripple" aria-hidden="true" />}
       <TableDressing felt={settings.tableFelt} title={def.meta.name} />
       <FeltDust />
+      {settings.seasonalFx !== 'off' && <SeasonalDrift kind={settings.seasonalFx} />}
       {/* Nothing is dealt to anybody in a set game — the cards go face up on a shared board —
           so a deal animation would be showing something that does not happen. */}
       {!isSet && <DealMotion
@@ -1428,8 +1501,8 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
       ) : view.mode === 'trick' ? (
         <div className="center trick-area" data-slot="trick">
           {view.trick && view.trick.length > 0 ? (
-            view.trick.map((t) => (
-              <div key={`${t.player}:${t.card.id}`} className="trick-card"
+            view.trick.map((t, i) => (
+              <div key={`${t.player}:${t.card.id}`} className={`trick-card ${i === 0 ? 'led' : ''}`}
                 data-from={seatSideOf(t.player)}
                 /* Where this card came from, for the flying-card layer: your own plays are
                    already tracked out of your hand, but an opponent's card has never been on
@@ -1514,7 +1587,8 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
           {view.zones.melds && view.zones.melds.cards.length > 0 && (
             <div className="melds-box" data-slot="melds">
               <div className="pile-label">Melds</div>
-              <div className="melds-row">
+              <div className="melds-row" style={{ ['--flash-scale' as string]: String(Math.max(1, meldFlash)) }}>
+                {meldFlash > 0 && <div className="score-flash" aria-hidden="true" />}
                 {view.zones.melds.cards.map((c) => <div key={c.id} className="meld-mini"><CardFace card={c} /></div>)}
               </div>
             </div>
@@ -1911,6 +1985,11 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
           <span>{isSet
             ? 'The board'
             : settings.playerName === 'You' ? 'Your hand' : `${settings.playerName}’s hand`}</span>
+          {clientRef.current.remote && (
+            <span className={`conn-dot ${conn}`} role="status"
+              aria-label={conn === 'live' ? 'Connected' : 'Reconnecting'}
+              title={conn === 'live' ? 'Connected' : 'Reconnecting…'} />
+          )}
           {teamOf(me) && <span className="team-tag">{teamOf(me)}</span>}
           {view.mode === 'trick' && view.bids?.[me] !== undefined && (
             <span className="seat-stat"><CountUp value={view.tricksWon?.[me] ?? 0} />/{view.bids[me]}<i>tricks</i></span>
@@ -1980,9 +2059,12 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
             </button>
           ))}
           {isRummy && view.rummyPhase === 'play' && view.isYourTurn && <span className="rummy-hint">discard</span>}
-          {/* The clock, only when there is one. Turns urgent in the last five seconds. */}
+          {/* The clock, only when there is one. The ring drains gold to amber to red as it goes;
+              the last five seconds also turn the pill itself urgent. */}
           {secsLeft !== null && (
-            <span className={`turn-clock ${secsLeft <= 5 ? 'urgent' : ''}`} role="timer" aria-live="off">
+            <span className={`turn-clock ${secsLeft <= 5 ? 'urgent' : secsLeft / settings.turnSeconds <= 0.5 ? 'warn' : ''}`}
+              style={{ ['--pct' as string]: String(settings.turnSeconds > 0 ? secsLeft / settings.turnSeconds : 1) }}
+              role="timer" aria-live="off">
               {secsLeft}s
             </span>
           )}
@@ -2517,6 +2599,7 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
           the hook, so nothing ever hands React a child it did not create. Inside .table, which
           isolates, so a card in flight covers the felt and never a dialog over it. */}
       <div className="flight-layer" aria-hidden="true" />
+      {showMatchPoint && <div className="match-point-sweep" aria-hidden="true" />}
       {/* The card actually following the pointer while a drag is in progress — see cardDrag.ts.
           Fixed to the viewport, not the felt, since it tracks clientX/clientY. */}
       {dragGhost && (
@@ -2662,6 +2745,13 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
           ? `${humanise(lastLine)}${lastLine ? ' ' : ''}${view.isYourTurn ? 'Your turn.' : ''}`
           : humanise(lastLine)}
       </div>
+
+      {/* The same line, on screen — for low vision rather than no vision, where a caption
+          often matters as much read as heard. Off by default; a screen reader already gets
+          the region above regardless. */}
+      {settings.showCaptions && lastLine && (
+        <div className="caption-bar" aria-hidden="true">{humanise(lastLine)}</div>
+      )}
 
       {/* The pad and the log are both a record of the game, so they sit together under the
           table. On the felt the pad was clipped by the table edge and landed on whoever was

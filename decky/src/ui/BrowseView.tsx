@@ -54,6 +54,18 @@ function blurb(text: string, limit = 165): string {
   return out || text.slice(0, limit);
 }
 
+/** A shelf with nothing on it, drawn rather than typed — two empty card outlines fanned the way
+ *  a real hand would be, so "nothing here" reads as a place rather than a glyph off the font. */
+function EmptyDeckMark() {
+  return (
+    <svg className="empty-mark" width="56" height="56" viewBox="0 0 56 56" fill="none"
+      stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+      <rect x="10" y="12" width="24" height="34" rx="3" transform="rotate(-8 22 29)" />
+      <rect x="22" y="10" width="24" height="34" rx="3" transform="rotate(8 34 27)" />
+    </svg>
+  );
+}
+
 export function BrowseView({ onPlay, onSetup, onOnline, onlineHostDown, onRemix }: {
   onPlay: (def: GameDefinition) => void;
   onSetup: (def: GameDefinition) => void;
@@ -174,7 +186,7 @@ export function BrowseView({ onPlay, onSetup, onOnline, onlineHostDown, onRemix 
 
           {shelves.length === 0 ? (
             <div className="empty-shelf">
-              <div className="empty-mark">🂠</div>
+              <EmptyDeckMark />
               <h3>Nothing of that kind yet</h3>
               <p>Pick another tab, or build one in Create.</p>
             </div>
@@ -191,7 +203,7 @@ export function BrowseView({ onPlay, onSetup, onOnline, onlineHostDown, onRemix 
         </>
       ) : results.length === 0 ? (
         <div className="empty-shelf">
-          <div className="empty-mark">🂠</div>
+          <EmptyDeckMark />
           <h3>{filters.favouritesOnly ? 'No favourites yet' : 'Nothing here'}</h3>
           <p>{filters.favouritesOnly ? 'Tap ♥ on any game.' : 'Try fewer filters.'}</p>
           <button className="ghost" onClick={() => setFilters({})}>Clear</button>

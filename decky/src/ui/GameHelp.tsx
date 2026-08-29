@@ -93,7 +93,7 @@ export function GameHelp({ def, onClose }: { def: GameDefinition; onClose: () =>
       <div className="modal-box help-box" ref={ref} role="dialog" aria-modal="true"
         aria-label={`How to play ${def.meta.name}`}
         onClick={(e) => e.stopPropagation()}>
-        <h3>{def.meta.name}</h3>
+        <h3 className="help-title">{def.meta.name}</h3>
         <p className="help-desc">{def.meta.description}</p>
 
         {/* Shown before the prose, because a worked example is the part people actually read. */}

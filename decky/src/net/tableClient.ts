@@ -67,6 +67,9 @@ export interface TableClient {
   fairness(): FairnessInfo | null;
   /** Fires whenever the cached position changes, so React can re-read. */
   onChange(cb: () => void): () => void;
+  /** 'live' unless this table is over a socket that has dropped and is retrying. A local table
+   *  is always 'live' — there is no wire to lose. */
+  connectionState(): 'live' | 'reconnecting';
 }
 
 // ---------- the local one ----------
@@ -131,6 +134,7 @@ export class LocalTableClient implements TableClient {
   }
 
   onChange(cb: () => void) { this.listeners.add(cb); return () => { this.listeners.delete(cb); }; }
+  connectionState(): 'live' | 'reconnecting' { return 'live'; }
   private changed() { for (const l of this.listeners) l(); }
 }
 
@@ -285,5 +289,6 @@ export class RemoteTableClient implements TableClient {
   fairness(): FairnessInfo | null { return null; }
 
   onChange(cb: () => void) { this.listeners.add(cb); return () => { this.listeners.delete(cb); }; }
+  connectionState(): 'live' | 'reconnecting' { return (this.api.isLive?.() ?? true) ? 'live' : 'reconnecting'; }
   private changed() { for (const l of this.listeners) l(); }
 }

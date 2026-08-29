@@ -9,6 +9,7 @@ export type CardBack =
   | 'monogram' | 'lattice' | 'ivory' | 'stripe' | 'halftone' | 'checker'
   | 'sunburst' | 'linen' | 'neongrid' | 'kraft' | 'tartan' | 'marble'
   | 'circuit' | 'damask' | 'wave' | 'mesh' | 'confetti' | 'deepsolid'
+  | 'artdeco' | 'holofoil'
   | 'custom';
 // Four table builds, each with its own rail, felt, markings and lighting.
 /** The thirteen tables that survived the cut. */
@@ -91,6 +92,16 @@ export interface Settings {
   /** Heavier strokes, looser letter-spacing, no italics — for low vision and dyslexia. */
   legibleText: boolean;
   colorVisionSim: ColorVisionSim;
+  /** Panels, chips and rules gain a harder edge and a flatter fill — less "material", more
+   *  legible against everything around it. Independent of the high-contrast card face, which
+   *  only ever touched the cards themselves. */
+  highContrast: boolean;
+  /** The screen-reader move announcement, shown as an on-screen caption too — for low vision
+   *  rather than no vision, where the same line matters just as much read as heard. */
+  showCaptions: boolean;
+  /** Seasonal drift overlay on the felt. Off by default — decoration nobody asked for is still
+   *  decoration somebody has to turn off. */
+  seasonalFx: 'off' | 'snow' | 'leaves';
   surface: Surface;
   ambient3d: boolean;
   orbs: boolean;
@@ -132,6 +143,9 @@ export interface Settings {
   uiSounds: boolean;
   /** 0-100. Applies to both categories above; muting either still mutes at 0. */
   soundVolume: number;
+  /** One switch that silences both categories at once without losing the volume and the two
+   *  toggles above — the same relationship reduced motion has to full motion. */
+  reducedSound: boolean;
   /** Read the table out loud through the browser's own voice. Off unless asked for. */
   speak: boolean;
   /** A short buzz for your turn starting, a move being refused, and a trick or a win landing.
@@ -165,6 +179,9 @@ export const defaultSettings: Settings = {
   textSize: 'm',
   legibleText: false,
   colorVisionSim: 'off',
+  highContrast: false,
+  showCaptions: false,
+  seasonalFx: 'off',
   surface: 'soft',
   ambient3d: true,
   orbs: true,
@@ -192,6 +209,7 @@ export const defaultSettings: Settings = {
   cardSounds: false,
   uiSounds: false,
   soundVolume: 70,
+  reducedSound: false,
   speak: false,
   haptics: false,
   oneHandedMode: false,
@@ -315,6 +333,8 @@ export const BACKS: Record<Exclude<CardBack, 'custom'>, BackPreset> = {
   mesh:      { name: 'Gradient Mesh' },
   confetti:  { name: 'Confetti' },
   deepsolid: { name: 'Deep Solid' },
+  artdeco:   { name: 'Art Deco' },
+  holofoil:  { name: 'Holo Foil' },
 };
 
 export interface FacePreset { name: string; note: string }
@@ -377,10 +397,11 @@ const ALLOWED = {
   density: ['comfortable', 'compact'],
   botNaming: ['bot', 'seat', 'named'],
   colorVisionSim: ['off', 'protanopia', 'deuteranopia', 'tritanopia'],
+  seasonalFx: ['off', 'snow', 'leaves'],
 } as const;
 
 /** How loud, and which categories are on — the shape `playSound` actually needs. */
-export type SoundPrefs = Pick<Settings, 'cardSounds' | 'uiSounds' | 'soundVolume'>;
+export type SoundPrefs = Pick<Settings, 'cardSounds' | 'uiSounds' | 'soundVolume' | 'reducedSound'>;
 
 export function loadSettings(): Settings {
   try {
@@ -503,4 +524,7 @@ export function applySettings(s: Settings): void {
   root.style.setProperty('--text-scale', String(TEXT_SCALE[s.textSize]));
   root.setAttribute('data-colorvision', s.colorVisionSim);
   root.setAttribute('data-onehanded', s.oneHandedMode ? 'on' : 'off');
+  root.setAttribute('data-contrast', s.highContrast ? 'high' : 'normal');
+  root.setAttribute('data-captions', s.showCaptions ? 'on' : 'off');
+  root.setAttribute('data-season', s.seasonalFx);
 }

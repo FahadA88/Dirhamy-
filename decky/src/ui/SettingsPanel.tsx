@@ -490,6 +490,10 @@ function MotionSection({ s, set }: { s: Settings; set: Setter }) {
       <Row label="Drifting cards" keywords="floaties cards background" indent>
         <Toggle on={s.floaties} onChange={(v) => set('floaties', v)} disabled={!s.ambient3d} label="Drifting cards" />
       </Row>
+      <Row label="Seasonal drift" hint="A slow scatter of snow or leaves over the felt. Purely decorative, off by default." keywords="seasonal snow leaves weather ambient particles">
+        <Seg value={s.seasonalFx} onChange={(v) => set('seasonalFx', v as Settings['seasonalFx'])}
+          options={[['off', 'Off'], ['snow', 'Snow'], ['leaves', 'Leaves']]} />
+      </Row>
     </>
   );
 }
@@ -503,6 +507,15 @@ function AccessSection({ s, set }: { s: Settings; set: Setter }) {
       </Row>
       <Row label="Easier-to-read text" hint="Heavier strokes, more space between letters, no italics." keywords="dyslexia legible contrast bold">
         <Toggle on={s.legibleText} onChange={(v) => set('legibleText', v)} label="Easier-to-read text" />
+      </Row>
+      <Row label="High contrast" hint="Flatter panels, harder edges, stronger text against everything around it. Separate from the card face above — this is the rest of the room." keywords="contrast high vision low legibility panels ui">
+        <Toggle on={s.highContrast} onChange={(v) => set('highContrast', v)} label="High contrast" />
+      </Row>
+      <Row label="On-screen captions" hint="Shows the same line a screen reader announces — the last move, whose turn it is — as a caption at the bottom of the table, for low vision without a screen reader running." keywords="captions subtitles screen reader low vision announce">
+        <Toggle on={s.showCaptions} onChange={(v) => set('showCaptions', v)} label="On-screen captions" />
+      </Row>
+      <Row label="Reduced sound" hint="Silences card and interface sounds outright, without losing your volume and the two toggles in Motion & sound." keywords="sound audio mute reduced quiet">
+        <Toggle on={s.reducedSound} onChange={(v) => set('reducedSound', v)} label="Reduced sound" />
       </Row>
       <Row
         label="Colour-safe cards"

@@ -1,5 +1,40 @@
 import { TableFelt } from '../settings/settings';
 
+const SEASON_N = 16;
+const SEASON_GLYPH: Record<'snow' | 'leaves', string> = { snow: '❄', leaves: '🍂' };
+
+/** A slow scatter of snow or leaves over the felt — see FeltDust just below for the same
+ *  deterministic-spread trick, so a re-render never reshuffles where anything is falling. */
+export function SeasonalDrift({ kind }: { kind: 'snow' | 'leaves' }) {
+  const glyph = SEASON_GLYPH[kind];
+  return (
+    <div className="season-layer" aria-hidden="true">
+      {Array.from({ length: SEASON_N }, (_, i) => {
+        const left = (i * 6.4 + (i % 4) * 9) % 100;
+        const delay = (i * 1.3) % 10;
+        const dur = 7 + (i % 6) * 1.8;
+        const drift = 16 + (i % 5) * 8;
+        const size = 10 + (i % 3) * 4;
+        return (
+          <span
+            key={i}
+            className="season-flake"
+            style={{
+              ['--sx' as string]: `${left}%`,
+              ['--sdelay' as string]: `${delay}s`,
+              ['--sdur' as string]: `${dur}s`,
+              ['--sdrift' as string]: `${drift}px`,
+              fontSize: size,
+            }}
+          >
+            {glyph}
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
 /*
   Shared furniture for the cloths drawn below.
 

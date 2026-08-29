@@ -77,6 +77,9 @@ export class WebSocketApi implements MatchApi {
     sock.onerror = () => { /* onclose does the work */ };
   }
 
+  /** Whether the socket is open right now — the connection-status dot's only source of truth. */
+  isLive(): boolean { return this.sock?.readyState === WebSocket.OPEN; }
+
   private rawSend(p: Pending): void {
     const id = this.nextId++;
     this.pending.set(id, p);

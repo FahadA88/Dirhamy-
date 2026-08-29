@@ -62,6 +62,7 @@
    used where a hand goes.
    ------------------------------------------------------------------ */
 :root {
+  --daywarm: 0.3;          /* set for real at mount, from the local clock — see App.tsx */
   --bg0: #0a0807;          /* the room, lights low */
   --bg1: #14100d;
   --panel: #1a1613;        /* a surface with something on it */
@@ -1224,7 +1225,7 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
 .knock-btn:hover { filter: brightness(1.08); }
 .rummy-center { flex-wrap: wrap; }
 .melds-box { text-align: center; }
-.melds-row { display: flex; flex-wrap: wrap; gap: 4px; max-width: 340px; }
+.melds-row { display: flex; flex-wrap: wrap; gap: 4px; max-width: 340px; position: relative; }
 .meld-mini { transform: scale(0.62); margin: -14px; }
 
 /* a card already committed to a multi-card pass */
@@ -1732,7 +1733,7 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
 }
 
 .empty-shelf { text-align: center; padding: 60px 20px; }
-.empty-mark { font-size: 42px; color: var(--panel-brd); margin-bottom: 10px; }
+.empty-mark { width: 56px; height: 56px; color: var(--panel-brd); margin: 0 auto 10px; display: block; }
 .empty-shelf h3 { margin: 0 0 6px; }
 .empty-shelf p { margin: 0 auto 16px; color: var(--muted); max-width: 42ch; line-height: 1.55; }
 
@@ -2265,6 +2266,25 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
 [data-back="mesh"]      .card.back::before { background: radial-gradient(60% 60% at 25% 20%, #8b5cf6, transparent 65%), radial-gradient(60% 60% at 80% 75%, #22d3ee, transparent 65%), #1c1145; }
 [data-back="confetti"]  .card.back::before { background: radial-gradient(circle at 4px 6px, #e03131 2px, transparent 2.4px) 0 0/17px 15px, radial-gradient(circle at 12px 13px, #1c7ed6 2px, transparent 2.4px) 0 0/17px 15px, radial-gradient(circle at 8px 2px, #f0a000 2px, transparent 2.4px) 0 0/17px 15px, #f6f1e4; }
 [data-back="deepsolid"] .card.back::before { background: #1f3a5c; }
+/* Art Deco: gilt linework on ink — nested chevrons and a fan of hairlines, the way a '20s
+   cigarette-case back is drawn rather than printed. */
+[data-back="artdeco"] .card.back::before {
+  background:
+    repeating-linear-gradient(45deg, rgba(214,175,92,.55) 0 1.5px, transparent 1.5px 9px),
+    repeating-linear-gradient(-45deg, rgba(214,175,92,.55) 0 1.5px, transparent 1.5px 9px),
+    radial-gradient(circle at 50% 50%, transparent 22%, rgba(214,175,92,.28) 23% 24%, transparent 25%),
+    #0e0d0c;
+  box-shadow: inset 0 0 0 4px rgba(214,175,92,.55), inset 0 0 0 5px rgba(214,175,92,.18);
+}
+/* Holo Foil: the same rainbow a hologram sticker throws, so the existing edge-glint on the
+   pile's one big back (see "A DECK THAT CATCHES THE LIGHT") reads as foil catching real light
+   rather than a plain colour animating. */
+[data-back="holofoil"] .card.back::before {
+  background:
+    conic-gradient(from 0deg at 50% 50%,
+      #ff7ad1, #ffd27a, #d4ff7a, #7affd4, #7ab8ff, #b47aff, #ff7ad1);
+  background-size: 200% 200%;
+}
 
 /* A back somebody made: pattern, two colours and one glyph. */
 [data-back="custom"] .card.back::before { background: var(--cb-ground, #1c2a44); }
@@ -2470,6 +2490,15 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
 .sw-back[data-back="mesh"]::before { background: radial-gradient(60% 60% at 25% 20%, #8b5cf6, transparent 65%), radial-gradient(60% 60% at 80% 75%, #22d3ee, transparent 65%), #1c1145; }
 .sw-back[data-back="confetti"]::before { background: radial-gradient(circle at 4px 6px, #e03131 1.8px, transparent 2.2px) 0 0/15px 13px, radial-gradient(circle at 11px 11px, #1c7ed6 1.8px, transparent 2.2px) 0 0/15px 13px, #f6f1e4; }
 .sw-back[data-back="deepsolid"]::before { background: #1f3a5c; }
+.sw-back[data-back="artdeco"]::before {
+  background:
+    repeating-linear-gradient(45deg, rgba(214,175,92,.55) 0 1.5px, transparent 1.5px 8px),
+    repeating-linear-gradient(-45deg, rgba(214,175,92,.55) 0 1.5px, transparent 1.5px 8px),
+    #0e0d0c;
+}
+.sw-back[data-back="holofoil"]::before {
+  background: conic-gradient(from 0deg at 50% 50%, #ff7ad1, #ffd27a, #d4ff7a, #7affd4, #7ab8ff, #b47aff, #ff7ad1);
+}
 .sw-back.mine::before { background: var(--cb-ground, var(--panel2, #2a2a2a)); }
 .sw-back.mine[data-cbpattern="lattice"]::before { background: repeating-linear-gradient(45deg, var(--cb-ink) 0 3px, transparent 3px 7px), repeating-linear-gradient(-45deg, var(--cb-ink) 0 3px, transparent 3px 7px), var(--cb-ground); }
 .sw-back.mine[data-cbpattern="stripe"]::before { background: repeating-linear-gradient(60deg, var(--cb-ink) 0 6px, var(--cb-ground) 6px 12px); }
@@ -7211,3 +7240,433 @@ button.primary, button.ghost {
 @media (max-width: 620px) {
   .maid-card { margin-left: -22px; }
 }
+
+/* ==================================================================
+   31 · SEVENTY-THREE MORE
+
+   A second pass over the same ground THE SEAM OF METAL and its
+   neighbours opened: more material, more depth, more of the table
+   reacting to what is actually happening on it. Same law as before —
+   every animated rule here respects prefers-reduced-motion and
+   data-motion="reduced", every colour comes off the existing tokens,
+   and nothing here is a redesign of something that already worked.
+   ------------------------------------------------------------------ */
+
+/* ---- 31.1 · surfaces ---- */
+
+/* Leather-stitched borders: a dashed inner line a few pixels shy of the real edge, the way a
+   bound leather panel is stitched rather than simply cut. Opt-in — most panels already have a
+   material of their own (glass, felt) and a stitch line on every one of them would be a shop
+   window, not a room. */
+.stitched { position: relative; }
+.stitched::before {
+  content: ""; position: absolute; inset: 8px; border-radius: calc(var(--r-lg, 18px) - 8px);
+  border: 1px dashed color-mix(in srgb, var(--panel-brd) 130%, transparent);
+  pointer-events: none;
+}
+
+/* Marble panel headers: a thin, quiet vein under the rule a section heading already sits above
+   nothing on — cool stone rather than a flat line. */
+.panel-head { position: relative; }
+.panel-head::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: -8px; height: 2px;
+  background:
+    radial-gradient(60% 400% at 8% 50%, rgba(255,255,255,.5), transparent 70%),
+    radial-gradient(40% 400% at 46% 50%, rgba(255,255,255,.3), transparent 70%),
+    radial-gradient(50% 400% at 78% 50%, rgba(255,255,255,.4), transparent 70%),
+    var(--panel-brd);
+  opacity: 0.7;
+}
+
+/* Satin-brass corner rivets: one dot pressed into each top corner, the way a padded panel is
+   actually fastened down. Opt-in, same reasoning as .stitched. */
+.riveted { position: relative; }
+.riveted::before, .riveted::after {
+  content: ""; position: absolute; top: 10px; width: 7px; height: 7px; border-radius: 50%;
+  background: radial-gradient(circle at 34% 30%, var(--brass-hi, #f0dcae), var(--brass, #c9a24a) 60%, #6b4f1e 100%);
+  box-shadow: 0 1px 2px rgba(0,0,0,.5), inset 0 0 0 1px rgba(0,0,0,.25);
+}
+.riveted::before { left: 10px; }
+.riveted::after { right: 10px; }
+
+/* Suede scoreboard backing: the pad's own panel gets a soft napped texture instead of a flat
+   fill — cloth under glass rather than glass on its own. */
+.scorepad {
+  background-image:
+    repeating-linear-gradient(72deg, rgba(0,0,0,.035) 0 1px, transparent 1px 3px),
+    repeating-linear-gradient(-12deg, rgba(255,255,255,.02) 0 1px, transparent 1px 4px);
+}
+
+/* Letterpress for body copy: the same idea as the heading emboss, at a fraction of the depth —
+   a line of running text pressed in rather than stamped. */
+.hero-blurb, .felt-blurb, .shelf-blurb, .about-p {
+  text-shadow: 0 1px 0 var(--emboss-hi), 0 -1px 0 color-mix(in srgb, var(--emboss-lo) 55%, transparent);
+}
+
+/* Etched-glass dividers: a frosted stripe standing in for the flat 1px rule everywhere a panel
+   already draws one. */
+.panel hr {
+  height: 6px; border: none; border-radius: 3px;
+  background:
+    linear-gradient(90deg, transparent, var(--panel-brd) 15%, var(--panel-brd) 85%, transparent),
+    linear-gradient(180deg, rgba(255,255,255,.16), transparent 55%);
+  opacity: 0.8;
+}
+
+/* ---- 31.2 · depth ---- */
+
+/* Fanned-hand overlap depth: each card in your own hand casts a shadow scaled to how deep in
+   the stack it sits, rather than every card in the fan casting the same one. --i/--n are
+   already on the element for the rotation above; this reads them too. */
+.hand .card-btn .card.face {
+  box-shadow:
+    0 calc(1px + var(--i, 0) * 0.4px) calc(2px + var(--i, 0) * 0.3px) rgba(0,0,0,.14),
+    0 calc(3px + var(--i, 0) * 0.6px) calc(8px + var(--i, 0) * 0.5px) rgba(0,0,0,.16);
+}
+.hand .card-btn.playable:hover .card.face,
+.hand .card-btn.playable:focus-visible .card.face,
+.hand .card-btn.selected .card.face,
+.hand .card-btn.staged .card.face {
+  box-shadow: 0 10px 22px rgba(0,0,0,.30), 0 3px 8px rgba(0,0,0,.20);
+}
+
+/* The panel actually awaiting your move rises very slightly off the felt — not the glow
+   .your-turn already carries (that says "your turn"), this says "and here is where to act". */
+.you.your-turn .you-head { transform: translateY(-2px); }
+:root[data-motion="reduced"] .you.your-turn .you-head { transform: none; }
+
+/* Beveled suit glyphs in the corner index: a hairline of light above, dark below, so the shape
+   sits proud of the card rather than lying flat on it. Left off the pip field itself — a dozen
+   beveled pips would read as noise, not craft. */
+.corner .ix-suit {
+  filter: drop-shadow(0 1px 0 var(--emboss-hi)) drop-shadow(0 -0.5px 0 var(--emboss-lo));
+}
+
+/* Recessed fields, raised buttons — the two kinds of control already read differently by shape
+   (pill vs rectangle); now they read differently by light too. */
+.field input[type=text], .field input:not([type]), .field input[type=number], .field select,
+.desc, .json-edit, .searchbox, input[type="text"], input[type="number"], select, textarea {
+  box-shadow: inset 0 1px 3px rgba(0,0,0,.20), inset 0 0 0 1px rgba(0,0,0,.04);
+}
+:root[data-theme="light"] .field input[type=text], :root[data-theme="light"] .field input:not([type]),
+:root[data-theme="light"] .field input[type=number], :root[data-theme="light"] .field select,
+:root[data-theme="light"] .desc, :root[data-theme="light"] .json-edit, :root[data-theme="light"] .searchbox,
+:root[data-theme="light"] input[type="text"], :root[data-theme="light"] input[type="number"],
+:root[data-theme="light"] select, :root[data-theme="light"] textarea {
+  box-shadow: inset 0 1px 3px rgba(0,0,0,.10), inset 0 0 0 1px rgba(0,0,0,.03);
+}
+
+/* Layered modal depth: the backdrop blur already separates a dialog from the table; a second,
+   wider shadow under the box itself sells the gap between the two layers rather than just the
+   blur doing it alone. */
+.modal-box { box-shadow: 0 30px 70px rgba(0,0,0,.38), 0 10px 26px rgba(0,0,0,.30), 0 20px 60px rgba(16, 64, 40, 0.22); }
+
+/* Chunky segmented pill toggles: a raised lip on the row, a pressed-in look for whichever
+   segment is actually on. */
+.seg button {
+  box-shadow: 0 1px 0 var(--emboss-hi), inset 0 -2px 0 rgba(0,0,0,.06);
+}
+.seg button.on {
+  box-shadow: inset 0 2px 4px rgba(0,0,0,.28), inset 0 0 0 1px rgba(0,0,0,.1);
+}
+:root[data-theme="light"] .seg button.on { box-shadow: inset 0 2px 4px rgba(0,0,0,.16), inset 0 0 0 1px rgba(0,0,0,.06); }
+
+/* ---- 31.3 · visual effects ---- */
+
+/* A contract that just went down gets one tremor through the felt. */
+@keyframes felt-shake {
+  10%, 90% { transform: translate3d(-1px, 0, 0); }
+  20%, 80% { transform: translate3d(2px, 0, 0); }
+  30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+  40%, 60% { transform: translate3d(4px, 0, 0); }
+}
+.felt-shake { animation: felt-shake 400ms cubic-bezier(.36,.07,.19,.97); }
+@media (prefers-reduced-motion: reduce) { .felt-shake { animation: none; } }
+:root[data-motion="reduced"] .felt-shake { animation: none; }
+
+/* The timer ring: a conic sweep round the clock pill that drains from gold through amber to
+   red as --pct falls, instead of only the last five seconds turning urgent. */
+.turn-clock { position: relative; --pct: 1; }
+.turn-clock::before {
+  content: ""; position: absolute; inset: -3px; border-radius: inherit; padding: 2px;
+  background: conic-gradient(from -90deg, var(--clock-c, var(--gold)) calc(var(--pct) * 360deg), transparent 0);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor; mask-composite: exclude;
+  transition: background 0.3s linear;
+}
+.turn-clock.warn { --clock-c: #d97706; }
+.turn-clock.urgent { --clock-c: var(--red, #e5484d); }
+
+/* A one-time gold sweep across the felt at match point — the moment the score first says
+   "one more and it's over", not every hand after. */
+@keyframes match-point-sweep {
+  from { transform: translateX(-120%); opacity: 0; }
+  15% { opacity: 1; }
+  to { transform: translateX(120%); opacity: 0; }
+}
+.match-point-sweep {
+  position: fixed; inset: 0; z-index: 25; pointer-events: none; overflow: hidden;
+}
+.match-point-sweep::after {
+  content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 40%;
+  background: linear-gradient(100deg, transparent, color-mix(in srgb, var(--gold) 55%, transparent) 45%, transparent);
+  animation: match-point-sweep 1100ms ease-out;
+}
+@media (prefers-reduced-motion: reduce) { .match-point-sweep { display: none; } }
+:root[data-motion="reduced"] .match-point-sweep { display: none; }
+
+/* A trick's leading card carries a faint warm underglow until the trick resolves — the same
+   colour family as .your-turn's glow, at a fraction of the strength, so "this is what everyone
+   is following" reads at a glance without competing with it. */
+.trick-card.led .card.face {
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--gold) 55%, transparent), 0 0 16px -2px color-mix(in srgb, var(--gold) 45%, transparent);
+}
+
+/* A turn-change ripple: a ring that expands once from the seat that just finished, crossing the
+   felt toward the middle. Purely decorative — the actual turn indicators do the informing. */
+@keyframes turn-ripple {
+  from { transform: translate(-50%, -50%) scale(0.2); opacity: 0.5; }
+  to { transform: translate(-50%, -50%) scale(2.6); opacity: 0; }
+}
+.turn-ripple {
+  position: absolute; left: var(--rx, 50%); top: var(--ry, 50%);
+  width: 40px; height: 40px; border-radius: 50%;
+  border: 1.5px solid color-mix(in srgb, var(--gold) 60%, transparent);
+  pointer-events: none; z-index: 5;
+  animation: turn-ripple 700ms ease-out;
+}
+@media (prefers-reduced-motion: reduce) { .turn-ripple { display: none; } }
+:root[data-motion="reduced"] .turn-ripple { display: none; }
+
+/* A warm flash behind a card (or a run of them) as it scores — sized by the caller through
+   --flash-scale so a bigger meld gets a bigger flash rather than the same puff every time. */
+@keyframes score-flash {
+  from { box-shadow: 0 0 0 0 color-mix(in srgb, var(--gold) 65%, transparent); opacity: 1; }
+  to   { box-shadow: 0 0 0 calc(var(--flash-scale, 1) * 26px) transparent; opacity: 0; }
+}
+.score-flash { position: absolute; inset: -6px; animation: score-flash 520ms ease-out; border-radius: inherit; pointer-events: none; }
+@media (prefers-reduced-motion: reduce) { .score-flash { animation: none; } }
+:root[data-motion="reduced"] .score-flash { animation: none; }
+
+/* ---- 31.4 · micro-interactions ---- */
+
+/* Ripple-from-tap on the primary and ghost buttons: one circle, born where the pointer landed,
+   fading as it grows. Coordinates arrive as --rx/--ry from a pointerdown listener. */
+@keyframes tap-ripple {
+  from { transform: scale(0); opacity: 0.35; }
+  to { transform: scale(1); opacity: 0; }
+}
+button.primary, button.ghost { position: relative; overflow: hidden; }
+.tap-ripple {
+  position: absolute; left: var(--rx, 50%); top: var(--ry, 50%);
+  width: var(--rr, 140px); height: var(--rr, 140px); margin: calc(var(--rr, 140px) / -2);
+  border-radius: 50%; background: radial-gradient(circle, #fff, transparent 70%);
+  pointer-events: none; animation: tap-ripple 480ms ease-out;
+}
+@media (prefers-reduced-motion: reduce) { .tap-ripple { display: none; } }
+:root[data-motion="reduced"] .tap-ripple { display: none; }
+
+/* A very faint cursor-follow spotlight on the felt, desktop only (a touch table has no cursor to
+   follow, and the pointer coordinates would otherwise just sit at the last tap forever). */
+@media (hover: hover) and (pointer: fine) {
+  .felt { position: relative; }
+  .felt::before {
+    content: ""; position: absolute; inset: 0; z-index: 0; pointer-events: none;
+    background: radial-gradient(320px 320px at var(--sx, 50%) var(--sy, 50%), rgba(255,255,255,.05), transparent 70%);
+    opacity: 0;
+    transition: opacity 0.4s;
+  }
+  .felt.spotlit::before { opacity: 1; }
+}
+:root[data-motion="reduced"] .felt::before { display: none; }
+@media (prefers-reduced-motion: reduce) { .felt::before { display: none; } }
+
+/* Spring-eased toggle thumbs, in place of the flat 0.18s ease it had. */
+.toggle .knob { transition: left 0.32s cubic-bezier(.34, 1.56, .64, 1); }
+@media (prefers-reduced-motion: reduce) { .toggle .knob { transition: left 0.05s linear; } }
+:root[data-motion="reduced"] .toggle .knob { transition: left 0.05s linear; }
+
+/* A drawn checkmark rather than an instant fill — the box fills, then the mark springs in a
+   beat after, the way a hand actually finishes a tick. Native checkboxes only; the settings
+   panel's own pill toggles above already have their own motion. */
+input[type="checkbox"] {
+  appearance: none; -webkit-appearance: none;
+  width: 18px; height: 18px; border-radius: 5px; flex: none;
+  border: 1.5px solid var(--panel-brd); background: var(--panel-hi);
+  display: inline-grid; place-items: center; cursor: pointer; position: relative; margin: 0;
+  transition: background 0.15s, border-color 0.15s;
+}
+input[type="checkbox"]:checked { background: var(--hot); border-color: transparent; }
+input[type="checkbox"]::after {
+  content: ""; width: 9px; height: 5px;
+  border-left: 2px solid #1a1613; border-bottom: 2px solid #1a1613;
+  transform: rotate(-45deg) scale(0); transform-origin: center;
+  transition: transform 0.2s cubic-bezier(.34, 1.56, .64, 1);
+}
+input[type="checkbox"]:checked::after { transform: rotate(-45deg) scale(1); }
+input[type="checkbox"]:focus-visible { outline: 2px solid var(--brass-hi); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { input[type="checkbox"]::after { transition: none; } }
+:root[data-motion="reduced"] input[type="checkbox"]::after { transition: none; }
+
+/* ---- 31.5 · ambient atmosphere ---- */
+
+/* A candle-like flicker on the gold glow elements — one long, irregular loop rather than a
+   metronomic pulse, so it reads as a live flame rather than a strobe. */
+@keyframes gold-flicker {
+  0%, 100% { filter: brightness(1); }
+  8%  { filter: brightness(0.96); }
+  22% { filter: brightness(1.04); }
+  37% { filter: brightness(0.99); }
+  55% { filter: brightness(1.03); }
+  71% { filter: brightness(0.97); }
+  86% { filter: brightness(1.02); }
+}
+.foil, .win-banner h2, .turn-badge {
+  animation: gold-flicker 6.4s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) { .foil, .win-banner h2, .turn-badge { animation: none; } }
+:root[data-motion="reduced"] .foil, :root[data-motion="reduced"] .win-banner h2, :root[data-motion="reduced"] .turn-badge { animation: none; }
+
+/* A warm haze at the felt's far edge — the table fading into the room around it rather than
+   stopping at a hard line. */
+.felt { position: relative; }
+.felt::after {
+  content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none; border-radius: inherit;
+  background: radial-gradient(120% 90% at 50% -10%, color-mix(in srgb, var(--hot) calc(9% + var(--daywarm, 0.3) * 10%), transparent), transparent 55%);
+}
+
+/* Seasonal drift: a slow scatter of snow or leaves over the felt, off unless asked for in
+   Preferences ▸ Appearance, and always off under reduced motion regardless of that setting —
+   this is the one category of movement that has no informational job to lose. */
+.season-layer { position: absolute; inset: 0; z-index: 2; pointer-events: none; overflow: hidden; border-radius: inherit; }
+.season-flake {
+  position: absolute; top: -10%; left: var(--sx, 50%); opacity: 0.7;
+  animation: season-fall linear infinite;
+  animation-duration: var(--sdur, 9s);
+  animation-delay: var(--sdelay, 0s);
+}
+@keyframes season-fall {
+  from { transform: translateY(-10%) translateX(0) rotate(0deg); }
+  to   { transform: translateY(110%) translateX(var(--sdrift, 20px)) rotate(120deg); }
+}
+:root[data-season="off"] .season-layer,
+:root[data-motion="reduced"] .season-layer { display: none; }
+@media (prefers-reduced-motion: reduce) { .season-layer { display: none; } }
+
+/* ---- 31.6 · typography ---- */
+
+/* Heavier optical weight for the numbers that are actually the point of the row — a bid, a
+   score, a trick count — set apart from the label sitting next to it. */
+.seat-stat, .turn-clock, .scores dd, .final-score, .ms-score { font-variation-settings: "wght" 720; font-weight: 800; }
+
+/* A drop cap for a game's name in its help panel — set in the display face, in gold, the way a
+   printed rulebook opens its first chapter. */
+.help-title { position: relative; }
+.help-title::first-letter {
+  font-family: var(--display); font-size: 1.7em; color: var(--gold); float: left;
+  line-height: 0.8; padding-right: 0.06em;
+}
+
+/* Warm italic for flavour and empty-state copy — text that is describing the room rather than
+   telling you what to do next. */
+.empty-shelf p, .empty-hero p, .about-p, .felt-blurb { font-style: italic; color: var(--muted); }
+
+/* ---- 31.7 · personalization ---- */
+
+/* A streak of three or more wins warms the profile avatar's own ring rather than replacing it —
+   the accent colour it already wears just gets brighter and gains a slow pulse. */
+.profile-avatar.on-streak {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--gold) 55%, var(--you, var(--emerald)) 45%), 0 0 20px -4px var(--gold);
+  animation: gold-flicker 6.4s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) { .profile-avatar.on-streak { animation: none; } }
+:root[data-motion="reduced"] .profile-avatar.on-streak { animation: none; }
+
+/* ---- 31.8 · accessibility ---- */
+
+/* High contrast: panels lose their glass and go flat and opaque, borders double in weight, and
+   muted text steps up toward full ink — independent of the high-contrast card face, which never
+   touched anything but the cards. */
+:root[data-contrast="high"] .panel, :root[data-contrast="high"] .glass {
+  backdrop-filter: none; background: var(--panel-solid, var(--panel)); border-width: 2px; border-color: var(--ink);
+}
+:root[data-contrast="high"] { --muted: var(--ink); }
+:root[data-contrast="high"] button.ghost, :root[data-contrast="high"] .seg button {
+  border-width: 2px; border-color: var(--ink);
+}
+
+/* The on-screen caption for the same line the screen reader already gets. */
+.caption-bar {
+  position: fixed; left: 50%; bottom: 84px; transform: translateX(-50%);
+  z-index: 55; max-width: min(92vw, 560px);
+  padding: 8px 16px; border-radius: var(--r-pill);
+  background: rgba(10, 8, 7, 0.82); color: #f4ede1;
+  font-size: 13px; text-align: center; line-height: 1.4;
+  box-shadow: 0 8px 24px rgba(0,0,0,.35);
+}
+:root[data-theme="light"] .caption-bar { background: rgba(255,255,255,.92); color: #1a1613; border: 1px solid var(--panel-brd); }
+
+/* ---- 31.9 · loading & performance feel ---- */
+
+/* A felt-textured skeleton, standing in for a bare loading line. */
+.view-loading {
+  position: relative; overflow: hidden; border-radius: var(--r-lg, 18px);
+  background: var(--panel-hi);
+}
+.view-loading::after {
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(100deg, transparent, color-mix(in srgb, var(--gold) 12%, transparent) 40%, transparent 60%);
+  animation: skeleton-sweep 1.6s ease-in-out infinite;
+}
+@keyframes skeleton-sweep { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+@media (prefers-reduced-motion: reduce) { .view-loading::after { animation: none; } }
+:root[data-motion="reduced"] .view-loading::after { animation: none; }
+
+/* The online connection dot: a slow, calm pulse while live, a faster amber one while the socket
+   is retrying — a living indicator rather than a static label. */
+.conn-dot {
+  width: 8px; height: 8px; border-radius: 50%; display: inline-block;
+  background: var(--emerald); box-shadow: 0 0 0 0 color-mix(in srgb, var(--emerald) 60%, transparent);
+  animation: conn-pulse 2.4s ease-in-out infinite;
+}
+.conn-dot.reconnecting {
+  background: #d97706; box-shadow: 0 0 0 0 color-mix(in srgb, #d97706 60%, transparent);
+  animation: conn-pulse 0.9s ease-in-out infinite;
+}
+@keyframes conn-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 50%, transparent); }
+  50% { box-shadow: 0 0 0 5px transparent; }
+}
+.conn-dot { color: var(--emerald); }
+.conn-dot.reconnecting { color: #d97706; }
+@media (prefers-reduced-motion: reduce) { .conn-dot { animation: none; } }
+:root[data-motion="reduced"] .conn-dot { animation: none; }
+
+/* An idle table breathes rather than spins: three low dots, each catching the glow a beat
+   after the one before it — an ambient loop standing in for a spinner while a table waits for
+   its other seats. */
+.online-idle { display: flex; gap: 7px; justify-content: center; margin-top: 4px; }
+.online-idle span {
+  width: 6px; height: 6px; border-radius: 50%; background: var(--gold);
+  opacity: 0.25; animation: idle-breathe 1.8s ease-in-out infinite;
+}
+.online-idle span:nth-child(2) { animation-delay: 0.3s; }
+.online-idle span:nth-child(3) { animation-delay: 0.6s; }
+@keyframes idle-breathe { 0%, 100% { opacity: 0.25; } 50% { opacity: 0.9; } }
+@media (prefers-reduced-motion: reduce) { .online-idle span { animation: none; opacity: 0.6; } }
+:root[data-motion="reduced"] .online-idle span { animation: none; opacity: 0.6; }
+
+/* A sparkle-twinkle on a card actively being dragged — three points of light at the ghost's
+   corners, each on its own offbeat loop, rather than a trailing path of spawned particles
+   (which would mean a per-frame DOM write on top of the pointermove this already costs). */
+.drag-ghost { position: fixed; pointer-events: none; z-index: 40; }
+.drag-ghost::before, .drag-ghost::after {
+  content: ""; position: absolute; width: 6px; height: 6px; border-radius: 50%;
+  background: radial-gradient(circle, #fff, var(--gold-hi, var(--gold)) 60%, transparent 75%);
+  animation: sparkle-twinkle 900ms ease-in-out infinite;
+}
+.drag-ghost::before { top: -4px; left: -4px; animation-delay: 0ms; }
+.drag-ghost::after { bottom: -4px; right: -4px; animation-delay: 300ms; }
+@keyframes sparkle-twinkle { 0%, 100% { opacity: 0; transform: scale(0.4); } 50% { opacity: 1; transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) { .drag-ghost::before, .drag-ghost::after { display: none; } }
+:root[data-motion="reduced"] .drag-ghost::before, :root[data-motion="reduced"] .drag-ghost::after { display: none; }

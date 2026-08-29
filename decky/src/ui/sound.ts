@@ -39,6 +39,7 @@ const NOTES: Record<Kind, number[]> = {
 const DECAY_MS: Partial<Record<Kind, number>> = { slap: 55, shuffle: 70 };
 
 export function playSound(kind: Kind, prefs: SoundPrefs): void {
+  if (prefs.reducedSound) return;
   const on = CARD_KINDS.includes(kind) ? prefs.cardSounds : prefs.uiSounds;
   if (!on || prefs.soundVolume <= 0) return;
   const a = ac();

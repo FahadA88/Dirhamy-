@@ -189,6 +189,7 @@ export function OnlineTable({ def, onStart, onCancel }: {
           <p className="muted">
             Any seat nobody takes is played by a bot, so you are never stuck waiting.
           </p>
+          <div className="online-idle" aria-hidden="true"><span /><span /><span /></div>
         </div>
       )}
 

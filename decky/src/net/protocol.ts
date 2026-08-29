@@ -100,4 +100,7 @@ export interface MatchApi {
   /** Live updates. Returns an unsubscribe. Async transports simply never call the listener. */
   subscribe(matchId: string, listener: (e: TableEvent) => void): () => void;
   close(): void;
+  /** Whether the wire is up right now. Missing (rather than false) for a transport that has no
+   *  concept of a live socket to lose — the caller then has nothing to show, not a false alarm. */
+  isLive?(): boolean;
 }
