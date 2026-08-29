@@ -596,6 +596,8 @@ export function CreateView({ onPlay }: { onPlay?: (def: GameDefinition) => void 
                     <label className="field"><span>The dealer's mandatory level: <b>{knobs.contractDealerMustBidLevel}</b></span>
                       <input type="range" min={1} max={knobs.contractMaxLevel} value={knobs.contractDealerMustBidLevel} onChange={(e) => set('contractDealerMustBidLevel', +e.target.value)} /></label>
                   )}
+                  <div className="field row"><Switch on={knobs.contractConcedeWhenDecided} onChange={(v) => set('contractConcedeWhenDecided', v)} aria-label="End a hand as soon as its outcome is mathematically locked in, rather than playing out a foregone conclusion" />
+                <span aria-hidden="true">End a hand as soon as its outcome is mathematically locked in, rather than playing out a foregone conclusion</span></div>
                   <div className="field row"><Switch on={knobs.bowers} onChange={(v) => set('bowers', v)} aria-label="Bowers — trump's jack is highest, and the other jack of the same colour becomes trump just under it" />
                 <span aria-hidden="true">Bowers — trump's jack is highest, and the other jack of the same colour becomes trump just under it{knobs.jacksAreTrumps ? ' (needs jacksAreTrumps off, above)' : ''}</span></div>
                 </>}

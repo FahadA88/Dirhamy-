@@ -1103,6 +1103,86 @@ section('Hokm: scoring — made and failed contracts both score by tricks actual
   }
 }
 
+section('Hokm: concedeWhenDecided ends the hand the moment its outcome is locked in');
+{
+  const mk = (id: string, rank: string, suit: string): Card => ({ id, rank: rank as Card['rank'], suit: suit as Card['suit'] });
+
+  function midHand(highBid: { player: string; level: number; strain: 'S' }, tricksWon: Record<string, number>, cardsLeftPerHand: number): MatchState {
+    const s: MatchState = createMatch(hokm, ['P1', 'P2', 'P3', 'P4'], 5);
+    s.phase = 'playing';
+    s.highBid = highBid;
+    s.trumpSuit = 'S';
+    s.maker = 'P1';
+    s.tricksWon = tricksWon;
+    const ranks = ['7', '8', '9', '10', 'J', 'Q'];
+    const suits = ['D', 'C', 'H'];
+    for (const [i, p] of s.players.entries()) {
+      s.zones[`hand:${p}`] = Array.from({ length: cardsLeftPerHand },
+        (_, k) => mk(`${suits[k % suits.length]}${ranks[i]}${k}`, ranks[i], suits[k % suits.length]));
+    }
+    s.turnIndex = s.players.indexOf('P2');
+    s.trickPlays = [];
+    s.lead = null;
+    s.auctionRound = 0;
+    return s;
+  }
+
+  function playOneTrick(s: MatchState): MatchState {
+    for (const p of ['P2', 'P3', 'P4', 'P1']) {
+      if (s.phase !== 'playing') break;
+      const card = (s.zones[`hand:${p}`] || [])[0];
+      if (!card) break;
+      s = applyMove(s, p, { actionId: 'playToTrick', cardId: card.id });
+    }
+    return s;
+  }
+
+  // P1's side bid 7 with 0 tricks so far; the defence already has 3. Three tricks remain (6
+  // total in this synthetic hand), so declaring side's absolute ceiling is 0 + 3 = 3 — nowhere
+  // near 7, already before a single one of those three tricks is played out. The deterministic
+  // deal hands the very first of them to the defence too, so the defence's real total ends up
+  // 3 (already held) + 1 (this trick) + 2 (conceded, the two left after it) = 6 — the whole hand.
+  {
+    let s = midHand({ player: 'P1', level: 7, strain: 'S' }, { P1: 0, P2: 3, P3: 0, P4: 0 }, 3);
+    const before = s.players.map((p) => (s.zones[`hand:${p}`] || []).length);
+    s = playOneTrick(s);
+    check('the hand ends after just the first of three remaining tricks, not all three',
+      s.phase === 'roundOver', s.phase);
+    const declaring = (s.tricksWon.P1 ?? 0) + (s.tricksWon.P3 ?? 0);
+    const defending = (s.tricksWon.P2 ?? 0) + (s.tricksWon.P4 ?? 0);
+    check('the impossible contract scores 0 for the declaring side', s.scores.P1 === 0 && s.scores.P3 === 0, s.scores);
+    check('the defence is credited every trick, played or conceded (6 total, all of them)',
+      declaring === 0 && defending === 6, { declaring, defending });
+    check('nothing was left in anyone\'s hand to keep playing', before.every((n) => n === 3), before);
+  }
+
+  // The mirror case: P1's side bid 6 and already has 6 in hand (9 total in this synthetic
+  // hand) — the contract cannot be beaten by anything left, however the remaining tricks fall.
+  // The deterministic deal still hands the very first remaining trick to the defence, so P1's
+  // side ends up with 6 (already held) + 2 (conceded, the two left after that one trick) = 8,
+  // and made-contract scoring pays exactly what was actually taken: 8.
+  {
+    let s = midHand({ player: 'P1', level: 6, strain: 'S' }, { P1: 6, P2: 0, P3: 0, P4: 0 }, 3);
+    s = playOneTrick(s);
+    check('an already-made contract also ends the hand early rather than playing it out',
+      s.phase === 'roundOver', s.phase);
+    check('the declaring side is credited every remaining trick', s.scores.P1 === 8 && s.scores.P3 === 8, s.scores);
+    check('the defence scores 0 on a made contract', s.scores.P2 === 0 && s.scores.P4 === 0, s.scores);
+  }
+
+  // A genuinely undecided contract must NOT be cut short — this guards against the check firing
+  // too eagerly. Bid 6 with 5 tricks (5 cards per hand) still to come, declaring side already has
+  // 2, defence has 1. The deterministic deal below always hands this next trick to the defence
+  // (highest rank of the suit led, no trump in play), which is the least favourable single trick
+  // for the declaring side available here — and even then, 2 + the 4 tricks left after it is
+  // exactly 6, still reachable. Nothing about this position is decided yet.
+  {
+    let s = midHand({ player: 'P1', level: 6, strain: 'S' }, { P1: 2, P2: 1, P3: 0, P4: 0 }, 5);
+    s = playOneTrick(s);
+    check('a genuinely open contract is not conceded early', s.phase === 'playing', s.phase);
+  }
+}
+
 section('Hokm: neither joker can lead a trick, and the two never collide in the same one');
 {
   const base = createMatch(hokm, ['P1', 'P2', 'P3', 'P4'], 3);
@@ -1182,6 +1262,50 @@ section('Hokm: neither joker can lead a trick, and the two never collide in the 
     const ids = playCardIds(midTrick(3, false, [coloredJoker, heartKing]));
     check('holding the led suit does not lock the colored joker out of a differently-trumped trick', ids.includes('JOKER1') && ids.includes('HK'), ids);
   }
+}
+
+// Regression: the no-lead restrictions above were verified only against hand-built MatchStates,
+// which set `trickStarted` directly rather than through the real event pipeline — and that
+// pipeline had its own bug. The generic `cardPlayed` hook fires for every card, including the
+// fourth that completes a trick, and it fires AFTER `resolveTrick` has already cleared the trick
+// pile and fired `trickWon` (which reset `trickStarted` to 0 for the trick about to open). That
+// trailing `cardPlayed` event immediately flipped `trickStarted` back to 1 before the new
+// trick's leader had played anything, so from the second trick on the restriction's own
+// condition (`trickStarted === 0`) was never true — both jokers could lead freely. Only a real
+// multi-trick game, driven through actual `applyMove` calls, exercises that ordering; a
+// hand-built single-trick state cannot.
+section('Hokm: playing an entire hand through applyMove never lets a joker lead when it has a choice');
+{
+  let jokerLeadWithChoice = 0;
+  let jokerLeadsSeen = 0;
+  for (let seed = 1; seed <= 300; seed++) {
+    let s: MatchState = createMatch(hokm, ['P1', 'P2', 'P3', 'P4'], seed);
+    let botSeed = seed * 104729 + 1;
+    let guard = 0;
+    while (s.phase === 'playing' && guard++ < 500) {
+      const actor = s.pendingChoice ? s.pendingChoice.player : s.players[s.turnIndex];
+      const leading = s.trickPlays.length === 0;
+      const handBefore = s.zones[`hand:${actor}`] || [];
+      const legalBefore = legalMoves(s, actor);
+      const { move, botSeed: nextSeed } = chooseMove(s, actor, botSeed, 'smart');
+      botSeed = nextSeed;
+      if (leading && move.actionId === 'playToTrick') {
+        const card = handBefore.find((c) => c.id === move.cardId);
+        if (card && card.rank === 'JOKER') {
+          jokerLeadsSeen++;
+          const nonJokerLeads = legalBefore.filter((m) => {
+            if (m.actionId !== 'playToTrick') return false;
+            const c = handBefore.find((x) => x.id === m.cardId);
+            return c && c.rank !== 'JOKER';
+          });
+          if (nonJokerLeads.length > 0) jokerLeadWithChoice++;
+        }
+      }
+      s = applyMove(s, actor, move);
+    }
+  }
+  check('300 simulated hands produced at least one joker-leads-a-trick event to check', jokerLeadsSeen > 0, jokerLeadsSeen);
+  check('a joker never leads a trick while a non-joker lead is also legal', jokerLeadWithChoice === 0, jokerLeadWithChoice);
 }
 
 console.log(failed ? '\nMECHANICS: FAILED' : '\nMECHANICS: all checks passed');

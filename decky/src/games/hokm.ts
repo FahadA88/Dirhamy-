@@ -14,6 +14,12 @@ import { GameDefinition } from '../engine/types';
 // passes, the deal is not thrown in — the dealer's side is stuck with a mandatory bid of five and
 // the dealer names trump, so a hand is never wasted for want of anyone willing to commit.
 //
+// A hand does not play itself out once its fate no longer depends on it. Bid 7 and the defence
+// alone has already taken enough tricks that the other six left in play cannot add up to 7
+// anymore — or the bidder has already reached 7 regardless of what's left — and `concedeWhenDecided`
+// ends it right there, crediting whichever side is already locked in with every trick still
+// unplayed.
+//
 // Both jokers beat everything, dealt with by the same `jokerRank: 'trump'` Five Hundred already
 // proved — and, like Five Hundred's, a joker is never bound by the led suit: it can be played
 // on top of any suit, whether or not its holder could have followed. What makes the two jokers
@@ -53,7 +59,11 @@ export const hokm: GameDefinition = {
       + 'and can be played over any suit, but neither may open a trick — they can only come in '
       + 'on somebody else’s lead. The colored joker also cannot be played before the fourth '
       + 'trick; the plain joker cannot be held past the third — whoever has it must play it '
-      + 'there, lead or not, so it is always spent well before the colored one is even legal.',
+      + 'there, lead or not, so it is always spent well before the colored one is even legal. '
+      + 'If either side is already guaranteed the hand before the last trick is dealt — the '
+      + 'bidders reached their number, or the defence has taken enough that the bidders '
+      + 'mathematically can’t — the hand ends there and then, no need to play out a foregone '
+      + 'conclusion.',
     players: { min: 4, max: 4, step: 2 },
     family: 'trick-taking',
   },
@@ -110,6 +120,11 @@ export const hokm: GameDefinition = {
       // A failed contract is not priced by how far short it fell — the defence simply takes the
       // hand and scores the tricks they actually hold, same as a made contract does for the bidders.
       defendersScoreOwnTricks: true,
+      // Bid 7 and the defence has already taken 3 of the remaining tricks needed to stop you?
+      // The other 6 in play can't undo that arithmetic. Rather than dealing out cards nobody's
+      // fate still turns on, the hand ends the moment either side's outcome is locked in, and
+      // whichever side is already guaranteed the win is credited the rest of the tricks.
+      concedeWhenDecided: true,
     },
     // Both jokers rank above every trump — this is the exact mechanism Five Hundred uses for its
     // one joker; Hokm's timing restrictions below are what turn a single top card into a pair.
@@ -138,6 +153,14 @@ export const hokm: GameDefinition = {
       id: 'mark-trick-started',
       name: 'A trick is no longer open for lead once its first card lands',
       when: 'cardPlayed',
+      // The generic cardPlayed hook fires for every card, including the fourth that completes
+      // a trick — and it fires AFTER resolveTrick has already cleared the trick pile and fired
+      // trickWon (which reset trickStarted to 0 for the trick about to open). Without this
+      // guard, that trailing cardPlayed event immediately flipped trickStarted back to 1 before
+      // the new trick's leader had played anything, so the no-lead restrictions below silently
+      // did nothing from the second trick on. An empty trick pile at this exact moment means
+      // this cardPlayed event is that trailing one, not a genuine lead — skip it.
+      if: { cmp: { left: { count: 'trick' }, op: '>', right: { lit: 0 } } },
       then: [{ op: 'setVarNum', var: 'trickStarted', value: { lit: 1 } }],
     },
   ],

@@ -2042,8 +2042,42 @@ function resolveTrick(s: MatchState, trickZoneId: string): void {
   s.ply += 1;
   fireRules(s, 'trickWon', { playerId: winner.player, targetCard: winner.card });
 
+  if (settleContractEarlyIfDecided(s)) return;
+
   // Round ends when every hand still in play is empty.
   if (activeSeats(s).every((p) => (s.zones[`hand:${p}`] || []).length === 0)) endTrickRound(s);
+}
+
+/**
+ * `numericAuction.concedeWhenDecided`: once no remaining trick can change which side wins the
+ * contract, stop dealing out cards nobody's fate depends on and score it now. Returns true if it
+ * ended the hand.
+ */
+function settleContractEarlyIfDecided(s: MatchState): boolean {
+  const cfg = s.definition.trick?.numericAuction;
+  if (!cfg?.concedeWhenDecided || !s.highBid) return false;
+
+  const remaining = Math.max(0, ...s.players.map((p) => (s.zones[`hand:${p}`] || []).length));
+  if (remaining === 0) return false; // the ordinary hands-empty check above already covers this
+
+  const teams = trickTeams(s);
+  const declaring = teams.find((t) => t.includes(s.highBid!.player)) ?? [s.highBid!.player];
+  const defending = teams.filter((t) => t !== declaring).flat();
+  const need = s.highBid.level + cfg.book;
+  const declaringTricks = declaring.reduce((a, p) => a + (s.tricksWon[p] ?? 0), 0);
+
+  let winner: string[] | null = null;
+  if (declaringTricks >= need) winner = declaring;                    // already made, whatever's left
+  else if (declaringTricks + remaining < need) winner = defending;    // already out of reach
+
+  if (!winner) return false;
+  // It does not matter which teammate's tally absorbs the rest — scoreContract sums by side.
+  s.tricksWon[winner[0]] = (s.tricksWon[winner[0]] ?? 0) + remaining;
+  log(s, null, winner === declaring
+    ? `${short(s.highBid.player)}'s contract is unbeatable now — the rest of the hand is conceded.`
+    : `${short(s.highBid.player)} can no longer reach the contract — the defence takes the rest of the hand.`);
+  endTrickRound(s);
+  return true;
 }
 
 // ---------- the contract auction (Bridge-style) ----------

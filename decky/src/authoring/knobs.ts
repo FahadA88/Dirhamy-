@@ -75,6 +75,11 @@ export interface Knobs {
    * shortfall.
    */
   contractDefendersScoreOwnTricks: boolean;
+  /**
+   * Stop playing out a hand once its outcome is mathematically locked in either direction, and
+   * credit whichever side is already guaranteed with the tricks nobody's fate depends on anymore.
+   */
+  contractConcedeWhenDecided: boolean;
   bowers: boolean;           // trump jack, then the same-colour jack, top the trump suit
   goAlone: boolean;          // the maker may cut their partner out of the hand
   shootTheMoon: boolean;     // sweeping every penalty point scores you 0 and everyone else the pot
@@ -305,6 +310,7 @@ export const defaultKnobs: Knobs = {
   contractDealerMustBid: false,
   contractDealerMustBidLevel: 1,
   contractDefendersScoreOwnTricks: false,
+  contractConcedeWhenDecided: false,
   bowers: false,
   goAlone: false,
   shootTheMoon: false,
@@ -1069,6 +1075,7 @@ function buildTrickDefinition(knobs: Knobs, id: string): GameDefinition {
           ? { dealerMustBid: Math.max(1, Math.min(knobs.contractDealerMustBidLevel, knobs.contractMaxLevel)) }
           : {}),
         ...(knobs.contractDefendersScoreOwnTricks ? { defendersScoreOwnTricks: true } : {}),
+        ...(knobs.contractConcedeWhenDecided ? { concedeWhenDecided: true } : {}),
       } : undefined,
       // jacksAreTrumps promotes all four jacks out of their printed suits; bowers only promotes
       // two while leaving the other two where they are printed — a jack cannot be both at once.
@@ -1254,6 +1261,7 @@ export function knobsFromDefinition(def: GameDefinition): Knobs {
     contractDealerMustBid: def.trick?.numericAuction?.dealerMustBid !== undefined,
     contractDealerMustBidLevel: def.trick?.numericAuction?.dealerMustBid ?? 1,
     contractDefendersScoreOwnTricks: !!def.trick?.numericAuction?.defendersScoreOwnTricks,
+    contractConcedeWhenDecided: !!def.trick?.numericAuction?.concedeWhenDecided,
     bowers: !!def.trick?.bowers,
     goAlone: !!def.trick?.goAlone,
     shootTheMoon: !!def.trick?.shootTheMoon,

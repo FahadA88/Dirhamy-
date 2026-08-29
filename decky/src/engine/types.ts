@@ -635,6 +635,15 @@ export interface NumericAuctionConfig {
    * contract scores about the same as a contract that barely failed.
    */
   defendersScoreOwnTricks?: boolean;
+  /**
+   * Stop playing out a hand once its outcome is mathematically locked in either direction — the
+   * defence has already taken more tricks than the declaring side could possibly make up even by
+   * winning everything left, or the declaring side has already reached its number regardless of
+   * how the rest falls. The remaining, no-longer-competitive tricks are credited to whichever
+   * side is already guaranteed them (the real-world "claim" a table makes rather than dealing
+   * out cards nobody's contest depends on anymore), and the hand is scored immediately.
+   */
+  concedeWhenDecided?: boolean;
 }
 
 /**
