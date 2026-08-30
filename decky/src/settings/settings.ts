@@ -55,6 +55,15 @@ export type Highlight = 'glow' | 'outline' | 'lift' | 'off';
 // in Table.tsx) — suit-grouped for a trick game, rank for a climbing game, and so on. The other
 // three are an explicit override a player can pick regardless of what the game would suggest.
 export type SortMode = 'auto' | 'off' | 'rank' | 'suit';
+/**
+ * How the home screen arranges the library. `grid` is the shipped shelf-and-carousel page;
+ * everything past it is an alternate way to browse the same games, over the same actions —
+ * picking one only ever changes this one screen's arrangement.
+ */
+export type HomeLayout =
+  | 'grid' | 'kanban' | 'feed' | 'radial' | 'pager' | 'command' | 'magazine' | 'bento'
+  | 'dual' | 'iconrail' | 'drawer' | 'megaheader' | 'canvas' | 'terminal' | 'doctree'
+  | 'widgets' | 'ledger';
 export type BotSpeed = 'slow' | 'normal' | 'fast' | 'instant';
 export type BotNaming = 'bot' | 'seat' | 'named';
 /**
@@ -165,6 +174,8 @@ export interface Settings {
   myLooks: MyLook[];
   /** When exactly one move is legal, play it rather than waiting to be told to. */
   autoPlayForced: boolean;
+  /** How the front page presents the library — the shipped grid, or one of sixteen others. */
+  homeLayout: HomeLayout;
 }
 
 export const defaultSettings: Settings = {
@@ -216,6 +227,7 @@ export const defaultSettings: Settings = {
   // Long enough to catch a misclick, short enough that nobody waits on it.
   undoGraceMs: 3000,
   turnSeconds: 0,
+  homeLayout: 'grid',
 };
 
 /** The glyphs offered as an avatar. Fixed set, so nothing needs screening. */
@@ -337,6 +349,29 @@ export const BACKS: Record<Exclude<CardBack, 'custom'>, BackPreset> = {
   holofoil:  { name: 'Holo Foil' },
 };
 
+export interface HomeLayoutPreset { name: string; blurb: string; mark: string }
+
+/** Order here is the order the picker offers them in. The house grid leads. */
+export const HOME_LAYOUTS: Record<HomeLayout, HomeLayoutPreset> = {
+  grid:       { name: 'Shelf',          blurb: 'The house front page — a carousel, kind tabs, and shelves under that.', mark: '▦' },
+  kanban:     { name: 'Kanban Board',   blurb: 'One column per kind of game, each game a card in its column.', mark: '▥' },
+  feed:       { name: 'Vertical Feed',  blurb: 'A scrolling feed of picks, recent plays and new arrivals.', mark: '☰' },
+  radial:     { name: 'Radial Menu',    blurb: 'Kinds arranged around a hub — spin to the one you want.', mark: '◎' },
+  pager:      { name: 'Full-Screen Pager', blurb: 'One game at a time, edge to edge. Step through with the arrows.', mark: '▭' },
+  command:    { name: 'Command Palette', blurb: 'Type to filter the whole library, Enter opens the top match.', mark: '⌘' },
+  magazine:   { name: 'Magazine',       blurb: 'One game given the cover story, the rest set as a reading list.', mark: '𝔸' },
+  bento:      { name: 'Bento Grid',     blurb: 'A mix of tile sizes — one big pick, small stats, the rest of the shelf.', mark: '▣' },
+  dual:       { name: 'Split Pane',     blurb: 'A scannable list on the left, a live preview on the right.', mark: '◫' },
+  iconrail:   { name: 'Icon Rail',      blurb: 'A narrow rail of kind icons instead of a row of tabs.', mark: '▤' },
+  drawer:     { name: 'Slide-Out Drawer', blurb: 'Filters tuck into a drawer; the shelf gets the full width.', mark: '⇥' },
+  megaheader: { name: 'Mega-Header',    blurb: 'A tall header that opens into a full menu of kinds.', mark: '▔' },
+  canvas:     { name: 'Infinite Canvas', blurb: 'Games as nodes on a pannable board, clustered by kind.', mark: '⬡' },
+  terminal:   { name: 'Terminal',       blurb: 'A command line — type a name, or `list --family`, to browse.', mark: '❯' },
+  doctree:    { name: 'Doc Tree',       blurb: 'Kinds expand into games like folders into files, in a sidebar.', mark: '⌸' },
+  widgets:    { name: 'Widget Dashboard', blurb: 'Small real widgets — jump back in, staff picks, your stats.', mark: '⊞' },
+  ledger:     { name: 'Newsprint Ledger', blurb: 'Dense columns and hairline rules, built for scanning names fast.', mark: '≡' },
+};
+
 export interface FacePreset { name: string; note: string }
 
 export const FACES: Record<CardFace, FacePreset> = {
@@ -398,6 +433,7 @@ const ALLOWED = {
   botNaming: ['bot', 'seat', 'named'],
   colorVisionSim: ['off', 'protanopia', 'deuteranopia', 'tritanopia'],
   seasonalFx: ['off', 'snow', 'leaves'],
+  homeLayout: Object.keys(HOME_LAYOUTS),
 } as const;
 
 /** How loud, and which categories are on — the shape `playSound` actually needs. */

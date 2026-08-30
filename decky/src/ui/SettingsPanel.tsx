@@ -9,7 +9,7 @@ import { ENGINE_CHANGELOG } from '../engine/changelog';
 import { canSpeak } from './speech';
 import {
   ACCENTS, AVATARS, AccentId, BACKS, CardBack, CardFace, CustomBack, CustomFelt, FACES, FELTS,
-  MAX_BACK_IMAGE, MyLook, Settings, TableFelt, THEME_PACKS,
+  HOME_LAYOUTS, HomeLayout, MAX_BACK_IMAGE, MyLook, Settings, TableFelt, THEME_PACKS,
 } from '../settings/settings';
 
 // Preferences.
@@ -246,6 +246,19 @@ function LookSection({ s, set }: { s: Settings; set: Setter }) {
               </button>
             )
           )}
+        </div>
+      </Row>
+      <Row label="Home screen layout" hint={HOME_LAYOUTS[s.homeLayout].blurb}
+        keywords="browse home library layout kanban feed radial pager command palette magazine bento split dual pane icon rail drawer mega header canvas terminal doctree tree widget dashboard ledger newsprint" wide>
+        <div className="swatches layouts">
+          {(Object.keys(HOME_LAYOUTS) as HomeLayout[]).map((id) => (
+            <button key={id} className={`swatch wide ${s.homeLayout === id ? 'on' : ''}`}
+              title={HOME_LAYOUTS[id].blurb} aria-pressed={s.homeLayout === id}
+              onClick={() => set('homeLayout', id)}>
+              <span className="layout-mark" aria-hidden="true">{HOME_LAYOUTS[id].mark}</span>
+              <em>{HOME_LAYOUTS[id].name}</em>
+            </button>
+          ))}
         </div>
       </Row>
       <Row label="Theme" hint="The room after midnight, or the same room with the lights on." keywords="light dark mode night">

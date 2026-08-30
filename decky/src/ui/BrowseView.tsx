@@ -2,8 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { GameDefinition } from '../engine/types';
 import {
   Collection, Filters, KINDS, PublishedGame, SortKey,
-  allGames, averageRating, collections, complexityOf, creator, featuredSet, follows, fork,
-  isFavourite, isFollowing, kindLabel, kindOf, myReview, playtimeOf, review, reviewsFor,
+  allGames, averageRating, collections, creator, featuredSet, follows, fork,
+  isFavourite, isFollowing, kindOf, myReview, review, reviewsFor,
   searchLibrary, toggleFavourite, toggleFollow, unpublish,
 } from '../library/library';
 import { explainGame } from '../authoring/explain';
@@ -15,6 +15,8 @@ import { leaderboard } from '../social/records';
 import { useSettings } from '../settings/SettingsContext';
 import { GameArt } from './GameArt';
 import { Confirm } from './Confirm';
+import { EmptyDeckMark, Meta, ShelfCard, blurb } from './browseCommon';
+import { HOME_LAYOUTS_BY_ID } from './homeLayouts';
 
 
 // The shelf.
@@ -36,35 +38,6 @@ const SORTS: { key: SortKey; label: string }[] = [
   { key: 'most-played', label: 'Most played' },
   { key: 'name', label: 'A–Z' },
 ];
-
-/**
- * As much of a description as fits, ending on a full stop.
- *
- * The banner clamps to three lines, which cut Hearts off at "Whoever holds t…" — a sentence
- * chopped mid-word reads like the page failed to load rather than like a summary. Take whole
- * sentences up to roughly a banner's worth and stop there.
- */
-function blurb(text: string, limit = 165): string {
-  const sentences = text.split(/(?<=\.)\s+/);
-  let out = '';
-  for (const sentence of sentences) {
-    if (out && (out + ' ' + sentence).length > limit) break;
-    out = out ? `${out} ${sentence}` : sentence;
-  }
-  return out || text.slice(0, limit);
-}
-
-/** A shelf with nothing on it, drawn rather than typed — two empty card outlines fanned the way
- *  a real hand would be, so "nothing here" reads as a place rather than a glyph off the font. */
-function EmptyDeckMark() {
-  return (
-    <svg className="empty-mark" width="56" height="56" viewBox="0 0 56 56" fill="none"
-      stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
-      <rect x="10" y="12" width="24" height="34" rx="3" transform="rotate(-8 22 29)" />
-      <rect x="22" y="10" width="24" height="34" rx="3" transform="rotate(8 34 27)" />
-    </svg>
-  );
-}
 
 export function BrowseView({ onPlay, onSetup, onOnline, onlineHostDown, onRemix }: {
   onPlay: (def: GameDefinition) => void;
@@ -97,6 +70,11 @@ export function BrowseView({ onPlay, onSetup, onOnline, onlineHostDown, onRemix 
   const shelves = useMemo(() => collections(inKind), [inKind, tick]);
   const spotlight = useMemo(() => featuredSet(inKind, 5), [inKind]);
   const results = useMemo(() => searchLibrary(games, filters, sort), [games, filters, sort, tick]);
+
+  // The sixteen alternate layouts don't share the front page's kind-tab state — each is its
+  // own whole home screen — so they read the shelf and the featured set off the full library.
+  const shelvesAll = useMemo(() => collections(games), [games, tick]);
+  const spotlightAll = useMemo(() => featuredSet(games, 5), [games]);
 
   const refresh = () => setTick((t) => t + 1);
   const searching = !!filters.query || !!filters.family || !!filters.players
@@ -131,6 +109,22 @@ export function BrowseView({ onPlay, onSetup, onOnline, onlineHostDown, onRemix 
         onOpen={(id) => { setProfile(null); setDetail(id); }}
         onChanged={refresh}
       />
+    );
+  }
+
+  if (settings.homeLayout !== 'grid') {
+    const Layout = HOME_LAYOUTS_BY_ID[settings.homeLayout];
+    return (
+      <div className="browse">
+        <Layout
+          games={games}
+          shelves={shelvesAll}
+          spotlight={spotlightAll}
+          onOpen={setDetail}
+          onPlay={(g) => onPlay(g.definition)}
+          onChanged={refresh}
+        />
+      </div>
     );
   }
 
@@ -431,61 +425,6 @@ function Shelf({ collection, onOpen, onPlay, onChanged }: {
         ))}
       </EdgeScroller>
     </section>
-  );
-}
-
-function ShelfCard({ game, onOpen, onPlay, onChanged }: {
-  game: PublishedGame; onOpen: () => void; onPlay: () => void; onChanged: () => void;
-}) {
-  const def = game.definition;
-  const fav = isFavourite(game.id);
-  return (
-    <div className="shelfcard">
-      <button className="sc-main" onClick={onOpen}>
-        <GameArt def={def} id={game.id} />
-        <div className="sc-body">
-          <h3>{def.meta.name}</h3>
-          <Meta game={game} />
-        </div>
-        {game.staffPick && <span className="pick-badge" title="Staff pick">★</span>}
-        {game.aiWritten && <span className="ai-badge" title="Written from a description">✎</span>}
-      </button>
-      <button className={`star ${fav ? 'on' : ''}`} aria-pressed={fav}
-        aria-label={fav ? 'Remove from favourites' : 'Add to favourites'}
-        onClick={() => { toggleFavourite(game.id); onChanged(); }}>♥</button>
-      <button className="sc-play" onClick={onPlay} aria-label={`Play ${def.meta.name}`}>▶</button>
-    </div>
-  );
-}
-
-function Meta({ game }: { game: PublishedGame }) {
-  const def = game.definition;
-  const rating = averageRating(game.stats);
-  const p = def.meta.players;
-  const weight = complexityOf(def);
-  return (
-    <div className="sc-meta">
-      <span className="sc-kind" title="Kind of game">{kindLabel(def)}</span>
-      <span title="Players">♟ {p.min === p.max ? p.min : `${p.min}–${p.max}`}</span>
-      <span title="Typical length">◷ {playtimeOf(def)}m</span>
-      {/*
-        Bare pips read as a loading bar, not a rating — and unlike the pawn or the clock next
-        to them, a row of blocks has no built-in meaning to fall back on. A scale reads as
-        "weight", which a filled-in pip count then quantifies; the title spells out what more
-        of it costs you, since it is rules to learn and not, as a bar chart usually implies,
-        more time at the table. Not the gear from Preferences — that already means "settings"
-        on this same page, in the same header, and reusing it here would make one glyph answer
-        two unrelated questions.
-      */}
-      <span
-        title={`Complexity ${weight} of 5 — more rules to learn, not more time to play`}
-        aria-label={`Complexity ${weight} of 5`}
-        className="sc-weight"
-      >
-        ⚖ {'▮'.repeat(weight)}<i aria-hidden="true">{'▮'.repeat(5 - weight)}</i>
-      </span>
-      {rating !== null && <span className="sc-rating" title="Rating">★ {rating.toFixed(1)}</span>}
-    </div>
   );
 }
 
