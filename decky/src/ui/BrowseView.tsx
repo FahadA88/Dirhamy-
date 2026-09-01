@@ -379,10 +379,10 @@ function EdgeScroller({ className, label, children }: {
         {children}
       </div>
       {edge.left && (
-        <button className="rail-nudge left" onClick={() => nudge(-1)} aria-label={`Scroll ${label} back`}>&lsaquo;</button>
+        <button className="rail-nudge left" onClick={() => nudge(-1)} aria-label={`Scroll ${label} back`} title="Scroll back">&lsaquo;</button>
       )}
       {edge.right && (
-        <button className="rail-nudge right" onClick={() => nudge(1)} aria-label={`Scroll ${label} on`}>&rsaquo;</button>
+        <button className="rail-nudge right" onClick={() => nudge(1)} aria-label={`Scroll ${label} on`} title="Scroll on">&rsaquo;</button>
       )}
     </div>
   );
@@ -513,6 +513,7 @@ function GameDetail({ game, me, onBack, onPlay, onSetup, onOnline, onlineHostDow
                 right above the actual ★-rating control below, made them look like one control. */}
             <button className={`star big ${fav ? 'on' : ''}`} aria-pressed={fav}
               aria-label={fav ? 'Remove from favourites' : 'Add to favourites'}
+              title={fav ? 'Remove from favourites' : 'Add to favourites'}
               onClick={() => { toggleFavourite(game.id); onChanged(); }}>♥</button>
           </div>
 
@@ -618,6 +619,7 @@ function GameDetail({ game, me, onBack, onPlay, onSetup, onOnline, onlineHostDow
             {[1, 2, 3, 4, 5].map((n) => (
               <button key={n} className={`star ${stars >= n ? 'on' : ''}`}
                 aria-label={`${n} star${n === 1 ? '' : 's'}`}
+                title={`Rate ${n} star${n === 1 ? '' : 's'}`}
                 onClick={() => { setStars(n); setSaved(false); }}>★</button>
             ))}
           </div>

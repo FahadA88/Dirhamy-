@@ -101,8 +101,9 @@ export function ShelfCard({ game, onOpen, onPlay, onChanged }: {
       </button>
       <button className={`star ${fav ? 'on' : ''}`} aria-pressed={fav}
         aria-label={fav ? 'Remove from favourites' : 'Add to favourites'}
+        title={fav ? 'Remove from favourites' : 'Add to favourites'}
         onClick={() => { toggleFavourite(game.id); onChanged(); }}>♥</button>
-      <button className="sc-play" onClick={onPlay} aria-label={`Play ${def.meta.name}`}>▶</button>
+      <button className="sc-play" onClick={onPlay} aria-label={`Play ${def.meta.name}`} title="Play">▶</button>
     </div>
   );
 }
