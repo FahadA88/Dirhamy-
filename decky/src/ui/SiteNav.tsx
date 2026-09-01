@@ -40,7 +40,10 @@ export function SiteNav({ style, view, onView, onSettings, onDaily }: {
   // the element's text, so a button reading "Play" is really "\u2660Play" to anything matching on
   // text — screen readers included.
   const marks = style === 'rail' || style === 'dock';
-  const settingsLabel = style === 'rail';
+  // The rail has room for it, and the default bar becomes a labelled bottom tab bar on phones
+  // where a bare gear would be the one unexplained cell in the row. CSS hides it again above
+  // 780px, where the gear sits in a pill beside four labelled tabs and reads fine alone.
+  const settingsLabel = style === 'rail' || style === 'bar';
   const streak = dailyStreak();
   const items = (
     <>
@@ -70,7 +73,10 @@ export function SiteNav({ style, view, onView, onSettings, onDaily }: {
   const brand = (
     <div className="brand">
       <div className="logo3d"><span>♠</span></div>
-      <h1>DECKY</h1>
+      {/* Not an <h1>. This is the brand, and it rendered on every screen — so a screen-reader
+          user landing on a Hearts table heard "Decky" as the page heading and never heard
+          "Hearts". The heading level belongs to whatever the screen is actually about. */}
+      <div className="wordmark">DECKY</div>
     </div>
   );
 

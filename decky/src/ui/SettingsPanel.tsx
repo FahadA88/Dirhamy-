@@ -65,6 +65,9 @@ export function SettingsPanel({ open, onClose }: { open: boolean; onClose: () =>
   const ref = useDismissable(open, onClose);
   const [section, setSection] = useState<SectionId>('look');
   const [query, setQuery] = useState('');
+  // Drives the fade at the pane's bottom edge — see .prefs-pane. Starts false so a pane that
+  // opens already scrolled to its end still resolves on the first scroll or section change.
+  const [atEnd, setAtEnd] = useState(false);
   const [confirmingReset, setConfirmingReset] = useState(false);
   const q = query.trim().toLowerCase();
   const searching = q.length > 0;
@@ -122,7 +125,14 @@ export function SettingsPanel({ open, onClose }: { open: boolean; onClose: () =>
             <Preview />
           </nav>
 
-          <div className="prefs-pane">
+          <div
+            className="prefs-pane"
+            data-end={atEnd ? 'yes' : 'no'}
+            onScroll={(e) => {
+              const el = e.currentTarget;
+              setAtEnd(el.scrollHeight - el.clientHeight - el.scrollTop < 8);
+            }}
+          >
             <Query.Provider value={q}>
               {searching ? (
                 <>
@@ -179,6 +189,19 @@ function LookSection({ s, set }: { s: Settings; set: Setter }) {
   // combination once you moved past it — pick another pack and the mix you had was just gone,
   // with no record it ever existed. This is that record.
   const unsaved = !activePack && !activeMine;
+  // Seventeen ways to arrange the front page asked every player to settle an information
+  // architecture before they could deal a hand, and the grid needed to hold them all wrapped
+  // half the names onto two lines. Three stay: the default, a dense list, and big tiles. The
+  // rest still work and still load — ?lab=1 puts them all back — they are just no longer a
+  // question the settings panel asks. Whatever is already selected is always offered, so a
+  // saved choice never silently disappears from its own control.
+  const shownLayouts = useMemo(() => {
+    const all = Object.keys(HOME_LAYOUTS) as HomeLayout[];
+    const lab = new URLSearchParams(window.location.search).get('lab') === '1';
+    if (lab) return all;
+    const core: HomeLayout[] = ['grid', 'ledger', 'bento'];
+    return all.filter((id) => core.includes(id) || id === s.homeLayout);
+  }, [s.homeLayout]);
   const [naming, setNaming] = useState(false);
   const [name, setName] = useState('');
   function saveMix() {
@@ -251,7 +274,7 @@ function LookSection({ s, set }: { s: Settings; set: Setter }) {
       <Row label="Home screen layout" hint={HOME_LAYOUTS[s.homeLayout].blurb}
         keywords="browse home library layout kanban feed radial pager command palette magazine bento split dual pane icon rail drawer mega header canvas terminal doctree tree widget dashboard ledger newsprint" wide>
         <div className="swatches layouts">
-          {(Object.keys(HOME_LAYOUTS) as HomeLayout[]).map((id) => (
+          {shownLayouts.map((id) => (
             <button key={id} className={`swatch wide ${s.homeLayout === id ? 'on' : ''}`}
               title={HOME_LAYOUTS[id].blurb} aria-pressed={s.homeLayout === id}
               onClick={() => set('homeLayout', id)}>

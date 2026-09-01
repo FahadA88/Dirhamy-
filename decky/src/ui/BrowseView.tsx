@@ -83,6 +83,14 @@ export function BrowseView({ onPlay, onSetup, onOnline, onlineHostDown, onRemix 
 
   const shown = browsing || searching;
 
+  // At phone widths the five filter controls used four stacked rows, and pushed every game below
+  // the fold on a site whose whole job is showing games. They fold behind one button instead —
+  // nobody narrows a catalogue they have not seen yet. Above 780px the CSS shows them all again
+  // and this state stops mattering.
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const activeFilters = [filters.family, filters.players, filters.maxComplexity,
+    filters.favouritesOnly || undefined].filter((v) => v !== undefined).length;
+
   if (detail) {
     const game = games.find((g) => g.id === detail);
     if (game) {
@@ -139,12 +147,25 @@ export function BrowseView({ onPlay, onSetup, onOnline, onlineHostDown, onRemix 
           onChange={(e) => setFilters((f) => ({ ...f, query: e.target.value }))}
           aria-label="Search games"
         />
-        <div className="filter-chips">
-          <select value={filters.family ?? ''} aria-label="Kind of game"
-            onChange={(e) => setFilters((f) => ({ ...f, family: e.target.value || undefined }))}>
-            <option value="">Any kind</option>
-            {KINDS.filter((k) => k.id).map((k) => <option key={k.id} value={k.id}>{k.label}</option>)}
-          </select>
+        <button
+          className={`chip filters-toggle ${activeFilters ? 'on' : ''}`}
+          aria-expanded={filtersOpen}
+          aria-controls="filter-chips"
+          onClick={() => setFiltersOpen((o) => !o)}
+        >
+          Filters{activeFilters ? ` · ${activeFilters}` : ''}
+        </button>
+        <div className="filter-chips" id="filter-chips" data-open={filtersOpen ? 'yes' : 'no'}>
+          {/* Only in Browse all. The front page has the kind tabs a few rows down, which do the
+              same job in one tap and show counts; two controls over one dimension left it unclear
+              which of them was in charge. */}
+          {shown && (
+            <select value={filters.family ?? ''} aria-label="Kind of game"
+              onChange={(e) => setFilters((f) => ({ ...f, family: e.target.value || undefined }))}>
+              <option value="">Any kind</option>
+              {KINDS.filter((k) => k.id).map((k) => <option key={k.id} value={k.id}>{k.label}</option>)}
+            </select>
+          )}
           <select value={filters.players ?? ''} aria-label="Number of players"
             onChange={(e) => setFilters((f) => ({ ...f, players: e.target.value ? +e.target.value : undefined }))}>
             <option value="">Any players</option>
@@ -152,7 +173,7 @@ export function BrowseView({ onPlay, onSetup, onOnline, onlineHostDown, onRemix 
           </select>
           <select value={filters.maxComplexity ?? ''} aria-label="Complexity"
             onChange={(e) => setFilters((f) => ({ ...f, maxComplexity: e.target.value ? +e.target.value : undefined }))}>
-            <option value="">Any weight</option>
+            <option value="">Any complexity</option>
             <option value="1">Very simple</option>
             <option value="2">Simple</option>
             <option value="3">Middling</option>

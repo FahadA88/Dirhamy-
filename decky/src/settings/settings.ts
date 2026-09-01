@@ -360,7 +360,7 @@ export interface HomeLayoutPreset { name: string; blurb: string; mark: string }
 
 /** Order here is the order the picker offers them in. The house grid leads. */
 export const HOME_LAYOUTS: Record<HomeLayout, HomeLayoutPreset> = {
-  grid:       { name: 'Shelf',          blurb: 'The house front page — a carousel, kind tabs, and shelves under that.', mark: '▦' },
+  grid:       { name: 'Grid',           blurb: 'The house front page — a carousel, kind tabs, and shelves under that.', mark: '▦' },
   kanban:     { name: 'Kanban Board',   blurb: 'One column per kind of game, each game a card in its column.', mark: '▥' },
   feed:       { name: 'Vertical Feed',  blurb: 'A scrolling feed of picks, recent plays and new arrivals.', mark: '☰' },
   radial:     { name: 'Radial Menu',    blurb: 'Kinds arranged around a hub — spin to the one you want.', mark: '◎' },

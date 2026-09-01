@@ -280,7 +280,7 @@ header { display: flex; align-items: center; justify-content: space-between; gap
   background: var(--ink); color: var(--bg1); line-height: 1;
   box-shadow: 0 4px 14px rgba(16,32,24,0.20);
 }
-header h1 {
+header h1, header .wordmark {
   margin: 0; font-family: var(--mono); font-size: 25px; letter-spacing: -0.5px; font-weight: 700;
   color: var(--ink);
 }
@@ -519,7 +519,7 @@ h2 { letter-spacing: -0.025em; color: var(--ink); font-size: 22px; font-weight: 
      earlier in this audit pass, caught before it shipped rather than after. */
   .app { padding-top: max(14px, env(safe-area-inset-top)); padding-inline: max(10px, env(safe-area-inset-left)) max(10px, env(safe-area-inset-right)); padding-bottom: calc(40px + env(safe-area-inset-bottom)); }
   header { gap: 10px; }
-  header h1 { font-size: 20px; }
+  header h1, header .wordmark { font-size: 20px; }
   header .sub { display: none; }
   .logo3d { width: 34px; height: 34px; }
   .logo3d span { border-radius: 10px; font-size: 17px; }
@@ -575,6 +575,35 @@ h2 { letter-spacing: -0.025em; color: var(--ink); font-size: 22px; font-weight: 
   .felt-content.sol { --cw: 58px; --ch: 82px; --bw: 58px; --bh: 82px; }
 }
 @media (max-width: 780px) {
+  /* Five destinations never fitted beside the brand in one top pill at phone widths. The old
+     answer was to shrink them, which took the buttons to roughly 30px — under the 44px floor,
+     on the five most-used controls in the product. They move to the bottom instead, where a
+     thumb reaches, and get the height back. Only the default bar: the rail, centre, dock and
+     plate styles each carry their own narrow-width treatment. */
+  /* backdrop-filter makes an element a containing block for its fixed descendants, which pinned
+     the tab bar to the header instead of the viewport. Down here the top bar carries only the
+     brand over an opaque page, so it has nothing to blur and can drop the filter. */
+  /* header.nav-bar, not .nav-bar: the base rule that sets the blur is ~2,900 lines further down,
+     and a media query adds no specificity, so the plain class alone loses on source order. */
+  header.nav-bar { position: relative; backdrop-filter: none; }
+  .nav-bar .tabs.nv-items {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
+    display: grid; grid-auto-flow: column; grid-auto-columns: 1fr;
+    gap: 0; padding: 4px 4px calc(4px + env(safe-area-inset-bottom));
+    border-radius: 0; border: 0; border-top: 1px solid var(--panel-brd);
+    background: color-mix(in srgb, var(--panel-solid) 94%, transparent);
+    backdrop-filter: blur(12px);
+  }
+  .nav-bar .tabs.nv-items button {
+    flex-direction: column; gap: 3px; min-height: 52px;
+    padding: 7px 4px; border-radius: 10px; font-size: 11px; font-weight: 600;
+  }
+  .nav-bar .tabs.nv-items button .nv-mark { font-size: 18px; line-height: 1; }
+  /* The gear is icon-only on desktop; down here it needs the label its neighbours have, or the
+     fifth cell reads as an unexplained symbol. */
+  header.nav-bar .nv-settings .nv-label { display: inline; }
+  .app { padding-bottom: calc(78px + env(safe-area-inset-bottom)); }
+
   .felt-content.sol { --cw: 52px; --ch: 74px; --bw: 52px; --bh: 74px; gap: 12px; }
   .sol-top { gap: 8px; }
   .sol-group { gap: 5px; }
@@ -583,16 +612,12 @@ h2 { letter-spacing: -0.025em; color: var(--ink); font-size: 22px; font-weight: 
 }
 @media (max-width: 480px) {
   /* Longhand for the same reason as the 780px block above — see item 32. */
-  .app { padding-top: max(10px, env(safe-area-inset-top)); padding-inline: max(6px, env(safe-area-inset-left)) max(6px, env(safe-area-inset-right)); padding-bottom: calc(36px + env(safe-area-inset-bottom)); }
-  /* Item 33 of the audit pass: five items (Play/Daily/Create/You/Settings) in the default top
-     bar's pill genuinely do not fit next to the brand at 320-375px widths — the row was
-     overflowing the header instead of shrinking. Nothing here needed the full desktop padding. */
-  .nav-bar .tabs.nv-items { gap: 2px; padding: 3px; }
-  .nav-bar .tabs.nv-items button { padding: 7px 8px; font-size: 12.5px; }
+  /* Bottom clearance stays the 780px value — the tab bar is fixed over the page down here. */
+  .app { padding-top: max(10px, env(safe-area-inset-top)); padding-inline: max(6px, env(safe-area-inset-left)) max(6px, env(safe-area-inset-right)); padding-bottom: calc(78px + env(safe-area-inset-bottom)); }
   .nav-bar .brand { gap: 8px; }
   .nav-bar .logo3d { width: 30px; height: 30px; }
   .nav-bar .logo3d span { font-size: 15px; border-radius: 9px; }
-  .nav-bar h1 { font-size: 16px; }
+  .nav-bar .wordmark { font-size: 16px; }
   .table[data-felt] { --rail-w: 6px; --felt-pad: 7px; }
   .table-wrap { --room-pad: 4px !important; }
   /* Small enough that seven columns of Klondike still fit without scrolling, big enough that
@@ -1568,16 +1593,36 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
   display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
   padding: 10px 0 18px; border-bottom: 1px solid var(--panel-brd); margin-bottom: 20px;
 }
+/* Desktop has room for every control at once, so the toggle that folds them away is phone-only. */
+.filters-toggle { display: none; }
+@media (max-width: 780px) {
+  .filters-toggle { display: inline-flex; flex: 0 0 auto; min-height: 44px; align-items: center; }
+  .searchbox { min-height: 44px; }
+  .filter-chips[data-open="no"] { display: none; }
+  .filter-chips[data-open="yes"] { flex-basis: 100%; }
+  .filterbar { padding-bottom: 12px; margin-bottom: 14px; }
+  .searchbox { flex: 1 1 auto; min-width: 0; }
+}
 .searchbox {
   flex: 1 1 260px; min-width: 200px; padding: 9px 14px; border-radius: 999px;
   border: 1px solid var(--panel-brd); background: var(--panel); color: inherit; font-size: 14px;
 }
 .searchbox:focus { border-color: var(--green-d); outline: none; }
 .filter-chips { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+/* The native chevron and the native text inset do not match the pill buttons these sit beside,
+   so the row read as half-finished. The arrow below is drawn rather than inherited; the element
+   stays a real <select> so the platform picker and its screen-reader behaviour are untouched. */
 .filter-chips select {
-  padding: 7px 10px; border-radius: 999px; border: 1px solid var(--panel-brd);
-  background: var(--panel); color: inherit; font-size: 13px;
+  appearance: none; -webkit-appearance: none;
+  padding: 7px 30px 7px 12px; border-radius: 999px; border: 1px solid var(--panel-brd);
+  background-color: var(--panel); color: inherit; font-size: 13px;
+  background-image: linear-gradient(45deg, transparent 50%, currentColor 50%),
+                    linear-gradient(135deg, currentColor 50%, transparent 50%);
+  background-position: right 14px top 52%, right 9px top 52%;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
 }
+.filter-chips select:hover { border-color: var(--ink); }
 .chip.on { border-color: var(--gold); color: var(--gold-hi); background: var(--gold-dim); }
 
 /* --- featured: a dealt hand, a name, one verb --- */
@@ -2793,9 +2838,18 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
 .sc-weight { letter-spacing: .5px; }
 .shelfcard .sc-kind { max-width: 92px; overflow: hidden; text-overflow: ellipsis; }
 
-/* The tab strip fades at the right so it is obvious there is more of it. */
-.kindtabs { -webkit-mask-image: linear-gradient(90deg, #000 88%, transparent 100%);
-            mask-image: linear-gradient(90deg, #000 88%, transparent 100%); }
+/* The tab strip fades at the right so it is obvious there is more of it. Only where it actually
+   scrolls: above 900px every kind fits on two rows, and hiding two of them behind a scroll
+   gesture on a wide screen cost more than the single tidy row was worth. */
+@media (max-width: 899px) {
+  .kindtabs { -webkit-mask-image: linear-gradient(90deg, #000 88%, transparent 100%);
+              mask-image: linear-gradient(90deg, #000 88%, transparent 100%); }
+}
+@media (min-width: 900px) {
+  /* Matches .rail-wrap > .kindtabs below, which would otherwise keep overflow-x: auto. Once it
+     wraps there is no slack, so EdgeScroller's own measure drops the nudge arrows by itself. */
+  .kindtabs, .rail-wrap > .kindtabs { flex-wrap: wrap; overflow-x: visible; row-gap: 8px; }
+}
 
 /* --- front page, third pass: the slide in normal flow --- */
 .carousel { padding: 0 58px; }          /* room for the arrows outside the board */
@@ -3169,7 +3223,16 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
 .pt-mark { width: 18px; text-align: center; font-size: 15px; opacity: .8; }
 
 /* --- the pane --- */
-.prefs-pane { flex: 1 1 auto; min-width: 0; overflow-y: auto; padding: 20px 26px 32px; }
+/* The pane scrolls, but its bottom edge used to be a hard cut — a sentence sliced mid-word at
+   the panel border reads as a broken layout rather than as more content below. The mask fades
+   the last few pixels out instead, and lifts once you are at the end so nothing is dimmed when
+   there is nothing left to reach. */
+.prefs-pane {
+  flex: 1 1 auto; min-width: 0; overflow-y: auto; padding: 20px 26px 32px;
+  --fade: linear-gradient(#000 calc(100% - 26px), transparent 100%);
+  -webkit-mask-image: var(--fade); mask-image: var(--fade);
+}
+.prefs-pane[data-end="yes"] { --fade: linear-gradient(#000 100%, #000 100%); }
 .prefs-pane-head { margin: 0 0 6px; }
 .prefs-pane-head h3 { margin: 0 0 4px; font-size: 22px; }
 .prefs-pane-head p { margin: 0 0 6px; color: var(--muted); font-size: 13px; }
@@ -3444,6 +3507,9 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
    viewport, so the page scrolls — and until now the bar carrying "All games" and Rules
    scrolled away with it, right when a claim needed making. Sticky, with the same glass
    the floating dock already uses, so it survives a scroll instead of chasing it. */
+/* The bar renders a Settings label for its phone-width tab bar; from 781px up the gear sits in a
+   pill beside four labelled tabs and does not need one. */
+.nav-bar .nv-settings .nv-label { display: none; }
 .nav-bar {
   display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 8px;
   position: sticky; top: 0; z-index: 25;
@@ -3475,7 +3541,7 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
   box-shadow: 2px 0 18px rgba(58,44,20,.06);
 }
 .nav-rail .brand { flex-direction: column; gap: 6px; margin-bottom: 14px; }
-.nav-rail h1 { font-size: 12px; letter-spacing: 1.4px; }
+.nav-rail .wordmark { font-size: 12px; letter-spacing: 1.4px; }
 .nav-rail .nv-items { display: flex; flex-direction: column; gap: 4px; width: 100%; flex: 1 1 auto; }
 .nav-rail .nv-items button {
   display: flex; flex-direction: column; align-items: center; gap: 4px;
@@ -3499,7 +3565,7 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
   padding: 8px 0 0; margin-bottom: 20px;
 }
 .nav-centre .brand { flex-direction: column; gap: 8px; }
-.nav-centre h1 { font-size: 30px; letter-spacing: 2px; }
+.nav-centre .wordmark { font-size: 30px; letter-spacing: 2px; }
 .nav-centre .nv-items {
   display: flex; align-items: center; gap: 28px;
   width: 100%; justify-content: center;
@@ -3526,7 +3592,7 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
 .nav-dock-head { display: flex; align-items: center; justify-content: flex-start; margin-bottom: 10px; }
 .nav-dock-head .logo3d { width: 34px; height: 34px; }
 .nav-dock-head .logo3d span { font-size: 17px; border-radius: 10px; }
-.nav-dock-head h1 { font-size: 18px; }
+.nav-dock-head .wordmark { font-size: 18px; }
 .nav-dock {
   /* Fixed to the viewport, not to .app — floats right where a home-indicator gesture bar sits
      on a notched phone, so its own bottom offset needs the reservation (item 32). */
@@ -3572,7 +3638,7 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
     0 10px 26px rgba(58,44,20,.28);
 }
 .nav-plate .logo3d span { background: #f3ead6; color: #4a3218; }
-.nav-plate h1 {
+.nav-plate .wordmark {
   color: #f6ecd6; letter-spacing: 3px; font-size: 22px;
   text-shadow: 0 1px 0 rgba(0,0,0,.45), 0 -1px 0 rgba(255,255,255,.18);
 }
@@ -3604,11 +3670,11 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
   .nav-rail .brand { display: none; }
   .nav-rail .nv-items { flex-direction: row; }
   .nav-rail .nv-settings { margin-top: 0; }
-  .nav-centre h1 { font-size: 22px; }
+  .nav-centre .wordmark { font-size: 22px; }
   .nav-centre .nv-items { gap: 18px; }
   .nav-plate { margin: -6px -10px 16px; }
   .np-board { padding: 12px 14px; }
-  .nav-plate h1 { font-size: 17px; letter-spacing: 1.6px; }
+  .nav-plate .wordmark { font-size: 17px; letter-spacing: 1.6px; }
 }
 
 /* ============================================================
@@ -3741,8 +3807,11 @@ input:focus, textarea:focus, select:focus {
   color: #fff;
   box-shadow: 0 0 26px rgba(201, 162, 74,.6), 0 4px 0 #6a1180, 0 1px 0 rgba(255,255,255,.4) inset;
 }
-header h1 {
-  background: linear-gradient(100deg, var(--gold-hi) 0%, var(--hot-hi) 46%, var(--cyan) 100%);
+/* The gradient used to run out on --cyan, which put the dimmest stop of the ramp under the last
+   letter — the Y of DECKY visibly dropped out against the dark ground. The cyan is now a stop in
+   the middle and both ends land bright, so no letter of the name is ever the faint one. */
+header h1, header .wordmark {
+  background: linear-gradient(100deg, var(--gold-hi) 0%, var(--cyan-hi) 42%, var(--hot-hi) 74%, var(--gold-hi) 100%);
   -webkit-background-clip: text; background-clip: text;
   -webkit-text-fill-color: transparent;
   filter: drop-shadow(0 0 18px rgba(201, 162, 74,.35));
@@ -6243,7 +6312,7 @@ h2 { font-size: 25px; font-weight: 700; letter-spacing: -0.014em; }
 /* The wordmark, set in the display face rather than the mono it was
    using — the mono said "developer tool", which is the opposite of
    what the rest of the room says. */
-header h1 {
+header h1, header .wordmark {
   font-family: var(--serif);
   font-size: 30px;
   font-weight: 600;
@@ -6282,7 +6351,7 @@ header h1 {
    Everywhere else this would be a gradient on text, which is the
    first thing that reads as generic. */
 .foil,
-header h1,
+header h1, header .wordmark,
 .win-banner h2 {
   /* The dark stop sits at 78%, not 62%. Polished metal is mostly
      bright with one dark band low down where it turns away from the
@@ -6302,7 +6371,7 @@ header h1,
 }
 
 :root[data-theme="light"] .foil,
-:root[data-theme="light"] header h1,
+:root[data-theme="light"] header h1, :root[data-theme="light"] header .wordmark,
 :root[data-theme="light"] .win-banner h2 {
   /* Same metal, lit from the other side. On ivory the bright stops are
      the ones that disappear, so the gradient runs dark-to-bright-to-dark
@@ -6722,7 +6791,7 @@ h2 { font-size: 30px; }
      exactly the screens where a notch or gesture bar is likely. */
   .app { padding-top: max(20px, env(safe-area-inset-top)); padding-inline: max(16px, env(safe-area-inset-left)) max(16px, env(safe-area-inset-right)); padding-bottom: calc(80px + env(safe-area-inset-bottom)); }
   h2 { font-size: 24px; }
-  header h1 { font-size: 25px; }
+  header h1, header .wordmark { font-size: 25px; }
   .cards-grid { grid-template-columns: 1fr; gap: 16px; }
   .section-head h2::after { display: none; }
 }
