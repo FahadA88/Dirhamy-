@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { GameDefinition } from '../engine/types';
 import {
   Collection, Filters, KINDS, PublishedGame, SortKey,
@@ -141,14 +141,19 @@ export function BrowseView({ onPlay, onSetup, onOnline, onlineHostDown, onRemix 
     const Layout = HOME_LAYOUTS_BY_ID[settings.homeLayout];
     return (
       <div className="browse">
-        <Layout
-          games={games}
-          shelves={shelvesAll}
-          spotlight={spotlightAll}
-          onOpen={setDetail}
-          onPlay={(g) => onPlay(g.definition)}
-          onChanged={refresh}
-        />
+        {/* Each of these is its own chunk now — see homeLayouts/index.tsx — so the first render
+            of one a session hasn't picked before waits on a fetch. Same fallback CreateView
+            already uses for the same reason. */}
+        <Suspense fallback={<div className="view-loading muted">Loading…</div>}>
+          <Layout
+            games={games}
+            shelves={shelvesAll}
+            spotlight={spotlightAll}
+            onOpen={setDetail}
+            onPlay={(g) => onPlay(g.definition)}
+            onChanged={refresh}
+          />
+        </Suspense>
       </div>
     );
   }
@@ -224,7 +229,7 @@ export function BrowseView({ onPlay, onSetup, onOnline, onlineHostDown, onRemix 
             people — or describe a game of your own and have it built.
           </p>
 
-          <Carousel games={spotlight} onOpen={setDetail} onPlay={(g) => onPlay(g.definition)} />
+          <Featured games={spotlight} onOpen={setDetail} onPlay={(g) => onPlay(g.definition)} onChanged={refresh} />
 
           <KindTabs value={kind} onChange={setKind} games={games} />
 
@@ -277,99 +282,46 @@ export function BrowseView({ onPlay, onSetup, onOnline, onlineHostDown, onRemix 
  * banner that swaps images. It advances on its own until you touch it, then stops — nothing is
  * more annoying than a page that moves while you are reading it.
  */
-function Carousel({ games, onOpen, onPlay }: {
+/**
+ * The old carousel put one game in front of you and hid the other three behind an interval and
+ * a set of dots — real engagement data on carousels this shape lands on slide one and nowhere
+ * else, so three of the four staff picks were effectively unpublished. Everything here is shown
+ * at once instead: the top pick gets the full hero treatment, the rest sit beside it as ordinary
+ * shelf cards — smaller, but every one of them one click away rather than a timed reveal.
+ */
+function Featured({ games, onOpen, onPlay, onChanged }: {
   games: PublishedGame[];
   onOpen: (id: string) => void;
   onPlay: (g: PublishedGame) => void;
+  onChanged: () => void;
 }) {
-  const [i, setI] = useState(0);
-  const [dir, setDir] = useState<1 | -1>(1);
-  const [held, setHeld] = useState(false);
-  const n = games.length;
-  const wrap = (k: number) => (n === 0 ? 0 : ((k % n) + n) % n);
-
-  const go = (d: 1 | -1) => { setDir(d); setI((k) => wrap(k + d)); };
-
-  // Switching tabs hands us a shorter list; without this the index left over from the old one
-  // points past the end and there is no slide to draw.
-  const key = games.map((g) => g.id).join(',');
-  useEffect(() => { setI(0); setDir(1); }, [key]);
-
-  const stop = useRef(false);
-  useEffect(() => {
-    if (n < 2 || held) return;
-    const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-    if (reduced || stop.current) return;
-    const t = window.setInterval(() => { setDir(1); setI((k) => wrap(k + 1)); }, 7000);
-    return () => window.clearInterval(t);
-  }, [n, held]);
-
-  if (n === 0) return null;
-  const at = wrap(i);                          // the reset above lands next render; hold until then
-  const live = games[at];
-  const prev = n > 1 ? games[wrap(at - 1)] : null;
-  const next = n > 2 ? games[wrap(at + 1)] : null;
-
-  const hold = () => { stop.current = true; setHeld(true); };
+  if (games.length === 0) return null;
+  const [live, ...rest] = games;
 
   return (
-    // The region itself isn't a control — onPointerDown/onFocusCapture just notice that the
-    // user is interacting with it at all (pointer down anywhere in it, focus landing on a card
-    // inside it) and pause auto-advance so a game they're looking at doesn't slide away under
-    // them. Real interaction happens on the buttons and links inside; onKeyDown below is this
-    // region's own genuine keyboard support (arrow keys), not a workaround for this rule.
-    // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions
-    <div
-      className="carousel"
-      onPointerDown={hold}
-      onFocusCapture={hold}
-      onKeyDown={(e) => {
-        if (e.key === 'ArrowLeft') { hold(); go(-1); }
-        if (e.key === 'ArrowRight') { hold(); go(1); }
-      }}
-      role="region"
-      aria-roledescription="carousel"
-      aria-label="Featured games"
-    >
-      <div className="carousel-stage">
-        {prev && <div className="hero-peek left" aria-hidden="true"><GameArt def={prev.definition} id={prev.id} /></div>}
-        {next && <div className="hero-peek right" aria-hidden="true"><GameArt def={next.definition} id={next.id} /></div>}
-
-        <div key={live.id} className={`hero-slide turn-${dir > 0 ? 'fwd' : 'back'}`}>
-          <div className="hero">
-            <div className="hero-body">
-              <span className="hero-kicker">{at === 0 ? "Tonight's table" : 'Also worth a deal'}</span>
-              <h2><button className="hero-title" onClick={() => onOpen(live.id)}>{live.definition.meta.name}</button></h2>
-              <p className="hero-blurb">{blurb(live.definition.meta.description)}</p>
-              <Meta game={live} />
-              <div className="hero-actions">
-                <button className="hero-cta" onClick={() => onPlay(live)}>Deal me in ▶</button>
-                <button className="hero-more" onClick={() => onOpen(live.id)}>How it plays</button>
-              </div>
-            </div>
-            <div className="hero-art">
-              <GameArt def={live.definition} id={live.id} />
-            </div>
+    <div className="featured">
+      <div className="hero">
+        <div className="hero-body">
+          <span className="hero-kicker">Tonight's table</span>
+          <h2><button className="hero-title" onClick={() => onOpen(live.id)}>{live.definition.meta.name}</button></h2>
+          <p className="hero-blurb">{blurb(live.definition.meta.description)}</p>
+          <Meta game={live} />
+          <div className="hero-actions">
+            <button className="hero-cta" onClick={() => onPlay(live)}>Deal me in ▶</button>
+            <button className="hero-more" onClick={() => onOpen(live.id)}>How it plays</button>
           </div>
+        </div>
+        <div className="hero-art">
+          <GameArt def={live.definition} id={live.id} />
         </div>
       </div>
 
-      {n > 1 && (
-        <>
-          <button className="car-arrow prev" aria-label="Previous game" onClick={() => { hold(); go(-1); }}>‹</button>
-          <button className="car-arrow next" aria-label="Next game" onClick={() => { hold(); go(1); }}>›</button>
-          <div className="car-dots">
-            {games.map((g, k) => (
-              <button
-                key={g.id}
-                className={`car-dot ${k === at ? 'on' : ''}`}
-                aria-label={g.definition.meta.name}
-                aria-current={k === at}
-                onClick={() => { hold(); setDir(k > at ? 1 : -1); setI(k); }}
-              />
-            ))}
-          </div>
-        </>
+      {rest.length > 0 && (
+        <div className="featured-alts" role="region" aria-label="Also worth a deal">
+          {rest.map((g) => (
+            <ShelfCard key={g.id} game={g} onOpen={() => onOpen(g.id)} onPlay={() => onPlay(g)} onChanged={onChanged} />
+          ))}
+        </div>
       )}
     </div>
   );

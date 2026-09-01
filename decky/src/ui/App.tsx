@@ -8,7 +8,7 @@ import { SettingsPanel } from './SettingsPanel';
 import { SiteNav, navStyle } from './SiteNav';
 import { FirstRun } from './FirstRun';
 import { SiteFooter } from './SiteFooter';
-import { onRouteChange, pushRoute, readRoute, RouteView } from './route';
+import { normalizeEntry, onRouteChange, pushRoute, readRoute, RouteView } from './route';
 
 // Worklist #98: opening the shelf used to download the whole builder — the rule kit, the
 // knob catalogue, the AI copilot prompts and templates — to draw a grid of cards that has
@@ -63,6 +63,7 @@ export function App() {
     pushRoute({ view: v });
   }, []);
   useEffect(() => onRouteChange((r) => setViewState(r.view)), []);
+  useEffect(() => normalizeEntry(), []);
   const [settingsOpen, setSettingsOpen] = useState(false);
   // Fixed at start-up: the navigation is being chosen between, not switched at runtime.
   const [nav] = useState(navStyle);

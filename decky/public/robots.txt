@@ -1,4 +1,4 @@
-# Decky is a single-page app — everything lives behind one URL, so there's nothing here for a
-# crawler to be excluded from and no multi-page sitemap to offer.
+# 52 games, each with its own page under /g/ — see sitemap.xml.
 User-agent: *
 Allow: /
+Sitemap: /sitemap.xml

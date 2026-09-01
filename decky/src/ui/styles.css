@@ -2673,94 +2673,20 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
    button that drops the whole library into a grid.
    ============================================================ */
 
-.carousel {
-  position: relative;
-  margin-bottom: 26px;
-  perspective: 1600px;
-  perspective-origin: 50% 40%;
+/* Replaces the old auto-advancing carousel — see the Featured component's own comment for why.
+   The hero keeps its existing look untouched; only what surrounds it is new. */
+.featured { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 20px; margin-bottom: 26px; }
+.featured .hero { margin-bottom: 0; }
+.featured-alts { display: flex; flex-direction: column; gap: 12px; }
+/* These are ordinary .shelfcard elements (see browseCommon.tsx) at their normal size — the point
+   is that they look and behave exactly like every other card on the shelf below, not like a
+   demoted version of the hero. */
+.featured-alts .shelfcard { width: 100%; }
+@media (max-width: 900px) {
+  .featured { grid-template-columns: 1fr; }
+  .featured-alts { flex-direction: row; overflow-x: auto; padding-bottom: 4px; scrollbar-width: thin; }
+  .featured-alts .shelfcard { flex: 0 0 220px; }
 }
-.carousel-stage {
-  position: relative;
-  min-height: 260px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-/* The slides either side, lying behind the live one so the stack has depth. */
-.hero-peek {
-  position: absolute; top: 12px; bottom: 34px; width: 26%;
-  border-radius: 22px; overflow: hidden;
-  border: 1px solid rgba(214,175,92,0.18);
-  background: linear-gradient(150deg, #0d241a 0%, #103224 100%);
-  box-shadow: 0 14px 34px rgba(0,0,0,0.34);
-  opacity: 0.5;
-  display: none;
-  pointer-events: none;
-}
-.hero-peek.left  { left: -6%;  transform: rotateY(19deg)  translateZ(-130px) scale(.94); }
-.hero-peek.right { right: -6%; transform: rotateY(-19deg) translateZ(-130px) scale(.94); }
-.hero-peek .gameart { transform: scale(1.25); opacity: .8; }
-@media (min-width: 1100px) { .hero-peek { display: block; } }
-
-.hero-slide { position: relative; width: 100%; z-index: 1; }
-.hero-slide .hero { margin-bottom: 0; }
-
-/* Turning to the next board: it swings in on the axis, it does not slide like a banner. */
-@keyframes deal-in-fwd {
-  from { opacity: 0; transform: rotateY(-16deg) translateX(6%) translateZ(-90px); }
-  to   { opacity: 1; transform: none; }
-}
-@keyframes deal-in-back {
-  from { opacity: 0; transform: rotateY(16deg) translateX(-6%) translateZ(-90px); }
-  to   { opacity: 1; transform: none; }
-}
-.hero-slide.turn-fwd  { animation: deal-in-fwd 460ms cubic-bezier(.2,.85,.3,1) both; }
-.hero-slide.turn-back { animation: deal-in-back 460ms cubic-bezier(.2,.85,.3,1) both; }
-
-.hero-blurb {
-  margin: 0; max-width: 46ch; color: rgba(255,255,255,0.74);
-  font-size: 15px; line-height: 1.5;
-}
-/* The call to action is its own button now — you cannot nest one button in another. */
-.hero-slide .hero-cta {
-  position: absolute; left: 36px; bottom: 26px; z-index: 2;
-  margin: 0; border: 0; cursor: pointer;
-  box-shadow: 0 8px 20px rgba(0,0,0,.34);
-  transition: transform 160ms cubic-bezier(.2,.9,.3,1.2), box-shadow 160ms;
-}
-.hero-slide .hero-cta:hover { transform: translateY(-2px); box-shadow: 0 12px 26px rgba(0,0,0,.42); }
-.hero-slide .hero { padding-bottom: 84px; }
-
-.car-arrow {
-  position: absolute; top: 50%; transform: translateY(-50%); z-index: 4;
-  width: 42px; height: 42px; border-radius: 50%;
-  display: grid; place-items: center;
-  font-size: 24px; line-height: 1; cursor: pointer;
-  color: #f4f1e8; background: rgba(12,26,20,0.72);
-  border: 1px solid rgba(214,175,92,0.34);
-  backdrop-filter: blur(6px);
-  transition: background 160ms, transform 160ms;
-}
-.car-arrow:hover { background: rgba(20,44,32,0.92); }
-.car-arrow.prev { left: 10px; }
-.car-arrow.next { right: 10px; }
-.car-arrow.prev:hover { transform: translateY(-50%) translateX(-2px); }
-.car-arrow.next:hover { transform: translateY(-50%) translateX(2px); }
-
-.car-dots { display: flex; gap: 2px; justify-content: center; margin-top: 14px; }
-/* The button is the full touch target (32px); the visible dot is a smaller ::after inside it,
-   so the tap area is real without the pagination row looking like a row of buttons. */
-.car-dot {
-  position: relative; width: 32px; height: 32px; padding: 0; border: none; background: transparent;
-  cursor: pointer; display: flex; align-items: center; justify-content: center;
-}
-.car-dot::after {
-  content: ""; width: 8px; height: 8px; border-radius: 999px;
-  border: 1px solid var(--panel-brd); background: transparent;
-  transition: width 200ms, background 200ms, border-color 200ms;
-}
-.car-dot.on::after { width: 26px; background: var(--gold); border-color: var(--gold); }
 
 /* --- tabs: what kind of game --- */
 .kindtabs {
