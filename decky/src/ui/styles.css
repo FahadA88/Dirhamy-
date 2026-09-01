@@ -6339,7 +6339,12 @@ header h1, header .wordmark,
    under a lamp and what a border-top cannot fake, because a border
    is the same brightness all the way across.
    ------------------------------------------------------------------ */
-.glass, .game-card, .panel, .sheet, .modal-card, .pop {
+/* .modal-card and .game-card never matched anything real — the markup uses .modal-box and
+   .shelfcard. Every dialog and every shelf card sat on the old flat --panel-solid fill this
+   whole section was written to replace, which is why the app's two most-seen surfaces (every
+   round-over screen, every card on the front page) never actually became glass. Added rather
+   than renamed, since removing the dead names risks nothing and costs nothing. */
+.glass, .game-card, .panel, .sheet, .modal-card, .pop, .shelfcard, .modal-box {
   position: relative;
   background: var(--glass-fill);
   -webkit-backdrop-filter: var(--glass-blur);
@@ -6363,7 +6368,7 @@ header h1, header .wordmark,
    highlight, placed where the room's own key light is — the body
    background puts its warm lamp at 10% from the left, and this
    agrees with it. */
-.glass::before, .game-card::before {
+.glass::before, .game-card::before, .shelfcard::before, .modal-box::before {
   content: "";
   position: absolute;
   inset: 0;
@@ -6379,7 +6384,7 @@ header h1, header .wordmark,
 /* Lift on hover, and let a little more light through. A card that
    rises 2px and brightens is doing what a physical card does when
    you pick up its edge. */
-.game-card:hover {
+.game-card:hover, .shelfcard:hover, .shelfcard:focus-within {
   transform: translateY(-3px);
   background-color: var(--glass-fill-hi);
   box-shadow: var(--e4);
@@ -6656,7 +6661,7 @@ body::after {
    the browser default and reads as a web page rather than an object.
    ------------------------------------------------------------------ */
 .crumbs, .tabs, .glass, .game-card, .fam-badge, .seg-btn,
-.seat, .match-bar, .scorepad {
+.seat, .match-bar, .scorepad, .shelfcard, .modal-box {
   transition-timing-function: var(--ease);
 }
 
@@ -6666,8 +6671,8 @@ body::after {
 @media (prefers-reduced-motion: reduce) {
   .seat.active, .your-turn, .turn-badge.on { animation: none; }
   .card.face::after { transition: none; }
-  .glass, .game-card, button.ghost, button.primary { transition: none; }
-  .game-card:hover { transform: none; }
+  .glass, .game-card, button.ghost, button.primary, .shelfcard, .modal-box { transition: none; }
+  .game-card:hover, .shelfcard:hover { transform: none; }
 }
 
 /* ------------------------------------------------------------------
@@ -7116,7 +7121,7 @@ h2, .modal-box h3, .panel-head h3, .crumb-title, .game-card h3 {
    one gets its own tiny turbulence layer instead, low enough that it
    is felt rather than seen.
    ------------------------------------------------------------------ */
-.glass::after, .panel::after, .game-card::after {
+.glass::after, .panel::after, .game-card::after, .shelfcard::after, .modal-box::after {
   content: "";
   position: absolute; inset: 0; z-index: 2; pointer-events: none;
   border-radius: inherit;
