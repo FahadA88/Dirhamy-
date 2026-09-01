@@ -4214,8 +4214,10 @@ header h1, header .wordmark {
 .describe-head h2 { margin: 0 0 4px; font-size: 26px; }
 .describe-head p { margin: 0 0 16px; max-width: 62ch; }
 
+/* Prose, not a code field: past about 90 characters a line the eye loses its place on the way
+   back to the left margin, and this box ran the full 1080px container. */
 .describe-box {
-  width: 100%; padding: 14px 16px; border-radius: 12px;
+  width: 100%; max-width: 720px; padding: 14px 16px; border-radius: 12px;
   font: inherit; font-size: 15px; line-height: 1.55; resize: vertical;
   background: var(--input-bg); color: var(--ink);
   border: 1px solid var(--panel-brd);
@@ -8340,4 +8342,43 @@ input[type="checkbox"]:focus-visible { outline: 2px solid var(--brass-hi); outli
 @media (max-width: 780px) {
   .site-footer { margin-top: 36px; }
   .promise { font-size: 14.5px; }
+}
+.describe-hint { font-size: 13px; }
+
+/* A thirteen-card hand does not fit a fan at phone widths — the last card was cut off by the
+   panel edge, and a card you cannot see is a card you cannot play. Below 420px the fan gives up
+   and becomes a scrolling row: less pretty, but every card is reachable. Appended here rather
+   than beside .hand because that rule is earlier in the file and would otherwise win. */
+@media (max-width: 420px) {
+  .hand {
+    justify-content: flex-start;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-padding-inline: 12px;
+    padding-inline: 12px;
+    -webkit-overflow-scrolling: touch;
+  }
+  .hand .card-btn {
+    margin-left: calc(var(--cw) * -0.18);
+    transform: none !important;
+  }
+  .hand .card-btn:first-child { margin-left: 0; }
+}
+
+/* --- the 44px floor, at phone widths --- */
+/* scripts/browser/taptargets.mjs measures these rather than trusting the eye. Everything here
+   was between 30 and 41px: comfortably tappable for some people, a repeated near-miss for
+   anyone with larger fingers or less steady hands. The sizes only change where there is a
+   phone-sized viewport — desktop keeps its tighter, denser controls. */
+@media (max-width: 780px) {
+  /* The favourite heart on every shelf card — 30px, and there are fifty-two of them. */
+  .star { width: 44px; height: 44px; }
+  .car-arrow { width: 44px; height: 44px; }
+  .kindtab { min-height: 44px; }
+  .hero-cta, .hero-more { min-height: 44px; }
+  .hero-title { min-height: 44px; }
+  .seg-btn { width: 44px; height: 44px; }
+  button.primary.sm, button.ghost.sm { min-height: 44px; }
+  button.ghost { min-height: 44px; }
+  .restart-btn { min-width: 44px; min-height: 44px; }
 }

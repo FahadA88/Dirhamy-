@@ -101,6 +101,11 @@ export function DescribeGame({ onBuilt }: {
         <button className="primary" onClick={go} disabled={busy || !text.trim()}>
           {busy ? 'Building…' : 'Build it'}
         </button>
+        {/* A disabled button with no stated cause is the commonest dead end in a form — it reads
+            as the product being broken rather than as a step not done yet. */}
+        {!busy && !text.trim() && (
+          <span className="muted describe-hint">Describe your game above first.</span>
+        )}
         {/* Only shown when there is a real choice to make. A host with one model, or none,
             should not be asked about it. */}
         {host && host.authorModels.length > 1 && (

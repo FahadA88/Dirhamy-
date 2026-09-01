@@ -27,4 +27,5 @@ Short, quick sentences. Straight to the point. No long paragraphs.
   from scratch" builder (or their gap is a documented exception in the script itself)
 - `npm run typecheck`
 - `npm run build`
-- `npm run verify:all` — all five browser suites (needs `npm run preview` up on :4173)
+- `npm run taptargets` — every visible control clears 44x44 at 375px (needs `npm run preview` up on :4173)
+- `npm run verify:all` — all the browser suites, tap targets included (needs `npm run preview` up on :4173)

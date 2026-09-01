@@ -2077,8 +2077,10 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
           {isFish && <span className="seat-stat">{seatNum(view.booksWon?.[me] ?? 0)}<i>books</i></span>}
           {view.needsPassChoice && (
             <span className="turn-badge">
+              {/* "Pass 0/3 left" read as three remaining rather than as the direction to pass
+                  in. The direction leads now, and the count says what it counts. */}
               {view.passCount > 1
-                ? `Pass ${view.passStaged.length}/${view.passCount} ${view.passDirection}`
+                ? `Passing ${view.passDirection} · ${view.passStaged.length} of ${view.passCount} chosen`
                 : `Pass ${view.passDirection}`}
             </span>
           )}
