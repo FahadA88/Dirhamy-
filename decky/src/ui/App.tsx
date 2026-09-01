@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import { PlayView } from './PlayView';
 import { ProfileView } from './ProfileView';
 import { Backdrop } from './Backdrop';
@@ -7,6 +7,7 @@ import { startMagneticButtons, startTableParallax, startFeltSpotlight, startTapR
 import { SettingsPanel } from './SettingsPanel';
 import { SiteNav, navStyle } from './SiteNav';
 import { FirstRun } from './FirstRun';
+import { onRouteChange, pushRoute, readRoute, RouteView } from './route';
 
 // Worklist #98: opening the shelf used to download the whole builder — the rule kit, the
 // knob catalogue, the AI copilot prompts and templates — to draw a grid of cards that has
@@ -14,7 +15,7 @@ import { FirstRun } from './FirstRun';
 // so it is its own chunk now, fetched only by the click that actually needs it.
 const CreateView = lazy(() => import('./CreateView').then((m) => ({ default: m.CreateView })));
 
-type View = 'play' | 'create' | 'profile';
+type View = RouteView;
 
 // The three filters Preferences ▸ Accessibility ▸ "See it as" can switch on, applied to the
 // whole app via a CSS `filter: url(#id)` keyed off data-colorvision (see applySettings).
@@ -52,7 +53,15 @@ function ColorVisionFilters() {
 }
 
 export function App() {
-  const [view, setView] = useState<View>('play');
+  const [view, setViewState] = useState<View>(() => readRoute().view);
+  // Every tab change is a history entry, so back goes back a screen instead of leaving the site
+  // — on Android that is the primary way out of anywhere. BrowseView keeps ?g in step for the
+  // game it has open; both read the same query string.
+  const setView = useCallback((v: View) => {
+    setViewState(v);
+    pushRoute({ view: v });
+  }, []);
+  useEffect(() => onRouteChange((r) => setViewState(r.view)), []);
   const [settingsOpen, setSettingsOpen] = useState(false);
   // Fixed at start-up: the navigation is being chosen between, not switched at runtime.
   const [nav] = useState(navStyle);

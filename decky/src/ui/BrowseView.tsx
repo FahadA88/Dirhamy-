@@ -18,6 +18,7 @@ import { Confirm } from './Confirm';
 import { EmptyDeckMark, EmptyFriendsMark, Meta, ShelfCard, blurb } from './browseCommon';
 import { PullToRefresh } from './PullToRefresh';
 import { HOME_LAYOUTS_BY_ID } from './homeLayouts';
+import { onRouteChange, pushRoute, readRoute } from './route';
 
 
 // The shelf.
@@ -56,10 +57,25 @@ export function BrowseView({ onPlay, onSetup, onOnline, onlineHostDown, onRemix 
   const [filters, setFilters] = useState<Filters>({});
   const [sort, setSort] = useState<SortKey>('trending');
   const [browsing, setBrowsing] = useState(false); // false = the curated front page
-  const [detail, setDetail] = useState<string | null>(null);
+  // Seeded from ?g, and written back to it. That is what makes a game linkable: send someone
+  // ?g=hearts and they land on Hearts rather than on the front page. Back closes the detail
+  // instead of leaving the site, because opening it added a history entry.
+  const [detail, setDetailState] = useState<string | null>(() => readRoute().game ?? null);
+  const setDetail = useCallback((id: string | null) => {
+    setDetailState(id);
+    pushRoute({ view: 'play', game: id ?? undefined });
+  }, []);
+  useEffect(() => onRouteChange((r) => setDetailState(r.game ?? null)), []);
   const [profile, setProfile] = useState<string | null>(null);
 
   const [kind, setKind] = useState('');            // the tab across the top of the front page
+
+  // Now that a game has its own address, the tab and the history entry should say which game it
+  // is. Restores the site title on the way out, so the front page never inherits a game's name.
+  useEffect(() => {
+    const name = detail ? allGames().find((g) => g.id === detail)?.definition.meta.name : undefined;
+    document.title = name ? `${name} — Decky` : 'Decky — play & build card games';
+  }, [detail]);
 
   // A blocked creator's games are gone from every shelf, not greyed out — the point of blocking
   // is not seeing them.
