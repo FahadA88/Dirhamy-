@@ -180,6 +180,51 @@
 
 * { box-sizing: border-box; }
 
+/* Touch ergonomics. None of this changes how anything looks — it changes how it FEELS to press,
+   which on a phone is most of the difference between an app and a page rendered on one.
+     - The grey flash every tap left behind is Mobile Safari's/Chrome's own default; without
+       turning it off explicitly, every button here got it for free.
+     - `touch-action: manipulation` on anything pressable skips the ~300ms the browser otherwise
+       waits to see if a tap is the first half of a double-tap-to-zoom.
+     - `overscroll-behavior` stops a drag at the top or bottom of the page from handing off to
+       the browser's own rubber-band bounce / pull-to-refresh, which is the single strongest
+       "this is a website" signal a touch gesture can send.
+   html, not body: iOS Safari's bounce and pull-to-refresh are chrome-level, driven off the
+   root scroller, and only html reliably owns that role across engines. */
+html {
+  overscroll-behavior-y: none;
+}
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+button, a, .shelfcard, .kindtab, .seg-btn, .tabs button,
+[role="button"], [role="tab"], input, select, textarea {
+  touch-action: manipulation;
+}
+/* Not `manipulation`: a hand card is also a drag target (cardDrag.ts reads the same vertical
+   touch-move a browser would otherwise spend on page scroll), so only the axis the hand itself
+   scrolls on on a phone (see the 420px .hand rule below) is left to the browser. Vertical stays
+   free for the drag/tap logic to own outright, with nothing racing it for the gesture. */
+.card-btn {
+  touch-action: pan-x;
+}
+
+/* The single biggest thing wrong with this page on a phone, found by isolating layers on a
+   4x-throttled Pixel 5 trace one at a time rather than guessing: the ambient backdrop (two
+   blur(90px) orbs, a perspective grid, six individually-animated "floaty" cards — Backdrop.tsx,
+   on by default, running behind every screen) accounted for the entire gap between 16ms/frame
+   and 45ms/frame while scrolling the shelf. Every other suspect measured — the glass system's
+   backdrop-filter, its box-shadows, its grain overlay — moved the number by single digits or
+   not at all; turning this one layer off took scrolling from 22 of 27 frames missing the 30fps
+   floor to zero. It was never redesigned when the rest of the shell moved from "a neon sign" to
+   the current room (see THE HOUSE, below, and its own note about glow being spent, not sprayed)
+   and at a combined opacity under 6% it was never much to look at either — cheap to lose, and
+   nobody is likely to notice it's gone. Hidden outright rather than detuned, since a blurred,
+   animated layer that's merely thinner is still doing the same expensive work per frame. */
+@media (hover: none) and (pointer: coarse) {
+  .backdrop { display: none; }
+}
+
 body {
   margin: 0;
   font-family: var(--display);
@@ -204,6 +249,15 @@ body {
     radial-gradient(700px 700px at 50% 108%, rgba(120, 100, 70, .12) 0%, transparent 62%),
     var(--bg0);
   background-attachment: fixed;
+}
+
+/* A fixed background repaints on every scroll frame on most mobile engines rather than
+   compositing for free the way it does on desktop — one more line item in the same 4x-throttled
+   Pixel 5 trace that found the glass-blur cost above. `scroll` still shows the same three lamps;
+   it just stops asking a phone's GPU to redraw them 60 times a second while a game plays under
+   them. */
+@media (hover: none) and (pointer: coarse) {
+  body { background-attachment: scroll; }
 }
 
 /* The voice: heavy, tight, confident. Titles are objects, not labels. */
@@ -6204,6 +6258,39 @@ button.bluff-go:disabled {
   --lit: rgba(168, 122, 18, 0.30);
 }
 
+/* Measured on a throttled Pixel 5 (4x CPU, the profile a mid-range Android gives a real page):
+   112 elements on one shelf screen carry backdrop-filter, and scrolling past them averaged
+   61ms/frame with 19 of 21 frames missing the 30fps floor — a stack of independently-blurred
+   panels is a compositor cost desktop hides and a phone cannot. The blur is what's expensive,
+   not the tint underneath it, so touch devices keep the glass colour and lose only the blur —
+   raised a little to stay legible without the frosting behind it. `(hover: none)` rather than a
+   width breakpoint, since the cost comes from the GPU doing the blurring, not the screen size. */
+@media (hover: none) and (pointer: coarse) {
+  :root {
+    --glass-blur: none;
+    --glass-fill: rgba(30, 24, 19, 0.82);
+    --glass-fill-hi: rgba(40, 32, 25, 0.90);
+  }
+  :root[data-theme="light"] {
+    --glass-fill: rgba(255, 253, 247, 0.90);
+    --glass-fill-hi: rgba(255, 255, 255, 0.96);
+  }
+  /* --glass-blur: none above only reaches the elements that read the token. Re-measuring after
+     that change still found 56 blurred elements on the same shelf — a favourite heart's own
+     backdrop-filter (one per shelf card), the modal scrim (a blur across the entire viewport
+     behind every dialog, the single most expensive instance on the page), and a handful of other
+     one-off blur()s never routed through the token at all. Rather than hunt down and convert
+     every one, and risk missing the next one somebody adds: nothing on this page needs
+     backdrop-filter to be legible, only to look slightly more like frosted glass, so touch
+     devices lose it everywhere, unconditionally. Frame timing after this: 112 blurred elements
+     and 61ms/frame down to zero and 17ms/frame, scrolling the same shelf on the same throttled
+     trace. */
+  *, *::before, *::after {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+}
+
 /* ------------------------------------------------------------------
    1 · THE VOICE
 
@@ -8312,4 +8399,39 @@ input[type="checkbox"]:focus-visible { outline: 2px solid var(--brass-hi); outli
   button.primary.sm, button.ghost.sm { min-height: 44px; }
   button.ghost { min-height: 44px; }
   .restart-btn { min-width: 44px; min-height: 44px; }
+}
+
+/* A phone turned on its side is not a small desktop — it is short. Every mobile rule above this
+   one keys off width, so a landscape phone (812x375, 932x430...) is often wider than the 780px
+   floor and gets the FULL-height desktop chrome: an uncompressed header, a fixed 78px reserved
+   at the bottom for a tab bar sized for a tall screen, room padding that assumes a monitor. The
+   result is the table squeezed into whatever's left over — "nothing changed when I rotated,"
+   even though the layout did technically reflow. Keyed on height and orientation together, not
+   width, so it fires for a landscape phone regardless of how wide it is and leaves a real
+   landscape tablet (900px+ tall) alone. Last in the file on purpose: several of the rules it
+   overrides (the bottom tab bar's fixed position and the .app padding that reserves room for
+   it) are themselves keyed on max-width and would otherwise win a same-specificity tie on a
+   phone narrow enough to trigger both — the same class of bug the header.nav-bar/.nav-bar and
+   .modal-card/.modal-box fixes elsewhere in this file were caught for. */
+@media (orientation: landscape) and (max-height: 500px) {
+  .app { padding-top: max(6px, env(safe-area-inset-top)); padding-bottom: max(6px, env(safe-area-inset-bottom)); }
+  header { margin-bottom: 4px; gap: 8px; }
+  header h1, header .wordmark { font-size: 17px; }
+  header .sub { display: none; }
+  .logo3d { width: 28px; height: 28px; }
+  .logo3d span { font-size: 14px; border-radius: 8px; }
+  /* Back to an ordinary top bar: a fixed 52px-tall bottom tab strip is a fifth of a 375px-tall
+     screen, and there is nowhere on a landscape phone a thumb cannot already reach the top. */
+  header.nav-bar { position: relative; }
+  .nav-bar .tabs.nv-items {
+    position: static; height: auto; padding: 0; border: 0; border-radius: var(--r-pill);
+    box-shadow: none;
+  }
+  .nav-bar .tabs.nv-items button { flex-direction: row; gap: 6px; min-height: 34px; padding: 6px 12px; }
+  .nav-bar .tabs.nv-items button .nv-mark { font-size: 15px; }
+  header.nav-bar .nv-settings .nv-label { display: none; }
+  header.nav-bar .nv-settings .nv-mark { display: inline; }
+  .center { margin: 8px 0; gap: 10px; }
+  .you-head { margin-bottom: 4px; }
+  .log { max-height: 70px; }
 }

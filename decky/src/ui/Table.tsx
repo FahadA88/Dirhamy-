@@ -20,6 +20,7 @@ import { Confirm } from './Confirm';
 import { useCardFlights } from './cardFlight';
 import { useCardDrag, useCardPreview } from './cardDrag';
 import { useGamepad } from './useGamepad';
+import { useFullscreen } from './fullscreen';
 import { service, rememberSession, forgetSession, resumableSession } from '../server/local';
 import { Board, LocalTableClient, TableClient } from '../net/tableClient';
 import { Seat, MoveRecord } from '../server/matchService';
@@ -237,6 +238,7 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
   // The three match-level buttons — history, take back, restart — live behind one control
   // rather than on the line above your cards. See the .table-menu note below.
   const [tableMenu, setTableMenu] = useState(false);
+  const { supported: fullscreenSupported, isFullscreen, toggle: toggleFullscreen } = useFullscreen();
   const [confirmingRestart, setConfirmingRestart] = useState(false);
   const [hint, setHint] = useState<string | null>(null);
   const [history, setHistory] = useState<MoveRecord[]>([]);
@@ -2199,6 +2201,12 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
                   {typeof clientRef.current.replaySameDeal === 'function' && (
                     <button role="menuitem" onClick={() => { setTableMenu(false); replayDeal(); }}>
                       Replay this deal<i>the exact same hand, from the start</i>
+                    </button>
+                  )}
+                  {fullscreenSupported && (
+                    <button role="menuitem" onClick={() => { setTableMenu(false); toggleFullscreen(); }}>
+                      {isFullscreen ? 'Exit full screen' : 'Full screen'}
+                      <i>{isFullscreen ? 'bring back the browser bar' : 'hide the browser bar, keep the felt'}</i>
                     </button>
                   )}
                 </div>
