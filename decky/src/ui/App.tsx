@@ -7,6 +7,7 @@ import { startMagneticButtons, startTableParallax, startFeltSpotlight, startTapR
 import { SettingsPanel } from './SettingsPanel';
 import { SiteNav, navStyle } from './SiteNav';
 import { FirstRun } from './FirstRun';
+import { SiteFooter } from './SiteFooter';
 import { onRouteChange, pushRoute, readRoute, RouteView } from './route';
 
 // Worklist #98: opening the shelf used to download the whole builder — the rule kit, the
@@ -99,6 +100,7 @@ export function App() {
             ? <Suspense fallback={<div className="view-loading muted">Loading the builder…</div>}><CreateView /></Suspense>
           : <ProfileView onPlay={() => setView('play')} />}
       </main>
+      <SiteFooter onView={setView} />
       <SettingsPanel open={settingsOpen} onClose={() => setSettingsOpen(false)} />
       <FirstRun />
     </div>

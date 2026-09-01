@@ -216,6 +216,14 @@ export function BrowseView({ onPlay, onSetup, onOnline, onlineHostDown, onRemix 
       <PullToRefresh onRefresh={refresh}>
       {!shown ? (
         <>
+          {/* The front page never said what the site was. Everything above this line was chrome
+              — a nav, a deal banner, a search box — and a visitor could reach the shelves without
+              ever being told that the games are refereed or that they can write their own. */}
+          <p className="promise">
+            <strong>{games.length} card games, dealt honestly.</strong> Play against bots or
+            people — or describe a game of your own and have it built.
+          </p>
+
           <Carousel games={spotlight} onOpen={setDetail} onPlay={(g) => onPlay(g.definition)} />
 
           <KindTabs value={kind} onChange={setKind} games={games} />
