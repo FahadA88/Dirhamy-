@@ -15,7 +15,8 @@ import { leaderboard } from '../social/records';
 import { useSettings } from '../settings/SettingsContext';
 import { GameArt } from './GameArt';
 import { Confirm } from './Confirm';
-import { EmptyDeckMark, Meta, ShelfCard, blurb } from './browseCommon';
+import { EmptyDeckMark, EmptyFriendsMark, Meta, ShelfCard, blurb } from './browseCommon';
+import { PullToRefresh } from './PullToRefresh';
 import { HOME_LAYOUTS_BY_ID } from './homeLayouts';
 
 
@@ -172,6 +173,10 @@ export function BrowseView({ onPlay, onSetup, onOnline, onlineHostDown, onRemix 
         </div>
       </div>
 
+      {/* Worklist: a pull-down at the very top of the page re-reads the library — the same
+          setTick() a favourite or a rating already triggers, just reached by a gesture instead
+          of waiting for one of those. See PullToRefresh.tsx for why this is touch, not pointer. */}
+      <PullToRefresh onRefresh={refresh}>
       {!shown ? (
         <>
           <Carousel games={spotlight} onOpen={setDetail} onPlay={(g) => onPlay(g.definition)} />
@@ -214,6 +219,7 @@ export function BrowseView({ onPlay, onSetup, onOnline, onlineHostDown, onRemix 
           </div>
         </>
       )}
+      </PullToRefresh>
     </div>
   );
 }
@@ -632,8 +638,14 @@ function GameDetail({ game, me, onBack, onPlay, onSetup, onOnline, onlineHostDow
                   </span>
                 )}
               </h3>
-              {board.length === 0 && (
-                <p className="muted">Nobody you follow has finished this one yet.</p>
+              {board.length === 0 && boardScope === 'friends' && (
+                <div className="empty-inline">
+                  <EmptyFriendsMark />
+                  <p className="muted">Nobody you follow has finished this one yet.</p>
+                </div>
+              )}
+              {board.length === 0 && boardScope === 'all' && (
+                <p className="muted">Nobody has finished this one yet.</p>
               )}
               <ol className="leaderboard">
                 {board.map((row, i) => (

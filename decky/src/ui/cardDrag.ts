@@ -134,3 +134,83 @@ export function useCardDrag(enabled: boolean, onConfirm: (cardId: string) => voi
 
   return { ghost, startDrag, wasDrag };
 }
+
+// Worklist: "every move is a click or a drag — there is no way to just look at a card up close
+// before committing to either one." This sits beside both without touching them: a pointer-down
+// starts a plain timer, same shape as the drag tracking just above, and if nothing has moved by
+// the time it fires, an enlarged copy appears over the card. Move past a small threshold, or let
+// go, and it is cancelled — no different from the tap or drag it was sitting underneath, which
+// still run exactly as they did before this file grew a second hook. A quick tap never lives
+// long enough to start the timer at all, so nothing here can slow one down.
+
+const PREVIEW_DELAY = 480;   // ms held still before the enlarged copy appears
+const PREVIEW_CANCEL = 10;   // px of movement that cancels it, same idea as TAP_THRESHOLD above
+
+export interface CardPreview {
+  cardId: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  html: string;
+}
+
+interface PreviewTracking {
+  cardId: string;
+  startX: number;
+  startY: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  html: string;
+  timer: ReturnType<typeof setTimeout>;
+}
+
+/** Makes any card in `enabled` state show an enlarged copy of itself after being held still for
+ *  a moment — a long-press on touch, a click-and-hold with a mouse. Purely a look; it never
+ *  submits anything and never reaches for `onConfirm`, which stays the drag hook's job alone. */
+export function useCardPreview(enabled: boolean) {
+  const [preview, setPreview] = useState<CardPreview | null>(null);
+  const tracking = useRef<PreviewTracking | null>(null);
+
+  const cancel = useCallback(() => {
+    if (tracking.current) clearTimeout(tracking.current.timer);
+    tracking.current = null;
+    setPreview(null);
+  }, []);
+
+  const startPreview = useCallback((e: React.PointerEvent<HTMLElement>, cardId: string) => {
+    if (!enabled) return;
+    const el = e.currentTarget;
+    const rect = el.getBoundingClientRect();
+    const clone = el.cloneNode(true) as HTMLElement;
+    clone.removeAttribute('id');
+    clone.removeAttribute('data-cardkey');
+    clone.removeAttribute('tabindex');
+    clone.querySelectorAll('[id]').forEach((n) => n.removeAttribute('id'));
+    const x = rect.left, y = rect.top, width = rect.width, height = rect.height;
+    const html = clone.outerHTML;
+    const timer = setTimeout(() => setPreview({ cardId, x, y, width, height, html }), PREVIEW_DELAY);
+    tracking.current = { cardId, startX: e.clientX, startY: e.clientY, x, y, width, height, html, timer };
+  }, [enabled]);
+
+  useEffect(() => {
+    if (!enabled) return;
+    function move(e: PointerEvent) {
+      const t = tracking.current;
+      if (!t) return;
+      if (Math.hypot(e.clientX - t.startX, e.clientY - t.startY) > PREVIEW_CANCEL) cancel();
+    }
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', cancel);
+    window.addEventListener('pointercancel', cancel);
+    return () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', cancel);
+      window.removeEventListener('pointercancel', cancel);
+    };
+  }, [enabled, cancel]);
+
+  return { preview, startPreview };
+}

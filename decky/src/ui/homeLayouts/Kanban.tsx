@@ -1,4 +1,5 @@
 import { ShelfCard } from '../browseCommon';
+import { PullToRefresh } from '../PullToRefresh';
 import { HomeLayoutProps } from './types';
 import { useKindGroups } from './shared';
 
@@ -7,6 +8,7 @@ import { useKindGroups } from './shared';
 export function KanbanLayout({ games, onOpen, onPlay, onChanged }: HomeLayoutProps) {
   const columns = useKindGroups(games);
   return (
+    <PullToRefresh onRefresh={onChanged}>
     <div className="hl-kanban">
       {columns.map((col) => (
         <section className="hl-kanban-col" key={col.id} aria-label={col.label}>
@@ -23,5 +25,6 @@ export function KanbanLayout({ games, onOpen, onPlay, onChanged }: HomeLayoutPro
         </section>
       ))}
     </div>
+    </PullToRefresh>
   );
 }

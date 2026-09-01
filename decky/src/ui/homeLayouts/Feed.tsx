@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { GameArt } from '../GameArt';
 import { blurb } from '../browseCommon';
 import { PublishedGame } from '../../library/library';
+import { PullToRefresh } from '../PullToRefresh';
 import { HomeLayoutProps } from './types';
 import { timeAgo } from './shared';
 
@@ -15,7 +16,7 @@ interface FeedItem {
 /** A chronological read of the same shelf: what you left off on, what the staff likes, and
  *  what actually changed recently — no fabricated "friend activity", only real timestamps and
  *  real flags the library already tracks. */
-export function FeedLayout({ games, shelves, onOpen, onPlay }: HomeLayoutProps) {
+export function FeedLayout({ games, shelves, onOpen, onPlay, onChanged }: HomeLayoutProps) {
   const items = useMemo(() => {
     const out: FeedItem[] = [];
     const continueShelf = shelves.find((c) => c.id === 'continue');
@@ -35,10 +36,15 @@ export function FeedLayout({ games, shelves, onOpen, onPlay }: HomeLayoutProps) 
   }, [games, shelves]);
 
   if (items.length === 0) {
-    return <p className="muted hl-feed-empty">Nothing to show yet — play or publish something and it'll show up here.</p>;
+    return (
+      <PullToRefresh onRefresh={onChanged}>
+        <p className="muted hl-feed-empty">Nothing to show yet — play or publish something and it'll show up here.</p>
+      </PullToRefresh>
+    );
   }
 
   return (
+    <PullToRefresh onRefresh={onChanged}>
     <ol className="hl-feed">
       {items.map((it) => (
         <li key={it.key} className="hl-feed-item">
@@ -57,5 +63,6 @@ export function FeedLayout({ games, shelves, onOpen, onPlay }: HomeLayoutProps) 
         </li>
       ))}
     </ol>
+    </PullToRefresh>
   );
 }

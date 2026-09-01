@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { useSettings } from '../settings/SettingsContext';
 import { catalog } from '../games/catalog';
 import {
-  Badge, allResults, badges, currentStreak, highlights, leaderboard, mySummary,
+  Badge, allResults, badges, currentStreak, highlights, leaderboard, mySummary, tierFor,
 } from '../social/records';
 
 // Your record.
@@ -203,9 +203,17 @@ function ProfileHead({ name, avatar, summary }: {
   // A run of three or more wins earns the avatar a faint warmth of its own — nothing louder
   // than that, since this is a badge you carry everywhere, not a trophy you stop to admire.
   const streak = summary.streak ?? 0;
+  // Worklist: a rank derived from games finished — never a stored field, see tierFor's own
+  // comment — shown as the material the avatar's own frame is made of, the same way a table's
+  // felt says what kind of table it is rather than a label pinned beside it.
+  const tier = tierFor(summary.played);
+  const tierTitle = tier.next != null
+    ? `${tier.name} · ${tier.next - summary.played} more finished game${tier.next - summary.played === 1 ? '' : 's'} to ${tier.id === 'bronze' ? 'Silver' : tier.id === 'silver' ? 'Gold' : 'Platinum'}`
+    : `${tier.name} — the highest tier`;
   return (
     <header className="profile-head">
-      <span className={`profile-avatar ${streak >= 3 ? 'on-streak' : ''}`} aria-hidden="true">{avatar}</span>
+      <span className={`profile-avatar tier-${tier.id} ${streak >= 3 ? 'on-streak' : ''}`}
+        title={tierTitle} aria-label={`${avatar}, ${tier.name} tier`}>{avatar}</span>
       <div>
         <h2>{name}</h2>
         <p className="muted">

@@ -1,4 +1,4 @@
-import { SuitShape, SuitId } from './Suit';
+import { SuitShape, IllustratedSuitShape, SuitId } from './Suit';
 
 // Jacks, queens and kings.
 //
@@ -18,7 +18,7 @@ const GOLD = '#c39a45';
 const GOLD_HI = '#e8c877';
 
 /** The half-figure. Everything is drawn inside 0..75 so it can be turned about (50, 75). */
-function Half({ rank, suit }: { rank: 'J' | 'Q' | 'K'; suit: SuitId }) {
+function Half({ rank, suit, illustrated }: { rank: 'J' | 'Q' | 'K'; suit: SuitId; illustrated?: boolean }) {
   return (
     <g>
       {/* the robe */}
@@ -30,7 +30,7 @@ function Half({ rank, suit }: { rank: 'J' | 'Q' | 'K'; suit: SuitId }) {
         strokeWidth="1.3" opacity=".9" />
       {/* the suit worn on the chest */}
       <g transform="translate(43 57) scale(.14)" fill="currentColor" opacity=".85">
-        <SuitShape suit={suit} />
+        {illustrated ? <IllustratedSuitShape suit={suit} /> : <SuitShape suit={suit} />}
       </g>
 
       {/* head */}
@@ -88,12 +88,12 @@ function Half({ rank, suit }: { rank: 'J' | 'Q' | 'K'; suit: SuitId }) {
   );
 }
 
-export function CourtFigure({ rank, suit }: { rank: 'J' | 'Q' | 'K'; suit: SuitId }) {
+export function CourtFigure({ rank, suit, illustrated }: { rank: 'J' | 'Q' | 'K'; suit: SuitId; illustrated?: boolean }) {
   return (
     <svg className="court-svg" viewBox="0 0 100 150" aria-hidden="true" focusable="false"
       preserveAspectRatio="xMidYMid meet">
-      <Half rank={rank} suit={suit} />
-      <g transform="rotate(180 50 75)"><Half rank={rank} suit={suit} /></g>
+      <Half rank={rank} suit={suit} illustrated={illustrated} />
+      <g transform="rotate(180 50 75)"><Half rank={rank} suit={suit} illustrated={illustrated} /></g>
       {/* the rule down the middle, which is what makes it read as a court card */}
       <g stroke={GOLD} strokeWidth="1" opacity=".65">
         <path d="M6 73.5h88M6 76.5h88" />

@@ -5,6 +5,7 @@ import { CardFace } from './Card';
 import { AttrCard, describeAttrs } from './AttrCard';
 import { TableDressing, TableRail, FeltDust, SeasonalDrift } from './TableDressing';
 import { CountUp } from './CountUp';
+import { SevenSegmentNumber } from './SevenSegment';
 import { DealMotion } from './DealMotion';
 import { ScorePad } from './ScorePad';
 import { Confetti } from './Confetti';
@@ -17,7 +18,7 @@ import { useTurnAlert } from './useTurnAlert';
 import { useDismissable } from './useEscape';
 import { Confirm } from './Confirm';
 import { useCardFlights } from './cardFlight';
-import { useCardDrag } from './cardDrag';
+import { useCardDrag, useCardPreview } from './cardDrag';
 import { useGamepad } from './useGamepad';
 import { service, rememberSession, forgetSession, resumableSession } from '../server/local';
 import { Board, LocalTableClient, TableClient } from '../net/tableClient';
@@ -31,6 +32,12 @@ import { recordResult } from '../social/records';
 
 const HUMAN = 'P1';
 const SUIT_ORDER: Record<string, number> = { S: 0, H: 1, C: 2, D: 3, JOKER: 4 };
+// Worklist: "no tutorial-highlight mechanism exists to hook onto" — this is that mechanism, kept
+// to the one moment it is actually needed rather than a general-purpose spotlight system nobody
+// asked for. Seen once, ever, the same way FirstRun's own key retires itself: the first card this
+// player is ever offered a legal move on gets a gentle glow, and playing any card at all — this
+// one or another — retires it for good.
+const FIRST_CARD_KEY = 'decky.seenfirstcard.v1';
 
 /**
  * Where each opponent sits, given how many of them there are. You are always at the bottom
@@ -247,6 +254,22 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
   // One toast, two tones: a refusal is a red ✕, a status note is not.
   const [toast, setToast] = useState<{ text: string; tone: 'bad' | 'info' } | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
+  /**
+   * A card this seat has just played over a socket, before the referee has confirmed it. Only
+   * ever set for a remote table's own outbound plays — never for anything reflected in from the
+   * server about another seat, since the client has no visibility into an opponent's move before
+   * their host confirms it either. Cleared the moment the round trip settles, whichever way it
+   * goes, so it is never stale by more than one lag spike.
+   */
+  const [optimisticPlay, setOptimisticPlay] = useState<{ cardId: string; card: Card } | null>(null);
+  const [firstCardSeen, setFirstCardSeen] = useState(() => {
+    try { return !!localStorage.getItem(FIRST_CARD_KEY); } catch { return true; }
+  });
+  const markFirstCardSeen = () => {
+    if (firstCardSeen) return;
+    setFirstCardSeen(true);
+    try { localStorage.setItem(FIRST_CARD_KEY, '1'); } catch { /* private mode: skip it */ }
+  };
   // A shared layout has a second thing you can pick up: a whole pile, to drop on another one.
   const [selPile, setSelPile] = useState<string | null>(null);
   const [askRank, setAskRank] = useState<string | null>(null);
@@ -764,6 +787,9 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
     const c = clientRef.current;
     return c.onChange(() => {
       setBoard(c.read(me));
+      // Whatever just landed is the round trip settling — accepted, refused, or simply
+      // overtaken by somebody else's move — so the echoed card has done its job either way.
+      setOptimisticPlay(null);
       // A refusal from a networked referee lands after we have already told the player their
       // move went through. Surface it when it arrives rather than letting it disappear.
       const late = (c as { lastRefusal?: string | null }).lastRefusal;
@@ -925,6 +951,18 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
   }
 
   function submit(move: Move) {
+    if (move.cardId) markFirstCardSeen();
+    // Worklist: a networked referee answers a play a full round trip later than a local one
+    // does, and the trick area used to just sit empty for it — the honest fix touches
+    // RemoteTableClient's cache, which stays server-truth-only (see its own comment on why),
+    // so this stays a purely visual echo, on top of that cache rather than inside it. Scoped to
+    // trick-mode's one play action, the only one with a trick area to echo into — a plain
+    // 'playCard' game has nowhere for a pile-side echo to land, only the dimmed hand card, which
+    // reads as a stuck button rather than a move in flight.
+    if (clientRef.current.remote && move.actionId === 'playToTrick' && move.cardId) {
+      const card = view.hand.find((c) => c.id === move.cardId);
+      if (card) setOptimisticPlay({ cardId: move.cardId, card });
+    }
     const res = clientRef.current.submit(me, move);
     if (!res.ok) {
       // The rules said no. Say why, instead of letting the tap disappear.
@@ -932,6 +970,7 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
       playSound('ui', settings);
       haptic('refusal', settings.haptics);
       setSelected(null);
+      setOptimisticPlay(null);
       if (move.cardId) setShakeCard(move.cardId);
       return;
     }
@@ -1031,7 +1070,23 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
     },
   );
 
+  // Worklist: a long-press (or a mouse held down) enlarges a card where it sits, before either
+  // of the above ever gets a say. Enabled for the same cards a click can play, entirely so
+  // there's something to look closely at — it never submits anything itself.
+  const { preview: cardPreview, startPreview } = useCardPreview(!isFish && !isKent && !isLayout);
+
   const hand = useMemo(() => sortHand(view.hand, def, settings.sort), [view.hand, def, settings.sort]);
+
+  // The echo shows only until the referee's own copy of this trick catches up with it — once it
+  // does, the confirmed card takes over the same spot and there is nothing left to echo.
+  const ghostPlay = optimisticPlay && !view.trick?.some((t) => t.card.id === optimisticPlay.cardId)
+    ? optimisticPlay : null;
+
+  // The one card this glow is ever for: the first one this player, on this device, is ever
+  // offered a legal move on. Gone the instant they play any card at all — see markFirstCardSeen.
+  const firstGlowCardId = !firstCardSeen && !dealing && view.isYourTurn
+    ? hand.find((c) => playableCardIds.has(c.id))?.id ?? null
+    : null;
 
   // How close the hand is to running out, as a fraction — the vignette at the table's edge
   // warms toward it. Tracked against the fullest the hand has been *this* deal rather than a
@@ -1173,6 +1228,10 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
     if (seat) return seat.id === me ? `${seat.name} (you)` : seat.name;
     return id === me ? settings.playerName : botLabel(id);
   };
+  // A running trick, book or set count — the same number, drawn as a seven-segment readout
+  // instead of ticking type when the setting asks for it. Snaps rather than counting up: a real
+  // digital display changes instantly, it doesn't animate through the numbers in between.
+  const seatNum = (n: number) => (settings.digitalScore ? <SevenSegmentNumber value={n} /> : <CountUp value={n} />);
   /*
     The engine writes its log with raw seat ids — "P4 played 9♣" — because naming players is
     none of its business. The table is where names live, so it puts them back before anyone
@@ -1349,7 +1408,7 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
               )}
               <div className="seat-stats">
                 {isSet ? (
-                  <span className="seat-stat"><CountUp value={view.scores?.[p.id] ?? 0} /><i>{(view.scores?.[p.id] ?? 0) === 1 ? 'set' : 'sets'}</i></span>
+                  <span className="seat-stat">{seatNum(view.scores?.[p.id] ?? 0)}<i>{(view.scores?.[p.id] ?? 0) === 1 ? 'set' : 'sets'}</i></span>
                 ) : isLayout || isSwap ? (
                   // Both families sit somebody's whole holding on the table for the length of
                   // the round — a shared layout, or a face-down row everyone can see the BACKS
@@ -1361,12 +1420,12 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
                   </span>
                 )}
                 {view.mode === 'trick' && view.bids?.[p.id] !== undefined && (
-                  <span className="seat-stat"><CountUp value={view.tricksWon?.[p.id] ?? 0} />/{view.bids[p.id]}<i>tricks</i></span>
+                  <span className="seat-stat">{seatNum(view.tricksWon?.[p.id] ?? 0)}/{view.bids[p.id]}<i>tricks</i></span>
                 )}
                 {view.mode === 'trick' && view.bids?.[p.id] === undefined && (view.tricksWon?.[p.id] ?? 0) > 0 && (
-                  <span className="seat-stat"><CountUp value={view.tricksWon?.[p.id] ?? 0} /><i>won</i></span>
+                  <span className="seat-stat">{seatNum(view.tricksWon?.[p.id] ?? 0)}<i>won</i></span>
                 )}
-                {isFish && <span className="seat-stat"><CountUp value={view.booksWon?.[p.id] ?? 0} /><i>books</i></span>}
+                {isFish && <span className="seat-stat">{seatNum(view.booksWon?.[p.id] ?? 0)}<i>books</i></span>}
                 {view.mode === 'bluff' && (view.bluffCaught?.[p.id] ?? 0) > 0 && (
                   <span className="seat-stat">{view.bluffCaught![p.id]}<i>caught</i></span>
                 )}
@@ -1500,18 +1559,36 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
         </div>
       ) : view.mode === 'trick' ? (
         <div className="center trick-area" data-slot="trick">
-          {view.trick && view.trick.length > 0 ? (
-            view.trick.map((t, i) => (
-              <div key={`${t.player}:${t.card.id}`} className={`trick-card ${i === 0 ? 'led' : ''}`}
-                data-from={seatSideOf(t.player)}
-                /* Where this card came from, for the flying-card layer: your own plays are
-                   already tracked out of your hand, but an opponent's card has never been on
-                   screen before, so it has to be told which seat to fly out of. */
-                data-origin={t.player === me ? 'hand' : `seat:${t.player}`}>
-                <CardFace card={t.card} />
-                <div className="pile-label">{nameOf(t.player)}</div>
-              </div>
-            ))
+          {(view.trick && view.trick.length > 0) || ghostPlay ? (
+            <>
+              {view.trick?.map((t, i) => (
+                <div key={`${t.player}:${t.card.id}`} className={`trick-card ${i === 0 ? 'led' : ''}`}
+                  data-from={seatSideOf(t.player)}
+                  /* Where this card came from, for the flying-card layer: your own plays are
+                     already tracked out of your hand, but an opponent's card has never been on
+                     screen before, so it has to be told which seat to fly out of. */
+                  data-origin={t.player === me ? 'hand' : `seat:${t.player}`}>
+                  <CardFace card={t.card} />
+                  <div className="pile-label">{nameOf(t.player)}</div>
+                </div>
+              ))}
+              {/* Worklist: what this seat just sent a networked referee, before it has come back
+                  confirmed — dashed and half there, gone the moment the round trip settles (see
+                  optimisticPlay above), one way or the other. The real card of the same id is
+                  still sitting, dimmed, in the hand below (the referee hasn't taken it yet) — so
+                  this one is drawn under a decoy id, `#echo` appended, purely so the flying-card
+                  layer's data-flight tracking never sees the same card in two slots at once. The
+                  confirmed trick-card, under the real id, arrives and flies from the hand exactly
+                  as it always has the instant the referee agrees; this is only what fills the
+                  wait beforehand. */}
+              {ghostPlay && (
+                <div className={`trick-card ghost-pending ${!view.trick || view.trick.length === 0 ? 'led' : ''}`}
+                  data-from="me">
+                  <CardFace card={{ ...ghostPlay.card, id: `${ghostPlay.card.id}#echo` }} />
+                  <div className="pile-label">{nameOf(me)}</div>
+                </div>
+              )}
+            </>
           ) : view.lastTrick ? (
             /* The trick that was just taken. It used to blink out the moment the fourth card
                landed, so you never saw what beat what — now it stays until the next lead and
@@ -1992,12 +2069,12 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
           )}
           {teamOf(me) && <span className="team-tag">{teamOf(me)}</span>}
           {view.mode === 'trick' && view.bids?.[me] !== undefined && (
-            <span className="seat-stat"><CountUp value={view.tricksWon?.[me] ?? 0} />/{view.bids[me]}<i>tricks</i></span>
+            <span className="seat-stat">{seatNum(view.tricksWon?.[me] ?? 0)}/{view.bids[me]}<i>tricks</i></span>
           )}
           {view.mode === 'trick' && view.bids?.[me] === undefined && (view.tricksWon?.[me] ?? 0) > 0 && (
-            <span className="seat-stat"><CountUp value={view.tricksWon?.[me] ?? 0} /><i>won</i></span>
+            <span className="seat-stat">{seatNum(view.tricksWon?.[me] ?? 0)}<i>won</i></span>
           )}
-          {isFish && <span className="seat-stat"><CountUp value={view.booksWon?.[me] ?? 0} /><i>books</i></span>}
+          {isFish && <span className="seat-stat">{seatNum(view.booksWon?.[me] ?? 0)}<i>books</i></span>}
           {view.needsPassChoice && (
             <span className="turn-badge">
               {view.passCount > 1
@@ -2144,7 +2221,7 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
                 {view.setsAvailable ?? 0} on the board
               </span>
               <span className="chip mine">
-                You · <CountUp value={view.scores?.[me] ?? 0} /> {(view.scores?.[me] ?? 0) === 1 ? 'set' : 'sets'}
+                You · {seatNum(view.scores?.[me] ?? 0)} {(view.scores?.[me] ?? 0) === 1 ? 'set' : 'sets'}
               </span>
             </div>
             <div className="set-board" data-slot="board" role="group" aria-label="The board">
@@ -2394,12 +2471,12 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
                 style={{ '--i': i, '--n': hand.length } as React.CSSProperties}
                 tabIndex={playable ? (isCursor ? 0 : -1) : -1}
                 aria-label={cardLabel(c, playable, staged ? 'picked to pass' : undefined)}
-                className={`card-btn ${playable ? 'playable' : 'dim'} ${staged ? 'staged' : ''} ${hint === c.id ? 'hinted' : ''} ${(isFish ? c.rank === askRank : selected === c.id) ? 'selected' : ''} ${dragGhost?.cardId === c.id ? 'drag-source' : ''} ${shakeCard === c.id ? 'shake' : ''}`}
+                className={`card-btn ${playable ? 'playable' : 'dim'} ${staged ? 'staged' : ''} ${hint === c.id ? 'hinted' : ''} ${(isFish ? c.rank === askRank : selected === c.id) ? 'selected' : ''} ${dragGhost?.cardId === c.id ? 'drag-source' : ''} ${shakeCard === c.id ? 'shake' : ''} ${ghostPlay?.cardId === c.id ? 'pending-confirm' : ''} ${firstGlowCardId === c.id ? 'first-card-glow' : ''}`}
                 disabled={!playable}
                 onFocus={() => { if (idx >= 0) setCursor(idx); }}
                 onClick={() => clickCard(c.id)}
-                onPointerDown={playable ? (e) => startDrag(e, c.id) : undefined}
-                title={staged ? 'Picked to pass' : playable ? (isFish ? 'Pick this rank to ask for' : view.needsPassChoice ? 'Give this card away' : settings.confirmPlays && selected !== c.id ? 'Click to select' : 'Play this card') : capitalize(dimReason(c))}
+                onPointerDown={playable ? (e) => { startDrag(e, c.id); startPreview(e, c.id); } : undefined}
+                title={firstGlowCardId === c.id ? 'Your first move — tap this card to play it' : staged ? 'Picked to pass' : playable ? (isFish ? 'Pick this rank to ask for' : view.needsPassChoice ? 'Give this card away' : settings.confirmPlays && selected !== c.id ? 'Click to select' : 'Play this card') : capitalize(dimReason(c))}
               >
                 <CardFace card={c} />
               </button>
@@ -2611,6 +2688,19 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
             width: dragGhost.width, height: dragGhost.height,
           } as React.CSSProperties}
           dangerouslySetInnerHTML={{ __html: dragGhost.html }}
+        />
+      )}
+      {/* A held card, enlarged in place — see useCardPreview in cardDrag.ts. Suppressed the
+          instant a drag actually starts (dragGhost above takes over the same pointer). */}
+      {cardPreview && !dragGhost && (
+        <div
+          className="card-preview"
+          aria-hidden="true"
+          style={{
+            left: cardPreview.x, top: cardPreview.y,
+            width: cardPreview.width, height: cardPreview.height,
+          } as React.CSSProperties}
+          dangerouslySetInnerHTML={{ __html: cardPreview.html }}
         />
       )}
     </div>

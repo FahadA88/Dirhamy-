@@ -1,10 +1,11 @@
 import { useMemo } from 'react';
 import { averageRating, complexityOf, kindLabel, playtimeOf } from '../../library/library';
+import { PullToRefresh } from '../PullToRefresh';
 import { HomeLayoutProps } from './types';
 
 /** No tiles, no art — a dense, columned list built to scan a lot of names fast. Grouped by
  *  kind, sorted by name within each, with a hairline under every row. */
-export function LedgerLayout({ games, onOpen, onPlay }: HomeLayoutProps) {
+export function LedgerLayout({ games, onOpen, onPlay, onChanged }: HomeLayoutProps) {
   const groups = useMemo(() => {
     const byKind = new Map<string, typeof games>();
     for (const g of games) {
@@ -18,6 +19,7 @@ export function LedgerLayout({ games, onOpen, onPlay }: HomeLayoutProps) {
   }, [games]);
 
   return (
+    <PullToRefresh onRefresh={onChanged}>
     <div className="hl-ledger">
       {groups.map(([label, list]) => (
         <section key={label} className="hl-ledger-group">
@@ -42,5 +44,6 @@ export function LedgerLayout({ games, onOpen, onPlay }: HomeLayoutProps) {
         </section>
       ))}
     </div>
+    </PullToRefresh>
   );
 }

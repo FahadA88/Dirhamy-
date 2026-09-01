@@ -35,6 +35,32 @@ export function EmptyDeckMark() {
   );
 }
 
+/** Nobody you follow has shown up here yet — two figures rather than one, since "follow someone"
+ *  is the whole ask, drawn in the same currentColor line-art as the empty shelf above. */
+export function EmptyFriendsMark() {
+  return (
+    <svg className="empty-mark" width="56" height="56" viewBox="0 0 56 56" fill="none"
+      stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+      <circle cx="20" cy="20" r="7" />
+      <path d="M8 46c0-8 5.4-13 12-13s12 5 12 13" />
+      <circle cx="38" cy="24" r="6" opacity=".55" />
+      <path d="M30 46c.6-6.4 4.6-10.4 10-10.4S49 40 49.6 46" opacity=".55" />
+    </svg>
+  );
+}
+
+/** No table has your name on it right now — an empty seat at an empty table, rather than the
+ *  full hand the shelf's own mark draws. */
+export function EmptyMatchesMark() {
+  return (
+    <svg className="empty-mark" width="56" height="56" viewBox="0 0 56 56" fill="none"
+      stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+      <ellipse cx="28" cy="30" rx="21" ry="13" />
+      <path d="M28 17v-6M18 44l-3 6M38 44l3 6" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 export function Meta({ game }: { game: PublishedGame }) {
   const def = game.definition;
   const rating = averageRating(game.stats);

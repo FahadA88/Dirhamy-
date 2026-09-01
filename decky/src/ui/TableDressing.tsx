@@ -277,6 +277,23 @@ export function TableDressing({ felt, title }: { felt: TableFelt; title: string 
     );
   }
 
+  if (felt === 'walnut') {
+    // Growth rings, the way a plank actually reads end-on — drawn from the same material the
+    // rail is, rather than the ring every fallback cloth below gets.
+    return (
+      <svg className={SVG} viewBox={BOX} preserveAspectRatio="none" aria-hidden="true">
+        <defs><NameArc /></defs>
+        <g className="dr-line ring">
+          <ellipse cx="500" cy="288" rx="120" ry="66" />
+          <ellipse cx="500" cy="288" rx="200" ry="110" />
+          <ellipse cx="500" cy="288" rx="284" ry="156" />
+          <ellipse cx="500" cy="288" rx="368" ry="202" />
+        </g>
+        <Name className="dr-name wood" title={title} />
+      </svg>
+    );
+  }
+
   // midnight, and any cloth a player has supplied themselves — a single lit ring.
   return (
     <svg className="dressing mn" viewBox="0 0 1000 560" preserveAspectRatio="none" aria-hidden="true">

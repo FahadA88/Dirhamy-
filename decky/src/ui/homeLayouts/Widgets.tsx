@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { ShelfCard } from '../browseCommon';
+import { EmptyMatchesMark, ShelfCard } from '../browseCommon';
 import { useSettings } from '../../settings/SettingsContext';
 import { currentStreak, leaderboard } from '../../social/records';
 import { HomeLayoutProps } from './types';
@@ -27,7 +27,12 @@ export function WidgetsLayout({ games, shelves, onOpen, onPlay, onChanged }: Hom
               <ShelfCard key={g.id} game={g} onOpen={() => onOpen(g.id)} onPlay={() => onPlay(g)} onChanged={onChanged} />
             ))}
           </div>
-        ) : <p className="muted">Play something and it'll wait for you here.</p>}
+        ) : (
+          <div className="empty-inline">
+            <EmptyMatchesMark />
+            <p className="muted">Nothing in progress — play something and it'll wait for you here.</p>
+          </div>
+        )}
       </section>
 
       <section className="hl-widget hl-widget-stat">

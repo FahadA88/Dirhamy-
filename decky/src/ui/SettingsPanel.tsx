@@ -339,6 +339,10 @@ function CardsSection({ s, set }: { s: Settings; set: Setter }) {
         </div>
       </Row>
 
+      <Row label="Illustrated suits" hint="Spades, hearts, diamonds and clubs drawn in the same inked linework as the joker's face, instead of the plain flat mark." keywords="suits illustrated hand drawn joker linework spade heart diamond club">
+        <Toggle on={s.illustratedSuits} onChange={(v) => set('illustratedSuits', v)} label="Illustrated suits" />
+      </Row>
+
       <Row label="Back" hint="What the other side of every card looks like." keywords="back pattern deck design" wide>
         <div className="swatches backs">
           {(Object.keys(BACKS) as Exclude<CardBack, 'custom'>[]).map((bk) => (
@@ -422,6 +426,9 @@ function PlaySection({ s, set }: { s: Settings; set: Setter }) {
       </Row>
       <Row label="Game log" hint="The running account of what everyone did." keywords="log history record">
         <Toggle on={s.showLog} onChange={(v) => set('showLog', v)} label="Game log" />
+      </Row>
+      <Row label="Digital scoreboard" hint="The running trick count drawn as a seven-segment readout instead of plain type." keywords="digital score seven segment lcd led scoreboard tricks">
+        <Toggle on={s.digitalScore} onChange={(v) => set('digitalScore', v)} label="Digital scoreboard" />
       </Row>
       <Row label="Seats by default" hint="Used when you start a game without setting a table up." keywords="players seats number">
         <div className="pref-range">

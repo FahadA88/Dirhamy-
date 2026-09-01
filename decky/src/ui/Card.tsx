@@ -65,7 +65,7 @@ export function CardFace({ card }: { card: Card }) {
       <div className="face-frame" aria-hidden="true" />
       <div className="corner tl">
         <b className="ix-rank">{label}</b>
-        <Suit suit={suit} className="ix-suit" />
+        <Suit suit={suit} className="ix-suit" illustrated={settings.illustratedSuits} />
         {face === 'letters' && <b className="suitletter">{SUIT_LETTER[card.suit]}</b>}
       </div>
 
@@ -78,25 +78,25 @@ export function CardFace({ card }: { card: Card }) {
           {pips.map((p, i) => (
             <span key={i} className="spot"
               style={{ left: `${p.x}%`, top: `${p.y}%`, transform: `translate(-50%,-50%) rotate(${p.y > 55 ? 180 : 0}deg)` }}>
-              <Suit suit={suit} />
+              <Suit suit={suit} illustrated={settings.illustratedSuits} />
             </span>
           ))}
         </div>
       ) : card.rank === 'JOKER' ? (
         <div className="court-art" aria-hidden="true"><JokerFigure /></div>
       ) : isCourt ? (
-        <div className="court-art" aria-hidden="true"><CourtFigure rank={label as 'J' | 'Q' | 'K'} suit={suit} /></div>
+        <div className="court-art" aria-hidden="true"><CourtFigure rank={label as 'J' | 'Q' | 'K'} suit={suit} illustrated={settings.illustratedSuits} /></div>
       ) : (
         // The ace, which every deck makes something of: one big suit inside a fine ring.
         <div className="pip ace" aria-hidden="true">
           <span className="ace-ring" />
-          <Suit suit={suit} />
+          <Suit suit={suit} illustrated={settings.illustratedSuits} />
         </div>
       )}
 
       <div className="corner br">
         <b className="ix-rank">{label}</b>
-        <Suit suit={suit} className="ix-suit" />
+        <Suit suit={suit} className="ix-suit" illustrated={settings.illustratedSuits} />
         {(face === 'letters' || face === 'shapes') && <b className="suitletter">{SUIT_LETTER[card.suit]}</b>}
       </div>
     </div>

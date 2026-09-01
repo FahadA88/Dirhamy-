@@ -12,10 +12,10 @@ export type CardBack =
   | 'artdeco' | 'holofoil'
   | 'custom';
 // Four table builds, each with its own rail, felt, markings and lighting.
-/** The thirteen tables that survived the cut. */
+/** The fourteen tables that survived the cut. */
 export type TableFelt =
   | 'neon' | 'mahogany' | 'vegas' | 'midnight' | 'parlour' | 'concrete' | 'darkglass'
-  | 'papermat' | 'velvet' | 'marble' | 'zinc' | 'litedges' | 'chalkboard' | 'studio'
+  | 'papermat' | 'velvet' | 'marble' | 'zinc' | 'litedges' | 'chalkboard' | 'studio' | 'walnut'
   | 'custom';
 export type CardSize = 's' | 'm' | 'l';
 /**
@@ -176,6 +176,10 @@ export interface Settings {
   autoPlayForced: boolean;
   /** How the front page presents the library — the shipped grid, or one of sixteen others. */
   homeLayout: HomeLayout;
+  /** The running trick count drawn as a seven-segment digital readout instead of plain type. */
+  digitalScore: boolean;
+  /** Suit marks drawn in the joker's own illustrated linework instead of the plain flat glyph. */
+  illustratedSuits: boolean;
 }
 
 export const defaultSettings: Settings = {
@@ -228,6 +232,8 @@ export const defaultSettings: Settings = {
   undoGraceMs: 3000,
   turnSeconds: 0,
   homeLayout: 'grid',
+  digitalScore: false,
+  illustratedSuits: false,
 };
 
 /** The glyphs offered as an avatar. Fixed set, so nothing needs screening. */
@@ -320,6 +326,7 @@ export const FELTS: Record<TableFelt, FeltPreset> = {
   litedges:   { name: 'Lit Edges',  blurb: 'Black surface, glowing seams.' },
   chalkboard: { name: 'Chalkboard', blurb: 'Matte slate with chalk seat markings.' },
   studio:     { name: 'Studio',     blurb: 'Pure white, one soft shadow. Cards as a product shot.' },
+  walnut:     { name: 'Walnut',     blurb: 'A real wood-grain rail round a burgundy cloth. Grandpa’s table.' },
   custom:     { name: 'Yours',      blurb: 'Your own cloth and rail.' },
 };
 

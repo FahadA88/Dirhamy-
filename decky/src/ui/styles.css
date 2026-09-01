@@ -1525,6 +1525,44 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
 
 .browse { display: flex; flex-direction: column; gap: 8px; }
 
+/*
+  Worklist: a pull-to-refresh affordance — see PullToRefresh.tsx for why this watches touch
+  events rather than the pointer/drag machinery already on this page. The mark is a small felt
+  swatch rather than a generic spinner: the same green-baize gradient formula the mahogany and
+  vegas tables mix their own cloth from, so pulling down for a fresh shelf feels like this app
+  rather than like any other list.
+*/
+.ptr-wrap { position: relative; }
+.ptr-indicator {
+  position: absolute; top: 0; left: 0; right: 0;
+  display: flex; align-items: flex-end; justify-content: center;
+  overflow: hidden; pointer-events: none;
+  transition: height .22s cubic-bezier(.2, .85, .3, 1), opacity .18s linear;
+}
+.ptr-mark {
+  width: 34px; height: 34px; margin-bottom: 8px; flex: 0 0 auto;
+  display: grid; place-items: center; border-radius: 50%;
+  background:
+    radial-gradient(70% 70% at 32% 24%, rgba(255, 255, 255, .32), transparent 60%),
+    radial-gradient(120% 120% at 50% 120%, rgba(0, 0, 0, .38), transparent 60%),
+    linear-gradient(#1f9a55, #0c6d38);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, .3), inset 0 0 0 1px rgba(255, 255, 255, .22);
+  color: #eafff1; font-size: 15px;
+  transition: transform .1s linear, box-shadow .15s ease;
+}
+.ptr-mark.armed { box-shadow: 0 8px 20px rgba(0, 0, 0, .34), inset 0 0 0 1px rgba(255, 255, 255, .4), 0 0 0 3px rgba(255, 255, 255, .12); }
+.ptr-mark.spin { animation: ptr-spin .9s linear infinite; }
+@keyframes ptr-spin { to { transform: rotate(360deg); } }
+.ptr-content { transition: transform .22s cubic-bezier(.2, .85, .3, 1); }
+@media (prefers-reduced-motion: reduce) {
+  .ptr-mark.spin { animation: none; }
+  .ptr-indicator, .ptr-content, .ptr-mark { transition: none !important; }
+}
+:root[data-motion="reduced"] .ptr-mark.spin { animation: none; }
+:root[data-motion="reduced"] .ptr-indicator,
+:root[data-motion="reduced"] .ptr-content,
+:root[data-motion="reduced"] .ptr-mark { transition: none !important; }
+
 /* Quiet filters: one line, no chrome until touched. */
 .filterbar {
   display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
@@ -1734,6 +1772,11 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
 
 .empty-shelf { text-align: center; padding: 60px 20px; }
 .empty-mark { width: 56px; height: 56px; color: var(--panel-brd); margin: 0 auto 10px; display: block; }
+/* A smaller cousin of .empty-shelf for a state that has to fit inside a sidebar panel rather
+   than a whole section — the mark beside the line, not stacked above a heading. */
+.empty-inline { display: flex; align-items: center; gap: 12px; padding: 4px 0; }
+.empty-inline .empty-mark { width: 34px; height: 34px; margin: 0; flex: 0 0 auto; }
+.empty-inline p { margin: 0; }
 .empty-shelf h3 { margin: 0 0 6px; }
 .empty-shelf p { margin: 0 auto 16px; color: var(--muted); max-width: 42ch; line-height: 1.55; }
 
@@ -2411,6 +2454,39 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
   --t-ink: #17171a; --t-muted: rgba(23,23,26,0.55); --t-key: #3d3bd6;
   --t-line: rgba(23,23,26,0.12); --t-panel: rgba(23,23,26,0.04);
   --t-seat: rgba(23,23,26,0.04); --t-seat-line: rgba(23,23,26,0.3);
+}
+/*
+  Worklist: mahogany already has its own material identity — polished, leather-railed, a hard
+  overhead light. This is the other real wood: a plank rail with an actual grain running through
+  it rather than mahogany's smooth stained sheen, round a plain burgundy baize rather than
+  mahogany's deep green. Two irregular linear-gradients at a shallow angle stand in for the
+  streaks a real board has, uneven in width and spacing the way grain always is rather than a
+  tidy repeating stripe; a couple of soft radial blotches break up anywhere the streaks would
+  otherwise read as too regular, the same trick concrete's aggregate uses above.
+*/
+.table[data-felt="walnut"], .felt-swatch[data-felt="walnut"], .pp-stage[data-felt="walnut"], .pack-swatch[data-felt="walnut"] {
+  --rail-w: 26px; --rail-r: 20px; --felt-r: 9px; --felt-pad: 25px;
+  --rail-bg:
+    repeating-linear-gradient(94deg,
+      rgba(0,0,0,0.16) 0 2px, transparent 2px 11px,
+      rgba(0,0,0,0.10) 11px 13px, transparent 13px 27px,
+      rgba(0,0,0,0.14) 27px 29px, transparent 29px 44px),
+    radial-gradient(30% 46% at 22% 32%, rgba(0,0,0,0.20), transparent 70%),
+    radial-gradient(24% 38% at 78% 68%, rgba(0,0,0,0.16), transparent 70%),
+    radial-gradient(120% 70% at 30% -10%, rgba(255,214,168,0.16), transparent 60%),
+    linear-gradient(128deg, #8a5a34 0%, #6d4426 42%, #7c4e2e 66%, #4f2f19 100%);
+  --rail-shadow:
+    inset 0 2px 0 rgba(255,220,190,0.22),
+    inset 0 -3px 8px rgba(0,0,0,0.5),
+    0 22px 50px rgba(30, 16, 6, 0.38);
+  --felt-bg:
+    radial-gradient(120% 90% at 50% -10%, rgba(255,255,255,0.08), transparent 55%),
+    radial-gradient(90% 120% at 50% 120%, rgba(0,0,0,0.34), transparent 60%),
+    linear-gradient(#6d1c28, #551420);
+  --felt-shadow: inset 0 0 0 2px rgba(0,0,0,0.36), inset 0 12px 34px rgba(0,0,0,0.34);
+  --t-ink: #f8ede0; --t-muted: rgba(248,237,224,0.66); --t-key: #e8b979;
+  --t-line: rgba(255,232,208,0.18); --t-panel: rgba(0,0,0,0.26);
+  --t-seat: rgba(255,232,208,0.09); --t-seat-line: rgba(232,185,121,0.55);
 }
 
 /* ============================================================
@@ -4449,6 +4525,16 @@ header h1 {
   background: var(--panel-hi);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--you, var(--emerald)) 26%, transparent);
 }
+/*
+  Worklist: a rank/tier frame, derived from games finished rather than stored (see tierFor in
+  records.ts). A separate property from the ring above on purpose — `border` here, `box-shadow`
+  for the seat-colour ring and again for .on-streak below — so a bronze player on a hot streak
+  gets both without either one overwriting the other.
+*/
+.profile-avatar.tier-bronze   { border: 3px solid #96763c; }
+.profile-avatar.tier-silver   { border: 3px solid #8f9299; }
+.profile-avatar.tier-gold     { border: 3px solid var(--gold); }
+.profile-avatar.tier-platinum { border: 3px solid var(--cyan); }
 
 .profile-tabs { align-self: flex-start; }
 .profile-tabrow { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
@@ -5045,6 +5131,42 @@ button.primary.lg { padding: 13px 28px; font-size: 15.5px; border-radius: 999px;
 .seat-stats .seat-stat { font-size: 11.5px; color: var(--t-muted, rgba(255, 255, 255, .62)); font-variant-numeric: tabular-nums; }
 .seat-stats .seat-stat i { font-style: normal; margin-left: 3px; opacity: .72; }
 
+/*
+  A trick readout drawn as a digital display rather than typeset — see SevenSegment.tsx for why
+  this is CSS bars and not a font. `currentColor` throughout: it inherits whatever colour the
+  seat-stat it sits inside already earned (this table's ink token, dimmed or not), the same way
+  every other mark on the felt takes its colour from its container rather than choosing one.
+  Every segment renders always, dim when unlit — a real seven-segment readout shows its whole
+  raceway, lit or not, which is what makes it read as a digital display rather than a shape.
+*/
+.sevenseg-group { display: inline-flex; align-items: center; }
+.sevenseg-punct { margin: 0 1px; }
+.sevenseg {
+  position: relative; display: inline-block;
+  width: .62em; height: 1em; margin: 0 .05em;
+  vertical-align: -0.05em;
+}
+.sevenseg .seg {
+  position: absolute; background: currentColor; opacity: .13;
+  transition: opacity .1s linear;
+}
+.sevenseg .seg.on { opacity: 1; }
+.sevenseg .seg-a, .sevenseg .seg-d, .sevenseg .seg-g {
+  left: 12%; width: 76%; height: 12%;
+  clip-path: polygon(8% 0, 92% 0, 100% 50%, 92% 100%, 8% 100%, 0 50%);
+}
+.sevenseg .seg-a { top: 0; }
+.sevenseg .seg-g { top: 44%; }
+.sevenseg .seg-d { bottom: 0; }
+.sevenseg .seg-b, .sevenseg .seg-c, .sevenseg .seg-e, .sevenseg .seg-f {
+  width: 12%; height: 43%;
+  clip-path: polygon(0 8%, 50% 0, 100% 8%, 100% 92%, 50% 100%, 0 92%);
+}
+.sevenseg .seg-f { top: 5%; left: 0; }
+.sevenseg .seg-b { top: 5%; right: 0; }
+.sevenseg .seg-e { bottom: 5%; left: 0; }
+.sevenseg .seg-c { bottom: 5%; right: 0; }
+
 /* Whose turn it is, as a mark on the seat rather than an hourglass in the name. */
 .seat { position: relative; }
 .seat-turn {
@@ -5350,6 +5472,32 @@ button.bluff-go:disabled {
 .trick-card[data-from="tl"] { --fx: -190px; --fy: -140px; --fr: -9deg; }
 .trick-card[data-from="tr"] { --fx: 190px;  --fy: -140px; --fr: 9deg; }
 
+/*
+  Worklist: the card this seat just sent a networked referee, sitting where it will land, before
+  the referee has said yes. Dashed rather than solid — the one visual vocabulary this sheet does
+  not already use for "real" — so it reads as provisional at a glance and never as a confirmed
+  trick card. Resolves in place: the moment the referee's own copy of the trick catches up (see
+  ghostPlay in Table.tsx), this node is gone and the ordinary trick-card renders over the exact
+  same spot, dashes gone, full colour.
+*/
+.trick-card.ghost-pending .card.face, .trick-card.ghost-pending .card.back {
+  opacity: .55;
+  outline: 2px dashed var(--gold);
+  outline-offset: 2px;
+  box-shadow: none;
+  animation: ghost-pending-pulse 1.4s ease-in-out infinite;
+}
+@keyframes ghost-pending-pulse {
+  0%, 100% { outline-color: var(--gold); }
+  50% { outline-color: transparent; }
+}
+@media (prefers-reduced-motion: reduce) { .trick-card.ghost-pending .card.face, .trick-card.ghost-pending .card.back { animation: none; } }
+:root[data-motion="reduced"] .trick-card.ghost-pending .card.face,
+:root[data-motion="reduced"] .trick-card.ghost-pending .card.back { animation: none; }
+/* The card left behind in the hand while its echo sits in the trick — present, not gone, but
+   plainly spoken for. */
+.card-btn.pending-confirm { opacity: .45; }
+
 /* --- a card landing on a pile --- */
 /* Straight down and a little heavy, with the bounce a stiff card actually has. */
 @keyframes card-landed {
@@ -5511,6 +5659,30 @@ button.bluff-go:disabled {
 @keyframes mark-glow {
   0%, 100% { text-shadow: 0 0 26px rgba(255, 197, 49, .7); }
   50%      { text-shadow: 0 0 44px rgba(255, 197, 49, 1), 0 0 12px rgba(255, 255, 255, .8); }
+}
+
+/*
+  Worklist: the one card a brand-new player is ever shown this for — the first legal move this
+  app has ever offered them (see FIRST_CARD_KEY in Table.tsx, gone for good the moment they play
+  any card at all). Same gold, same pulse as mark-glow just above, on a box-shadow instead of a
+  text-shadow since this sits on a card rather than lettering.
+*/
+@keyframes first-card-glow-pulse {
+  0%, 100% { box-shadow: 0 0 0 2px rgba(255, 197, 49, .85), 0 0 22px 4px rgba(255, 197, 49, .55); }
+  50%      { box-shadow: 0 0 0 3px rgba(255, 197, 49, 1), 0 0 38px 10px rgba(255, 197, 49, .85); }
+}
+.card-btn.first-card-glow .card.face, .card-btn.first-card-glow .card.back {
+  border-radius: inherit;
+  animation: first-card-glow-pulse 1.7s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .card-btn.first-card-glow .card.face, .card-btn.first-card-glow .card.back {
+    animation: none; box-shadow: 0 0 0 2px rgba(255, 197, 49, .9), 0 0 20px 4px rgba(255, 197, 49, .6);
+  }
+}
+:root[data-motion="reduced"] .card-btn.first-card-glow .card.face,
+:root[data-motion="reduced"] .card-btn.first-card-glow .card.back {
+  animation: none; box-shadow: 0 0 0 2px rgba(255, 197, 49, .9), 0 0 20px 4px rgba(255, 197, 49, .6);
 }
 .cb-ring {
   position: absolute; left: 50%; top: 50%; width: 46px; height: 46px;
@@ -5724,6 +5896,26 @@ button.bluff-go:disabled {
 @media (prefers-reduced-motion: reduce) { .drag-ghost { transform: none; } }
 :root[data-motion="reduced"] .drag-ghost { transform: none; }
 
+/* A card held still long enough to earn a closer look — see useCardPreview in cardDrag.ts.
+   Grows in place over the card it is a copy of, rather than travelling anywhere, so it never
+   competes with drag-ghost for what the eye is meant to follow. */
+.card-preview {
+  position: fixed;
+  pointer-events: none;
+  z-index: 55;
+  transform-origin: center center;
+  transform: scale(1.65) translateY(-14%);
+  filter: drop-shadow(0 22px 30px rgba(0, 0, 0, .46));
+  animation: card-preview-in 160ms cubic-bezier(.2, .85, .3, 1) both;
+}
+.card-preview > * { width: 100%; height: 100%; margin: 0; cursor: default !important; }
+@keyframes card-preview-in {
+  from { transform: scale(1) translateY(0); opacity: .7; }
+  to { transform: scale(1.65) translateY(-14%); opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) { .card-preview { animation: none; transform: scale(1.3); } }
+:root[data-motion="reduced"] .card-preview { animation: none; transform: scale(1.3); }
+
 
 /* ============================================================================
    THE TABLE MENU
@@ -5879,6 +6071,11 @@ button.bluff-go:disabled {
   stroke: rgba(255, 255, 255, .26); stroke-width: 2.5;
   stroke-linecap: round; stroke-dasharray: 26 3 40 2 18 4;
 }
+/* Growth rings on the walnut cloth — warmer and fainter toward the centre, the way a real cut
+   plank goes lighter near its heart. */
+.dr .dr-line.ring { stroke: rgba(255, 232, 208, .14); }
+.dr .dr-line.ring ellipse:first-child { opacity: .8; }
+.dr .dr-line.ring ellipse:last-child { opacity: .4; }
 
 .dr .dr-rivet { fill: var(--t-ink, #fff); opacity: .22; }
 
@@ -5895,6 +6092,7 @@ button.bluff-go:disabled {
 .dr .dr-name.brass   { fill: #96763c; opacity: .3; }
 .dr .dr-name.lit     { fill: #22d3ee; opacity: .26; }
 .dr .dr-name.chalk   { fill: #f2f4ef; opacity: .22; font-family: var(--display); letter-spacing: 11px; }
+.dr .dr-name.wood    { fill: #f8ede0; opacity: .2; }
 
 /* A swatch is 90px wide. The mark is for a table, not a thumbnail — at that size it is a
    smear, and the swatch is already telling you the colour, which is what it is for. */

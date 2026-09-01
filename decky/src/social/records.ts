@@ -111,6 +111,34 @@ export function mySummary(): PlayerSummary {
   };
 }
 
+// ---------- rank ----------
+//
+// Worklist: "no rank/tier concept in the data model, and inventing one was out of scope." A tier
+// stored as its own field would be exactly that invention — a second place for the same fact to
+// live, one that can drift from the truth the moment somebody edits localStorage by hand or an
+// old build wrote it differently. Games finished is already tracked, already honest (practice
+// games are excluded the same way everywhere else on this page excludes them), and already the
+// basis two of the badges above cut at — this only reads the same number a third time.
+
+export type Tier = 'bronze' | 'silver' | 'gold' | 'platinum';
+
+export interface TierInfo {
+  id: Tier;
+  name: string;
+  /** What it takes to reach the next one, or null at the top. */
+  next: number | null;
+}
+
+/** The two lower cuts match the "Regular" (10) and "Fixture" (50) badges above, so a player who
+ *  has earned one of those already carries the tier that goes with it. Platinum is one more cut
+ *  past the highest badge, for whoever kept going after that. */
+export function tierFor(gamesPlayed: number): TierInfo {
+  if (gamesPlayed >= 150) return { id: 'platinum', name: 'Platinum', next: null };
+  if (gamesPlayed >= 50) return { id: 'gold', name: 'Gold', next: 150 };
+  if (gamesPlayed >= 10) return { id: 'silver', name: 'Silver', next: 50 };
+  return { id: 'bronze', name: 'Bronze', next: 10 };
+}
+
 // ---------- badges ----------
 //
 // Every badge is derived from the results already stored, never tracked separately. That means
