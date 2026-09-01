@@ -124,7 +124,10 @@ export function PlayView({ startDailyTrigger }: { startDailyTrigger?: number } =
     })();
     return () => { cancelled = true; };
     // Deliberately runs once, reading the URL directly — re-running on every settings.playerName
-    // change would try to rejoin the same link's table over and over.
+    // change would try to rejoin the same link's table over and over. settings.playerName is
+    // read from the synchronous initial load (see SettingsContext.tsx), so the value this
+    // closure captures on mount is already the real one, not a placeholder waiting to update.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Refreshed whenever we come back to the shelf, which is the only time it is on screen.

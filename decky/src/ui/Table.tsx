@@ -524,7 +524,7 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
       if (botRetries.current < 8) { botRetries.current += 1; setBotTick((n) => n + 1); }
     }, delay);
     return () => clearTimeout(timer);
-  }, [board, botTick, matchId, me, localSeats, view.phase, view.kentTell, settings.botSpeed, settings.botDiff, isPit, isSet, isReflex, isKent]);
+  }, [board, botTick, matchId, me, localSeats, view.phase, view.kentTell, settings.botSpeed, settings.botDiff, isPit, isSet, isReflex, isKent, clientRef]);
 
   // A fresh position means a fresh allowance of retries.
   useEffect(() => { botRetries.current = 0; }, [board]);
@@ -536,7 +536,7 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
     const waiting = clientRef.current.pending().filter((p) => localSeats.includes(p));
     if (waiting.length === 0 || waiting.includes(me)) return;
     setHandoff(waiting[0]);
-  }, [board, passAndPlay, view.phase, handoff, matchId, me, localSeats]);
+  }, [board, passAndPlay, view.phase, handoff, matchId, me, localSeats, clientRef]);
 
   function takeSeat(seat: string) {
     setHandoff(null);
@@ -666,7 +666,7 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
     setConn(clientRef.current.connectionState());
     const tick = setInterval(() => setConn(clientRef.current.connectionState()), 1000);
     return () => clearInterval(tick);
-  }, [matchId]);
+  }, [matchId, clientRef]);
 
   // ---------- the clock ----------
 
@@ -798,13 +798,13 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
         (c as { lastRefusal?: string | null }).lastRefusal = null;
       }
     });
-  }, [me]);
+  }, [me, clientRef]);
 
   // Closing the tab on an online table should hang up, not leave a socket open.
   useEffect(() => {
     const c = clientRef.current;
     return () => { if (c.remote) c.end(); };
-  }, []);
+  }, [clientRef]);
 
 
   // ---------- playing without a mouse ----------
@@ -938,7 +938,16 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
       });
     }
     prevPhase.current = view.phase;
-  }, [view.phase, settings.cardSounds, settings.soundVolume]);
+    // def, me, localSeats, practice, isKent, teamOf and nameOf are all fixed for the life of a
+    // match — the seats you're in, who you are, whether it's practice, and the game's own shape
+    // don't change hand to hand, so the render that schedules this effect always has the same
+    // values a later one would. view is deliberately not listed either: this is meant to be an
+    // edge-triggered effect (prevPhase.current is the actual trigger, checked above), and view
+    // is a new object on every move — depending on it would fire the sound and leaderboard
+    // write on every move instead of once per hand, relying on the same ref guard to no-op the
+    // ones that aren't the real transition rather than not scheduling them at all.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view.phase, settings]);
 
   function playNextHand() {
     // Guarded because the button can be hit twice before the modal unmounts; the second call
@@ -1131,7 +1140,8 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
       if (p.handCount > 0 || view.mode !== 'shedding') order.push(p.id);
     }
     return order;
-  }, [view.players, view.direction, view.mode, view.phase, isPit, isKent, isSet, isReflex]);
+  }, [view.players, view.direction, view.mode, view.phase, view.needsPassChoice, view.passDirection,
+    isPit, isKent, isSet, isReflex]);
 
   // Worklist #59: naming a card from a MoveRecord logged earlier in the match, once it may no
   // longer be in view.hand at all. The definition's own deck is a pure function of def, so a

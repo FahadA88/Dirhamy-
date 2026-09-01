@@ -79,18 +79,26 @@ export function BrowseView({ onPlay, onSetup, onOnline, onlineHostDown, onRemix 
 
   // A blocked creator's games are gone from every shelf, not greyed out — the point of blocking
   // is not seeing them.
+  //
+  // tick isn't read inside this callback — it exists to force the recompute at all. allGames()
+  // reads localStorage, which is mutable state React doesn't know how to watch; tick is the
+  // signal that something under it changed. Every memo below this one that also lists tick is
+  // redundant rather than wrong: games itself is a fresh array on every tick bump (.filter()
+  // guarantees that), so their own "games changed" dependency already propagates the same
+  // invalidation. This one is the one place the counter is actually load-bearing.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const games = useMemo(() => allGames().filter((g) => !isBlocked(g.author)), [tick]);
   const inKind = useMemo(
     () => (kind ? games.filter((g) => kindOf(g.definition) === kind) : games),
     [games, kind],
   );
-  const shelves = useMemo(() => collections(inKind), [inKind, tick]);
+  const shelves = useMemo(() => collections(inKind), [inKind]);
   const spotlight = useMemo(() => featuredSet(inKind, 5), [inKind]);
-  const results = useMemo(() => searchLibrary(games, filters, sort), [games, filters, sort, tick]);
+  const results = useMemo(() => searchLibrary(games, filters, sort), [games, filters, sort]);
 
   // The sixteen alternate layouts don't share the front page's kind-tab state — each is its
   // own whole home screen — so they read the shelf and the featured set off the full library.
-  const shelvesAll = useMemo(() => collections(games), [games, tick]);
+  const shelvesAll = useMemo(() => collections(games), [games]);
   const spotlightAll = useMemo(() => featuredSet(games, 5), [games]);
 
   const refresh = () => setTick((t) => t + 1);
