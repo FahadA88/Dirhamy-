@@ -170,6 +170,9 @@ export interface Settings {
    *  end you reach across first is on the near side) and swaps which side the draw and discard
    *  piles sit on. Right-handed by default, the same as the layout always was before this. */
   handedness: 'right' | 'left';
+  /** A curved fan (the traditional look) or a straight row — some players find the leaning
+   *  edges harder to read than a plain line of overlapping cards. */
+  handFan: 'fan' | 'straight';
   /** A few seconds to take back a misclick before the table moves on. 0 turns it off. */
   undoGraceMs: number;
   /** Optional clock. 0 is no clock at all, which is the default. */
@@ -234,6 +237,7 @@ export const defaultSettings: Settings = {
   haptics: false,
   oneHandedMode: false,
   handedness: 'right',
+  handFan: 'fan',
   // Long enough to catch a misclick, short enough that nobody waits on it.
   undoGraceMs: 3000,
   turnSeconds: 0,
@@ -449,6 +453,7 @@ const ALLOWED = {
   seasonalFx: ['off', 'snow', 'leaves'],
   homeLayout: Object.keys(HOME_LAYOUTS),
   handedness: ['right', 'left'],
+  handFan: ['fan', 'straight'],
 } as const;
 
 /** How loud, and which categories are on — the shape `playSound` actually needs. */
@@ -584,6 +589,7 @@ export function applySettings(s: Settings): void {
   root.setAttribute('data-colorvision', s.colorVisionSim);
   root.setAttribute('data-onehanded', s.oneHandedMode ? 'on' : 'off');
   root.setAttribute('data-hand', s.handedness);
+  root.setAttribute('data-handfan', s.handFan);
   root.setAttribute('data-contrast', s.highContrast ? 'high' : 'normal');
   root.setAttribute('data-captions', s.showCaptions ? 'on' : 'off');
   root.setAttribute('data-season', s.seasonalFx);

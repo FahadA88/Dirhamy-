@@ -942,6 +942,10 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
    to .dd-center rather than every .center — most families (War, Kent, Layout, Bluff, Swap…) give
    theirs a different meaning entirely, and only the plain draw/discard block is genuinely handed. */
 [data-hand="left"] .dd-center { flex-direction: row-reverse; }
+/* Item 23's "which corner the log lives in": the last-move caption sits in the felt's top-left
+   by default — the same handedness setting moves it to the top-right, matching the rest of the
+   table mirror rather than adding a second, separate corner control nobody would find. */
+[data-hand="left"] .felt-say { left: auto; right: 0; }
 .pile { text-align: center; }
 .center .pile:nth-child(1) .card { animation: floatA 5s ease-in-out infinite; }
 .center .pile:nth-child(2) .card { animation: floatB 6s ease-in-out infinite; }
@@ -2227,6 +2231,10 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
   --fan-step: min(2deg, 24deg / max(var(--n) - 1, 1));
   transform: rotateX(9deg) rotate(calc(var(--fan-off) * var(--fan-step)));
 }
+/* Item 23's "whether your hand fans or lines up": zeroing the fan angle is the whole change —
+   the overlap and the slight 3D tilt stay, so it still reads as a hand held rather than a row of
+   cards laid on the table, just without each one leaning toward the edges. */
+[data-handfan="straight"] .hand .card-btn { --fan-step: 0deg; }
 
 /* Lifting one out of the fan straightens it and brings it forward. */
 .hand .card-btn.playable:hover,
@@ -5138,6 +5146,14 @@ button.primary.lg { padding: 13px 28px; font-size: 16px; border-radius: 999px; }
 
   /* Two opponents face each other across the table rather than hugging the top. */
   .ring-2 .seat.at-l, .ring-2 .seat.at-r { top: 96px; }
+
+  /* Item 23's "where the seats sit": swaps which side of the ring each named position renders
+     on, so the whole opponent ring mirrors along with the hand and the piles. Only the l/r/tl/tr
+     rules have a side to swap — .at-t is already centred and needs nothing. */
+  [data-hand="left"] .seat.at-l  { left: auto;   right: 0; }
+  [data-hand="left"] .seat.at-r  { right: auto;  left: 0; }
+  [data-hand="left"] .seat.at-tl { left: auto;   right: 172px; }
+  [data-hand="left"] .seat.at-tr { right: auto;  left: 172px; }
 
   /* Room for the ring. The top band belongs to the seats along the top, the gutters to the
      ones on either side, so whatever the game puts in the middle never lands on a player.

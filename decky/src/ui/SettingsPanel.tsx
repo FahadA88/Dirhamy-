@@ -590,9 +590,13 @@ function AccessSection({ s, set }: { s: Settings; set: Setter }) {
       <Row label="One-handed mode" hint="On a narrow phone, moves a bid, a bet or an offer below your hand instead of the centre of the felt — closer to where a thumb holding the phone actually reaches." keywords="one hand thumb reach mobile phone bid bet offer">
         <Toggle on={s.oneHandedMode} onChange={(v) => set('oneHandedMode', v)} label="One-handed mode" />
       </Row>
-      <Row label="Table layout" hint="Left mirrors the order of your own hand, and swaps which side the draw and discard piles sit on." keywords="left handed handedness mirror layout draw discard">
+      <Row label="Table layout" hint="Left mirrors the order of your own hand, swaps which side the draw and discard piles sit on, moves the opponent seats to the other side of the ring, and moves the last-move caption to the other corner." keywords="left handed handedness mirror layout draw discard seats corner log where the seats sit">
         <Seg value={s.handedness} onChange={(v) => set('handedness', v as Settings['handedness'])}
           options={[['right', 'Right-handed'], ['left', 'Left-handed']]} />
+      </Row>
+      <Row label="Hand shape" hint="A curved fan (the traditional look) or a straight row, if the leaning edges are harder to read than an overlapping line." keywords="fan straight line hand shape layout">
+        <Seg value={s.handFan} onChange={(v) => set('handFan', v as Settings['handFan'])}
+          options={[['fan', 'Fanned'], ['straight', 'Straight']]} />
       </Row>
       <Row
         label="Carry your block list to another device"
