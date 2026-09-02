@@ -57,7 +57,12 @@ await p.waitForTimeout(200);
 const editor = p.locator('.rb-item.open');
 ok('the new rule opened for editing', (await editor.count()) === 1);
 await editor.locator('.rb-clause select').first().selectOption('turnEnd');
-await editor.locator('.rb-clause select').nth(1).selectOption('handSize');
+// The condition dropdown lives in its own .rb-cond-head, a sibling of .rb-clause, not a second
+// select inside it — it grew that wrapper to hold the "not" toggle and support stacking more
+// than one condition ("+ And only if…"). This script still queried .rb-clause select's second
+// match, which the DOM stopped having; found when a bug-hunt sweep's verify:all run timed out
+// waiting on a select that was never going to appear there.
+await editor.locator('.rb-cond-head select').first().selectOption('handSize');
 await p.waitForTimeout(150);
 await editor.locator('.rb-effect select').first().selectOption('announce');
 await p.waitForTimeout(150);
@@ -67,11 +72,14 @@ const readback = await editor.locator('.rb-readback p').textContent();
 ok('the read-back updated live', /Down to the wire/.test(readback), readback);
 console.log('       ' + readback.trim());
 ok('advanced ingredients are hidden by default',
-  (await editor.locator('.rb-clause select').nth(1).locator('option').count()) < 12);
-await p.locator('.rb-adv input').check();
+  (await editor.locator('.rb-cond-head select').first().locator('option').count()) < 12);
+// Two independent "Show advanced" toggles share this markup on the same step — RuleBuilder's
+// own (Twists) and RestrictionBuilder's (Forbidden plays), rendered directly below it. .first()
+// is the rules one, since that's the DOM order CreateView mounts them in.
+await p.locator('.rb-adv input').first().check();
 await p.waitForTimeout(150);
 ok('...and appear when asked for',
-  (await editor.locator('.rb-clause select').nth(1).locator('option').count()) >= 12);
+  (await editor.locator('.rb-cond-head select').first().locator('option').count()) >= 12);
 
 console.log('\nStep 5 — prove it works before publishing');
 await p.locator('.steprail-item', { hasText: 'Test' }).click();
