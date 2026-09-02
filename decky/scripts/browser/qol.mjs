@@ -21,22 +21,43 @@ console.log('\nKeyboard play');
 // and the cursor then has nowhere to go — which the test was reading as dead keyboard
 // navigation rather than as a hand with one legal move. Deal until there are two.
 let playableCount = 0;
-for (let attempt = 0; attempt < 12; attempt++) {
+// Restarting mid-game (which every attempt but the first is) now costs two iterations of this
+// loop, not one: opening the confirm dialog, then dismissing it on the next pass. 12 was tuned
+// for one iteration per re-deal.
+for (let attempt = 0; attempt < 20; attempt++) {
   await p.waitForSelector('.hand .card-btn', { timeout: 8000 }).catch(() => {});
   playableCount = await p.locator('.hand .card-btn.playable').count();
   if (playableCount >= 2) break;
   // A hand can end while re-dealing; clear whatever is on top before reaching for Restart,
-  // or the click lands on the modal instead.
-  const modal = p.locator('.modal .primary, .modal-box button.primary');
+  // or the click lands on the modal instead. Confirm's own buttons (Cancel/Restart on the "are
+  // you sure" dialog restarting mid-game opens) are .ghost, never .primary — a generic
+  // ".modal .primary" locator walks straight past it, so it sat there covering the menu button
+  // for the rest of the loop, and every later menu-btn click just timed out against it.
+  const modal = p.locator('.modal .primary, .modal-box button.primary, .confirm-box button.danger');
   if (await modal.count()) { await modal.first().click({ timeout: 2000 }).catch(() => {}); await p.waitForTimeout(600); }
-  // Restart is in the table menu now.
-  await p.locator('.menu-btn').first().click({ timeout: 3000 }).catch(() => {});
+  // Restart is in the table menu now. A single 3s attempt right after the PREVIOUS restart's
+  // own re-render (a fresh deal, cards flying into the hand) found the button not yet settled
+  // often enough to read as "Restart isn't there" and give up after only one or two of the
+  // twelve attempts this loop is meant to have. A few short tries, not one longer one — the
+  // button reappears well under a second once the deal animation clears.
+  let menuOpen = false;
+  for (let menuTry = 0; menuTry < 5 && !menuOpen; menuTry++) {
+    menuOpen = await p.locator('.menu-btn').first().click({ timeout: 1200 }).then(() => true).catch(() => false);
+    if (!menuOpen) await p.waitForTimeout(300);
+  }
   const again = p.locator('.menu-pop button', { hasText: /^Restart/ });
   if (!(await again.count())) { await p.keyboard.press('Escape').catch(() => {}); break; }
   await again.first().click({ timeout: 3000 }).catch(() => {});
   await p.waitForTimeout(1000);
 }
 ok(`the hand has more than one legal move (${playableCount})`, playableCount >= 2);
+// The loop above can exit right as a fresh deal (from the last restart it took to get here) is
+// still flying cards into the hand — DealMotion (shuffle + up to 3 rounds per seat + a flight
+// tail, comfortably over a second with several seats) unmounts itself only once done, not a
+// fixed short beat — and focusing a card mid-flight grabs an element that gets repositioned or
+// replaced a moment later, which then reads as focus, the arrow key and Enter all silently
+// doing nothing.
+await p.locator('.dealmotion').waitFor({ state: 'detached', timeout: 4000 }).catch(() => {});
 const firstCard = p.locator('.hand .card-btn.playable').first();
 await firstCard.focus();
 ok('a card takes focus', await firstCard.evaluate(el => el === document.activeElement));
