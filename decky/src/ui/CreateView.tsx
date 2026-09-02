@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Knobs, RANK_CHOICES, RANKS_13, buildDefinition, defaultKnobs, knobsFromDefinition, rankLabel,
 } from '../authoring/knobs';
@@ -1240,6 +1240,7 @@ function ExpertEditor({ def, onApply, isOverride }: { def: GameDefinition; onApp
   const [open, setOpen] = useState(false);
   const [text, setText] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const fileInput = useRef<HTMLInputElement>(null);
 
   function openEditor() { setText(JSON.stringify(def, null, 2)); setError(null); setOpen(true); }
   function apply() {
@@ -1251,11 +1252,36 @@ function ExpertEditor({ def, onApply, isOverride }: { def: GameDefinition; onApp
     } catch (e) { setError('Invalid JSON: ' + (e as Error).message); }
   }
 
+  // It is already pure data — download it as a file to keep, mail, or check into a repository
+  // of its own, and read one straight back in the same shape a paste into the editor already
+  // takes, so importing is never a second, separately-trusted code path.
+  function downloadDefinition() {
+    const blob = new Blob([JSON.stringify(def, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${(def.meta.id || def.meta.name || 'game').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'game'}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+  function importFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    file.text().then((content) => { setText(content); setError(null); setOpen(true); })
+      .catch(() => setError('Could not read that file.'));
+  }
+
   return (
     <div className="expert">
       <div className="expert-head">
         <span className="mini-label">Expert · edit the raw game definition</span>
-        {!open ? <button className="chip" onClick={openEditor}>Open editor</button> : <button className="chip" onClick={() => setOpen(false)}>Close</button>}
+        <div className="expert-actions">
+          <button className="chip" onClick={downloadDefinition}>⭳ Download JSON</button>
+          <input ref={fileInput} type="file" accept="application/json,.json" hidden onChange={importFile} />
+          <button className="chip" onClick={() => fileInput.current?.click()}>⭱ Import JSON</button>
+          {!open ? <button className="chip" onClick={openEditor}>Open editor</button> : <button className="chip" onClick={() => setOpen(false)}>Close</button>}
+        </div>
       </div>
       {isOverride && <div className="expert-note">Running from a hand-edited definition.</div>}
       {open && (

@@ -1209,7 +1209,8 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
 .metric b { font-size: 15px; }
 .report .warn { grid-column: 1 / -1; color: var(--red); }
 
-.expert-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.expert-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.expert-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .json-edit { width: 100%; font-family: var(--mono); font-size: 12px; line-height: 1.5; resize: vertical; margin-top: 10px; }
 .json-error { color: var(--red); font-size: 12px; margin: 8px 0; font-family: var(--mono); }
 
