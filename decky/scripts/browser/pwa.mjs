@@ -23,7 +23,10 @@ await p.evaluate(() => localStorage.setItem('decky.seenintro.v1', '1'));
 await p.reload({ waitUntil: 'networkidle' });
 ok('a manifest is linked', (await p.locator('link[rel="manifest"]').count()) === 1);
 ok('a theme colour is set', (await p.locator('meta[name="theme-color"]').count()) === 1);
-ok('an icon is linked', (await p.locator('link[rel="icon"]').count()) === 1);
+// index.html deliberately carries two: the SVG icon, and an explicit favicon.ico link whose own
+// comment explains why — without it, a browser makes its own automatic, wasted /favicon.ico
+// request. "=== 1" was true before that second, intentional link existed.
+ok('an icon is linked', (await p.locator('link[rel="icon"]').count()) >= 1);
 
 const man = await (await fetch(`${base}/manifest.webmanifest`)).json();
 ok('the manifest names the app', man.name && man.short_name === 'Decky');
