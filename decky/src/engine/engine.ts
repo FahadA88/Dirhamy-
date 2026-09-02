@@ -3493,7 +3493,7 @@ function applyRummyMove(s: MatchState, playerId: string, move: Move): MatchState
     s.rummyMeldSizes[meldIdx] += 1;
     s.stallCount = 0;
     log(s, playerId, `${short(playerId)} lays ${cardLabel(card)} onto a meld.`);
-    if (s.zones[`hand:${playerId}`].length === 0) endRummyRound(s, playerId);
+    if (s.zones[`hand:${playerId}`].length === 0 && !pickUpFoot(s, playerId)) endRummyRound(s, playerId);
     return s;
   }
 
@@ -3506,7 +3506,7 @@ function applyRummyMove(s: MatchState, playerId: string, move: Move): MatchState
     s.stallCount = 0;
     log(s, playerId, `${short(playerId)} melds ${melded.map(cardLabel).join(' ')}.`);
     fireRules(s, 'meldLaid', { playerId, targetCard: melded[0] });
-    if (s.zones[`hand:${playerId}`].length === 0) endRummyRound(s, playerId);
+    if (s.zones[`hand:${playerId}`].length === 0 && !pickUpFoot(s, playerId)) endRummyRound(s, playerId);
     return s;
   }
   // rummyDiscard
@@ -3515,7 +3515,7 @@ function applyRummyMove(s: MatchState, playerId: string, move: Move): MatchState
   hand.splice(idx, 1);
   s.zones[z.discard].push(card);
   log(s, playerId, `${short(playerId)} discards ${cardLabel(card)}.`);
-  if (hand.length === 0) { endRummyRound(s, playerId); return s; }
+  if (hand.length === 0 && !pickUpFoot(s, playerId)) { endRummyRound(s, playerId); return s; }
   s.stallCount += 1;
   s.rummyPhase = 'draw';
   s.turnIndex = ((s.turnIndex + s.direction) % s.players.length + s.players.length) % s.players.length;
@@ -3525,6 +3525,21 @@ function applyRummyMove(s: MatchState, playerId: string, move: Move): MatchState
     endRummyRound(s, null); // nobody melding → end by fewest cards
   }
   return s;
+}
+
+// Hand and Foot: a second stash, dealt alongside the hand and never looked at until the hand
+// itself runs out. The moment it does, its cards become the hand and play continues — going
+// out for real means clearing both. No config flag for this: a zone literally named 'foot'
+// (perPlayer, same shape as 'hand') is the whole signal, so every other rummy game — which never
+// declares one — sees an always-empty lookup here and behaves exactly as it did before this.
+function pickUpFoot(s: MatchState, playerId: string): boolean {
+  const footKey = `foot:${playerId}`;
+  const foot = s.zones[footKey];
+  if (!foot || foot.length === 0) return false;
+  s.zones[`hand:${playerId}`] = foot;
+  s.zones[footKey] = [];
+  log(s, playerId, `${short(playerId)} picks up the foot.`);
+  return true;
 }
 
 // Knocking scores the gap between the two players' unmatched cards. Going gin pays a bonus;
@@ -3586,10 +3601,13 @@ function endRummyRound(s: MatchState, winner: string | null): void {
   */
   const priced = Object.keys(s.definition.scoring.cardPoints ?? {}).length > 0;
   for (const p of s.players) {
-    const hand = s.zones[`hand:${p}`] || [];
+    // A foot nobody reached in time is exactly as much a penalty as the hand it never became —
+    // this is the only place foot-still-full and hand-still-full are ever the same question, so
+    // it's the only place that needs to know the foot exists at all.
+    const cards = [...(s.zones[`hand:${p}`] || []), ...(s.zones[`foot:${p}`] || [])];
     s.scores[p] = priced
-      ? hand.reduce((total, c) => total + cardPoints(s.definition.scoring, c), 0)
-      : hand.length;   // fewer left = better
+      ? cards.reduce((total, c) => total + cardPoints(s.definition.scoring, c), 0)
+      : cards.length;   // fewer left = better
   }
   s.winner = winner;
   log(s, null, `Round over — ${short(winner)} goes out.`);
