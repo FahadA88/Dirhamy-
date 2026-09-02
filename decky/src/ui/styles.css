@@ -8462,4 +8462,12 @@ input[type="checkbox"]:focus-visible { outline: 2px solid var(--brass-hi); outli
   .center { margin: 8px 0; gap: 10px; }
   .you-head { margin-bottom: 4px; }
   .log { max-height: 70px; }
+  /* Landscape patience (item 32): the width-only breakpoints above size a board for how narrow
+     a PORTRAIT phone is, and never noticed that a phone on its side is wide enough for Spider's
+     ten columns to sit side by side — it just never got cards small enough to prove it. Height
+     is the real signal here, not width: a landscape phone is short, so the card shrinks to fit
+     the fan vertically, and that alone leaves the ten columns comfortably under even a small
+     phone's landscape width without ever reaching for the horizontal scroll above. */
+  .felt-content.sol { --cw: 42px; --ch: 60px; --bw: 42px; --bh: 60px; gap: 8px; }
+  .sol-tableau { gap: 4px; min-height: 0; }
 }
