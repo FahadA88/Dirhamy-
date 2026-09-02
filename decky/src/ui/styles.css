@@ -770,6 +770,32 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
 .daily-info p { margin: 2px 0 0; font-size: 13px; }
 .daily .primary.sm { margin-left: auto; flex: 0 0 auto; }
 
+/* ---------------- tournament bracket (item 38) ---------------- */
+.tourney-banner {
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  padding: 14px 18px; margin-bottom: 18px; font-size: 14px;
+}
+.tb-mark { font-size: 22px; line-height: 1; flex: 0 0 auto; }
+.tourney-banner b { color: var(--ink); }
+.tourney-banner p { margin: 2px 0 0; font-size: 13px; }
+.tourney-banner .primary.sm { margin-left: auto; flex: 0 0 auto; }
+
+.bracket { display: flex; gap: 20px; overflow-x: auto; padding-block-end: 8px; }
+.bracket-round { display: flex; flex-direction: column; gap: 12px; min-inline-size: 180px; flex: 0 0 auto; }
+.bracket-round h4 {
+  margin: 0; font-size: 12px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--muted);
+}
+.bracket-table {
+  border: 1px solid var(--panel-brd); border-radius: var(--r-md); background: var(--panel);
+  padding: 8px 10px;
+}
+.bracket-table.mine { border-color: var(--gold, #d6af5c); }
+.bracket-table ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.bracket-table li { font-size: 13px; padding: 2px 0; color: var(--muted); }
+.bracket-table li.won { color: var(--ink); font-weight: 600; }
+.bracket-table li.lost { text-decoration: line-through; opacity: 0.6; }
+.bracket-tbd { font-size: 13px; margin: 0; color: var(--muted); }
+
 .help-box { max-width: 520px; text-align: left; }
 /* Rules beside the table, not instead of it (item 34): a right-docked panel rather than a
    centered box, so the table stays visible — dimmed, not replaced — while it's open. The scrim

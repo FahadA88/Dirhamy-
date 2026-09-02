@@ -196,7 +196,7 @@ const STANDARD_PILES = new Set([
   'draw', 'discard', 'melds', 'ocean', 'center', 'pile', 'battle', 'kitty', 'stock', 'trick',
 ]);
 
-export function Table({ def, seats = 3, plan, practice = false, client: injected, mySeat, resumeMatchId }: {
+export function Table({ def, seats = 3, plan, practice = false, client: injected, mySeat, resumeMatchId, onMatchOver }: {
   def: GameDefinition;
   seats?: number;
   /** Who is sitting where. Omitted means the classic single human against bots. */
@@ -219,6 +219,12 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
    * hint is always on offer — so somebody can learn a game without it counting against them.
    */
   practice?: boolean;
+  /**
+   * Item 38: a tournament bracket table needs to know the match is fully decided — not just
+   * one hand of it — so it can record who won and advance the bracket. Fired once, the moment
+   * `matchOver` turns true; `null` only if the match somehow ended with nobody the winner.
+   */
+  onMatchOver?: (winnerId: string | null) => void;
 }) {
   const { settings } = useSettings();
   const players = useMemo(
@@ -955,6 +961,18 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
     // ones that aren't the real transition rather than not scheduling them at all.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view.phase, settings]);
+
+  // Item 38: a tournament table cares about the MATCH being over, not just a hand of it — a
+  // points-target game runs several hands, each one flipping phase to 'roundOver' and back,
+  // before matchOver ever turns true. Same edge-triggered shape as the effect above, watching a
+  // different flag, so a callback prop that never fires more than once for a match already in
+  // progress before this component mounted.
+  const prevMatchOver = useRef(view.matchOver);
+  useEffect(() => {
+    if (!prevMatchOver.current && view.matchOver) onMatchOver?.(view.matchWinner ?? view.winner);
+    prevMatchOver.current = view.matchOver;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view.matchOver]);
 
   function playNextHand() {
     // Guarded because the button can be hit twice before the modal unmounts; the second call

@@ -16,6 +16,8 @@ import { recordPlay } from '../library/library';
 import { dailyGame, dailyStreak, resultFor, todayKey } from '../social/daily';
 import { WebSocketApi, joinRemoteTable } from '../net/wsClient';
 import { HouseRules, applyHouseRules, decodeHouseRules } from '../library/houseRules';
+import { Tournament, TournamentTable, recordYourTable } from '../social/tournament';
+import { TournamentView } from './TournamentView';
 
 // Worklist #98, continued: the websocket client, the remote-table protocol and the online
 // lobby only matter to the fraction of sessions that ever click "Play with people" — most
@@ -77,6 +79,11 @@ export function PlayView({ startDailyTrigger }: { startDailyTrigger?: number } =
   const [dailyMode, setDailyMode] = useState(false);
   // Item 41: a solitaire deal known ahead of time to have a short solve — see puzzles.ts.
   const [puzzleMode, setPuzzleMode] = useState(false);
+  // Item 38: which game's bracket is open (the bracket view, not a live table).
+  const [tournamentFor, setTournamentFor] = useState<GameDefinition | null>(null);
+  // Set only while playing a specific tournament table — which bracket and which table to
+  // record the result into once the match ends. Null for every ordinary game.
+  const [tournamentTable, setTournamentTable] = useState<{ t: Tournament; table: TournamentTable } | null>(null);
   // Item 60 of the audit pass: the invite-link "Copy link" button built a ?table=CODE URL that,
   // until now, did nothing special when opened — it just landed on the ordinary shelf. This is
   // what makes that link actually join the table it points at.
@@ -210,15 +217,39 @@ export function PlayView({ startDailyTrigger }: { startDailyTrigger?: number } =
     );
   }
 
+  if (tournamentFor) {
+    return (
+      <TournamentView
+        def={tournamentFor}
+        you={settings.playerName}
+        onClose={() => setTournamentFor(null)}
+        onPlayTable={(seatPlan, t, table) => {
+          setTournamentTable({ t, table });
+          setPlan(seatPlan); setPractice(false); setResumeId(null); setSeats(seatPlan.length);
+          setGame(tournamentFor); setTournamentFor(null);
+        }}
+      />
+    );
+  }
+
   if (game) {
     return (
       <div>
         <div className="crumbs">
           <button className="ghost" onClick={() => {
             session?.client.end();
+            // A tournament table's "back" returns to its bracket, not all the way out — the
+            // match itself is still recorded (see Table's onMatchOver below) whether or not you
+            // stick around for the final-score modal before leaving.
+            if (tournamentTable) {
+              const def = game;
+              setGame(null); setPlan(null); setPractice(false); setTournamentTable(null);
+              setTournamentFor(def);
+              return;
+            }
             setSession(null); setGame(null); setPlan(null); setPractice(false); setResumeId(null); setDailyMode(false); setPuzzleMode(false);
-          }}>← All games</button>
-          <span className="crumb-title">{dailyMode ? "Today's Deal" : puzzleMode ? `${game.meta.name} · Puzzle` : game.meta.name}</span>
+          }}>← {tournamentTable ? 'Bracket' : 'All games'}</button>
+          <span className="crumb-title">{dailyMode ? "Today's Deal" : puzzleMode ? `${game.meta.name} · Puzzle` : tournamentTable ? `${game.meta.name} · Tournament` : game.meta.name}</span>
           {practice && <span className="practice-badge" title="Nothing here is recorded">Practice</span>}
           {session && (
             <span className="table-code" title="Anyone with this code can join">
@@ -258,6 +289,12 @@ export function PlayView({ startDailyTrigger }: { startDailyTrigger?: number } =
                 client={session?.client}
                 mySeat={session?.seat}
                 resumeMatchId={resumeId ?? undefined}
+                onMatchOver={tournamentTable ? (winnerId) => {
+                  const winnerName = (plan ?? []).find((s) => s.id === winnerId)?.name;
+                  if (!winnerName) return;
+                  const updated = recordYourTable(game, tournamentTable.t, tournamentTable.table, winnerName);
+                  setTournamentTable({ t: updated, table: tournamentTable.table });
+                } : undefined}
               />}
         </ErrorBoundary>
         {helpFor && <GameHelp def={helpFor} onClose={() => setHelpFor(null)} />}
@@ -372,6 +409,7 @@ export function PlayView({ startDailyTrigger }: { startDailyTrigger?: number } =
           setPlan(null); setPractice(false); setResumeId(null); setDailyMode(false);
           setPuzzleMode(true); setGame(def);
         }}
+        onTournament={(def) => { recordPlay(def.meta.id); setTournamentFor(def); }}
         onOnline={hostUp ? (def) => { recordPlay(def.meta.id); setOnlineFor(def); } : undefined}
         onlineHostDown={hostChecked && !hostUp}
       />

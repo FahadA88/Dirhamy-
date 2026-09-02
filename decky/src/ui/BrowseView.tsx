@@ -20,6 +20,7 @@ import { PullToRefresh } from './PullToRefresh';
 import { HOME_LAYOUTS_BY_ID } from './homeLayouts';
 import { onRouteChange, pushRoute, readRoute } from './route';
 import { canFindPuzzle } from '../library/puzzles';
+import { canRunTournament } from '../social/tournament';
 
 
 // The shelf.
@@ -42,11 +43,14 @@ const SORTS: { key: SortKey; label: string }[] = [
   { key: 'name', label: 'A–Z' },
 ];
 
-export function BrowseView({ onPlay, onSetup, onPuzzle, onOnline, onlineHostDown, onRemix }: {
+export function BrowseView({ onPlay, onSetup, onPuzzle, onTournament, onOnline, onlineHostDown, onRemix }: {
   onPlay: (def: GameDefinition) => void;
   onSetup: (def: GameDefinition) => void;
   /** Item 41: a solitaire deal known ahead of time to have a short solve. */
   onPuzzle: (def: GameDefinition) => void;
+  /** Item 38: a single-elimination bracket at this game's own seat count. Only offered where a
+   *  bracket table means something fixed — see canRunTournament in social/tournament.ts. */
+  onTournament: (def: GameDefinition) => void;
   /** Play this one with other people. Absent when no host is running. */
   onOnline?: (def: GameDefinition) => void;
   /** True once we've checked and no host answered — distinct from onOnline simply being
@@ -128,6 +132,7 @@ export function BrowseView({ onPlay, onSetup, onPuzzle, onOnline, onlineHostDown
           onPlay={() => { onPlay(game.definition); }}
           onSetup={() => { onSetup(game.definition); }}
           onPuzzle={() => { onPuzzle(game.definition); }}
+          onTournament={() => { onTournament(game.definition); }}
           onOnline={onOnline ? () => { onOnline(game.definition); } : undefined}
           onlineHostDown={onlineHostDown}
           onChanged={refresh}
@@ -445,13 +450,14 @@ function Shelf({ collection, onOpen, onPlay, onChanged }: {
 
 // ---------- detail ----------
 
-function GameDetail({ game, me, onBack, onPlay, onSetup, onPuzzle, onOnline, onlineHostDown, onChanged, onProfile, onRemix }: {
+function GameDetail({ game, me, onBack, onPlay, onSetup, onPuzzle, onTournament, onOnline, onlineHostDown, onChanged, onProfile, onRemix }: {
   game: PublishedGame;
   me: string;
   onBack: () => void;
   onPlay: () => void;
   onSetup: () => void;
   onPuzzle: () => void;
+  onTournament: () => void;
   onOnline?: () => void;
   onlineHostDown?: boolean;
   onChanged: () => void;
@@ -537,6 +543,11 @@ function GameDetail({ game, me, onBack, onPlay, onSetup, onPuzzle, onOnline, onl
             {game.definition.solitaire && canFindPuzzle(game.definition) && (
               <button className="ghost" onClick={onPuzzle} title="A deal known ahead of time to have a short solution">
                 🧩 Solve a puzzle
+              </button>
+            )}
+            {canRunTournament(game.definition) && (
+              <button className="ghost" onClick={onTournament} title={`A single-elimination bracket of ${game.definition.meta.players.min}-handed ${game.definition.meta.name}`}>
+                🏆 Tournament
               </button>
             )}
             {!game.definition.solitaire && onOnline && (
