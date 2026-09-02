@@ -12,11 +12,71 @@ p.on('pageerror', (e) => errs.push(e.message));
 let failed = false;
 const ok = (l, c, x) => { console.log(`  ${c ? 'PASS' : 'FAIL'}  ${l}${c ? '' : '  ' + (x ?? '')}`); if (!c) failed = true; };
 
+// Two local seats hand off on every turn that isn't a bot's, and with bots at instant speed a
+// new one can land in any gap between clicks — a real race, not a fixed number of stale overlays
+// to clear once (a fixed count of 4, then 20, both still found a run that needed one more).
+// Dismisses whatever's covering the screen and retries the click itself, rather than only
+// clearing before it and hoping the screen holds still for the click to land.
+//
+// The overlay locator deliberately does NOT include a generic ".modal .primary" — a target that
+// is itself a modal's own primary button (the movelist's "OK", say) matches that just as well as
+// a foreign one covering it, and the loop then spends its whole budget "dismissing" its own
+// target instead of ever attempting the real click. Handoff and the suit-picker are the only two
+// screens that genuinely interrupt something else.
+const FOREIGN_OVERLAY = '.handoff button.primary, .suit-btn';
+async function clickThrough(page, locator, timeoutMs = 12000) {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    const overlay = page.locator(FOREIGN_OVERLAY);
+    if (await overlay.count()) {
+      await overlay.first().click({ timeout: 1000 }).catch(() => {});
+      await page.waitForTimeout(150);
+      if (Date.now() > deadline) { await locator.click({ timeout: 1000 }); return; }
+      continue;
+    }
+    const clicked = await locator.click({ timeout: 1000 }).then(() => true).catch(() => false);
+    if (clicked) return;
+    if (Date.now() > deadline) { await locator.click({ timeout: 1000 }); return; }
+  }
+}
+
+// Opening the table menu and then picking an item from it is two clicks, and a hand-off landing
+// between them closes the dropdown along with everything else on screen — clickThrough alone
+// would keep retrying a click on a menu item that isn't there to click any more. This reopens
+// the menu itself as one of the things it retries.
+async function menuAction(page, itemText, timeoutMs = 15000) {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    const overlay = page.locator(FOREIGN_OVERLAY);
+    if (await overlay.count()) {
+      await overlay.first().click({ timeout: 1000 }).catch(() => {});
+      await page.waitForTimeout(150);
+      if (Date.now() > deadline) break;
+      continue;
+    }
+    if (!(await page.locator('.menu-pop').count())) {
+      await page.locator('.menu-btn').click({ timeout: 1000 }).catch(() => {});
+      await page.waitForTimeout(120);
+      if (Date.now() > deadline) break;
+      continue;
+    }
+    const clicked = await page.locator('.menu-pop button', { hasText: itemText })
+      .click({ timeout: 1000 }).then(() => true).catch(() => false);
+    if (clicked) return;
+    if (Date.now() > deadline) break;
+  }
+  await page.locator('.menu-pop button', { hasText: itemText }).click({ timeout: 1000 });
+}
+
 await p.goto(base, { waitUntil: 'networkidle' });
 await p.evaluate(() => {
   localStorage.clear();
     localStorage.setItem('decky.seenintro.v1', '1');
-  localStorage.setItem('decky.settings.v1', JSON.stringify({ botSpeed: 'instant' }));
+  // Not 'instant' (40ms) here specifically: two LOCAL seats means a hand-off can land between
+  // any two clicks this script makes, and 40ms between bot moves left near-zero room for a
+  // click to land in a state that was still true by the time it arrived. 'fast' costs this one
+  // test a few extra seconds and buys the UI enough of a gap to actually be stable when asked.
+  localStorage.setItem('decky.settings.v1', JSON.stringify({ botSpeed: 'fast' }));
 });
 await p.goto(base, { waitUntil: 'networkidle' });
 
@@ -63,27 +123,18 @@ ok(`${plays} moves were played`, plays > 4);
 await p.screenshot({ path: '/tmp/mp-table.png' });
 
 console.log('\nThe move history');
-// Clear whatever the loop left on screen — a hand-off, a suit picker, or a hand-over modal.
-for (let i = 0; i < 4; i++) {
-  const overlay = p.locator('.modal .primary, .suit-btn');
-  if (!(await overlay.count())) break;
-  await overlay.first().click({ timeout: 2000 }).catch(() => {});
-  await p.waitForTimeout(250);
-}
 // History, take back and restart live behind the table menu now.
-await p.locator('.menu-btn').click();
-await p.locator('.menu-pop button', { hasText: 'History' }).click();
+await menuAction(p, 'History');
 await p.waitForSelector('.movelist');
 const rows = await p.locator('.movelist li').count();
 ok(`${rows} moves listed`, rows > 3);
 const first = (await p.locator('.movelist li').first().textContent()).replace(/\s+/g, ' ').trim();
 ok('each row names the seat and what happened', first.length > 6, first);
 console.log('       ' + first);
-await p.locator('.modal-box button.primary').click();
+await clickThrough(p, p.locator('.modal-box button.primary'));
 
 console.log('\nAsking the table for a takeback');
-await p.locator('.menu-btn').click();
-await p.locator('.menu-pop button', { hasText: 'Take back' }).click();
+await menuAction(p, 'Take back');
 await p.waitForTimeout(300);
 const bar = await p.locator('.takeback-bar').count();
 const toast = await p.locator('.refused').textContent().catch(() => '');
