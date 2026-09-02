@@ -368,6 +368,13 @@ export interface RummyConfig {
    */
   wilds?: boolean;
   maxWildsPerMeld?: number; // default 1, capped at 2
+  /**
+   * The wild rank climbs one step up deck.rankOrder every hand, starting from whichever rank
+   * deck.tags.wild names first (Three Thirteen: hand one's wild is a three, hand two's a four,
+   * and so on). Requires `wilds` and a single-rank `deck.tags.wild`; a game whose wild is more
+   * than one rank, or never changes, leaves this off.
+   */
+  wildRotatesByHand?: boolean;
 }
 
 export interface ClimbConfig {
@@ -698,7 +705,15 @@ export type SetupStep =
   // countPerPlayer is the fallback; countByPlayers overrides it for a specific seat count, for
   // the handful of games (Crazy Eights, Go Fish, Rummy…) whose real deal size actually depends
   // on how many are at the table rather than being one fixed number.
-  | { op: 'deal'; from: string; to: string; countPerPlayer: number; countByPlayers?: Record<number, number> }
+  | {
+      op: 'deal'; from: string; to: string; countPerPlayer: number; countByPlayers?: Record<number, number>;
+      /**
+       * The deal grows by this many cards every hand of the match (Three Thirteen: one more
+       * each time). Applied on top of countPerPlayer/countByPlayers, using how many hands of
+       * THIS match have already been played — so hand one deals the base count, unchanged.
+       */
+      growPerHand?: number;
+    }
   | { op: 'dealAll'; from: string; to: string } // distribute every card round-robin
   | { op: 'move'; from: string; to: string; count: number };
 
@@ -895,6 +910,13 @@ export interface ScoringDef {
   // whoever crossed it (e.g. Spades' "-200 and you're out"), regardless of the target above.
   // Only meaningful alongside a negative-scoring match (bidding games where a hand can lose points).
   bust?: number | null;
+  /**
+   * The match is exactly this many hands, win or lose on points alone — Three Thirteen plays
+   * one hand per rank from three to king and stops there, whether or not anyone has crossed
+   * `target`. Poker has always had its own version of this (`PokerConfig.hands`); this is the
+   * same idea for every other family.
+   */
+  handsCap?: number;
 }
 
 // ---------- Runtime state ----------

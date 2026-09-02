@@ -280,7 +280,8 @@ export function createMatch(
       state.zones[key] = result;
       state.rngState = rngState;
     } else if (step.op === 'deal') {
-      const count = step.countByPlayers?.[players.length] ?? step.countPerPlayer;
+      const base = step.countByPlayers?.[players.length] ?? step.countPerPlayer;
+      const count = base + (step.growPerHand ?? 0) * (state.handNumber - 1);
       for (let i = 0; i < count; i++) {
         for (const p of players) {
           const card = state.zones[step.from].pop();
@@ -1612,8 +1613,10 @@ function finalizeMatchProgress(s: MatchState): void {
   }
 
   const target = scoring.target;
-  if (target == null) { s.matchOver = true; s.matchWinner = s.winner; return; }
-  const crossed = s.players.some((p) => s.matchScores[p] >= target);
+  const handsCap = scoring.handsCap;
+  if (target == null && handsCap == null) { s.matchOver = true; s.matchWinner = s.winner; return; }
+  const crossed = (target != null && s.players.some((p) => s.matchScores[p] >= target))
+    || (handsCap != null && s.handNumber >= handsCap);
   if (!crossed) { s.matchOver = false; s.matchWinner = null; return; }
   s.matchOver = true;
   const highest = scoring.winner === 'highestTotal';
@@ -3070,6 +3073,13 @@ function wildRule(state: MatchState): { on: boolean; max: number } {
 }
 
 function isWildCard(state: MatchState, card: Card): boolean {
+  const cfg = state.definition.rummy;
+  if (cfg?.wildRotatesByHand) {
+    const rankOrder = state.definition.deck.rankOrder;
+    const baseRank = state.definition.deck.tags.wild?.ranks[0];
+    const baseIdx = baseRank ? rankOrder.indexOf(baseRank) : -1;
+    if (baseIdx >= 0) return card.rank === rankOrder[baseIdx + (state.handNumber - 1)];
+  }
   return cardTags(state.definition, card).includes('wild');
 }
 
