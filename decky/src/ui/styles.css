@@ -1324,7 +1324,7 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
 /* war */
 .war-center { flex-wrap: wrap; }
 .war-controls { display: flex; align-items: center; gap: 20px; padding: 10px 0; }
-.war-pile { font-family: var(--mono); color: var(--muted); }
+.war-pile, .war-count { font-family: var(--mono); color: var(--muted); }
 /* The battle cards already fly to the middle; the pile count is what they become once they
    land, so a beat of pop keeps that landing from reading as a silent teleport. Keyed on the
    count itself, so it replays every change without a manual timer to reset it. */

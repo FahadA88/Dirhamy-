@@ -2459,7 +2459,7 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
         ) : isWar ? (
           <div className="war-controls">
             <span className="war-pile">Your pile · <b key={myPile} className="war-pile-n">{myPile}</b> cards</span>
-            {(view.warsCount ?? 0) > 0 && <span className="war-pile">{view.warsCount} war{view.warsCount === 1 ? '' : 's'} fought</span>}
+            {(view.warsCount ?? 0) > 0 && <span className="war-count">{view.warsCount} war{view.warsCount === 1 ? '' : 's'} fought</span>}
             {canFlip && <button className="primary" onClick={() => submit({ actionId: 'warFlip' })}>⚔ Flip</button>}
           </div>
         ) : (
