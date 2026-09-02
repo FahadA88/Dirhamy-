@@ -135,6 +135,30 @@ export function chooseSolitaireMove(
   });
   // If churn was the only thing on offer, the game is over in every sense that matters.
   if (moves.length === 0) return null;
+
+  /*
+    Item 14, Scorpion: dealing a new row needs every column full — see solDeal's own legality
+    check — and the only way a column empties is by playing its last card away. Once that
+    happens there is no way back: nothing can refill a column except the deal that emptying it
+    just switched off, for good, with however many cards were still sitting in the stock. A
+    greedy player chasing "empty a column" as pure progress (which it genuinely is in FreeCell
+    or Forty Thieves) walks straight into that trap here — measured on Scorpion, deals were
+    ending 0/120 with cards still sitting in an undealt stock, sometimes in under thirty moves.
+    So the deal is taken the moment it's on offer, ahead of anything else that might cost it.
+
+    Gated to moveRun 'any' — Scorpion's own defining move (pick up any face-up card and
+    everything sitting on it, however jumbled, and drop it wherever the bottom card fits) —
+    rather than every deal-row game. That move is what makes dealing onto a half-built column
+    safe: whatever lands can always be untangled later. Spider requires an already-clean
+    same-suit run to lift more than one card, so a card dealt onto an unfinished pile can jam it
+    for good — applying this same fix to every deal-row game, not just moveRun:'any' ones, took
+    Spider (One Suit) from 38/120 solved to 0/120.
+  */
+  if (cfg.stock === 'deal-row' && cfg.moveRun === 'any') {
+    const deal = moves.find((m) => m.actionId === 'solDeal');
+    if (deal && !seen.has(positionKey(apply(s, deal)))) return deal;
+  }
+
   for (const tier of ['progress', 'stock', 'lateral'] as Tier[]) {
     const pool = moves.filter((m) => tierOf(s, m) === tier).sort((a, b) => rank(s, b) - rank(s, a));
     if (pool.length === 0) continue;

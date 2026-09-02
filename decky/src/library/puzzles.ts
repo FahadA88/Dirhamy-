@@ -14,17 +14,19 @@ import { chooseSolitaireMove, positionKey } from '../bots/solitaireBot';
 // foundations, a hundred-plus moves even on an easy deal) — so this samples a batch of deals and
 // keeps whichever greedy win took the fewest moves, rather than filtering by a fixed ceiling.
 //
-// Not offered for every patience game. FreeCell, Spider, Spider (Two Suits), Scorpion and Forty
-// Thieves are all real, winnable games — but winning them takes real look-ahead, and this player
-// has none. Measured directly (a batch of deals, same player, same harness as selftest.ts's own
+// Not offered for every patience game. FreeCell, Spider, Spider (Two Suits) and Forty Thieves
+// are all real, winnable games — but winning them takes real look-ahead, and this player has
+// none. Measured directly (a batch of deals, same player, same harness as selftest.ts's own
 // solve-rate report): it wins zero of them. Searching anyway would mean a long wait on click,
 // followed by quietly serving an ordinary deal wearing a "puzzle" badge it did not earn — so
 // those games skip the search and this list is how the UI knows to leave the entry point off.
+// Scorpion isn't on this list: item 14's fix to solitaireBot.ts's handling of its one-shot deal
+// took its solve rate from 3/120 to 36/120 — a real rate, not a guaranteed one, but enough that
+// the batch-and-keep-the-best search below reliably turns one up.
 const NO_QUICK_SOLVE = new Set([
   'classic-freecell',
   'classic-spider',
   'classic-spider-2',
-  'classic-scorpion',
   'classic-forty-thieves',
 ]);
 
