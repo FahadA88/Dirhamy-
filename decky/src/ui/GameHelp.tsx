@@ -100,7 +100,7 @@ export function GameHelp({ def, onClose }: { def: GameDefinition; onClose: () =>
     // Click-outside-to-close is supplementary — the ref below wires Escape, and there's a real
     // Close button inside. The backdrop is the dimmed rest of the page, not a control.
     // eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events
-    <div className="modal" onClick={onClose}>
+    <div className="modal help-scrim" onClick={onClose}>
       {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/click-events-have-key-events */}
       <div className="modal-box help-box" ref={ref} role="dialog" aria-modal="true"
         aria-label={`How to play ${def.meta.name}`}

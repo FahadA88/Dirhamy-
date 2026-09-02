@@ -771,6 +771,18 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
 .daily .primary.sm { margin-left: auto; flex: 0 0 auto; }
 
 .help-box { max-width: 520px; text-align: left; }
+/* Rules beside the table, not instead of it (item 34): a right-docked panel rather than a
+   centered box, so the table stays visible — dimmed, not replaced — while it's open. The scrim
+   still blocks play underneath; that's an explicit trade-off, not an oversight — letting moves
+   go through behind an open reference panel is a bigger, riskier change than this one. */
+.help-scrim { display: flex; align-items: stretch; justify-content: flex-end; }
+.help-scrim .help-box {
+  height: 100%; max-height: 100%; width: min(420px, 92vw); max-width: min(420px, 92vw);
+  margin: 0; border-radius: 18px 0 0 18px; animation: help-slide-in 220ms cubic-bezier(.2, .9, .3, 1) both;
+}
+@keyframes help-slide-in { from { transform: translateX(24px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .help-scrim .help-box { animation: none; } }
+:root[data-motion="reduced"] .help-scrim .help-box { animation: none; }
 .help-desc { color: var(--muted); font-size: 14px; line-height: 1.6; margin: 0 0 18px; }
 .help-head {
   font-family: var(--mono); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase;
