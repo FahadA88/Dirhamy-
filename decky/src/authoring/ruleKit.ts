@@ -115,6 +115,7 @@ export const HOOKS: { value: RuleHook; label: string; hint: string }[] = [
   { value: 'matchEnd', label: 'The match is decided', hint: 'Once, at the very end of everything.' },
   { value: 'meldLaid', label: 'A meld goes down', hint: 'Rummy games only.' },
   { value: 'bidMade', label: 'A player bids', hint: 'Any game with an auction.' },
+  { value: 'roundStuck', label: 'A player has no legal move', hint: 'Fires on whoever is stuck, right before the hand ends for it.' },
 ];
 
 // ---------- conditions ----------

@@ -1229,6 +1229,9 @@ function advanceAndCheck(s: MatchState): void {
   }
   // If the new current player has no legal move at all, end by lowest hand.
   if (legalMoves(s, s.players[s.turnIndex]).length === 0) {
+    // Give a custom rule a chance to penalize the stuck player before the hand's scores
+    // (state.bonus, folded in by finalizeMatchProgress) are locked in.
+    fireRules(s, 'roundStuck', { playerId: s.players[s.turnIndex] });
     endRound(s, 'stuck');
   }
 }

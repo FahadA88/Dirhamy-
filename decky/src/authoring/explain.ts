@@ -23,6 +23,7 @@ const HOOK_WORDS: Record<RuleHook, string> = {
   meldLaid: 'When a meld goes down',
   bidMade: 'When a player bids',
   playerOut: 'When a player goes out',
+  roundStuck: 'When the player to act has no legal move',
 };
 
 const WHO: Record<string, string> = {

@@ -51,6 +51,7 @@ import { canfield } from './canfield';
 import { pinochle } from './pinochle';
 import { skat } from './skat';
 import { hokm } from './hokm';
+import { ninetyNine } from './ninetyNine';
 
 // The classics library. Each entry is a hand-authored game, expressed purely as data.
 export const catalog: GameDefinition[] = [
@@ -77,4 +78,7 @@ export const catalog: GameDefinition[] = [
   // a failed contract scored by the tricks the defence actually holds rather than by how far
   // short it fell, and two jokers that are the same rank and suit but not interchangeable.
   hokm,
+  // Ninety-Nine needed nothing new but a hook: a shared running total, gated by ordinary rule
+  // arithmetic already on offer, and a moment to penalize whoever the total leaves with no move.
+  ninetyNine,
 ];

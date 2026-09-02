@@ -66,6 +66,12 @@ const FAMILY_HOW: Record<string, string[]> = {
     'All red, or one of each colour — never two of one and one of another.',
     'Call it first and it is yours; call wrongly and it costs you.',
   ],
+  'running-total': [
+    'Play any card — its rank joins a running total the whole table shares.',
+    'Draw straight back up to your hand size.',
+    'You may never play a card that would push the total past the limit.',
+    'No card fits and it’s your turn — you’re stuck. Take a penalty and the hand ends.',
+  ],
   solitaire: [
     'Build the columns downward and the foundations upward.',
     'Tap a card to pick it up, then tap where it should go.',

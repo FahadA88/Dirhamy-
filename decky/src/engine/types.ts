@@ -877,7 +877,8 @@ export type RuleHook =
   | 'matchEnd'       // the whole match is decided
   | 'meldLaid'       // rummy: a set or run went down on the table
   | 'bidMade'        // any auction: a player has named their bid
-  | 'playerOut';     // a player emptied their hand
+  | 'playerOut'      // a player emptied their hand
+  | 'roundStuck';    // the player to act has no legal move; the round is about to end for it
 
 export interface EndConditionDef {
   id: string;

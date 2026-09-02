@@ -21,7 +21,7 @@ export interface ValidationResult {
 
 const HOOKS_ALL: RuleHook[] = [
   'handStart', 'turnStart', 'turnEnd', 'cardPlayed', 'cardDrawn', 'trickWon', 'drawPileEmpty',
-  'trickLed', 'handEnd', 'matchEnd', 'meldLaid', 'bidMade', 'playerOut',
+  'trickLed', 'handEnd', 'matchEnd', 'meldLaid', 'bidMade', 'playerOut', 'roundStuck',
 ];
 
 /**
