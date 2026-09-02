@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   CONDITIONS, CondNode, EFFECTS, HOOKS, ParamSpec, ParamValue, RestrictionDraft, RuleDraft,
   compileRestriction, compileRule, condNodesOf, defaultsFor, findCondition, findEffect,
@@ -6,6 +6,8 @@ import {
 } from '../authoring/ruleKit';
 import { explainPredicate, explainRule } from '../authoring/explain';
 import { Confirm } from './Confirm';
+import { GameDefinition } from '../engine/types';
+import { previewRule } from '../engine/engine';
 
 // The near-programmable layer, as a screen.
 //
@@ -16,7 +18,8 @@ import { Confirm } from './Confirm';
 // Progressive disclosure is literal here: ingredients marked `advanced` are hidden behind a
 // toggle, so the first list an author sees is eight plain choices rather than twenty.
 
-export function RuleBuilder({ rules, onChange }: {
+export function RuleBuilder({ def, rules, onChange }: {
+  def: GameDefinition;
   rules: RuleDraft[];
   onChange: (next: RuleDraft[]) => void;
 }) {
@@ -276,6 +279,8 @@ export function RuleBuilder({ rules, onChange }: {
                     <span className="rb-readback-label">In plain English</span>
                     <p>{explainRule(compileRule(rule))}</p>
                   </div>
+
+                  <RulePreviewPanel def={def} rule={compileRule(rule)} />
                 </div>
               )}
             </li>
@@ -284,6 +289,55 @@ export function RuleBuilder({ rules, onChange }: {
       </ol>
 
       {rules.length > 0 && <button className="ghost sm" onClick={add}>+ Add another rule</button>}
+    </div>
+  );
+}
+
+/**
+ * Watch a rule fire before you save it (item 43). Not a simulation of the rule's own hook
+ * actually occurring — that would mean a bespoke search per hook, thirteen of them — but a real
+ * dealt position, the rule's condition actually checked against it, and its effects actually run
+ * on a throwaway copy of that state if the condition holds. "Deal another hand" tries a
+ * different position rather than pretending the same one is the only one that matters.
+ */
+function RulePreviewPanel({ def, rule }: { def: GameDefinition; rule: ReturnType<typeof compileRule> }) {
+  const [seed, setSeed] = useState(20250817);
+  const preview = useMemo(() => previewRule(def, rule, seed), [def, rule, seed]);
+
+  return (
+    <div className="rb-preview">
+      <div className="rb-preview-head">
+        <span className="rb-readback-label">Watch it fire</span>
+        <button className="chip subtle sm" onClick={() => setSeed((s) => s + 1)}>🎲 Deal another hand</button>
+      </div>
+      {!preview.ok ? (
+        <p className="rb-preview-note">Can't preview this yet — {preview.error ?? 'the game has something to fix first.'}</p>
+      ) : (
+        <div className="rb-preview-body">
+          <p className="rb-preview-note">
+            {preview.playerId ?? 'Someone'}{preview.targetCard ? `, looking at ${preview.targetCard}` : ''} —{' '}
+            {preview.conditionHolds ? 'the condition holds here.' : 'the condition does NOT hold here — nothing would happen.'}
+          </p>
+          {preview.conditionHolds && (
+            <>
+              {(preview.changes?.length ?? 0) > 0 ? (
+                <ul className="rb-preview-changes">
+                  {preview.changes!.map((c, i) => (
+                    <li key={i}><b>{c.label}</b>: {c.before} → {c.after}</li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="rb-preview-note">The effects ran, but nothing about the score or the game's own counters changed.</p>
+              )}
+              {(preview.logLines?.length ?? 0) > 0 && (
+                <ul className="rb-preview-log">
+                  {preview.logLines!.map((l, i) => <li key={i}>{l}</li>)}
+                </ul>
+              )}
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }

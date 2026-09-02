@@ -224,7 +224,7 @@ export function CreateView({ onPlay }: { onPlay?: (def: GameDefinition) => void 
       {step === 'twists' && (
         <div className="editor-grid">
           <div className="panel glass">
-            <RuleBuilder rules={knobs.customRules ?? []} onChange={setRules} />
+            <RuleBuilder def={def} rules={knobs.customRules ?? []} onChange={setRules} />
             <hr />
             <RestrictionBuilder restrictions={knobs.restrictions ?? []} onChange={setRestrictions} />
           </div>

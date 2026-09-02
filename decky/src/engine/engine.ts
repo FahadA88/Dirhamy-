@@ -9,7 +9,7 @@
 //   redact(state, playerId)         -> RedactedState
 
 import {
-  ActionDef, Card, Effect, GameDefinition, MatchState, Move, NumericAuctionConfig,
+  ActionDef, Card, CustomRule, Effect, GameDefinition, MatchState, Move, NumericAuctionConfig,
   PlayerRef, Predicate, RedactedState, RedactedZone, RuleHook, RuleValue, ScoringDef, Strain,
   Suit, TrickConfig, ZoneDef,
 } from './types';
@@ -823,6 +823,76 @@ function cloneState(state: MatchState): MatchState {
     highBid: state.highBid ? { ...state.highBid } : null,
     log: state.log.slice(),
   };
+}
+
+export interface RulePreview {
+  ok: boolean;
+  error?: string;
+  /** Who the rule would be evaluated for, and what card (if any) stood in for the trigger. */
+  playerId?: string;
+  targetCard?: string | null;
+  /** Whether the rule's own `if` (and `cardHasTag`, if it has one) actually held here. */
+  conditionHolds?: boolean;
+  /** What changed, only ever present when the condition held and effects actually ran. */
+  changes?: { label: string; before: string; after: string }[];
+  /** New lines the effects added to the log, in the author's own words. */
+  logLines?: string[];
+}
+
+/**
+ * Watch a rule fire before you save it (item 43). A rule is written blind otherwise — the
+ * builder can read it back as a sentence, but a sentence does not say whether the condition is
+ * ever actually true, or what the effects actually do to a real hand.
+ *
+ * Deliberately NOT a simulation of the match reaching this rule's own hook naturally — finding
+ * an authentic moment for all thirteen hooks (a trick won, a meld laid, the match ending...)
+ * would mean a bespoke search per hook. Instead this evaluates the rule against `seed`'s dealt
+ * position, AS IF the hook had just fired there — an illustration of the mechanics, honestly
+ * not a promise that this exact position is when the rule would really trigger.
+ */
+export function previewRule(def: GameDefinition, rule: CustomRule, seed: number): RulePreview {
+  try {
+    const n = Math.min(Math.max(2, def.meta.players.min), def.meta.players.max);
+    const players = Array.from({ length: n }, (_, i) => `P${i + 1}`);
+    const state = createMatch(def, players, seed);
+    const playerId = state.players[state.turnIndex] ?? players[0];
+    const hand = state.zones[`hand:${playerId}`] || [];
+    const discard = state.zones.discard || [];
+    const targetCard = hand[0] ?? discard[discard.length - 1];
+    const ctx: Ctx = { playerId, targetCard };
+
+    let holds = rule.if ? evalPredicate(state, rule.if, ctx) : true;
+    if (holds && rule.cardHasTag) {
+      holds = !!targetCard && cardTags(def, targetCard).includes(rule.cardHasTag);
+    }
+
+    const result: RulePreview = {
+      ok: true, playerId, targetCard: targetCard ? cardLabel(targetCard) : null, conditionHolds: holds,
+    };
+    if (!holds) return result;
+
+    const clone = cloneState(state);
+    runEffects(clone, rule.then, { ...ctx });
+
+    const changes: { label: string; before: string; after: string }[] = [];
+    const varKeys = new Set([...Object.keys(state.vars), ...Object.keys(clone.vars)]);
+    for (const k of varKeys) {
+      if (state.vars[k] !== clone.vars[k]) changes.push({ label: k, before: state.vars[k] ?? '(unset)', after: clone.vars[k] ?? '(unset)' });
+    }
+    for (const p of state.players) {
+      if ((state.scores[p] ?? 0) !== (clone.scores[p] ?? 0)) {
+        changes.push({ label: `${short(p)}'s score`, before: String(state.scores[p] ?? 0), after: String(clone.scores[p] ?? 0) });
+      }
+      if ((state.bonus[p] ?? 0) !== (clone.bonus[p] ?? 0)) {
+        changes.push({ label: `${short(p)}'s bonus`, before: String(state.bonus[p] ?? 0), after: String(clone.bonus[p] ?? 0) });
+      }
+    }
+    result.changes = changes;
+    result.logLines = clone.log.slice(state.log.length).map((l) => l.text);
+    return result;
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
 }
 
 function nextSeat(state: MatchState): string {

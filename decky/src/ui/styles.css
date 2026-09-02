@@ -1491,6 +1491,14 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
 .rb-readback { margin-top: 16px; padding: 12px 14px; border-radius: 10px; background: rgba(214, 175, 92, 0.08); border-left: 3px solid var(--green-d); }
 .rb-readback-label { font-family: var(--mono); font-size: 10px; letter-spacing: 1px; text-transform: uppercase; color: var(--green-d); }
 .rb-readback p { margin: 4px 0 0; font-size: 13px; line-height: 1.5; }
+/* Watch it fire (item 43): a real position, checked and run, not just a sentence. */
+.rb-preview { margin-top: 10px; padding: 12px 14px; border-radius: 10px; background: var(--panel-hi); border: 1px solid var(--panel-brd); }
+.rb-preview-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.rb-preview-body { margin-top: 8px; }
+.rb-preview-note { margin: 0 0 6px; font-size: 13px; line-height: 1.5; color: var(--t-muted, var(--muted)); }
+.rb-preview-changes, .rb-preview-log { margin: 6px 0 0; padding-left: 18px; font-size: 13px; line-height: 1.6; }
+.rb-preview-changes b { color: var(--ink); font-weight: 650; }
+.rb-preview-log { color: var(--t-muted, var(--muted)); font-style: italic; }
 
 /* --- live mini table --- */
 .mini-table { display: flex; flex-direction: column; gap: 12px; }
