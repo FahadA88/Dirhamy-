@@ -111,6 +111,8 @@ export interface GameDefinition {
   poker?: PokerConfig;
   // Present iff this is a trading game — see PitConfig.
   pit?: PitConfig;
+  // Present iff this is a capture-by-sum game — see CaptureConfig.
+  capture?: CaptureConfig;
   // Present iff this is Kent — see KentConfig.
   kent?: KentConfig;
   /** A shared tableau everyone builds on — Kings Corner. */
@@ -338,6 +340,31 @@ export interface PitConfig {
   cornerSize: number;
   /** A hard cap on moves within one round — see KentConfig.roundCap. Default 3000. */
   roundCap?: number;
+}
+
+// Present iff this is a capture-by-sum game (Scopa, and the family it belongs to): a shared
+// face-up table starts with a few cards on it. Playing a card from your hand claims whichever
+// table cards its own value covers — every table card sharing its exact value, or (short of
+// that) the table's cards ALL AT ONCE if their total comes to exactly that value — and the claim
+// joins your own pile, face up, for anyone to count. Missing both and the card just joins the
+// table, waiting for a later hand to claim it. A card's value is simply where its rank sits in
+// the deck's own rankOrder (ace low at 1) — the same reckoning `cardProp: 'value'` already uses
+// for every other rule in this engine, so nothing new had to be taught for it.
+//
+// This is Scopa with one real rule cut for the engine's sake: a genuine table has you CHOOSING
+// which cards a sum-claim takes when more than one combination adds up (three cards, or two, or
+// six) — arbitrary subset choice is a real decision the interpreter has no player-choice shape
+// for yet. Here, a sum-claim can only ever be the whole table at once. It reads the same at the
+// table and it is still a real claim gated on a real sum, which is the entire point being
+// proven — it is just never an ambiguous one.
+export interface CaptureConfig {
+  tableStart: number;        // cards dealt face-up to the table before any hand is dealt
+  handSize: number;          // cards in a hand; refilled by one from the stock after every play
+  /** Extra points for a claim that leaves the table completely empty. */
+  sweepBonus?: number;
+  /** When the stock and every hand are finally empty, whoever claimed last takes what's left on
+   *  the table — nobody's claim, and nobody's turn to make one. Default true. */
+  lastClaimerTakesRest?: boolean;
 }
 
 export interface RummyConfig {
@@ -1167,7 +1194,7 @@ export interface RedactedState {
   log: LogEntry[];
   // family-specific view
   mode: 'shedding' | 'trick' | 'climb' | 'fish' | 'rummy' | 'war' | 'solitaire'
-    | 'bluff' | 'reflex' | 'poker' | 'pit' | 'set' | 'kent' | 'layout' | 'swap' | 'maid';
+    | 'bluff' | 'reflex' | 'poker' | 'pit' | 'set' | 'kent' | 'layout' | 'swap' | 'maid' | 'capture';
   // solitaire
   tableau?: { id: string; cards: Card[]; faceDown: number }[];
   foundations?: { id: string; cards: Card[] }[];

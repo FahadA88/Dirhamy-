@@ -402,6 +402,7 @@ export const KINDS: { id: string; label: string; mark: string }[] = [
   { id: 'layout', label: 'Laying out', mark: '🃎' },
   { id: 'swap', label: 'Remembering', mark: '🂠' },
   { id: 'maid', label: 'Blind draw', mark: '🂭' },
+  { id: 'capture', label: 'Capturing', mark: '🂮' },
   { id: 'solitaire', label: 'Patience', mark: '🂨' },
 ];
 
@@ -429,6 +430,7 @@ export function kindOf(def: GameDefinition): string {
   if (def.layout) return 'layout';
   if (def.swap) return 'swap';
   if (def.maid) return 'maid';
+  if (def.capture) return 'capture';
   return 'shedding';
 }
 

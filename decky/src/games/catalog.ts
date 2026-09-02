@@ -52,6 +52,7 @@ import { pinochle } from './pinochle';
 import { skat } from './skat';
 import { hokm } from './hokm';
 import { ninetyNine } from './ninetyNine';
+import { scopa } from './scopa';
 
 // The classics library. Each entry is a hand-authored game, expressed purely as data.
 export const catalog: GameDefinition[] = [
@@ -81,4 +82,7 @@ export const catalog: GameDefinition[] = [
   // Ninety-Nine needed nothing new but a hook: a shared running total, gated by ordinary rule
   // arithmetic already on offer, and a moment to penalize whoever the total leaves with no move.
   ninetyNine,
+  // Scopa needed a family nothing else here has: a shared table you take FROM rather than play
+  // TO, claimed by matching or summing rather than following or melding.
+  scopa,
 ];

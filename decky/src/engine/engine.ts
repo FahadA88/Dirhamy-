@@ -611,7 +611,7 @@ function sumOver(state: MatchState, ref: PlayerRef, me: string, get: (p: string)
   return seats.reduce((t, p) => t + get(p), 0);
 }
 
-function rankIndex(def: GameDefinition, rank: string): number {
+export function rankIndex(def: GameDefinition, rank: string): number {
   const i = def.deck.rankOrder.indexOf(rank as never);
   return i < 0 ? 0 : i + 1;   // 1-based so "value > 0" reads naturally
 }
@@ -743,6 +743,7 @@ function familyLegalMoves(state: MatchState, playerId: string): Move[] {
   if (state.definition.reflex) return reflexLegalMoves(state, playerId);
   if (state.definition.poker) return pokerLegalMoves(state, playerId);
   if (state.definition.pit) return pitLegalMoves(state, playerId);
+  if (state.definition.capture) return captureLegalMoves(state, playerId);
   if (state.definition.kent) return kentLegalMoves(state, playerId);
   if (state.definition.layout) return layoutLegalMoves(state, playerId);
   if (state.definition.swap) return swapLegalMoves(state, playerId);
@@ -1096,6 +1097,7 @@ export function applyMove(state: MatchState, playerId: string, move: Move): Matc
   if (def.reflex) return afterFamilyMove(applyReflexMove(s, playerId, move), playerId, handBefore);
   if (def.poker) return afterFamilyMove(applyPokerMove(s, playerId, move), playerId, handBefore);
   if (def.pit) return afterFamilyMove(applyPitMove(s, playerId, move), playerId, handBefore);
+  if (def.capture) return afterFamilyMove(applyCaptureMove(s, playerId, move), playerId, handBefore);
   if (def.kent) return afterFamilyMove(applyKentMove(s, playerId, move), playerId, handBefore);
   if (def.layout) return afterFamilyMove(applyLayoutMove(s, playerId, move), playerId, handBefore);
   if (def.swap) return afterFamilyMove(applySwapMove(s, playerId, move), playerId, handBefore);
@@ -3623,6 +3625,90 @@ function sameCards(a?: string[], b?: string[]): boolean {
 
 function suitSym(s: string): string {
   return { C: '♣', D: '♦', H: '♥', S: '♠' }[s] || '';
+}
+
+// ---------- capture-by-sum family (Scopa) ----------
+
+function captureLegalMoves(state: MatchState, playerId: string): Move[] {
+  if (state.phase !== 'playing' || state.players[state.turnIndex] !== playerId) return [];
+  const hand = state.zones[`hand:${playerId}`] || [];
+  return hand.map((c) => ({ actionId: 'playCard', cardId: c.id }));
+}
+
+// What a played card takes off the table: every table card of its own value if any exist,
+// otherwise the WHOLE table at once if the table's total comes to exactly that value — see
+// CaptureConfig's own doc comment for why a sum-claim never gets to be a partial one here.
+function captureFor(def: MatchState['definition'], table: Card[], card: Card): Card[] {
+  const value = rankIndex(def, card.rank);
+  const sameValue = table.filter((c) => rankIndex(def, c.rank) === value);
+  if (sameValue.length > 0) return sameValue;
+  const total = table.reduce((t, c) => t + rankIndex(def, c.rank), 0);
+  return table.length > 0 && total === value ? table.slice() : [];
+}
+
+function applyCaptureMove(s: MatchState, playerId: string, move: Move): MatchState {
+  if (s.phase !== 'playing' || s.players[s.turnIndex] !== playerId) return s;
+  const cfg = s.definition.capture!;
+  const hand = s.zones[`hand:${playerId}`] || [];
+  const idx = hand.findIndex((c) => c.id === move.cardId);
+  if (idx < 0) return s;
+  const [card] = hand.splice(idx, 1);
+  const table = s.zones.table || [];
+  const claimed = captureFor(s.definition, table, card);
+
+  if (claimed.length > 0) {
+    const claimedIds = new Set(claimed.map((c) => c.id));
+    s.zones.table = table.filter((c) => !claimedIds.has(c.id));
+    const pileKey = `captured:${playerId}`;
+    (s.zones[pileKey] ||= []).push(card, ...claimed);
+    s.vars.lastClaimer = playerId;
+    const swept = s.zones.table.length === 0;
+    log(s, playerId, `${short(playerId)} plays ${cardLabel(card)}, claiming ${claimed.map(cardLabel).join(', ')}`
+      + (swept ? ' — the table is clear.' : '.'));
+    if (swept && cfg.sweepBonus) {
+      s.bonus[playerId] = (s.bonus[playerId] ?? 0) + cfg.sweepBonus;
+      log(s, playerId, `${short(playerId)} sweeps the table — +${cfg.sweepBonus}.`);
+    }
+  } else {
+    s.zones.table.push(card);
+    log(s, playerId, `${short(playerId)} plays ${cardLabel(card)} — no claim, it joins the table.`);
+  }
+
+  // One card back from the stock, same as everywhere else a hand refills mid-round — degrades
+  // to nothing once the stock runs dry rather than needing its own end-of-stock branch.
+  const drawn = s.zones.draw.pop();
+  if (drawn) hand.push(drawn);
+
+  const handsEmpty = s.players.every((p) => (s.zones[`hand:${p}`] || []).length === 0);
+  if (handsEmpty && s.zones.draw.length === 0) {
+    endCaptureRound(s);
+    return s;
+  }
+  s.turnIndex = ((s.turnIndex + s.direction) % s.players.length + s.players.length) % s.players.length;
+  return s;
+}
+
+function endCaptureRound(s: MatchState): void {
+  s.phase = 'roundOver';
+  const cfg = s.definition.capture!;
+  const table = s.zones.table || [];
+  if (cfg.lastClaimerTakesRest !== false && table.length > 0) {
+    const last = s.vars.lastClaimer;
+    const winner = last && s.players.includes(last) ? last : s.players[s.turnIndex];
+    (s.zones[`captured:${winner}`] ||= []).push(...table);
+    s.zones.table = [];
+    log(s, null, `${short(winner)} takes the last ${table.length} card${table.length === 1 ? '' : 's'} left on the table.`);
+  }
+  let best = s.players[0];
+  let bestN = -1;
+  for (const p of s.players) {
+    const n = (s.zones[`captured:${p}`] || []).length;
+    s.scores[p] = n;
+    if (n > bestN) { bestN = n; best = p; }
+  }
+  s.winner = best;
+  log(s, null, `Round over — ${short(best)} claimed the most cards.`);
+  finalizeMatchProgress(s);
 }
 
 // ---------- comparison family (War) ----------

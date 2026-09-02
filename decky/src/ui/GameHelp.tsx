@@ -66,6 +66,12 @@ const FAMILY_HOW: Record<string, string[]> = {
     'All red, or one of each colour — never two of one and one of another.',
     'Call it first and it is yours; call wrongly and it costs you.',
   ],
+  capture: [
+    'A few cards start face up on the table.',
+    'Play a card and take every table card worth the same as it.',
+    'Nothing matches? Take the whole table if it all adds up to your card instead.',
+    'Neither, and your card just joins the table for later. Most cards claimed wins.',
+  ],
   'running-total': [
     'Play any card — its rank joins a running total the whole table shares.',
     'Draw straight back up to your hand size.',

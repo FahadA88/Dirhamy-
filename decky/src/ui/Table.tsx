@@ -398,6 +398,7 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
   const isLayout = view.mode === 'layout';
   const isSwap = view.mode === 'swap';
   const isMaid = view.mode === 'maid';
+  const isCapture = view.mode === 'capture';
   const moonShooter = view.shotMoon ?? null;
   // Gin and an undercut are the two gin-rummy endings worth a beat of their own; an ordinary
   // knock is the unremarkable case the generic "X takes it" heading already covers.
@@ -1966,6 +1967,27 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
               </>
             )}
           </div>
+        </div>
+      ) : isCapture ? (
+        /*
+          The middle of a Scopa-style table: whatever is currently face up, free for the next
+          play to claim. Nothing here is clickable — a capture is worked out from the card
+          played, not chosen by tapping the table — so this is a display, the same shape Kent's
+          own pool is, minus the buttons.
+        */
+        <div className="center capture-center">
+          <div className="pile" data-slot="draw">
+            <div className={`${backCls} big`} />
+            <div className="pile-label">Stock · {view.zones.draw?.count ?? 0}</div>
+          </div>
+          <div className="capture-table" role="group" aria-label="The table">
+            {(view.zones.table?.cards ?? []).length === 0
+              ? <div className="card big empty" />
+              : (view.zones.table?.cards ?? []).map((c) => (
+                <div key={c.id} className="capture-tablecard"><CardFace card={c} /></div>
+              ))}
+          </div>
+          <span className="seat-stat">{seatNum(view.zones.captured?.count ?? 0)}<i>captured</i></span>
         </div>
       ) : isKent ? (
         /*

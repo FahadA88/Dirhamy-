@@ -5895,6 +5895,15 @@ button.bluff-go:disabled {
   .kent-letters { gap: 12px; }
 }
 
+.capture-center { display: flex; align-items: center; gap: 18px; }
+.capture-table { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; max-width: 360px; }
+.capture-tablecard { display: block; }
+
+@media (max-width: 780px) {
+  .capture-center { flex-wrap: wrap; justify-content: center; }
+  .capture-table { max-width: 100%; }
+}
+
 
 /* ============================================================================
    CARDS IN FLIGHT

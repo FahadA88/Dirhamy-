@@ -865,6 +865,37 @@ export function chooseMove(
     return { move: best, botSeed };
   }
 
+  // Capture-by-sum: play whatever claims the most cards off the table, sweeps first since
+  // those also carry a bonus. Nothing to claim with anything in hand — get rid of the highest
+  // card, since a small one left behind is more useful bait for a later sum than a big one is.
+  if (state.definition.capture) {
+    const plays = moves.filter((m) => m.actionId === 'playCard');
+    if (mode === 'random' || plays.length === 0) {
+      const r = nextRandom(botSeed);
+      return { move: moves[Math.floor(r.value * moves.length)], botSeed: r.state };
+    }
+    const hand = state.zones[`hand:${playerId}`] || [];
+    const table = state.zones.table || [];
+    const order = state.definition.deck.rankOrder;
+    const valueOf = (rank: string) => order.indexOf(rank as never) + 1;
+    const tableSum = table.reduce((t, c) => t + valueOf(c.rank), 0);
+    const scored = plays.map((m) => {
+      const card = hand.find((c) => c.id === m.cardId)!;
+      const v = valueOf(card.rank);
+      const sameValue = table.filter((c) => valueOf(c.rank) === v).length;
+      const claims = sameValue > 0 ? sameValue : (table.length > 0 && tableSum === v ? table.length : 0);
+      // A claim that clears the table outscores an equal-size claim that doesn't — it's the
+      // one worth a sweep bonus, when the game has one.
+      const swept = claims > 0 && claims === table.length;
+      return { m, score: claims * 10 + (swept ? 1 : 0) - v };
+    });
+    scored.sort((a, b) => b.score - a.score);
+    const r = nextRandom(botSeed);
+    const top = scored.filter((s) => s.score === scored[0].score);
+    const pick = top[Math.floor(r.value * top.length)] || scored[0];
+    return { move: pick.m, botSeed: r.state };
+  }
+
   // From here down is the shedding/matching family.
   const plays = moves.filter((m) => m.actionId === 'playCard');
   if (plays.length === 0) return { move: moves[0], botSeed }; // only a draw is available
