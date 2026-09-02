@@ -8,8 +8,9 @@ import { hostInfo } from '../net/host';
 import { ENGINE_CHANGELOG } from '../engine/changelog';
 import { canSpeak } from './speech';
 import {
-  ACCENTS, AVATARS, AccentId, BACKS, CardBack, CardFace, CustomBack, CustomFelt, FACES, FELTS,
-  HOME_LAYOUTS, HomeLayout, MAX_BACK_IMAGE, MyLook, Settings, TableFelt, THEME_PACKS,
+  ACCENTS, AVATARS, AccentId, BACKS, CARD_SIZE_MAX, CARD_SIZE_MIN, CardBack, CardFace, CustomBack,
+  CustomFelt, FACES, FELTS, HOME_LAYOUTS, HomeLayout, MAX_BACK_IMAGE, MyLook, Settings, TableFelt,
+  THEME_PACKS,
 } from '../settings/settings';
 
 // Preferences.
@@ -302,9 +303,13 @@ function LookSection({ s, set }: { s: Settings; set: Setter }) {
         <Seg value={s.density} onChange={(v) => set('density', v as Settings['density'])}
           options={[['comfortable', 'Comfortable'], ['compact', 'Compact']]} />
       </Row>
-      <Row label="Card size" keywords="big small large cards">
-        <Seg value={s.cardSize} onChange={(v) => set('cardSize', v as Settings['cardSize'])}
-          options={[['s', 'Small'], ['m', 'Medium'], ['l', 'Large']]} />
+      <Row label="Card size" hint="100 is the size the table has always used. Drag either way." keywords="big small large cards slider">
+        <div className="pref-range">
+          <input type="range" min={CARD_SIZE_MIN} max={CARD_SIZE_MAX} step={5} value={s.cardSize}
+            aria-label="Card size"
+            onChange={(e) => set('cardSize', +e.target.value)} />
+          <b>{s.cardSize}%</b>
+        </div>
       </Row>
     </>
   );

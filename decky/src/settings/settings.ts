@@ -17,7 +17,6 @@ export type TableFelt =
   | 'neon' | 'mahogany' | 'vegas' | 'midnight' | 'parlour' | 'concrete' | 'darkglass'
   | 'papermat' | 'velvet' | 'marble' | 'zinc' | 'litedges' | 'chalkboard' | 'studio' | 'walnut'
   | 'custom';
-export type CardSize = 's' | 'm' | 'l';
 /**
  * How a card face is drawn. The first is the traditional deck; the rest exist because a deck
  * that only distinguishes suits by colour excludes about one man in twelve, and because a
@@ -96,7 +95,9 @@ export interface Settings {
   cardFace: CardFace;
   /** A back the player designed themselves, applied when cardBack is 'custom'. */
   customBack: CustomBack | null;
-  cardSize: CardSize;
+  /** A slider, not a choice of three — "small, medium, large" was a guess at three people.
+   *  Percent of the old "medium" preset; 100 is that preset exactly. */
+  cardSize: number;
   textSize: TextSize;
   /** Heavier strokes, looser letter-spacing, no italics — for low vision and dyslexia. */
   legibleText: boolean;
@@ -194,7 +195,7 @@ export const defaultSettings: Settings = {
   tableFelt: 'mahogany',
   cardFace: 'classic',
   customBack: null,
-  cardSize: 'm',
+  cardSize: 100,
   textSize: 'm',
   legibleText: false,
   colorVisionSim: 'off',
@@ -406,11 +407,13 @@ export const FACES: Record<CardFace, FacePreset> = {
   linen:       { name: 'Linen Stock',  note: 'Visible paper grain, warm white, softened ink.' },
 };
 
-export const CARD_SIZES: Record<CardSize, { cw: number; ch: number; bw: number; bh: number }> = {
-  s: { cw: 62, ch: 90, bw: 46, bh: 66 },
-  m: { cw: 76, ch: 108, bw: 56, bh: 80 },
-  l: { cw: 92, ch: 130, bw: 68, bh: 96 },
-};
+// The old "medium" preset, still the anchor a card-size percentage scales from — 100 means
+// exactly this. The old "small" and "large" presets weren't quite proportional to it (about
+// 82% and 121% respectively across cw/ch/bw/bh), which is exactly the kind of three-guesses
+// unevenness a slider replaces.
+export const CARD_SIZE_BASE = { cw: 76, ch: 108, bw: 56, bh: 80 };
+export const CARD_SIZE_MIN = 70;
+export const CARD_SIZE_MAX = 140;
 
 /** Multiplies every type size in the app. Cards scale separately, via Card size. */
 export const TEXT_SCALE: Record<TextSize, number> = { s: 0.92, m: 1, l: 1.14, xl: 1.3 };
@@ -432,7 +435,6 @@ const ALLOWED = {
   theme: ['light', 'dark', 'system'],
   accent: Object.keys(ACCENTS),
   playerColor: Object.keys(ACCENTS),
-  cardSize: Object.keys(CARD_SIZES),
   textSize: ['s', 'm', 'l', 'xl'],
   surface: ['soft', 'glass', 'plain'],
   highlight: ['glow', 'outline', 'lift', 'off'],
@@ -471,6 +473,13 @@ export function loadSettings(): Settings {
     // both starting at whatever the one switch used to say, so nobody's silence gets undone.
     if (saved.cardSounds === undefined && saved.sound !== undefined) saved.cardSounds = saved.sound;
     if (saved.uiSounds === undefined && saved.sound !== undefined) saved.uiSounds = saved.sound;
+    // `cardSize` was a choice of three ('s' | 'm' | 'l') before it became a slider. Map each
+    // old step to the percentage nearest what it actually rendered at, so nobody who picked
+    // Large wakes up back at Medium.
+    if (typeof (saved as unknown as { cardSize?: unknown }).cardSize === 'string') {
+      const old = (saved as unknown as { cardSize: string }).cardSize;
+      (saved as unknown as { cardSize: number }).cardSize = old === 's' ? 80 : old === 'l' ? 120 : 100;
+    }
     const merged = { ...defaultSettings, ...saved } as Record<string, unknown>;
     for (const [key, options] of Object.entries(ALLOWED)) {
       if (!(options as readonly string[]).includes(String(merged[key]))) {
@@ -503,6 +512,7 @@ export function loadSettings(): Settings {
     }
     if (!Array.isArray(merged.myLooks)) merged.myLooks = [];
     merged.soundVolume = num(merged.soundVolume, 0, 100, defaultSettings.soundVolume);
+    merged.cardSize = num(merged.cardSize, CARD_SIZE_MIN, CARD_SIZE_MAX, defaultSettings.cardSize);
     return merged as unknown as Settings;
   } catch {
     return { ...defaultSettings };
@@ -533,11 +543,11 @@ export function applySettings(s: Settings): void {
   root.style.setProperty('--emerald', a.emerald);
   root.style.setProperty('--lime', a.lime);
 
-  const sz = CARD_SIZES[s.cardSize];
-  root.style.setProperty('--cw', `${sz.cw}px`);
-  root.style.setProperty('--ch', `${sz.ch}px`);
-  root.style.setProperty('--bw', `${sz.bw}px`);
-  root.style.setProperty('--bh', `${sz.bh}px`);
+  const scale = s.cardSize / 100;
+  root.style.setProperty('--cw', `${Math.round(CARD_SIZE_BASE.cw * scale)}px`);
+  root.style.setProperty('--ch', `${Math.round(CARD_SIZE_BASE.ch * scale)}px`);
+  root.style.setProperty('--bw', `${Math.round(CARD_SIZE_BASE.bw * scale)}px`);
+  root.style.setProperty('--bh', `${Math.round(CARD_SIZE_BASE.bh * scale)}px`);
 
   const theme = s.theme === 'system'
     ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
