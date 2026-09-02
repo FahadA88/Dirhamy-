@@ -512,6 +512,68 @@ export function playtimeOf(def: GameDefinition): number {
   return Math.max(3, Math.round(base * hands));
 }
 
+/**
+ * Search by mechanic (item 50): "games with trumps" used to mean nothing to the search box,
+ * because it only ever read a name and a blurb — everything else a definition carries about how
+ * it actually plays was invisible to it. This reads the structural shape of the definition (the
+ * family config blocks, not custom author rules — those are too open-ended to name generically)
+ * and turns it into plain words a query can match, folded into search alongside name/description.
+ */
+export function mechanicsOf(def: GameDefinition): string[] {
+  const out: string[] = [];
+  if (def.trick) {
+    out.push('trick-taking', 'trick taking');
+    if (def.trick.auction) out.push('trump auction', 'bidding for trump', 'auction');
+    else if (def.trick.trump && def.trick.trump !== 'none') out.push('trump');
+    if (def.trick.turnedTrump) out.push('trump from a turned card');
+    if (def.trick.bidding) out.push('bidding');
+    if (def.trick.numericAuction) out.push('numeric contract bidding', 'bidding');
+    if (def.trick.numericAuction?.kittyZone) out.push('kitty', 'widow', 'bury');
+    if (def.trick.scoreBy === 'penalty') out.push('trick-avoidance', 'penalty cards');
+  }
+  if (def.climb) out.push('climbing', 'beat the pile or pass');
+  if (def.fish) out.push('fishing', 'asking for cards');
+  if (def.rummy) {
+    out.push('melding', 'sets and runs');
+    if (def.rummy.knock !== undefined) out.push('knocking', 'deadwood');
+    if (def.rummy.wilds) out.push('wild cards');
+    if (def.rummy.contract) out.push('escalating contract', 'contract rummy');
+  }
+  if (def.war) out.push('comparison', 'flipping', 'ties go to war');
+  if (def.bluff) out.push('bluffing', 'claim and challenge');
+  if (def.reflex) out.push('reflex', 'slapping');
+  if (def.poker) out.push('betting', 'poker', 'bluffing');
+  if (def.pit) out.push('trading', 'no turn order');
+  if (def.kent) out.push('signalling', 'no turn order');
+  if (def.layout) out.push('shared layout', 'tableau building');
+  if (def.maid) out.push('blind draw', 'drawing from a neighbour');
+  if (def.swap) out.push('memory', 'hidden own cards');
+  if (def.set) out.push('spotting', 'no turn order');
+  if (def.capture) out.push('capture', 'capture by sum');
+  if (def.solitaire) out.push('solitaire', 'patience', 'single-player');
+  if (def.deck.tags.wild?.ranks?.length) out.push('wild cards');
+  if (def.deck.includeJokers) out.push('jokers');
+  if (def.meta.players.step === 2) out.push('partnerships', 'teams');
+  if (def.rules?.length) out.push('custom rules');
+  if (def.scoring.target != null) out.push('race to a target', 'match play');
+
+  // Action-card effects aren't a family of their own — Switch and Crazy Eights are both plain
+  // shedding underneath — but "reverses direction" or "forces a pickup" is exactly the kind of
+  // thing somebody searches by, so every effect anywhere in the definition gets one pass.
+  const ops = new Set<string>();
+  const collect = (effects?: { op: string }[]) => { for (const e of effects ?? []) ops.add(e.op); };
+  for (const a of def.actions) collect(a.effects);
+  for (const t of def.triggers) collect(t.do);
+  for (const r of def.rules ?? []) collect(r.then);
+  if (ops.has('forceDraw') || ops.has('drawUntilPlayable')) out.push('forced pickup', 'draw penalty');
+  if (ops.has('skipNext')) out.push('skip a turn');
+  if (ops.has('reverseOrder')) out.push('reverse direction');
+  if (ops.has('passCards')) out.push('passing cards');
+  if (ops.has('extraTurn')) out.push('extra turn');
+  if (ops.has('chooseSuit')) out.push('name a suit');
+  return dedupe(out);
+}
+
 export function searchLibrary(games: PublishedGame[], filters: Filters, sort: SortKey): PublishedGame[] {
   const q = (filters.query ?? '').trim().toLowerCase();
   const favs = favourites();
@@ -519,7 +581,7 @@ export function searchLibrary(games: PublishedGame[], filters: Filters, sort: So
   const hits = games.filter((g) => {
     const d = g.definition;
     if (q) {
-      const hay = `${d.meta.name} ${d.meta.description} ${g.author} ${g.tags.join(' ')}`.toLowerCase();
+      const hay = `${d.meta.name} ${d.meta.description} ${g.author} ${g.tags.join(' ')} ${mechanicsOf(d).join(' ')}`.toLowerCase();
       if (!hay.includes(q)) return false;
     }
     if (filters.family && kindOf(d) !== filters.family) return false;
