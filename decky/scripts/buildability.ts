@@ -70,6 +70,8 @@ function sameShape(a: unknown, b: unknown): boolean {
  * - Skat: its trump suit order (D-H-S-C, clubs strongest) is not the conventional C-D-H-S-NT
  *   ranking every other contract game here uses. `Strain[]` order is meaningful — see its own
  *   doc comment — so this needs a reorderable strain list, not a single knob; not built.
+ * - Contract Rummy: a per-hand list of set/run combinations a hand must lay before anything
+ *   else may go down. A single knob can't express a whole escalating list; not built.
  * - Three Thirteen: `wildRotatesByHand` climbs the wild rank one step every hand of the match.
  *   The builder's rummy wild knob is a fixed rank for the whole sitting — a rank that moves on
  *   its own schedule is a different shape of knob, not built.
@@ -97,6 +99,7 @@ const KNOWN_GAPS: Record<string, string> = {
   Skat: 'non-alphabetical trump suit order — no reorderable strain list',
   'Three Thirteen': 'a wild rank that climbs one step every hand — no such knob in the builder',
   'Five Hundred': 'the kitty — pick up and bury — has no knob in the builder yet',
+  'Contract Rummy': 'a per-hand list of set/run combinations — no knob for a whole escalating list',
 };
 
 let failed = false;

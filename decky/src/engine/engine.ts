@@ -3393,8 +3393,13 @@ function rummyLegalMoves(state: MatchState, playerId: string): Move[] {
   }
 
   // play phase: lay any meld, extend one already down, or discard to end the turn
-  const moves: Move[] = findMelds(state, hand).map((m) => ({ actionId: 'meld', cards: m.cards }));
-  if (cfg.layOff) {
+  const meldCandidates = findMelds(state, hand).map((m) => ({ actionId: 'meld' as const, cards: m.cards }));
+  const moves: Move[] = cfg.contract
+    ? meldCandidates.filter((m) => contractAllows(state, playerId, m.cards))
+    : meldCandidates;
+  // Laying off is spare cards onto a contract already met — blocked, same as an unmet meld
+  // shape, until this player's own contract for the hand is down.
+  if (cfg.layOff && contractDone(state, playerId)) {
     for (const m of layOffTargets(state, hand)) moves.push({ actionId: 'layOff', cardId: m.cardId, choice: m.meldKey });
   }
   for (const c of hand) moves.push({ actionId: 'rummyDiscard', cardId: c.id });
@@ -3426,6 +3431,51 @@ function layOffTargets(state: MatchState, hand: Card[]): { cardId: string; meldK
     for (const c of hand) if (extendsMeld(state, m, c)) out.push({ cardId: c.id, meldKey: String(i) });
   });
   return out;
+}
+
+// Contract Rummy — see RummyConfig.contract's own doc comment for what's simplified here.
+function meldShape(state: MatchState, cards: Card[]): 'set' | 'run' {
+  const wild = wildRule(state);
+  const core = wild.on ? cards.filter((c) => !isWildCard(state, c)) : cards;
+  if (core.length === 0) return 'set'; // an all-wild meld: nobody actually holds one this empty
+  return core.every((c) => c.rank === core[0].rank) ? 'set' : 'run';
+}
+
+function contractNeed(state: MatchState): { sets: number; runs: number } | null {
+  const list = state.definition.rummy?.contract;
+  return list && list.length > 0 ? list[(state.handNumber - 1) % list.length] : null;
+}
+
+function contractProgress(state: MatchState, playerId: string): { sets: number; runs: number } {
+  return {
+    sets: Number(state.vars[`contractSets:${playerId}`] ?? '0'),
+    runs: Number(state.vars[`contractRuns:${playerId}`] ?? '0'),
+  };
+}
+
+function contractDone(state: MatchState, playerId: string): boolean {
+  const need = contractNeed(state);
+  if (!need) return true;
+  const have = contractProgress(state, playerId);
+  return have.sets >= need.sets && have.runs >= need.runs;
+}
+
+// Whether THIS meld is one the player is still allowed to lay: free once their contract is met,
+// otherwise only a shape they are still short of — a set-shaped meld does nothing toward "1 set,
+// 1 run" once the set half is already down, so it stays blocked until the run half is too.
+function contractAllows(state: MatchState, playerId: string, cardIds: string[]): boolean {
+  const need = contractNeed(state);
+  if (!need || contractDone(state, playerId)) return true;
+  const hand = state.zones[`hand:${playerId}`] || [];
+  const shape = meldShape(state, hand.filter((c) => cardIds.includes(c.id)));
+  const have = contractProgress(state, playerId);
+  return shape === 'set' ? have.sets < need.sets : have.runs < need.runs;
+}
+
+function bumpContract(state: MatchState, playerId: string, cards: Card[]): void {
+  if (!contractNeed(state)) return;
+  const key = meldShape(state, cards) === 'set' ? `contractSets:${playerId}` : `contractRuns:${playerId}`;
+  state.vars[key] = String(Number(state.vars[key] ?? '0') + 1);
 }
 
 function applyRummyMove(s: MatchState, playerId: string, move: Move): MatchState {
@@ -3506,6 +3556,7 @@ function applyRummyMove(s: MatchState, playerId: string, move: Move): MatchState
     if (z.melds) s.zones[z.melds].push(...melded);
     s.rummyMeldSizes.push(melded.length);
     s.stallCount = 0;
+    bumpContract(s, playerId, melded);
     log(s, playerId, `${short(playerId)} melds ${melded.map(cardLabel).join(' ')}.`);
     fireRules(s, 'meldLaid', { playerId, targetCard: melded[0] });
     if (s.zones[`hand:${playerId}`].length === 0 && !pickUpFoot(s, playerId)) endRummyRound(s, playerId);

@@ -402,6 +402,20 @@ export interface RummyConfig {
    * than one rank, or never changes, leaves this off.
    */
   wildRotatesByHand?: boolean;
+  /**
+   * Contract Rummy: what a hand demands before anything may be laid down at all — two sets, or
+   * a set and a run, or three runs, escalating hand to hand. The list is read by `handNumber`
+   * and wraps if a match runs past the end of it, the same way `wildRotatesByHand` wraps.
+   *
+   * Two real rules are simplified for the engine's sake. First, the genuine game holds a
+   * player's whole contract back and lays it down in one simultaneous move — here a player lays
+   * their pieces one at a time, same as ordinary melding, except each meld's SHAPE has to be one
+   * the contract still owes; once every piece is down, melding and laying off are free again for
+   * the rest of the hand. Second, a real sitting is a fixed number of hands, win or lose — this
+   * engine only knows how to end a match by score, so the target below is tuned to run about as
+   * long as the contract list, not counted hand for hand.
+   */
+  contract?: { sets: number; runs: number }[];
 }
 
 export interface ClimbConfig {
