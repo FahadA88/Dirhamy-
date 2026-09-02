@@ -924,6 +924,12 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
 .fanned .card.back:first-child { margin-left: 0; }
 
 .center { display: flex; gap: 46px; justify-content: center; align-items: flex-start; margin: 34px 0; transform-style: preserve-3d; }
+/* Left-handed layout (item 26): which side the draw pile sits on relative to the discard is the
+   one thing here with a real "hand" to it — visual order only, so the float animations above
+   (keyed to DOM position, not screen position) don't need to know this happened at all. Scoped
+   to .dd-center rather than every .center — most families (War, Kent, Layout, Bluff, Swap…) give
+   theirs a different meaning entirely, and only the plain draw/discard block is genuinely handed. */
+[data-hand="left"] .dd-center { flex-direction: row-reverse; }
 .pile { text-align: center; }
 .center .pile:nth-child(1) .card { animation: floatA 5s ease-in-out infinite; }
 .center .pile:nth-child(2) .card { animation: floatB 6s ease-in-out infinite; }

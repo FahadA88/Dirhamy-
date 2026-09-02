@@ -1091,7 +1091,13 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
   // there's something to look closely at — it never submits anything itself.
   const { preview: cardPreview, startPreview } = useCardPreview(!isFish && !isKent && !isLayout);
 
-  const hand = useMemo(() => sortHand(view.hand, def, settings.sort), [view.hand, def, settings.sort]);
+  // Left-handed layout (item 26): the reverse happens in the actual card order, not just on
+  // screen — a CSS-only mirror would leave arrow-key navigation moving through the DOM order
+  // while the fan reads backwards, so "next" would visually jump to the wrong end of the hand.
+  const hand = useMemo(() => {
+    const sorted = sortHand(view.hand, def, settings.sort);
+    return settings.handedness === 'left' ? [...sorted].reverse() : sorted;
+  }, [view.hand, def, settings.sort, settings.handedness]);
 
   // The echo shows only until the referee's own copy of this trick catches up with it — once it
   // does, the confirmed card takes over the same spot and there is nothing left to echo.
@@ -2060,7 +2066,7 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
            furniture for a game that has neither at all. */
         null
       ) : (
-        <div className="center">
+        <div className="center dd-center">
           <div className="pile" data-slot="draw">
             <div className={`${backCls} big`} />
             <div className="pile-label">Draw · {view.zones.draw?.count ?? 0}</div>

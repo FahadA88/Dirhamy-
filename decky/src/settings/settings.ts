@@ -165,6 +165,10 @@ export interface Settings {
       centred middle of the felt — closer to where a thumb holding the phone actually reaches.
       Off by default: the centred middle is the right call for anyone not one-handing it. */
   oneHandedMode: boolean;
+  /** Which hand the table is laid out for. 'left' mirrors the order of the hand itself (so the
+   *  end you reach across first is on the near side) and swaps which side the draw and discard
+   *  piles sit on. Right-handed by default, the same as the layout always was before this. */
+  handedness: 'right' | 'left';
   /** A few seconds to take back a misclick before the table moves on. 0 turns it off. */
   undoGraceMs: number;
   /** Optional clock. 0 is no clock at all, which is the default. */
@@ -228,6 +232,7 @@ export const defaultSettings: Settings = {
   speak: false,
   haptics: false,
   oneHandedMode: false,
+  handedness: 'right',
   // Long enough to catch a misclick, short enough that nobody waits on it.
   undoGraceMs: 3000,
   turnSeconds: 0,
@@ -441,6 +446,7 @@ const ALLOWED = {
   colorVisionSim: ['off', 'protanopia', 'deuteranopia', 'tritanopia'],
   seasonalFx: ['off', 'snow', 'leaves'],
   homeLayout: Object.keys(HOME_LAYOUTS),
+  handedness: ['right', 'left'],
 } as const;
 
 /** How loud, and which categories are on — the shape `playSound` actually needs. */
@@ -567,6 +573,7 @@ export function applySettings(s: Settings): void {
   root.style.setProperty('--text-scale', String(TEXT_SCALE[s.textSize]));
   root.setAttribute('data-colorvision', s.colorVisionSim);
   root.setAttribute('data-onehanded', s.oneHandedMode ? 'on' : 'off');
+  root.setAttribute('data-hand', s.handedness);
   root.setAttribute('data-contrast', s.highContrast ? 'high' : 'normal');
   root.setAttribute('data-captions', s.showCaptions ? 'on' : 'off');
   root.setAttribute('data-season', s.seasonalFx);
