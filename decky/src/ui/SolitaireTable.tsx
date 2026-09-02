@@ -8,6 +8,7 @@ import { useSettings } from '../settings/SettingsContext';
 import { playSound } from './sound';
 import { service } from '../server/local';
 import { dailyStreak, recordDaily, todayKey } from '../social/daily';
+import { findPuzzle } from '../library/puzzles';
 
 const ME = 'P1';
 
@@ -18,9 +19,13 @@ const ME = 'P1';
 // Like the multiplayer table, this holds a match id and a redacted view. Face-down cards stay
 // face down on the service's side of the line: undo and hint are service calls, not local
 // replays of a state this component was trusted with.
-export function SolitaireTable({ def, daily = false }: { def: GameDefinition; daily?: boolean }) {
+export function SolitaireTable({ def, daily = false, puzzle = false }: {
+  def: GameDefinition; daily?: boolean;
+  /** Item 41: a real deal, known ahead of time to have a short solve — see puzzles.ts. */
+  puzzle?: boolean;
+}) {
   const { settings } = useSettings();
-  const [board, setBoard] = useState<{ matchId: string; view: RedactedState }>(() => boot(def, daily));
+  const [board, setBoard] = useState<{ matchId: string; view: RedactedState; puzzleMoves?: number }>(() => boot(def, daily, puzzle));
   const [dealing, setDealing] = useState(false);
   const [pick, setPick] = useState<{ zone: string; cardId: string } | null>(null);
   const [hint, setHint] = useState<Move | null>(null);
@@ -50,7 +55,7 @@ export function SolitaireTable({ def, daily = false }: { def: GameDefinition; da
   const cfg = def.solitaire!;
 
   function refresh(id: string) {
-    setBoard({ matchId: id, view: service.view(id, ME) });
+    setBoard((b) => ({ matchId: id, view: service.view(id, ME), puzzleMoves: b.puzzleMoves }));
     setCanUndo(service.canUndo(id));
     setCanRedo(service.canRedo(id));
   }
@@ -90,7 +95,7 @@ export function SolitaireTable({ def, daily = false }: { def: GameDefinition; da
     setCanRedo(false);
     try { service.end(matchId); } catch { /* already gone */ }
     recordedDaily.current = false;
-    setBoard(boot(def, daily));
+    setBoard(boot(def, daily, puzzle));
   }
 
   /**
@@ -109,7 +114,7 @@ export function SolitaireTable({ def, daily = false }: { def: GameDefinition; da
     const nextId = service.replaySameDeal(matchId, def.meta.id).matchId;
     try { service.end(matchId); } catch { /* already gone */ }
     recordedDaily.current = false;
-    setBoard({ matchId: nextId, view: service.view(nextId, ME) });
+    setBoard((b) => ({ matchId: nextId, view: service.view(nextId, ME), puzzleMoves: b.puzzleMoves }));
   }
 
   function showHint() {
@@ -192,8 +197,17 @@ export function SolitaireTable({ def, daily = false }: { def: GameDefinition; da
                   ? <span className="sol-stat" title="Today's Deal is the same for everyone">📅 Today's Deal</span>
                   : (
                     <>
+                      {puzzle && (
+                        board.puzzleMoves != null
+                          ? <span className="sol-stat" title="A no-lookahead player found a real win from this exact deal">
+                              🧩 Puzzle · solved in {board.puzzleMoves}
+                            </span>
+                          : <span className="sol-stat" title="No quick solve turned up in time — this is an ordinary deal instead">
+                              🧩 No puzzle found — try again
+                            </span>
+                      )}
                       <button className="ghost sm" onClick={replayDeal} title="Deal this exact layout again">Replay</button>
-                      <button className="ghost sm" onClick={newDeal}>New deal</button>
+                      <button className="ghost sm" onClick={newDeal}>{puzzle ? 'New puzzle' : 'New deal'}</button>
                     </>
                   )}
               </div>
@@ -344,14 +358,20 @@ export function SolitaireTable({ def, daily = false }: { def: GameDefinition; da
   );
 }
 
-function boot(def: GameDefinition, daily: boolean): { matchId: string; view: RedactedState } {
+function boot(def: GameDefinition, daily: boolean, puzzle = false): { matchId: string; view: RedactedState; puzzleMoves?: number } {
   // Today's Deal fixes BOTH seeds that feed deriveSeed() (fairness.ts) to strings built from
   // today's UTC date — the same commit-reveal shuffle math every match already uses, just with
   // its two random inputs replaced by public, reproducible ones. Anyone on Earth calling this
   // on the same UTC day gets byte-for-byte the same handSeed, and so the same shuffle.
   const key = todayKey();
+  // A puzzle picks its own hand seed directly (see findPuzzle) rather than deriving one from a
+  // client/server pair — the same forcedHandSeed escape hatch replaySameDeal already uses, for
+  // the same reason: the whole point here is dealing a SPECIFIC, already-known-good layout. No
+  // solvable seed turned up (rare, but a shallow greedy search isn't guaranteed one) falls back
+  // to an ordinary deal rather than a broken table.
+  const found = puzzle ? findPuzzle(def) : null;
   const m = daily
     ? service.create(def, `daily-${def.meta.id}-${key}`, [ME], `daily-client-${key}`, `daily-server-${key}`)
-    : service.create(def, def.meta.id, [ME]);
-  return { matchId: m.matchId, view: service.view(m.matchId, ME) };
+    : service.create(def, def.meta.id, [ME], undefined, undefined, found?.seed);
+  return { matchId: m.matchId, view: service.view(m.matchId, ME), puzzleMoves: found?.moves };
 }

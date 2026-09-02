@@ -75,6 +75,8 @@ export function PlayView({ startDailyTrigger }: { startDailyTrigger?: number } =
   const [resumeId, setResumeId] = useState<string | null>(null);
   // Today's Deal: the same Klondike seed for everyone playing today (see social/daily.ts).
   const [dailyMode, setDailyMode] = useState(false);
+  // Item 41: a solitaire deal known ahead of time to have a short solve — see puzzles.ts.
+  const [puzzleMode, setPuzzleMode] = useState(false);
   // Item 60 of the audit pass: the invite-link "Copy link" button built a ?table=CODE URL that,
   // until now, did nothing special when opened — it just landed on the ordinary shelf. This is
   // what makes that link actually join the table it points at.
@@ -214,9 +216,9 @@ export function PlayView({ startDailyTrigger }: { startDailyTrigger?: number } =
         <div className="crumbs">
           <button className="ghost" onClick={() => {
             session?.client.end();
-            setSession(null); setGame(null); setPlan(null); setPractice(false); setResumeId(null); setDailyMode(false);
+            setSession(null); setGame(null); setPlan(null); setPractice(false); setResumeId(null); setDailyMode(false); setPuzzleMode(false);
           }}>← All games</button>
-          <span className="crumb-title">{dailyMode ? "Today's Deal" : game.meta.name}</span>
+          <span className="crumb-title">{dailyMode ? "Today's Deal" : puzzleMode ? `${game.meta.name} · Puzzle` : game.meta.name}</span>
           {practice && <span className="practice-badge" title="Nothing here is recorded">Practice</span>}
           {session && (
             <span className="table-code" title="Anyone with this code can join">
@@ -247,7 +249,7 @@ export function PlayView({ startDailyTrigger }: { startDailyTrigger?: number } =
         </div>
         <ErrorBoundary label={game.meta.name}>
           {game.solitaire
-            ? <SolitaireTable def={game} daily={dailyMode} />
+            ? <SolitaireTable def={game} daily={dailyMode} puzzle={puzzleMode} />
             : <Table
                 def={game}
                 seats={session ? session.seats.length : seats}
@@ -365,6 +367,11 @@ export function PlayView({ startDailyTrigger }: { startDailyTrigger?: number } =
           setGame(def);
         }}
         onSetup={(def) => { recordPlay(def.meta.id); setSetupFor(def); }}
+        onPuzzle={(def) => {
+          recordPlay(def.meta.id);
+          setPlan(null); setPractice(false); setResumeId(null); setDailyMode(false);
+          setPuzzleMode(true); setGame(def);
+        }}
         onOnline={hostUp ? (def) => { recordPlay(def.meta.id); setOnlineFor(def); } : undefined}
         onlineHostDown={hostChecked && !hostUp}
       />
