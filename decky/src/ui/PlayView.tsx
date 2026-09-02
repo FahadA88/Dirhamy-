@@ -18,6 +18,7 @@ import { WebSocketApi, joinRemoteTable } from '../net/wsClient';
 import { HouseRules, applyHouseRules, decodeHouseRules } from '../library/houseRules';
 import { Tournament, TournamentTable, recordYourTable } from '../social/tournament';
 import { TournamentView } from './TournamentView';
+import { TeachView } from './TeachView';
 
 // Worklist #98, continued: the websocket client, the remote-table protocol and the online
 // lobby only matter to the fraction of sessions that ever click "Play with people" — most
@@ -84,6 +85,8 @@ export function PlayView({ startDailyTrigger }: { startDailyTrigger?: number } =
   // Set only while playing a specific tournament table — which bracket and which table to
   // record the result into once the match ends. Null for every ordinary game.
   const [tournamentTable, setTournamentTable] = useState<{ t: Tournament; table: TournamentTable } | null>(null);
+  // Item 39: which game is watching itself play right now.
+  const [teachFor, setTeachFor] = useState<GameDefinition | null>(null);
   // Item 60 of the audit pass: the invite-link "Copy link" button built a ?table=CODE URL that,
   // until now, did nothing special when opened — it just landed on the ordinary shelf. This is
   // what makes that link actually join the table it points at.
@@ -230,6 +233,10 @@ export function PlayView({ startDailyTrigger }: { startDailyTrigger?: number } =
         }}
       />
     );
+  }
+
+  if (teachFor) {
+    return <TeachView def={teachFor} onClose={() => setTeachFor(null)} />;
   }
 
   if (game) {
@@ -410,6 +417,7 @@ export function PlayView({ startDailyTrigger }: { startDailyTrigger?: number } =
           setPuzzleMode(true); setGame(def);
         }}
         onTournament={(def) => { recordPlay(def.meta.id); setTournamentFor(def); }}
+        onTeach={(def) => { setTeachFor(def); }}
         onOnline={hostUp ? (def) => { recordPlay(def.meta.id); setOnlineFor(def); } : undefined}
         onlineHostDown={hostChecked && !hostUp}
       />

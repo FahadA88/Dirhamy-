@@ -796,6 +796,10 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
 .bracket-table li.lost { text-decoration: line-through; opacity: 0.6; }
 .bracket-tbd { font-size: 13px; margin: 0; color: var(--muted); }
 
+/* ---------------- teach mode (item 39) ---------------- */
+.teach-log { max-height: 64vh; }
+.teach-deal { justify-content: center; font-style: italic; }
+
 .help-box { max-width: 520px; text-align: left; }
 /* Rules beside the table, not instead of it (item 34): a right-docked panel rather than a
    centered box, so the table stays visible — dimmed, not replaced — while it's open. The scrim
