@@ -4755,6 +4755,19 @@ button.primary.lg { padding: 13px 28px; font-size: 16px; border-radius: 999px; }
 .practice-toggle b { display: block; font-size: 13px; font-weight: 600; }
 .practice-toggle em { display: block; font-style: normal; font-size: 12px; color: var(--muted); }
 
+/* ---- house rules (items 19-20) ---- */
+.houserules {
+  margin: 14px 0; padding: 12px 14px; border-radius: var(--r-md);
+  border: 1px solid var(--panel-brd); background: var(--panel-hi);
+  display: flex; flex-direction: column; gap: 10px;
+}
+.houserules-head { font-family: var(--mono); font-size: 10px; letter-spacing: 1px; text-transform: uppercase; color: var(--green-d); }
+.houserule-row { display: flex; align-items: center; gap: 10px; }
+.houserule-row input[type="number"] { width: 90px; }
+.houserule-row.toggle-row { cursor: pointer; }
+.houserule-row.toggle-row input { inline-size: 17px; block-size: 17px; cursor: pointer; }
+.houserule-row em { font-style: normal; }
+
 .practice-badge {
   padding: 3px 10px; border-radius: var(--r-pill);
   border: 1px solid var(--gold, #d6af5c); color: var(--gold, #d6af5c);

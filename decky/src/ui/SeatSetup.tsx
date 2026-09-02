@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import { GameDefinition } from '../engine/types';
 import { Seat } from '../server/matchService';
+import {
+  HouseRules, encodeHouseRules, hasNoHouseRules, jokersHouseRuleApplies, targetHouseRuleApplies,
+} from '../library/houseRules';
 
 // Who is at the table.
 //
@@ -46,11 +49,13 @@ function tierOf(d: Seat['difficulty']): 'easy' | 'normal' | 'hard' {
   return 'hard';
 }
 
-export function SeatSetup({ def, defaultSeats, defaultName, onStart, onCancel }: {
+export function SeatSetup({ def, defaultSeats, defaultName, initialHouseRules, onStart, onCancel }: {
   def: GameDefinition;
   defaultSeats: number;
   defaultName: string;
-  onStart: (seats: Seat[], practice: boolean) => void;
+  /** Pre-filled from a shared link (see items 19-20) — a house rule somebody sent you. */
+  initialHouseRules?: HouseRules;
+  onStart: (seats: Seat[], practice: boolean, houseRules: HouseRules) => void;
   onCancel: () => void;
 }) {
   const min = def.meta.players.min;
@@ -61,6 +66,16 @@ export function SeatSetup({ def, defaultSeats, defaultName, onStart, onCancel }:
   const [seats, setSeats] = useState<Seat[]>(() => initial(startCount, defaultName, savedPlan));
   // Practice is a table you can learn at: it is not recorded and a move can always be taken back.
   const [practice, setPractice] = useState(false);
+
+  const targetApplies = targetHouseRuleApplies(def);
+  const jokersApply = jokersHouseRuleApplies(def);
+  const [target, setTarget] = useState(initialHouseRules?.target ?? def.scoring.target ?? 0);
+  const [jokers, setJokers] = useState(initialHouseRules?.jokers ?? def.deck.includeJokers);
+  const houseRules: HouseRules = {
+    ...(targetApplies && target !== def.scoring.target ? { target } : {}),
+    ...(jokersApply && jokers !== def.deck.includeJokers ? { jokers } : {}),
+  };
+  const [copied, setCopied] = useState(false);
 
   function resize(n: number) {
     setCount(n);
@@ -93,6 +108,37 @@ export function SeatSetup({ def, defaultSeats, defaultName, onStart, onCancel }:
             ))}
           </div>
         </div>
+
+        {(targetApplies || jokersApply) && (
+          <div className="houserules">
+            <div className="houserules-head">House rules</div>
+            {targetApplies && (
+              <label className="field houserule-row"><span>Play to</span>
+                <input type="number" min={Math.max(1, Math.round(def.scoring.target! / 4))}
+                  max={def.scoring.target! * 3} step={Math.max(1, Math.round(def.scoring.target! / 20))}
+                  value={target} onChange={(e) => setTarget(Math.max(1, +e.target.value || 1))}
+                  aria-label="Target score" />
+                <em className="muted">points{target !== def.scoring.target ? ` (usually ${def.scoring.target})` : ''}</em>
+              </label>
+            )}
+            {jokersApply && (
+              <label className="houserule-row toggle-row">
+                <input type="checkbox" checked={jokers} onChange={(e) => setJokers(e.target.checked)} aria-label="Jokers in the deck" />
+                <span>Jokers in the deck{jokers !== def.deck.includeJokers ? ' (usually ' + (def.deck.includeJokers ? 'in' : 'out') + ')' : ''}</span>
+              </label>
+            )}
+            {!hasNoHouseRules(houseRules) && (
+              <button className="chip subtle sm" onClick={() => {
+                const url = new URL(window.location.href);
+                url.searchParams.set('house', encodeHouseRules(def.meta.id, houseRules));
+                navigator.clipboard?.writeText(url.toString()).then(() => {
+                  setCopied(true);
+                  window.setTimeout(() => setCopied(false), 2000);
+                }).catch(() => {});
+              }}>{copied ? '✓ Copied' : '🔗 Copy a link with these rules'}</button>
+            )}
+          </div>
+        )}
 
         <ol className="seatlist">
           {seats.map((s, i) => (
@@ -144,7 +190,7 @@ export function SeatSetup({ def, defaultSeats, defaultName, onStart, onCancel }:
 
         <div className="step-actions">
           <button className="ghost" onClick={onCancel}>Cancel</button>
-          <button className="primary" onClick={() => { savePlan(def.meta.id, seats); onStart(seats, practice); }}>Deal →</button>
+          <button className="primary" onClick={() => { savePlan(def.meta.id, seats); onStart(seats, practice, houseRules); }}>Deal →</button>
         </div>
       </div>
     </div>

@@ -15,6 +15,7 @@ import { hostInfo } from '../net/host';
 import { recordPlay } from '../library/library';
 import { dailyGame, dailyStreak, resultFor, todayKey } from '../social/daily';
 import { WebSocketApi, joinRemoteTable } from '../net/wsClient';
+import { HouseRules, applyHouseRules, decodeHouseRules } from '../library/houseRules';
 
 // Worklist #98, continued: the websocket client, the remote-table protocol and the online
 // lobby only matter to the fraction of sessions that ever click "Play with people" — most
@@ -54,6 +55,9 @@ export function PlayView({ startDailyTrigger }: { startDailyTrigger?: number } =
   const [helpFor, setHelpFor] = useState<GameDefinition | null>(null);
   const [plan, setPlan] = useState<Seat[] | null>(null);
   const [setupFor, setSetupFor] = useState<GameDefinition | null>(null);
+  // A house rule somebody shared as a link (items 19-20) — pre-filled once Setup opens for the
+  // same game the link named. Cleared the moment Setup closes, same as everything else it holds.
+  const [houseRulesFor, setHouseRulesFor] = useState<({ gameId: string } & HouseRules) | null>(null);
   // A practice game is played but never counted. Chosen at the table, cleared when you leave it.
   const [practice, setPractice] = useState(false);
   // Playing with other people: which game is being set up, and the live session once joined.
@@ -130,6 +134,22 @@ export function PlayView({ startDailyTrigger }: { startDailyTrigger?: number } =
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    const code = new URLSearchParams(window.location.search).get('house');
+    if (!code) return;
+    const url = new URL(window.location.href);
+    url.searchParams.delete('house');
+    window.history.replaceState(null, '', url.toString());
+    const decoded = decodeHouseRules(code);
+    if (!decoded) return;
+    const def = catalog.find((g) => g.meta.id === decoded.gameId);
+    if (!def) return;
+    setHouseRulesFor(decoded);
+    setSetupFor(def);
+    // Deliberately runs once — the effect body only reads globals (the URL, the catalog) and
+    // calls setters, neither of which react-hooks/exhaustive-deps ever asks for in the array.
+  }, []);
+
   // Refreshed whenever we come back to the shelf, which is the only time it is on screen.
   useEffect(() => { if (!game && !setupFor && !onlineFor) setInProgress(openGames()); },
     [game, setupFor, onlineFor]);
@@ -178,10 +198,11 @@ export function PlayView({ startDailyTrigger }: { startDailyTrigger?: number } =
         // since Setup is exactly where seat count actually gets chosen.
         defaultSeats={seatsFor(setupFor, settings.perGameSeats[setupFor.meta.id] ?? settings.defaultSeats)}
         defaultName={settings.playerName}
-        onCancel={() => setSetupFor(null)}
-        onStart={(seatPlan, isPractice) => {
+        initialHouseRules={setupFor.meta.id === houseRulesFor?.gameId ? houseRulesFor : undefined}
+        onCancel={() => { setSetupFor(null); setHouseRulesFor(null); }}
+        onStart={(seatPlan, isPractice, houseRules) => {
           setPlan(seatPlan); setSeats(seatPlan.length); setPractice(isPractice);
-          setGame(setupFor); setSetupFor(null);
+          setGame(applyHouseRules(setupFor, houseRules)); setSetupFor(null); setHouseRulesFor(null);
         }}
       />
     );
