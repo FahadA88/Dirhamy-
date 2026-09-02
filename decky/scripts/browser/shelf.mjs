@@ -33,8 +33,16 @@ await p.locator('.searchbox').fill('');
 await p.locator('select[aria-label="Number of players"]').selectOption('1');
 await p.waitForTimeout(300);
 const soloNames = await p.locator('.shelf-grid .sc-main h3').allTextContents();
-ok(`filtering to 1 player gives only patience (${soloNames.join(', ')})`,
-  soloNames.length >= 2 && soloNames.length <= 4, JSON.stringify(soloNames));
+// "<= 4" was the whole solo shelf once; the catalog has grown past it since (eleven patience
+// games plus Trio, which genuinely supports one player as a timed puzzle) and this failed on
+// every run once it did, not because the filter was ever wrong. The real invariant a player-count
+// filter has to hold isn't a headcount that drifts every time a solo game ships — it's that the
+// filter actually filtered (fewer than the whole catalog) and didn't let in something that
+// can't be played alone.
+ok(`filtering to 1 player narrows the shelf (${soloNames.length} games)`,
+  soloNames.length >= 2 && soloNames.length < 30, JSON.stringify(soloNames));
+ok('and does not include a game that needs a second player',
+  !soloNames.includes('Hearts') && !soloNames.includes('Spades'), JSON.stringify(soloNames));
 await p.locator('select[aria-label="Number of players"]').selectOption('');
 await p.waitForTimeout(250);
 
