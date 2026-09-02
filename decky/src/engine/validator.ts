@@ -92,6 +92,9 @@ export function validate(def: GameDefinition): ValidationResult {
   // The auction reads and empties this zone at runtime with an unguarded pop — a typo here was
   // never anything but a crash waiting to happen, and nothing checked for it before now.
   if (isTrick && def.trick!.auction) zoneRef(def.trick!.auction.upcardZone, 'trick.auction.upcardZone');
+  if (isTrick && def.trick!.numericAuction?.kittyZone) {
+    zoneRef(def.trick!.numericAuction.kittyZone, 'trick.numericAuction.kittyZone');
+  }
   if (isClimb && !def.zones.some((z) => z.visibility === 'top-public')) {
     err('zones.pile', 'Climbing games need a shared play pile (a top-public discard).');
   }

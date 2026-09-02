@@ -635,6 +635,14 @@ export interface NumericAuctionConfig {
    */
   dealerMustBid?: number;
   /**
+   * A shared pile, dealt at setup and left untouched through the whole auction (Five Hundred's
+   * kitty, Skat's skat). The winning bidder picks up every card in it, then buries the same
+   * number back down before a card is led — the same zone serves as the widow before pickup and
+   * the buried cards after, since both are just "face down and out of play" from the table's
+   * point of view. Absent or empty means no kitty at all.
+   */
+  kittyZone?: string;
+  /**
    * Score a failed contract by the tricks the DEFENDERS actually took, not by how far short the
    * contract fell. Bridge-style undertrickValue prices the shortfall; some games instead treat
    * the whole hand as one contest for the tricks — whichever side ends up with more of them
@@ -973,6 +981,9 @@ export interface MatchState {
   alone: boolean;
   sittingOut: string | null; // the maker's partner, when going alone
   discarding: string | null; // the dealer, while they owe a discard after taking the upcard
+  // Cards still owed back to a numericAuction's kittyZone after the winning bidder picked it
+  // up (0 outside a bury). `discarding` names who owes them, same as the upcard discard above.
+  kittyBuryLeft: number;
   rummyPhase: 'draw' | 'play'; // rummy turn phase
   // climbing state (unused by other families)
   passStreak: number;       // consecutive passes since the last play

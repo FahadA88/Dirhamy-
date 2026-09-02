@@ -199,12 +199,15 @@ export function chooseMove(
     return { move: best, botSeed };
   }
 
-  // Dealer's discard after taking the upcard: throw the weakest off-trump card.
-  if (moves[0].actionId === 'dealerDiscard') {
+  // Dealer's discard after taking the upcard, or the contract winner burying the kitty back
+  // down: throw the weakest off-trump card. The kitty bury happens before trump is officially
+  // set (see settleContract), so fall back to the winning bid's own strain — the same trump the
+  // hand is about to be played in, just not written into state.trumpSuit yet.
+  if (moves[0].actionId === 'dealerDiscard' || moves[0].actionId === 'buryDiscard') {
     if (mode === 'random') { const r = nextRandom(botSeed); return { move: moves[Math.floor(r.value * moves.length)], botSeed: r.state }; }
     const hand = state.zones[`hand:${playerId}`] || [];
     const order = state.definition.deck.rankOrder;
-    const trump = state.trumpSuit;
+    const trump = state.highBid?.strain ?? state.trumpSuit;
     const sameColour: Record<string, string> = { C: 'S', S: 'C', H: 'D', D: 'H' };
     const keep = (id?: string) => {
       const c = hand.find((x) => x.id === id);

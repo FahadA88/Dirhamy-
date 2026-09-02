@@ -73,6 +73,9 @@ function sameShape(a: unknown, b: unknown): boolean {
  * - Three Thirteen: `wildRotatesByHand` climbs the wild rank one step every hand of the match.
  *   The builder's rummy wild knob is a fixed rank for the whole sitting — a rank that moves on
  *   its own schedule is a different shape of knob, not built.
+ * - Five Hundred: `numericAuction.kittyZone` — the auction winner picks up a widow and buries
+ *   cards back down before play. The contract-auction knobs cover level, strain and scoring;
+ *   picking a zone for a kitty that may or may not exist is a new knob, not built.
  *
  * A game added here should mean "found a new limitation, understood it, decided it's worth
  * shipping anyway" — never "the check got noisy so I stopped reading it."
@@ -93,6 +96,7 @@ const KNOWN_GAPS: Record<string, string> = {
   Pinochle: 'literal named melds beyond the one marriage pattern — no generic meld editor',
   Skat: 'non-alphabetical trump suit order — no reorderable strain list',
   'Three Thirteen': 'a wild rank that climbs one step every hand — no such knob in the builder',
+  'Five Hundred': 'the kitty — pick up and bury — has no knob in the builder yet',
 };
 
 let failed = false;

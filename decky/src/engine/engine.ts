@@ -86,6 +86,7 @@ export function createMatch(
     alone: false,
     sittingOut: null,
     discarding: null,
+    kittyBuryLeft: 0,
     rummyPhase: 'draw',
     passStreak: 0,
     lastPlayer: null,
@@ -1765,10 +1766,12 @@ function trickLegalMoves(state: MatchState, playerId: string): Move[] {
     return (['C', 'D', 'H', 'S'] as const).map((suit) => ({ actionId: 'resolveChoice', choice: suit }));
   }
 
-  // The dealer owes a discard after taking the upcard — nothing else can happen until they do.
+  // The dealer owes a discard after taking the upcard, or the auction's winner is burying the
+  // kitty back down one card at a time — either way, nothing else can happen until they do.
   if (state.discarding) {
     if (state.discarding !== playerId) return [];
-    return (state.zones[`hand:${playerId}`] || []).map((c) => ({ actionId: 'dealerDiscard', cardId: c.id }));
+    const actionId = state.kittyBuryLeft > 0 ? 'buryDiscard' : 'dealerDiscard';
+    return (state.zones[`hand:${playerId}`] || []).map((c) => ({ actionId, cardId: c.id }));
   }
 
   if (state.sittingOut === playerId) return [];   // partner is out while the maker plays alone
@@ -1861,11 +1864,12 @@ function applyTrickMove(s: MatchState, playerId: string, move: Move): MatchState
     return applyContractBid(s, playerId, move);
   }
 
-  // Trump auction and the dealer's discard.
+  // Trump auction, the dealer's discard, or the contract winner burying the kitty.
   if (s.discarding || s.auctionRound > 0) {
     const auctionMoves = trickLegalMoves(s, playerId);
     if (!auctionMoves.some((m) => m.actionId === move.actionId && m.choice === move.choice
       && !!m.alone === !!move.alone && m.cardId === move.cardId)) return s;
+    if (s.kittyBuryLeft > 0) return applyKittyBury(s, playerId, move);
     return applyAuctionMove(s, playerId, move);
   }
 
@@ -2227,7 +2231,9 @@ function strainLabel(strain: Strain): string {
 const SUIT_GLYPH: Record<string, string> = { C: '\u2663', D: '\u2666', H: '\u2665', S: '\u2660' };
 
 /**
- * The auction is over. Ordinarily the high bid already names its strain and that becomes trump
+ * The auction is over. If a kitty is in play, the winner picks it up and owes the same number
+ * of cards back before anything else happens — see applyKittyBury, which finishes what this
+ * starts. Otherwise: ordinarily the high bid already names its strain and that becomes trump
  * immediately; with `chooseTrumpAfter`, the bid is still just a number, and the winner is now
  * asked — trick play does not begin until they answer (see `resolveChoice`'s
  * `purpose === 'contractTrump'` branch, which finishes what this function starts here).
@@ -2238,6 +2244,23 @@ function settleContract(s: MatchState): MatchState {
   s.auctionPasses = 0;
   s.maker = bid.player;
   const cfg = s.definition.trick!.numericAuction!;
+  const kitty = cfg.kittyZone ? s.zones[cfg.kittyZone] : undefined;
+  if (kitty && kitty.length > 0) {
+    const hand = s.zones[`hand:${bid.player}`];
+    const n = kitty.length;
+    for (const c of kitty) hand.push(c);
+    s.zones[cfg.kittyZone!] = [];
+    log(s, null, `${short(bid.player)} picks up the kitty and buries ${n} back down.`);
+    s.discarding = bid.player;
+    s.kittyBuryLeft = n;
+    return s;
+  }
+  return finishContractSettle(s, bid, cfg);
+}
+
+function finishContractSettle(
+  s: MatchState, bid: NonNullable<MatchState['highBid']>, cfg: NumericAuctionConfig,
+): MatchState {
   if (cfg.chooseTrumpAfter) {
     log(s, null, `${short(bid.player)} won the bid at ${bid.level} — naming trump.`);
     s.pendingChoice = { type: 'suit', player: bid.player, setState: '__contractTrump', purpose: 'contractTrump' };
@@ -2251,6 +2274,21 @@ function settleContract(s: MatchState): MatchState {
   // The lead is to the declarer's left, as it is in the real game.
   s.turnIndex = (s.players.indexOf(bid.player) + 1) % s.players.length;
   return s;
+}
+
+// One card at a time, back into the kitty zone it came out of, until the winner has buried as
+// many as they picked up. Only then does trick play (or the chooseTrumpAfter suit choice) begin.
+function applyKittyBury(s: MatchState, playerId: string, move: Move): MatchState {
+  const hand = s.zones[`hand:${playerId}`];
+  const i = hand.findIndex((c) => c.id === move.cardId);
+  if (i < 0) return s;
+  const [card] = hand.splice(i, 1);
+  const cfg = s.definition.trick!.numericAuction!;
+  s.zones[cfg.kittyZone!].push(card);
+  s.kittyBuryLeft -= 1;
+  if (s.kittyBuryLeft > 0) return s;
+  s.discarding = null;
+  return finishContractSettle(s, s.highBid!, cfg);
 }
 
 /**

@@ -76,6 +76,7 @@ function describeHint(m: Move, nameOf: (id: string) => string): string {
     case 'orderUp': return 'Order it up.';
     case 'nameTrump': return `Name ${m.choice ?? 'trump'} as trump.`;
     case 'dealerDiscard': return 'Discard one to the kitty.';
+    case 'buryDiscard': return 'Bury a card in the kitty.';
     case 'drawStock': case 'fishDraw': return 'Draw from the stock.';
     case 'drawDiscard': return 'Take the discard.';
     case 'drawCard': return 'Draw a card.';
@@ -418,7 +419,10 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
   const canPassBid = myLegal.some((m) => m.actionId === 'passBid');
   const knockMoves = useMemo(() => myLegal.filter((m) => m.actionId === 'knock'), [myLegal]);
   const layOffMoves = useMemo(() => myLegal.filter((m) => m.actionId === 'layOff'), [myLegal]);
-  const discardMoves = useMemo(() => myLegal.filter((m) => m.actionId === 'dealerDiscard'), [myLegal]);
+  const discardMoves = useMemo(
+    () => myLegal.filter((m) => m.actionId === 'dealerDiscard' || m.actionId === 'buryDiscard'),
+    [myLegal],
+  );
   // pit: which suits you hold enough of to offer, and how many of the chosen one you could put
   // up. Both come from the engine's own list of legal offers, so the form can never show a
   // combination it would then refuse.
@@ -443,7 +447,7 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
   const canFlip = myLegal.some((m) => m.actionId === 'warFlip');
   const myPile = view.players.find((p) => p.id === me)?.handCount ?? 0;
   const playActionId = view.needsPassChoice ? 'choosePass'
-    : discardMoves.length > 0 ? 'dealerDiscard'
+    : discardMoves.length > 0 ? discardMoves[0].actionId
     : view.mode === 'trick' ? 'playToTrick' : view.mode === 'climb' ? 'climbPlay' : isRummy ? 'rummyDiscard' : 'playCard';
 
   // Bot loop, paced by the user's bot-speed setting. Bots move inside the service — the client
@@ -1158,7 +1162,7 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
   // to hold a stringified quantity ("1", "2", "3"), which labelCard would otherwise happily
   // "look up" and print back verbatim as a card name that doesn't exist.
   const CARD_MOVE_ACTIONS = new Set([
-    'playCard', 'playToTrick', 'climbPlay', 'climbBomb', 'rummyDiscard', 'dealerDiscard', 'layOff', 'meld', 'bluffClaim',
+    'playCard', 'playToTrick', 'climbPlay', 'climbBomb', 'rummyDiscard', 'dealerDiscard', 'buryDiscard', 'layOff', 'meld', 'bluffClaim',
   ]);
   function labelMove(m: Move): string {
     if (CARD_MOVE_ACTIONS.has(m.actionId)) {
