@@ -311,6 +311,10 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
   const [pitCount, setPitCount] = useState(1);
   // The misclick window: set on every move you make, cleared when it lapses or is used.
   const [undoable, setUndoable] = useState(false);
+  // Punch-list item 76: matches won at this table since it was opened, so five rematches in a
+  // sitting read as a session rather than five unconnected results. Keyed by seat id (or, for a
+  // pair game, the pair letter), reset whenever the table itself changes underneath it.
+  const [sessionTally, setSessionTally] = useState<Record<string, number>>({});
   // Seconds left on the clock, or null when there is no clock.
   const [secsLeft, setSecsLeft] = useState<number | null>(null);
   // Which card the keyboard is on. Null means the keyboard is not driving the hand.
@@ -351,6 +355,7 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
     if (lastKey.current === bootKey) return;
     lastKey.current = bootKey;
     deal(false);
+    setSessionTally({});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bootKey]);
 
@@ -990,7 +995,16 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
   // progress before this component mounted.
   const prevMatchOver = useRef(view.matchOver);
   useEffect(() => {
-    if (!prevMatchOver.current && view.matchOver) onMatchOver?.(view.matchWinner ?? view.winner);
+    if (!prevMatchOver.current && view.matchOver) {
+      const winner = view.matchWinner ?? view.winner;
+      onMatchOver?.(winner);
+      // Item 76: a pair game's tally belongs to the pair, or the whole thing double-counts
+      // "Pair A" under two different seat ids and never shows a pair actually pulling ahead.
+      if (winner) {
+        const key = isKent ? (teamOf(winner) ?? winner) : winner;
+        setSessionTally((t) => ({ ...t, [key]: (t[key] ?? 0) + 1 }));
+      }
+    }
     prevMatchOver.current = view.matchOver;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view.matchOver]);
@@ -2780,6 +2794,23 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
                   </li>
                 ))}
               </ol>
+              {/* Item 76: the running score across rematches at this table — nothing here reads
+                  it until a second match has actually finished, since a lone match has no "so
+                  far" to report yet. */}
+              {Object.values(sessionTally).reduce((a, n) => a + n, 0) > 0 && (
+                <div className="session-tally">
+                  <span className="st-label">This session</span>
+                  <div className="st-chips">
+                    {Object.entries(sessionTally)
+                      .sort((a, b) => b[1] - a[1])
+                      .map(([key, n]) => (
+                        <span key={key} className="chip subtle st-chip">
+                          {isKent ? key : nameOf(key)} {n}
+                        </span>
+                      ))}
+                  </div>
+                </div>
+              )}
               {/* Worklist #59: a finished match is a complete record of every decision and the
                   same advisor that already drives Hint and the bots — nothing looked back and
                   said anything about it until now. Not a verdict on any one move; just where a

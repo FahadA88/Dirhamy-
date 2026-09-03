@@ -4255,6 +4255,11 @@ header h1, header .wordmark {
 .podium li.first .pd-rank { background: var(--gold); color: #241700; font-weight: 800; }
 .pd-name { flex: 1 1 auto; text-align: left; color: var(--muted); }
 .pd-score { font-family: var(--mono); color: var(--ink); }
+.session-tally { margin: 0 0 20px; display: flex; flex-direction: column; gap: 6px; align-items: center; }
+.st-label { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.st-chips { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+.st-chip { font-family: var(--mono); cursor: default; }
+.st-chip:hover { border-color: var(--panel-brd); color: var(--ink); box-shadow: none; }
 
 .modal { background: rgba(6, 2, 22, .62); }
 
