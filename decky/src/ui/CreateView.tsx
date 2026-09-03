@@ -304,6 +304,33 @@ export function CreateView({ onPlay }: { onPlay?: (def: GameDefinition) => void 
               </div>
             ) : (
               <>
+                {/* Item 86 of the punch list: the 300-game self-play harness already exists and
+                    is one click away on the Test tab — but the step bar above is freely
+                    navigable, so nothing stopped a game reaching the shelf without anybody ever
+                    clicking that button. Structural validation (the pill up top) is the one
+                    real gate; this is a nudge, not a block — a report the author hasn't run
+                    yet, or one with real problems, still lets them publish, same as the rest of
+                    this app trusts an author's own judgement once the rules are sound. */}
+                {!report ? (
+                  <div className="issue warn">
+                    <p>This game hasn't been simulated. Nobody's checked whether it actually finishes.</p>
+                    <button className="ghost sm" onClick={() => setReport(simulate(def, Math.min(4, def.meta.players.max), 300))}>
+                      Simulate 300 games
+                    </button>
+                  </div>
+                ) : report.terminated === report.games && report.winnable && report.maxMovesHit === 0 ? (
+                  <div className="issue ok">
+                    Simulated {report.games} games: always finishes, winnable, no move-cap hits.
+                  </div>
+                ) : (
+                  <div className="issue warn">
+                    <p>
+                      Simulated {report.games} games: finished {report.terminated}/{report.games}
+                      {!report.winnable && ', nobody ever won'}
+                      {report.maxMovesHit > 0 && `, ${report.maxMovesHit} hit the move cap`}.
+                    </p>
+                  </div>
+                )}
                 <label className="field"><span>Name</span>
                   <input value={knobs.name} onChange={(e) => set('name', e.target.value)} /></label>
                 <label className="field"><span>Description</span>

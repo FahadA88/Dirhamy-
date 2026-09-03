@@ -8,6 +8,7 @@ import {
   FairCommit, FairReveal, commitTo, deriveSeed, newClientSeed, newServerSeed,
 } from '../engine/fairness';
 import { chooseMove, estimateTrickWins, BotMode } from '../bots/randomBot';
+import { personalityFor } from '../bots/personality';
 import { chooseSolitaireMove, positionKey } from '../bots/solitaireBot';
 
 // ---------------------------------------------------------------------------
@@ -56,6 +57,9 @@ export interface MoveRecord {
    *  person on this device, and the advisor's own pick landed somewhere different. Not a claim
    *  that the advisor was right; just where the two disagreed, for a post-game look back. */
   advisorMove?: Move;
+  /** Punch-list item 70: true when a bot move came from a tier's roll of the dice rather than
+   *  its real advisor — an easy bot's actual, visible mistake, not a difference nobody can see. */
+  slipped?: boolean;
 }
 
 export interface MatchSummary {
@@ -552,7 +556,10 @@ export class MatchService {
     const seat = waiting[cursor];
 
     const seatDiff = rec.seats.find((s) => s.id === seat)?.difficulty ?? difficulty;
-    const r = chooseMove(rec.state, seat, rec.botSeed, seatDiff);
+    // Item 66: a live table's bot seats are the one call site that gets a personality — Hint,
+    // the simulator and every existing test still call chooseMove with no fifth argument, and
+    // an unbiased bot is exactly what they get.
+    const r = chooseMove(rec.state, seat, rec.botSeed, seatDiff, personalityFor(matchId, seat));
     rec.botSeed = r.botSeed;
     // A bot goes through exactly the same validation as a person — including refusing to guess:
     // silently substituting allowed[0] here would mean a bug that makes chooseMove() disagree
@@ -565,9 +572,27 @@ export class MatchService {
     this.remember(rec);
     const before = rec.state.log.length;
     rec.state = applyMove(rec.state, seat, picked);
-    this.recordMove(rec, seat, picked, before);
+    this.recordMove(rec, seat, picked, before, undefined, r.slipped);
     this.store.set(matchId, rec);
     return { moved: true, seat, view: redact(rec.state, viewer) };
+  }
+
+  /**
+   * Item 69 of the punch list: "the pause is the same for a forced discard and a contested
+   * lead, which makes it read as a loading spinner rather than thought." The client cannot
+   * compute this itself — a bot's hand never leaves this boundary — so it asks here, the same
+   * way it already asks `pending()` who owes a move, and scales its own delay by the answer.
+   * A count of legal moves, nothing else: no card is named, no hand size implied beyond what
+   * `pending()` already reveals by naming the seat at all.
+   */
+  botComplexity(matchId: string, humanSeats?: string[]): number {
+    const rec = this.require(matchId);
+    const humans = humanSeats ?? rec.seats.filter((s) => s.kind !== 'bot').map((s) => s.id);
+    if (rec.state.phase !== 'playing') return 0;
+    const waiting = actingPlayers(rec.state).filter((p) => !humans.includes(p));
+    if (waiting.length === 0) return 0;
+    const cursor = ((rec.botCursor ?? 0) % waiting.length + waiting.length) % waiting.length;
+    return legalMoves(rec.state, waiting[cursor]).length;
   }
 
   /**
@@ -669,7 +694,9 @@ export class MatchService {
     if (rec.redoHistory.length > 0) rec.redoHistory = [];
   }
 
-  private recordMove(rec: MatchRecord, seat: string, move: Move, logLenBefore: number, advisorMove?: Move): void {
+  private recordMove(
+    rec: MatchRecord, seat: string, move: Move, logLenBefore: number, advisorMove?: Move, slipped?: boolean,
+  ): void {
     const added = rec.state.log.slice(logLenBefore);
     rec.moves.push({
       n: rec.moves.length + 1,
@@ -678,6 +705,7 @@ export class MatchService {
       at: Date.now(),
       text: added.length > 0 ? added.map((l) => l.text).join(' ') : describeMove(move),
       advisorMove,
+      slipped,
     });
     if (rec.moves.length > 500) rec.moves.shift();
   }

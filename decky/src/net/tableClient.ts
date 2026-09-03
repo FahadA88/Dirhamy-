@@ -54,6 +54,11 @@ export interface TableClient {
   declineTakeback(seat: string): void;
   history(): MoveRecord[];
   botStep(humanSeats: string[], difficulty: BotMode): { moved: boolean };
+  /** Item 69 of the punch list: how many legal moves the bot about to act actually has, so the
+   *  table can let a real decision take a moment longer than a forced one — without ever
+   *  handing the client a hand it isn't owed. Undefined for a client that doesn't offer it
+   *  (an online table's host runs its own bot loop independently of this browser tab). */
+  botComplexity?(humanSeats: string[]): number;
   nextHand(): void;
   seats(): Seat[];
   end(): void;
@@ -115,6 +120,7 @@ export class LocalTableClient implements TableClient {
     if (r.moved) this.changed();
     return { moved: r.moved };
   }
+  botComplexity(humanSeats: string[]) { return this.service.botComplexity(this.matchId, humanSeats); }
   nextHand() { this.service.nextHand(this.matchId); this.changed(); }
   seats() { return this.service.seats(this.matchId); }
   replaySameDeal(gameId: string): string | null {

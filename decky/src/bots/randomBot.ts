@@ -1,6 +1,7 @@
 import { MatchState, Move } from '../engine/types';
 import { legalMoves, handDeadwood, pitCorner, trickTeams, trickValueOf, cardPoints } from '../engine/engine';
 import { nextRandom } from '../engine/rng';
+import { Personality } from './personality';
 
 // Because the engine enumerates legal moves, a bot works for ANY valid game for free.
 // This bot uses a light heuristic: prefer shedding a card over drawing, dump high-value
@@ -41,12 +42,24 @@ const SLIP: Record<BotMode, number> = {
   easy: 1, normal: 0.22, hard: 0, smart: 0, random: 1,
 };
 
+/**
+ * Item 66 of the punch list: "Bot 2, Bot 3 and Bot 4 run the same advisor with the same
+ * weights." `personality` is optional and, before this, was never passed at all — every seat
+ * ran chooseMoveCore's decisions completely unbiased. It still does at every call site that
+ * doesn't pass one (existing tests, the simulator, Hint), so nothing that already exercised this
+ * function changes; only a live table's bot seats (see matchService.botStep) get one.
+ *
+ * Item 70: a tier's roll of the dice — did this move come from the real advisor, or from
+ * picking uniformly at random because the tier slipped — used to be thrown away the moment it
+ * was made. `slipped` on the way back out is that same roll, kept.
+ */
 export function chooseMove(
   state: MatchState,
   playerId: string,
   botSeed: number,
   tier: BotMode = 'smart',
-): { move: Move; botSeed: number } {
+  personality?: Personality,
+): { move: Move; botSeed: number; slipped: boolean } {
   // Resolve the tier into the two modes the rest of this file understands. The draw comes from
   // the bot seed, so a given seed still replays exactly — difficulty does not break determinism.
   let mode: 'smart' | 'random' = 'smart';
@@ -57,7 +70,17 @@ export function chooseMove(
     botSeed = r.state;
     if (r.value < slip) mode = 'random';
   }
+  const result = chooseMoveCore(state, playerId, botSeed, mode, personality);
+  return { ...result, slipped: mode === 'random' };
+}
 
+function chooseMoveCore(
+  state: MatchState,
+  playerId: string,
+  botSeed: number,
+  mode: 'smart' | 'random',
+  personality?: Personality,
+): { move: Move; botSeed: number } {
   const moves = legalMoves(state, playerId);
   if (moves.length === 0) return { move: { actionId: 'drawCard' }, botSeed };
 
@@ -138,7 +161,9 @@ export function chooseMove(
       const strength = carried + jacks * 8;
       // A hand carrying about a third of the pack's points is worth opening on; one carrying
       // half is worth pushing.
-      const share = Math.max(0, Math.min(1, (strength - 25) / 35));
+      // Item 66: a bolder personality reads the same hand as worth a little more; a cautious
+      // one wants a little more margin before it opens at all.
+      const share = Math.max(0, Math.min(1, (strength - 25) / 35 + (personality?.aggression ?? 0) * 0.08));
       if (share <= 0) return giveUp();
       const span = auction.maxLevel - auction.minLevel;
       const ceiling = auction.minLevel + Math.round(share * span);
@@ -149,7 +174,9 @@ export function chooseMove(
       return { move: (inSuit.length ? inSuit : canBid).slice(-1)[0], botSeed };
     }
 
-    const wantLevel = canTake - book;
+    // Item 66: the same small personality nudge as the card-points branch above, on the
+    // trick-count estimate instead of the point count.
+    const wantLevel = canTake - book + Math.round(personality?.aggression ?? 0);
     if (wantLevel < 1) return giveUp();
     // The strongest bid at or below what the hand is worth, preferring the long suit.
     const affordable = moves.filter((m) => m.actionId === 'contractBid' && (m.level ?? 9) <= wantLevel);
@@ -191,8 +218,12 @@ export function chooseMove(
       if (!canPass) { const r = nextRandom(botSeed); return { move: bids[Math.floor(r.value * bids.length)], botSeed: r.state }; }
       return { move: { actionId: 'passBid' }, botSeed };
     }
-    if (bestV < 6.5 && canPass) return { move: { actionId: 'passBid' }, botSeed };
-    if (bestV >= 10.5) {
+    // Item 66: shift both the bar for ordering it up at all and the bar for going alone by the
+    // same personality nudge used everywhere else here — a bolder seat takes marginal trump,
+    // and is quicker to leave its partner out of a near-lock hand.
+    const bidNudge = (personality?.aggression ?? 0) * 0.75;
+    if (bestV < 6.5 - bidNudge && canPass) return { move: { actionId: 'passBid' }, botSeed };
+    if (bestV >= 10.5 - bidNudge) {
       const solo = moves.find((m) => m.actionId === best!.actionId && m.choice === best!.choice && m.alone);
       if (solo) return { move: solo, botSeed };
     }
@@ -228,7 +259,10 @@ export function chooseMove(
   // is a broken one, and it makes the scorepad nonsense. So the estimate is always made, and
   // a slip moves it by a trick or two instead of replacing it.
   if (moves[0].actionId === 'bid') {
-    let bid = estimateTrickWins(state, playerId);
+    // Item 66: the same rough count of likely tricks a player can ask for in the bidding panel
+    // (worklist #64) — just read a little more hopefully, or a little more conservatively,
+    // depending on who's holding the hand.
+    let bid = estimateTrickWins(state, playerId) + Math.round(personality?.aggression ?? 0);
     if (mode === 'random') {
       const r = nextRandom(botSeed);
       botSeed = r.state;
@@ -527,14 +561,20 @@ export function chooseMove(
     const strong = Object.values(counts).some((n) => n >= 2);
     const toCall = moves.some((m) => m.actionId === 'pokerCall');
     const r = nextRandom(botSeed);
+    // Item 66: the same aggression trait, applied to the three probabilities this hand's actual
+    // strength already gates — how often a strong hand bets or raises instead of just calling,
+    // and how readily a weak one gives up rather than sees it through. Clamped so a nudge can
+    // never turn "sometimes" into "always" or "never."
+    const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
+    const aggr = personality?.aggression ?? 0;
     if (!toCall) {
       const bet = moves.find((m) => m.actionId === 'pokerBet');
-      if (strong && bet && r.value < 0.5) return { move: bet, botSeed: r.state };
+      if (strong && bet && r.value < clamp01(0.5 + aggr * 0.15)) return { move: bet, botSeed: r.state };
       return { move: moves.find((m) => m.actionId === 'pokerCheck') ?? moves[0], botSeed: r.state };
     }
-    if (!strong && r.value < 0.55) return { move: moves.find((m) => m.actionId === 'pokerFold') ?? moves[0], botSeed: r.state };
+    if (!strong && r.value < clamp01(0.55 - aggr * 0.15)) return { move: moves.find((m) => m.actionId === 'pokerFold') ?? moves[0], botSeed: r.state };
     const raise = moves.find((m) => m.actionId === 'pokerRaise');
-    if (strong && raise && r.value < 0.3) return { move: raise, botSeed: r.state };
+    if (strong && raise && r.value < clamp01(0.3 + aggr * 0.15)) return { move: raise, botSeed: r.state };
     return { move: moves.find((m) => m.actionId === 'pokerCall') ?? moves.find((m) => m.actionId === 'pokerFold') ?? moves[0], botSeed: r.state };
   }
 

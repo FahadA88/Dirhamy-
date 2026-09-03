@@ -1580,6 +1580,11 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
 .issue-list { list-style: none; padding: 0; margin: 12px 0 0; }
 .issue { font-size: 13px; padding: 8px 12px; border-radius: 8px; margin-bottom: 6px; line-height: 1.45; }
 .issue.error { background: color-mix(in srgb, var(--red) 9%, transparent); color: var(--red); border-left: 3px solid var(--red); }
+/* Item 86 of the punch list: a nudge to simulate before publishing, not a hard error — amber
+   rather than red, and it never disables Publish the way a real validation error does. */
+.issue.warn { background: color-mix(in srgb, #d97706 12%, transparent); color: #d97706; border-left: 3px solid #d97706; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.issue.warn p { margin: 0; flex: 1 1 auto; }
+.issue.ok { background: color-mix(in srgb, var(--green) 12%, transparent); color: var(--green-d); border-left: 3px solid var(--green); }
 
 .published-ok { text-align: center; padding: 20px 10px; }
 .pub-mark {
@@ -1647,6 +1652,12 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
 .ml-n { font-family: var(--mono); font-size: 11px; color: var(--muted); width: 24px; flex: 0 0 auto; text-align: right; }
 .ml-seat { font-weight: 600; flex: 0 0 auto; min-width: 70px; }
 .ml-text { color: var(--muted); }
+/* Item 70 of the punch list: an easy tier's actual, visible slip. */
+.ml-slip {
+  flex: 0 0 auto; font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em;
+  padding: 1px 6px; border-radius: 999px; font-weight: 700;
+  background: color-mix(in srgb, #d97706 16%, transparent); color: #d97706;
+}
 
 @media (max-width: 560px) {
   .seatrow { gap: 6px; }

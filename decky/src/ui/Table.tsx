@@ -11,6 +11,7 @@ import { ScorePad } from './ScorePad';
 import { Confetti } from './Confetti';
 import { useSettings } from '../settings/SettingsContext';
 import { BOT_SPEED_MS, botNameFor } from '../settings/settings';
+import { personalityFor } from '../bots/personality';
 import { playSound } from './sound';
 import { haptic } from './haptics';
 import { speak, stopSpeaking, spokenCard } from './speech';
@@ -504,11 +505,21 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
       easy: 1700, normal: 1050, hard: 620, smart: 620, random: 1900,
     };
     const tellUp = !!view.kentTell;
+    /*
+      Item 69 of the punch list: "the pause is the same for a forced discard and a contested
+      lead, which makes it read as a loading spinner rather than thought." Set, Reflex and Kent
+      are already paced as races — their delay IS the opponent's skill, not a stand-in for
+      deliberation — so only the ordinary turn-based pace scales with how much there actually
+      was to weigh. botComplexity is undefined for an online table (its host paces its own
+      bots), in which case this is a no-op multiplier around 1.
+    */
+    const complexity = clientRef.current.botComplexity?.(localSeats) ?? 4;
+    const complexityMul = Math.max(0.35, Math.min(1.6, 0.3 + complexity * 0.13));
     const delay = isSet ? (SET_THINK[settings.botDiff] ?? 5500)
       : isReflex ? (SLAP_THINK[settings.botDiff] ?? 900)
       : isKent && tellUp ? (SLAP_THINK[settings.botDiff] ?? 900) * 1.5
       : isKent ? (KENT_THINK[settings.botDiff] ?? 1050)
-      : Math.max(BOT_SPEED_MS[settings.botSpeed] ?? 950, noTurnOrder ? 420 : 0);
+      : Math.max(BOT_SPEED_MS[settings.botSpeed] ?? 950, noTurnOrder ? 420 : 0) * (noTurnOrder ? 1 : complexityMul);
     // Everybody at once, where everybody is at once.
     //
     // A tick steps one bot, which is right at a table with a turn order because only one seat
@@ -1269,6 +1280,14 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
     if (seat) return seat.id === me ? `${seat.name} (you)` : seat.name;
     return id === me ? settings.playerName : botLabel(id);
   };
+  // Item 66 of the punch list: a seat's personality is server-driven (see matchService.botStep)
+  // and applies whether or not the plan bothered to name the seat — read straight off the same
+  // deterministic hash the server used, not stored anywhere, the same way botNameFor works.
+  const isBotSeat = (id: string) => {
+    const seat = plan?.find((s) => s.id === id);
+    return seat ? seat.kind === 'bot' : id !== me;
+  };
+  const personalityOf = (id: string) => (isBotSeat(id) ? personalityFor(matchId, id) : null);
   // A running trick, book or set count — the same number, drawn as a seven-segment readout
   // instead of ticking type when the setting asks for it. Snaps rather than counting up: a real
   // digital display changes instantly, it doesn't animate through the numbers in between.
@@ -1436,7 +1455,7 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
                 },
               } : {})}>
               <div className="seat-head">
-                <span className="seat-name">{nameOf(p.id)}</span>
+                <span className="seat-name" title={personalityOf(p.id)?.label}>{nameOf(p.id)}</span>
                 {teamOf(p.id) && <span className="team-tag">{teamOf(p.id)}</span>}
               </div>
               {/* Nobody holds cards in a spotting game — everything is face up on the board —
@@ -2846,6 +2865,10 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
                       them too, so it read "You  You bid 0 (nil)". Drop the lead-in when it
                       is simply repeating the column beside it. */}
                   <span className="ml-text">{stripLeadingName(humanise(h.text), nameOfSeat(h.seat))}</span>
+                  {/* Item 70 of the punch list: "an easy tier's mistakes are invisible... nothing
+                      shows you the opening." This is that opening — the one roll where the tier
+                      actually did play at random rather than its real advisor. */}
+                  {h.slipped && <span className="ml-slip" title="Played at random, not its best move — a lower tier's actual mistake">slip</span>}
                 </li>
               ))}
             </ol>
