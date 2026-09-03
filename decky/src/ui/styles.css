@@ -1126,6 +1126,21 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
   display: grid; place-items: center; font-size: 11px; font-weight: 800;
   background: var(--red); color: #fff;
 }
+
+/* Item 68 of the punch list: the same fixed-banner register as .refused, but a suggestion, not
+   a refusal — the panel's own palette rather than red, and it never times out on its own. */
+.diff-prompt {
+  position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%);
+  z-index: 60; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  max-width: min(92vw, 520px);
+  padding: 10px 14px; border-radius: 999px;
+  background: var(--panel); color: var(--ink);
+  border: 1px solid var(--panel-brd);
+  box-shadow: 0 10px 34px rgba(0, 0, 0, 0.28);
+  font-size: 14px; line-height: 1.35; text-align: left;
+  animation: refused-in 180ms cubic-bezier(0.2, 0.9, 0.3, 1.3);
+}
+@media (prefers-reduced-motion: reduce) { .diff-prompt { animation: none; } }
 @keyframes refused-in {
   from { opacity: 0; transform: translate(-50%, 10px); }
   to { opacity: 1; transform: translate(-50%, 0); }
@@ -5318,6 +5333,22 @@ button.primary.lg { padding: 13px 28px; font-size: 16px; border-radius: 999px; }
 .sevenseg .seg-b { top: 5%; right: 0; }
 .sevenseg .seg-e { bottom: 5%; left: 0; }
 .sevenseg .seg-c { bottom: 5%; right: 0; }
+
+/* Item 67 of the punch list: a short line from a bot seat, at the seat, not the shared toast. */
+.seat-react {
+  position: absolute; left: 50%; top: -8px; transform: translate(-50%, -100%);
+  background: var(--panel); color: var(--ink); border: 1px solid var(--panel-brd);
+  border-radius: var(--r-md); padding: 5px 11px; font-size: 12px; font-weight: 600;
+  white-space: nowrap; box-shadow: var(--shadow-panel); z-index: 2;
+  animation: seat-react-pop 220ms ease-out;
+}
+.seat-react::after {
+  content: ''; position: absolute; left: 50%; bottom: -5px; transform: translateX(-50%) rotate(45deg);
+  width: 9px; height: 9px; background: var(--panel); border-right: 1px solid var(--panel-brd);
+  border-bottom: 1px solid var(--panel-brd);
+}
+@keyframes seat-react-pop { from { opacity: 0; transform: translate(-50%, -90%); } to { opacity: 1; transform: translate(-50%, -100%); } }
+@media (prefers-reduced-motion: reduce) { .seat-react { animation: none; } }
 
 /* Whose turn it is, as a mark on the seat rather than an hourglass in the name. */
 .seat { position: relative; }

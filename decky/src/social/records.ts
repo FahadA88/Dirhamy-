@@ -86,6 +86,18 @@ export function currentStreak(gameId?: string): number {
   return n;
 }
 
+/** Punch-list item 68: the other direction — consecutive losses, so the table can offer to ease
+ *  up on a tier that's clearly too hard, the same way currentStreak drives the "try a harder
+ *  bot?" nudge. */
+export function currentLossStreak(gameId?: string): number {
+  let n = 0;
+  for (const r of allResults(gameId)) {
+    if (r.youWon) break;
+    n++;
+  }
+  return n;
+}
+
 export interface PlayerSummary {
   played: number;
   won: number;

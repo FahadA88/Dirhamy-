@@ -10,7 +10,7 @@ import { DealMotion } from './DealMotion';
 import { ScorePad } from './ScorePad';
 import { Confetti } from './Confetti';
 import { useSettings } from '../settings/SettingsContext';
-import { BOT_SPEED_MS, botNameFor } from '../settings/settings';
+import { BOT_SPEED_MS, botNameFor, BotDiff } from '../settings/settings';
 import { personalityFor } from '../bots/personality';
 import { playSound } from './sound';
 import { haptic } from './haptics';
@@ -25,7 +25,7 @@ import { useFullscreen } from './fullscreen';
 import { service, rememberSession, forgetSession, resumableSession } from '../server/local';
 import { Board, LocalTableClient, TableClient } from '../net/tableClient';
 import { Seat, MoveRecord } from '../server/matchService';
-import { recordResult } from '../social/records';
+import { recordResult, currentStreak, currentLossStreak } from '../social/records';
 
 // This component holds a match id and a redacted view — never a MatchState. Every move it wants
 // to make goes to the service as an intent; the service decides, and hands back the board as
@@ -227,7 +227,7 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
    */
   onMatchOver?: (winnerId: string | null) => void;
 }) {
-  const { settings } = useSettings();
+  const { settings, set: setSetting } = useSettings();
   const players = useMemo(
     () => plan ?? Array.from({ length: seats }, (_, i) => `P${i + 1}`),
     [seats, plan],
@@ -263,6 +263,16 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
   const [board, setBoard] = useState<Board>(() => clientRef.current.read(localSeats[0] ?? HUMAN));
   // One toast, two tones: a refusal is a red ✕, a status note is not.
   const [toast, setToast] = useState<{ text: string; tone: 'bad' | 'info' } | null>(null);
+  // Item 67 of the punch list: "bots never speak... a short, rules-grounded line... would do
+  // more for the feel of the table than any animation." A speech bubble at the seat it's from,
+  // not the shared toast — the toast is a message from the table to you, this is one bot seat
+  // reacting to its own hand.
+  const [reaction, setReaction] = useState<{ seat: string; text: string } | null>(null);
+  const reactionTimer = useRef<number | null>(null);
+  // Item 68 of the punch list: "win nine in a row and the tenth is the same game." A nudge, not
+  // an automatic change — the tier a player chose stays theirs until they say otherwise.
+  const [diffPrompt, setDiffPrompt] = useState<{ to: BotDiff; up: boolean } | null>(null);
+  const diffPromptShown = useRef(false);
   const [selected, setSelected] = useState<string | null>(null);
   /**
    * A card this seat has just played over a socket, before the referee has confirmed it. Only
@@ -1288,6 +1298,64 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
     return seat ? seat.kind === 'bot' : id !== me;
   };
   const personalityOf = (id: string) => (isBotSeat(id) ? personalityFor(matchId, id) : null);
+
+  function react(seat: string, text: string) {
+    if (reactionTimer.current) window.clearTimeout(reactionTimer.current);
+    setReaction({ seat, text });
+    reactionTimer.current = window.setTimeout(() => setReaction(null), 2600);
+  }
+
+  /*
+    Item 67 of the punch list: a nil bid is settled the moment a hand ends — the same fields the
+    seat-stat chip already reads (view.bids / view.tricksWon), at the same phase transition the
+    win sound above fires on. One reaction per hand: a table that comments on every hand's every
+    outcome is noise, not character. Bot seats only — this is the table replying to itself, not
+    to you.
+  */
+  const prevReactPhase = useRef(view.phase);
+  useEffect(() => {
+    if (prevReactPhase.current !== 'roundOver' && view.phase === 'roundOver' && view.bids) {
+      for (const p of view.players) {
+        if (!isBotSeat(p.id) || view.bids[p.id] !== 0) continue;
+        const made = (view.tricksWon?.[p.id] ?? 0) === 0;
+        react(p.id, made ? 'Nil. Every time.' : 'So much for nil.');
+        break;
+      }
+    }
+    prevReactPhase.current = view.phase;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view.phase]);
+
+  /*
+    Item 68 of the punch list: "win nine in a row and the tenth is the same game." Reads the
+    exact per-game streak the leaderboard already keeps (social/records.ts) — nothing new to
+    track — the moment a hand ends; a separate ref from the reaction effect above, since sharing
+    one would mean whichever effect runs second always sees the ref the first already advanced.
+    Solo against bots only: pass-and-play splits a streak across whoever's actually winning, and
+    an online table's difficulty isn't this browser's alone to change. 'smart' and 'random' sit
+    outside the easy/normal/hard ladder on purpose — a deliberate choice, left alone.
+  */
+  const prevDiffPhase = useRef(view.phase);
+  useEffect(() => {
+    if (prevDiffPhase.current !== 'roundOver' && view.phase === 'roundOver'
+      && !practice && !clientRef.current.remote && localSeats.length === 1 && !diffPromptShown.current) {
+      const ladder: BotDiff[] = ['easy', 'normal', 'hard'];
+      const at = ladder.indexOf(settings.botDiff);
+      if (at >= 0) {
+        const wins = currentStreak(def.meta.id);
+        const losses = currentLossStreak(def.meta.id);
+        if (wins >= 3 && at < ladder.length - 1) {
+          setDiffPrompt({ to: ladder[at + 1], up: true });
+          diffPromptShown.current = true;
+        } else if (losses >= 3 && at > 0) {
+          setDiffPrompt({ to: ladder[at - 1], up: false });
+          diffPromptShown.current = true;
+        }
+      }
+    }
+    prevDiffPhase.current = view.phase;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view.phase]);
   // A running trick, book or set count — the same number, drawn as a seven-segment readout
   // instead of ticking type when the setting asks for it. Snaps rather than counting up: a real
   // digital display changes instantly, it doesn't animate through the numbers in between.
@@ -1458,6 +1526,9 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
                 <span className="seat-name" title={personalityOf(p.id)?.label}>{nameOf(p.id)}</span>
                 {teamOf(p.id) && <span className="team-tag">{teamOf(p.id)}</span>}
               </div>
+              {reaction?.seat === p.id && (
+                <div className="seat-react" aria-live="polite">{reaction.text}</div>
+              )}
               {/* Nobody holds cards in a spotting game — everything is face up on the board —
                   so a fan of backs and the word "out" under it said the player had been knocked
                   out of a game they were in fact winning. Show what they have actually got. */}
@@ -2914,6 +2985,20 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
       {toast && (
         <div className={`refused ${toast.tone}`} role="alert">
           <span className="refused-mark">{toast.tone === 'bad' ? '✕' : 'i'}</span>{toast.text}
+        </div>
+      )}
+
+      {diffPrompt && (
+        <div className="diff-prompt" role="status">
+          <span>
+            {diffPrompt.up
+              ? `Three in a row at ${settings.botDiff}. Try ${diffPrompt.to}?`
+              : `A rough few at ${settings.botDiff}. Ease down to ${diffPrompt.to}?`}
+          </span>
+          <button className="ghost sm" onClick={() => setDiffPrompt(null)}>Not now</button>
+          <button className="primary sm" onClick={() => { setSetting('botDiff', diffPrompt.to); setDiffPrompt(null); }}>
+            {diffPrompt.up ? 'Try it' : 'Ease down'}
+          </button>
         </div>
       )}
 
