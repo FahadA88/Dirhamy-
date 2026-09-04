@@ -1826,8 +1826,34 @@ export function Table({
         </div>
       ) : isWar ? (
         <div className="center war-center" data-slot="trick">
-          {view.battle && view.battle.length > 0
-            ? view.battle.map((c, i) => (
+          {view.battle && view.battle.length > 0 ? (
+            view.battleWinner ? (
+              /* Item 30: "War and Slapjack still teleport a pile from the middle into a
+                 counter." The pot already moved into the winner's hand by the time this state
+                 arrives (applyWarMove resolves a whole flip, war or no war, in one move), so
+                 there is no separate reveal step to animate — only the settled pair, now shown
+                 sweeping to whoever just took it instead of sitting there inert. Keyed on the
+                 cards plus the winner's new hand size so the next flip's pair — almost always a
+                 different key — remounts the div and replays the sweep rather than reusing a
+                 node whose animation already finished. */
+              <div
+                key={`${view.battle.map((c) => c.id).join('|')}:${view.players.find((p) => p.id === view.battleWinner)?.handCount ?? 0}`}
+                className={`trick-taken to-${seatSideOf(view.battleWinner)}`}
+              >
+                {view.battle.map((c, i) => (
+                  <div key={c.id}
+                    className={`trick-card ${(i % 2 === 0 ? view.players[0]?.id : view.players[1]?.id) === view.battleWinner ? 'took-it' : ''}`}
+                    data-from={i % 2 === 0 ? 'me' : 't'}>
+                    <CardFace card={c} />
+                    <div className="pile-label">{i % 2 === 0 ? nameOf(view.players[0].id) : nameOf(view.players[1].id)}</div>
+                  </div>
+                ))}
+                <div className="trick-won">
+                  {view.battleWinner === me ? 'You take it' : `${nameOf(view.battleWinner)} takes it`}
+                </div>
+              </div>
+            ) : (
+              view.battle.map((c, i) => (
                 <div key={c.id} className="trick-card"
                   data-from={i % 2 === 0 ? 'me' : 't'}
                   data-origin={i % 2 === 0 ? 'hand' : `seat:${view.players[1]?.id ?? ''}`}>
@@ -1835,7 +1861,8 @@ export function Table({
                   <div className="pile-label">{i % 2 === 0 ? nameOf(view.players[0].id) : nameOf(view.players[1].id)}</div>
                 </div>
               ))
-            : <div className="trick-empty">Flip</div>}
+            )
+          ) : <div className="trick-empty">Flip</div>}
         </div>
       ) : isRummy ? (
         <div className="center rummy-center">
@@ -2539,7 +2566,26 @@ export function Table({
         ) : isReflex ? (
           <div className="reflex-controls">
             <div className="reflex-pile" data-slot="trick">
-              {view.pileTop ? <div className="pile-card"><CardFace card={view.pileTop} /></div> : <div className="empty-hand">— empty —</div>}
+              {view.pileTop ? (
+                <div className="pile-card"><CardFace card={view.pileTop} /></div>
+              ) : view.lastSlap ? (
+                /* Item 30: "War and Slapjack still teleport a pile from the middle into a
+                   counter." The pile already emptied into the winner's hand by the time this
+                   state arrives, so this is a copy of the card that had been showing (see
+                   MatchState.lastSlap) fading and shrinking away instead of the pile just
+                   vanishing. Keyed on the card plus the winner's new hand size so the next
+                   slap remounts the div and replays the animation rather than reusing a node
+                   whose animation already finished. */
+                <div key={`${view.lastSlap.card.id}:${view.players.find((p) => p.id === view.lastSlap!.player)?.handCount ?? 0}`}
+                  className="slap-taken">
+                  <div className="pile-card taken"><CardFace card={view.lastSlap.card} /></div>
+                  <span className="slap-won">
+                    {view.lastSlap.player === me
+                      ? `You slap it — take ${view.lastSlap.count}`
+                      : `${nameOf(view.lastSlap.player)} slaps it — takes ${view.lastSlap.count}`}
+                  </span>
+                </div>
+              ) : <div className="empty-hand">— empty —</div>}
               <span className="muted">{view.zones.pile?.count ?? 0} on the pile</span>
             </div>
             <div className="reflex-actions">

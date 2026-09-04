@@ -71,6 +71,7 @@ export function createMatch(
     trickPlays: [],
     lastTrick: null,
     lastBattle: null,
+    lastBattleWinner: null,
     warsCount: 0,
     shotMoon: null,
     roundOutcome: null,
@@ -120,6 +121,7 @@ export function createMatch(
     bluffCalled: Object.fromEntries(players.map((p) => [p, 0])),
     lastReveal: null,
     reflexOut: [],
+    lastSlap: null,
     chips: def.poker
       ? Object.fromEntries(players.map((p) => [p, carry?.chips?.[p] ?? def.poker!.startingChips]))
       : {},
@@ -794,6 +796,7 @@ function cloneState(state: MatchState): MatchState {
       ? { winner: state.lastTrick.winner, plays: state.lastTrick.plays.map((t) => ({ ...t })) }
       : null,
     lastBattle: state.lastBattle ? state.lastBattle.map((b) => ({ card: { ...b.card } })) : null,
+    lastBattleWinner: state.lastBattleWinner ?? null,
     warsCount: state.warsCount,
     shotMoon: state.shotMoon ?? null,
     roundOutcome: state.roundOutcome ?? null,
@@ -809,6 +812,7 @@ function cloneState(state: MatchState): MatchState {
     bluffCalled: { ...state.bluffCalled },
     lastReveal: state.lastReveal ? { ...state.lastReveal, cards: state.lastReveal.cards.map((c) => ({ ...c })) } : null,
     reflexOut: state.reflexOut.slice(),
+    lastSlap: state.lastSlap ? { ...state.lastSlap, card: { ...state.lastSlap.card } } : null,
     chips: { ...state.chips },
     committed: { ...state.committed },
     folded: { ...state.folded },
@@ -3861,9 +3865,11 @@ function applyWarMove(s: MatchState, playerId: string, move: Move): MatchState {
     const sa = warStrength(s.definition, ca.rank);
     const sb = warStrength(s.definition, cb.rank);
     if (sa !== sb) {
+      const winner = sa > sb ? a : b;
       const winnerHand = sa > sb ? handA : handB;
       winnerHand.push(...shuffleForWar(s, pot));
-      log(s, null, `${short(sa > sb ? a : b)} wins ${ca.rank} vs ${cb.rank}.`);
+      s.lastBattleWinner = winner;
+      log(s, null, `${short(winner)} wins ${ca.rank} vs ${cb.rank}.`);
       break;
     }
     // tie → war: 3 face-down each, then flip again
@@ -3871,8 +3877,10 @@ function applyWarMove(s: MatchState, playerId: string, move: Move): MatchState {
     log(s, null, `War! ${ca.rank} ties ${cb.rank}.`);
     for (let k = 0; k < 3; k++) { const x = handA.shift(); const y = handB.shift(); if (x) pot.push(x); if (y) pot.push(y); }
     if (handA.length === 0 || handB.length === 0) {
+      const winner = handA.length >= handB.length ? a : b;
       const winnerHand = handA.length >= handB.length ? handA : handB;
       winnerHand.push(...shuffleForWar(s, pot));
+      s.lastBattleWinner = winner;
       break;
     }
   }
@@ -4074,10 +4082,12 @@ function applyReflexMove(s: MatchState, playerId: string, move: Move): MatchStat
   if (move.actionId === 'reflexSlap') {
     if (!reflexSlapValid(s) || s.reflexOut.includes(playerId)) return s;
     const won = s.zones[pile] || [];
+    const top = topCard(won);
     log(s, playerId, `${short(playerId)} slaps! Takes ${won.length} card${won.length === 1 ? '' : 's'}.`);
     const hand = s.zones[`hand:${playerId}`] || (s.zones[`hand:${playerId}`] = []);
     hand.unshift(...won);
     s.zones[pile] = [];
+    s.lastSlap = top ? { player: playerId, count: won.length, card: { ...top } } : null;
     reflexCheckEnd(s);
     return s;
   }
@@ -5398,6 +5408,7 @@ export function redact(state: MatchState, viewer: string): RedactedState {
       ? state.pendingPower.kind : undefined,
     caller: state.definition.swap ? state.caller : undefined,
     battle: state.definition.war ? (state.lastBattle ?? []).map((b) => b.card) : undefined,
+    battleWinner: state.definition.war ? (state.lastBattleWinner ?? null) : undefined,
     warsCount: state.definition.war ? state.warsCount : undefined,
     shotMoon: state.definition.trick?.shootTheMoon ? (state.shotMoon ?? null) : undefined,
     roundOutcome: (state.definition.rummy?.knock !== undefined || state.definition.trick?.numericAuction)
@@ -5465,6 +5476,7 @@ export function redact(state: MatchState, viewer: string): RedactedState {
     lastReveal: state.definition.bluff ? state.lastReveal : undefined,
     // reflex
     pileTop: state.definition.reflex ? (topCard(state.zones[reflexPileZone(def)] || []) ?? null) : undefined,
+    lastSlap: state.definition.reflex ? (state.lastSlap ?? null) : undefined,
     slapValid: state.definition.reflex ? reflexSlapValid(state) : undefined,
     reflexOut: state.definition.reflex ? state.reflexOut.slice() : undefined,
     // poker

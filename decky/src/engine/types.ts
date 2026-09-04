@@ -1002,6 +1002,9 @@ export interface MatchState {
    * being animated by id, gave the flying-card layer two candidate homes for one card.
    */
   lastBattle?: { card: Card }[] | null;
+  /** Who took the pot in lastBattle, so the table can sweep the cards to them instead of
+   *  leaving the settled pair sitting in the middle until the next flip overwrites it. */
+  lastBattleWinner?: string | null;
   /** War: how many ties have gone to a war (three down, flip again) so far this game. */
   warsCount: number;
   /** Who swept every penalty point this hand, if anyone — cleared each time scoring runs. */
@@ -1091,6 +1094,11 @@ export interface MatchState {
   lastReveal: { claimant: string; challenger: string; claimedRank: string; cards: Card[]; wasTrue: boolean; ply: number } | null;
   // reflex: who has been eliminated (hand empty), in elimination order — last remaining wins.
   reflexOut: string[];
+  // reflex: the last successful slap — who, how many cards the pile handed them, and a copy
+  // of the card that had been showing — kept so the table can sweep the pile to them instead
+  // of it just vanishing into a hand count. A copy for the same reason as lastBattle: the
+  // real card already moved into the winner's hand.
+  lastSlap: { player: string; count: number; card: Card } | null;
   // poker: chip stacks, the pot, and betting-round bookkeeping.
   chips: Record<string, number>;
   pot: number;
@@ -1234,6 +1242,8 @@ export interface RedactedState {
   meldMoves?: { cards: string[]; label: string }[];
   deadwood?: number;       // gin: what this viewer's unmatched cards are currently worth
   battle?: Card[];
+  /** Who won the pair in `battle`, so the table can sweep it to them rather than show it inert. */
+  battleWinner?: string | null;
   warsCount?: number;
   /** Who swept every penalty point this hand, if the game plays that way and anyone did. */
   shotMoon?: string | null;
@@ -1286,6 +1296,7 @@ export interface RedactedState {
   pileTop?: Card | null;
   slapValid?: boolean;                // true iff a slap would currently succeed for THIS viewer
   reflexOut?: string[];
+  lastSlap?: { player: string; count: number; card: Card } | null;
   // poker
   chips?: Record<string, number>;
   pot?: number;

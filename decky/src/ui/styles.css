@@ -4489,6 +4489,27 @@ header h1, header .wordmark {
 
 .reflex-pile { display: flex; align-items: center; gap: 14px; }
 .reflex-pile .pile-card { transform: rotate(-3deg); }
+
+/* Item 30: the slapped-away pile. A small fade-and-shrink rather than the felt's big directional
+   sweep — this sits in the compact controls strip, not the open table, so there is no seat to
+   translate 200-300px towards, only a card that should visibly leave rather than vanish. */
+.slap-taken { display: flex; align-items: center; gap: 12px; }
+.slap-taken .pile-card.taken {
+  animation: slap-swept 700ms cubic-bezier(.55, 0, .85, .35) both;
+  animation-duration: calc(700ms * var(--anim-scale, 1));
+}
+@keyframes slap-swept {
+  0%, 30% { transform: rotate(-3deg) scale(1) translateY(0); opacity: 1; }
+  100%    { transform: rotate(-3deg) scale(.5) translateY(-16px); opacity: 0; }
+}
+.slap-won {
+  font-size: 13px; font-weight: 750; letter-spacing: .2px; color: var(--gold, #ffc531);
+  animation: won-in 260ms ease-out both;
+}
+@media (prefers-reduced-motion: reduce) { .slap-taken .pile-card.taken, .slap-won { animation: none !important; } }
+:root[data-motion="reduced"] .slap-taken .pile-card.taken,
+:root[data-motion="reduced"] .slap-won { animation: none !important; }
+
 .reflex-actions { display: flex; gap: 12px; align-items: center; }
 .reflex-slap {
   font-size: 20px; padding: 18px 40px !important;
