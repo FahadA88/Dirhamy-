@@ -193,7 +193,7 @@ export interface Settings {
 export const defaultSettings: Settings = {
   // Neon Table is the house look, and a card room after midnight is dark. Daylight is a choice.
   theme: 'dark',
-  accent: 'slate',
+  accent: 'teal',
   cardBack: 'lattice',
   tableFelt: 'mahogany',
   cardFace: 'classic',
@@ -296,7 +296,7 @@ export type MyLook = Omit<ThemePack, 'blurb'>;
 export const THEME_PACKS: ThemePack[] = [
   // The house look leads the list, and it is the one the app opens on — so it is the one that
   // shows as chosen until somebody changes something.
-  { id: 'club', name: 'The Card Room', blurb: 'The house look — mahogany, brass and green baize.', accent: 'slate', tableFelt: 'mahogany', cardBack: 'lattice', cardFace: 'classic' },
+  { id: 'club', name: 'The Card Room', blurb: 'The house look — mahogany, brass and green baize.', accent: 'teal', tableFelt: 'mahogany', cardBack: 'lattice', cardFace: 'classic' },
   { id: 'neon', name: 'Neon Table', blurb: 'A card room after midnight, lit by the sign outside.', accent: 'emerald', tableFelt: 'neon', cardBack: 'monogram', cardFace: 'classic' },
   { id: 'parlour', name: 'Sunlit Parlour', blurb: 'Afternoon light on a quiet table.', accent: 'amber', tableFelt: 'parlour', cardBack: 'ivory', cardFace: 'typographic' },
   { id: 'midnight', name: 'Midnight Blue', blurb: 'Deep and cool, easy on the eyes.', accent: 'ocean', tableFelt: 'midnight', cardBack: 'neongrid', cardFace: 'big-index' },

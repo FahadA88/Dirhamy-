@@ -63,27 +63,27 @@
    ------------------------------------------------------------------ */
 :root {
   --daywarm: 0.3;          /* set for real at mount, from the local clock — see App.tsx */
-  --bg0: #0b0b0c;          /* the room, lights low */
-  --bg1: #151517;
-  --panel: #1c1c1e;        /* a surface with something on it */
-  --panel-solid: #1c1c1e;
-  --panel-hi: #242426;
-  --panel-brd: rgba(200, 200, 205, 0.20);
-  --panel-brd-hi: rgba(222, 222, 226, 0.68);
-  --ink: #f0f0f0;
-  --muted: #a3a3a3;
-  --dim: #707070;
+  --bg0: #090518;          /* the room, past midnight */
+  --bg1: #120a2e;
+  --panel: #1b1040;        /* a lit surface */
+  --panel-solid: #1b1040;
+  --panel-hi: #261656;
+  --panel-brd: rgba(150, 110, 255, 0.26);
+  --panel-brd-hi: rgba(255, 46, 136, 0.75);
+  --ink: #f6f1ff;
+  --muted: #b3a4de;
+  --dim: #7d6dab;
 
-  /* Steel leads, a deep verdigris answers, and silver is still for winning. */
-  --hot: #c7c9cc;
-  --hot-hi: #e8e9eb;
-  --cyan: #4c8f84;
-  --cyan-hi: #7ebdb1;
-  --gold: #c7c9cc;
-  --gold-hi: #eceded;
-  --gold-dim: rgba(199, 201, 204, 0.16);
-  --violet: #6e6e72;
-  --lime: #9ec6a4;
+  /* Five lights. Magenta leads, cyan answers, gold is for winning. */
+  --hot: #ff2e88;
+  --hot-hi: #ff6aa9;
+  --cyan: #1fe3ff;
+  --cyan-hi: #7ceeff;
+  --gold: #ffc531;
+  --gold-hi: #ffdd7a;
+  --gold-dim: rgba(255, 197, 49, 0.16);
+  --violet: #9b5cff;
+  --lime: #4dffa0;
   --red: #c4453f;
   /* --red as small text on a panel measures ~3.7:1 here — fine for a background or a border,
      not enough for reading. A separate, brighter token for red TEXT specifically, so a warning
@@ -108,8 +108,8 @@
   --display: "Outfit", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --serif: var(--display);   /* the serif is gone; anything asking for it gets the display face */
   --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
-  --glow: rgba(199, 201, 204, 0.30);
-  --input-bg: #1a1a1c;
+  --glow: rgba(255, 46, 136, 0.45);
+  --input-bg: #150c36;
   --cw: 76px; --ch: 108px; --bw: 56px; --bh: 80px;
   --r-lg: 18px; --r-md: 12px; --r-pill: 999px;
   --shadow-panel: 0 1px 0 rgba(0,0,0,.5), 0 20px 50px rgba(0, 0, 0, .62);
@@ -138,43 +138,44 @@
    Ink is warm near-black rather than blue-black, because the walls are warm.
 */
 :root[data-theme="light"] {
-  --bg0: #e9e9ea;          /* the room, shutters open */
-  --bg1: #f4f4f5;
+  /* Still the same neon signage, just with the lights on and white walls — not paper, not a
+     magazine. Everything saturated stays saturated. */
+  --bg0: #eceaf8;          /* the room, shutters open */
+  --bg1: #f6f4ff;
   --panel: #ffffff;        /* a surface with something on it */
   --panel-solid: #ffffff;
   --panel-hi: #ffffff;
-  --panel-brd: rgba(70, 70, 75, 0.20);
-  --panel-brd-hi: rgba(50, 50, 55, 0.55);
-  --ink: #19191a;
-  --muted: #5c5c60;
-  --dim: #86868a;
+  --panel-brd: rgba(70, 40, 140, 0.16);
+  --panel-brd-hi: rgba(255, 46, 136, 0.6);
+  --ink: #180f34;
+  --muted: #6b5f92;
+  --dim: #9d93bd;
 
-  /* Steel has to go darker in daylight to stay legible on white; verdigris comes up a little. */
-  --hot: #5c5c60;
-  --hot-hi: #78787c;
-  --cyan: #2f6d62;
-  --cyan-hi: #45897c;
-  --gold: #5c5c60;
-  --gold-hi: #78787c;
-  --gold-dim: rgba(92, 92, 96, 0.14);
-  --violet: #5c5c60;
-  --lime: #4f7d57;
+  --hot: #e6006b;
+  --hot-hi: #ff3d8f;
+  --cyan: #0090b8;
+  --cyan-hi: #16b8e0;
+  --gold: #c98a00;
+  --gold-hi: #e6a70c;
+  --gold-dim: rgba(201, 138, 0, 0.14);
+  --violet: #7b3cf0;
+  --lime: #2f8f5c;
   --red: #a8352f;
   --red-text: #a8352f;   /* already ~6.5:1 against a light panel — no separate value needed */
   --amber: #a97516;
 
   --card-edge: #d9d2c4;
   --input-bg: #ffffff;
-  --glow: rgba(92, 92, 96, 0.24);
-  --shadow-panel: 0 1px 0 rgba(20, 20, 22, .08), 0 14px 34px rgba(20, 20, 22, .14);
+  --glow: rgba(230, 0, 107, 0.3);
+  --shadow-panel: 0 2px 0 rgba(70, 40, 140, .10), 0 14px 34px rgba(70, 40, 140, .14);
 
   /* The dark-room --seg-on-bg/--seg-on-ink swap (defined at the top of this file) is an ink/
-     page-background inversion that happened to land on a warm cream because --ink itself is
-     warm cream after dark. Swap the same two roles in daylight and it lands on --ink's daylight
-     value instead: near-black, flat, no brass in it at all — a selected pill sitting in an
-     otherwise warm room the one place that still looked like the old neon palette's leftovers.
-     Given its own colour instead of inheriting the swap: a dark steel rather than plain ink. */
-  --seg-on-bg: #3a3a3e;
+     page-background inversion that happened to land on a lilac tint because --ink itself is
+     that colour after dark. Swap the same two roles in daylight and it lands on --ink's
+     daylight value instead: near-black indigo, flat, no glow in it at all — a selected pill
+     sitting in an otherwise electric room the one place that still looked flat. Given its own
+     colour instead of inheriting the swap: a dark violet rather than plain ink. */
+  --seg-on-bg: #3a1a70;
   --seg-on-ink: var(--bg1);
 }
 
@@ -234,19 +235,20 @@ body {
   /* Low light in a panelled room: one warm lamp high on the left, a colder one from a window
      on the right, and the floor falling away into the dark. Two neon signs and a purple haze
      is a bar, and a bar is not what this is. */
+  /* Two signs in the dark and the haze between them. */
   background:
-    radial-gradient(980px 660px at 10% -10%, rgba(200, 202, 205, .14) 0%, transparent 62%),
-    radial-gradient(820px 560px at 94% 2%, rgba(120, 140, 150, .10) 0%, transparent 58%),
-    radial-gradient(760px 760px at 50% 112%, rgba(30, 30, 32, .34) 0%, transparent 64%),
+    radial-gradient(900px 620px at 12% -8%, rgba(255, 46, 136, .26) 0%, transparent 62%),
+    radial-gradient(820px 560px at 92% 4%, rgba(31, 227, 255, .20) 0%, transparent 60%),
+    radial-gradient(700px 700px at 50% 108%, rgba(155, 92, 255, .22) 0%, transparent 62%),
     var(--bg0);
   background-attachment: fixed;
   overflow-x: hidden;
 }
 :root[data-theme="light"] body {
   background:
-    radial-gradient(900px 620px at 12% -8%, rgba(170, 172, 176, .14) 0%, transparent 62%),
-    radial-gradient(820px 560px at 92% 4%, rgba(140, 155, 165, .14) 0%, transparent 60%),
-    radial-gradient(700px 700px at 50% 108%, rgba(90, 90, 95, .10) 0%, transparent 62%),
+    radial-gradient(900px 620px at 12% -8%, rgba(255, 46, 136, .16) 0%, transparent 62%),
+    radial-gradient(820px 560px at 92% 4%, rgba(31, 200, 255, .16) 0%, transparent 60%),
+    radial-gradient(700px 700px at 50% 108%, rgba(155, 92, 255, .14) 0%, transparent 62%),
     var(--bg0);
   background-attachment: fixed;
 }
@@ -282,8 +284,8 @@ h1 { letter-spacing: 0.06em; font-weight: 900; }
 .grid3d {
   position: absolute; left: -20%; right: -20%; bottom: -5%; height: 55%;
   background-image:
-    linear-gradient(rgba(200, 200, 205, 0.07) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(200, 200, 205, 0.07) 1px, transparent 1px);
+    linear-gradient(rgba(150, 110, 255, 0.12) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(150, 110, 255, 0.12) 1px, transparent 1px);
   background-size: 46px 46px;
   transform: perspective(420px) rotateX(66deg);
   transform-origin: bottom center;
@@ -299,8 +301,8 @@ h1 { letter-spacing: 0.06em; font-weight: 900; }
   width: 100%; height: 100%; border-radius: 8px; display: grid; place-items: center; font-size: 34px;
   border: 1px solid; backface-visibility: hidden; background: rgba(255, 255, 255, 0.5);
 }
-.floaty.cyan .floaty-inner { color: var(--green); border-color: rgba(200, 200, 205, 0.4); }
-.floaty.violet .floaty-inner { color: var(--emerald); border-color: rgba(200, 200, 205, 0.4); }
+.floaty.cyan .floaty-inner { color: var(--green); border-color: rgba(255, 46, 136, 0.4); }
+.floaty.violet .floaty-inner { color: var(--emerald); border-color: rgba(255, 46, 136, 0.4); }
 @keyframes drift {
   0%   { transform: translate3d(0,0,0) rotateX(0) rotateY(0) scale(var(--sc)); }
   50%  { transform: translate3d(26px,-42px,70px) rotateX(180deg) rotateY(120deg) scale(var(--sc)); }
@@ -905,7 +907,7 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
   padding: 9px; border-radius: 12px; font: inherit; color: inherit;
   background: var(--panel); border: 1px solid var(--panel-brd); transition: 0.16s;
 }
-.felt-opt:hover { border-color: rgba(199, 201, 204, 0.45); transform: translateY(-2px); }
+.felt-opt:hover { border-color: rgba(255, 46, 136, 0.45); transform: translateY(-2px); }
 .felt-opt.on { border-color: var(--green); box-shadow: 0 0 0 2px var(--glow), 0 8px 22px rgba(16,64,40,0.14); }
 .felt-swatch {
   position: relative; display: block; height: 62px; padding: var(--rail-w); overflow: hidden;
@@ -960,7 +962,7 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
 }
 .opponents { display: flex; gap: 26px; justify-content: center; flex-wrap: wrap; }
 .seat { text-align: center; padding: 10px 14px; border-radius: 14px; transition: 0.2s; }
-.seat.active { background: rgba(199, 201, 204, 0.08); box-shadow: 0 0 0 1px rgba(199, 201, 204, 0.35), 0 6px 20px rgba(199, 201, 204, 0.15); }
+.seat.active { background: rgba(255, 46, 136, 0.08); box-shadow: 0 0 0 1px rgba(255, 46, 136, 0.35), 0 6px 20px rgba(255, 46, 136, 0.15); }
 .seat-name { font-weight: 600; font-size: 13px; }
 .fanned { display: flex; justify-content: center; }
 .fanned .card.back:first-child { margin-left: 0; }
@@ -1071,8 +1073,8 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
 .you { margin-top: 10px; padding-top: 16px; border-top: 1px solid var(--panel-brd); }
 .you-head { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
 .you-head > span:first-child { font-family: var(--mono); letter-spacing: 1px; color: var(--muted); }
-.turn-badge { font-family: var(--mono); background: linear-gradient(135deg, var(--emerald), var(--green)); color: #fff; font-weight: 700; padding: 4px 12px; border-radius: 999px; font-size: 12px; box-shadow: 0 4px 14px rgba(199, 201, 204, 0.35); }
-.draw-btn { margin-left: auto; background: linear-gradient(135deg, var(--lime), var(--emerald)); color: #05321f; border: none; font-weight: 700; padding: 9px 18px; border-radius: 10px; cursor: pointer; font: inherit; font-weight: 700; box-shadow: 0 6px 16px rgba(199, 201, 204, 0.28); }
+.turn-badge { font-family: var(--mono); background: linear-gradient(135deg, var(--emerald), var(--green)); color: #fff; font-weight: 700; padding: 4px 12px; border-radius: 999px; font-size: 12px; box-shadow: 0 4px 14px rgba(255, 46, 136, 0.35); }
+.draw-btn { margin-left: auto; background: linear-gradient(135deg, var(--lime), var(--emerald)); color: #05321f; border: none; font-weight: 700; padding: 9px 18px; border-radius: 10px; cursor: pointer; font: inherit; font-weight: 700; box-shadow: 0 6px 16px rgba(255, 46, 136, 0.28); }
 
 .hand { display: flex; flex-wrap: wrap; gap: 10px; perspective: 900px; }
 .card-btn { background: none; border: none; padding: 0; cursor: pointer; border-radius: 8px; transition: transform 0.14s; transform-style: preserve-3d; }
@@ -1093,7 +1095,7 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
 
 /* ---------------- modal ---------------- */
 .modal { position: fixed; inset: 0; background: rgba(16, 40, 28, 0.35); backdrop-filter: blur(4px); display: grid; place-items: center; z-index: 30; }
-.modal-box { background: var(--panel-solid); border: 1px solid rgba(199, 201, 204, 0.4); border-radius: 18px; padding: 28px 32px; text-align: center; max-width: 380px; max-height: min(88vh, 720px); overflow-y: auto; box-shadow: 0 20px 60px rgba(16, 64, 40, 0.22); }
+.modal-box { background: var(--panel-solid); border: 1px solid rgba(255, 46, 136, 0.4); border-radius: 18px; padding: 28px 32px; text-align: center; max-width: 380px; max-height: min(88vh, 720px); overflow-y: auto; box-shadow: 0 20px 60px rgba(16, 64, 40, 0.22); }
 .modal-box h3 { margin: 0 0 14px; font-size: 22px; }
 .confirm-body { color: var(--muted); font-size: 14px; line-height: 1.55; margin: 0 0 20px; }
 .confirm-actions { display: flex; gap: 10px; justify-content: center; }
@@ -1103,7 +1105,7 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
 .suit-btn { width: 62px; height: 62px; font-size: 32px; border-radius: 12px; cursor: pointer; border: 1px solid var(--panel-brd); background: #fff; transition: 0.15s; }
 .suit-btn.s-H, .suit-btn.s-D { color: var(--card-red); }
 .suit-btn.s-C, .suit-btn.s-S { color: var(--card-black); }
-.suit-btn:hover { border-color: var(--green); box-shadow: 0 6px 20px rgba(199, 201, 204, 0.35); transform: translateY(-2px); }
+.suit-btn:hover { border-color: var(--green); box-shadow: 0 6px 20px rgba(255, 46, 136, 0.35); transform: translateY(-2px); }
 
 .log { margin-top: 20px; background: var(--panel); border: 1px solid var(--panel-brd); border-radius: 14px; padding: 14px 16px; max-height: 180px; overflow-y: auto; font-size: 13px; }
 .log-head { font-family: var(--mono); color: var(--green-d); letter-spacing: 1px; margin-bottom: 8px; font-size: 12px; }
@@ -1152,14 +1154,14 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
 .panel { padding: 20px; }
 .panel-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .status-pill { font-family: var(--mono); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; padding: 4px 12px; border-radius: 999px; }
-.status-pill.green { background: rgba(199, 201, 204, 0.14); color: var(--green-d); border: 1px solid rgba(199, 201, 204, 0.4); }
+.status-pill.green { background: rgba(255, 46, 136, 0.14); color: var(--green-d); border: 1px solid rgba(255, 46, 136, 0.4); }
 .status-pill.amber { background: rgba(217, 119, 6, 0.14); color: var(--amber); border: 1px solid rgba(217, 119, 6, 0.4); }
 .status-pill.red { background: color-mix(in srgb, var(--red) 12%, transparent); color: var(--red); border: 1px solid color-mix(in srgb, var(--red) 40%, transparent); }
 
 .starters { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 12px; }
 .mini-label { color: var(--muted); font-size: 12px; font-family: var(--mono); letter-spacing: 0.3px; margin: 8px 0 4px; display: block; }
 .chip { background: var(--panel); color: var(--ink); border: 1px solid var(--panel-brd); border-radius: 999px; padding: 6px 13px; cursor: pointer; font: inherit; font-size: 13px; transition: 0.15s; }
-.chip:hover { border-color: var(--gold); color: var(--gold-hi); box-shadow: 0 4px 12px rgba(199, 201, 204, 0.18); }
+.chip:hover { border-color: var(--gold); color: var(--gold-hi); box-shadow: 0 4px 12px rgba(255, 46, 136, 0.18); }
 
 .expert-note { font-size: 12px; color: var(--amber); background: rgba(217, 119, 6, 0.08); border: 1px solid rgba(217, 119, 6, 0.25); border-radius: 8px; padding: 7px 10px; margin: 8px 0; }
 
@@ -1179,13 +1181,13 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
 .cust-field input:not([type=range]) {
   background: var(--input-bg); color: var(--ink); border: 1px solid var(--panel-brd); border-radius: 8px; padding: 9px 11px; font: inherit;
 }
-.field input:focus, .desc:focus, .json-edit:focus { outline: none; border-color: var(--green); box-shadow: 0 0 0 3px rgba(199, 201, 204, 0.15); }
+.field input:focus, .desc:focus, .json-edit:focus { outline: none; border-color: var(--green); box-shadow: 0 0 0 3px rgba(255, 46, 136, 0.15); }
 .field input[type=range] { accent-color: var(--green); padding: 0; background: transparent; }
 
 .rank-toggles { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 6px; }
 .rank-toggle { min-width: 34px; padding: 6px 7px; border-radius: 8px; cursor: pointer; font: inherit; font-size: 13px; background: rgba(255, 255, 255, 0.7); color: var(--ink); border: 1px solid var(--panel-brd); transition: 0.12s; }
 .rank-toggle:hover { border-color: var(--green); }
-.rank-toggle.on { background: linear-gradient(135deg, var(--emerald), var(--green)); color: #fff; border-color: transparent; font-weight: 700; box-shadow: 0 4px 12px rgba(199, 201, 204, 0.3); }
+.rank-toggle.on { background: linear-gradient(135deg, var(--emerald), var(--green)); color: #fff; border-color: transparent; font-weight: 700; box-shadow: 0 4px 12px rgba(255, 46, 136, 0.3); }
 
 /* The whole pack, one button per card — the grid behind every card-level control. */
 .cardpicker { margin: 8px 0; }
@@ -1248,7 +1250,7 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
 .desc { width: 100%; resize: vertical; }
 .panel .primary { margin-top: 10px; }
 
-.proposal { margin-top: 14px; background: rgba(199, 201, 204, 0.06); border: 1px solid rgba(199, 201, 204, 0.25); border-radius: 12px; padding: 14px; }
+.proposal { margin-top: 14px; background: rgba(255, 46, 136, 0.06); border: 1px solid rgba(255, 46, 136, 0.25); border-radius: 12px; padding: 14px; }
 .changes { margin: 6px 0 10px; padding-left: 18px; }
 .changes li { color: var(--ink); font-size: 13px; padding: 1px 0; }
 .proposal-actions { display: flex; gap: 8px; margin-top: 8px; }
@@ -1259,7 +1261,7 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
 .panel hr { border: none; border-top: 1px solid var(--panel-brd); margin: 20px 0; }
 
 .validation { border-radius: 12px; padding: 12px 14px; font-size: 13px; border: 1px solid transparent; }
-.validation.green { background: rgba(199, 201, 204, 0.08); border-color: rgba(199, 201, 204, 0.25); }
+.validation.green { background: rgba(255, 46, 136, 0.08); border-color: rgba(255, 46, 136, 0.25); }
 .validation.amber { background: rgba(217, 119, 6, 0.08); border-color: rgba(217, 119, 6, 0.25); }
 .validation.red { background: color-mix(in srgb, var(--red) 8%, transparent); border-color: color-mix(in srgb, var(--red) 30%, transparent); }
 .validation ul { margin: 8px 0 0; padding-left: 16px; }
@@ -1269,7 +1271,7 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
 
 .test-row { display: flex; gap: 10px; margin-top: 14px; }
 .report { margin-top: 14px; padding: 14px; border-radius: 12px; font-size: 13px; display: grid; gap: 8px; grid-template-columns: 1fr 1fr; }
-.report.good { background: rgba(199, 201, 204, 0.07); border: 1px solid rgba(199, 201, 204, 0.25); }
+.report.good { background: rgba(255, 46, 136, 0.07); border: 1px solid rgba(255, 46, 136, 0.25); }
 .report.bad { background: color-mix(in srgb, var(--red) 8%, transparent); border: 1px solid color-mix(in srgb, var(--red) 30%, transparent); }
 .metric { display: flex; flex-direction: column; gap: 2px; }
 .metric span { color: var(--muted); font-size: 11px; font-family: var(--mono); }
@@ -1340,7 +1342,7 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
 
 /* fishing (Go Fish) */
 .seat.askable { cursor: pointer; box-shadow: 0 0 0 2px var(--green), 0 6px 20px var(--glow); }
-.seat.askable:hover { background: rgba(199, 201, 204, 0.1); }
+.seat.askable:hover { background: rgba(255, 46, 136, 0.1); }
 .seat.askable:hover .ask-hint { background: var(--green); color: #06210f; border-color: transparent; }
 /* This is the thing you press to take your turn, so it has to look pressable. In grey-green
    mono at eleven pixels it read as a debug label printed under the seat. */
@@ -1364,10 +1366,10 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
 .bid-btn { min-width: 44px; padding: 10px 12px; border-radius: 10px; cursor: pointer; font: inherit; font-weight: 700;
   background: var(--panel-solid); color: var(--ink); border: 1px solid var(--panel-brd); transition: 0.14s; }
 .bid-btn:hover { border-color: transparent; color: #fff; background: linear-gradient(135deg, var(--emerald), var(--green)); transform: translateY(-2px); }
-.team-tag { margin-top: 4px; font-family: var(--mono); font-size: 10px; letter-spacing: 0.5px; color: var(--green-d); background: rgba(199, 201, 204, 0.1); border-radius: 999px; padding: 2px 8px; display: inline-block; }
+.team-tag { margin-top: 4px; font-family: var(--mono); font-size: 10px; letter-spacing: 0.5px; color: var(--green-d); background: rgba(255, 46, 136, 0.1); border-radius: 999px; padding: 2px 8px; display: inline-block; }
 
 /* rummy */
-.meld-btn { background: rgba(199, 201, 204, 0.12); color: var(--green-d); border: 1px solid rgba(199, 201, 204, 0.4); border-radius: 8px; padding: 6px 12px; cursor: pointer; font: inherit; font-size: 13px; font-weight: 600; }
+.meld-btn { background: rgba(255, 46, 136, 0.12); color: var(--green-d); border: 1px solid rgba(255, 46, 136, 0.4); border-radius: 8px; padding: 6px 12px; cursor: pointer; font: inherit; font-size: 13px; font-weight: 600; }
 .meld-btn:hover { background: linear-gradient(135deg, var(--emerald), var(--green)); color: #fff; border-color: transparent; }
 .rummy-hint { color: var(--muted); font-size: 12px; font-family: var(--mono); align-self: center; }
 .knock-btn { background: linear-gradient(135deg, var(--emerald), var(--green)); color: #fff; border: none; border-radius: 8px; padding: 6px 14px; cursor: pointer; font: inherit; font-size: 13px; font-weight: 700; box-shadow: 0 4px 14px var(--glow); }
@@ -1408,7 +1410,7 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
 .match-bar {
   display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;
   padding: 8px 14px; margin-bottom: 16px; border-radius: 10px;
-  background: rgba(199, 201, 204, 0.07); border: 1px solid rgba(199, 201, 204, 0.2);
+  background: rgba(255, 46, 136, 0.07); border: 1px solid rgba(255, 46, 136, 0.2);
   font-size: 13px;
 }
 .match-hand i { font-style: normal; color: var(--muted); }
@@ -1418,7 +1420,7 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
 .match-chip b { color: var(--ink); }
 .match-chip.you b { color: var(--green-d); }
 
-.match-scoreboard { margin: 14px 0; padding: 12px 16px; border-radius: 10px; background: rgba(199, 201, 204, 0.06); border: 1px solid rgba(199, 201, 204, 0.2); text-align: left; }
+.match-scoreboard { margin: 14px 0; padding: 12px 16px; border-radius: 10px; background: rgba(255, 46, 136, 0.06); border: 1px solid rgba(255, 46, 136, 0.2); text-align: left; }
 .ms-title { font-family: var(--mono); font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: var(--green-d); margin-bottom: 8px; }
 .ms-row { display: flex; justify-content: space-between; padding: 3px 0; font-size: 14px; }
 .ms-row b { font-family: var(--mono); }
@@ -1533,7 +1535,7 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
 .rb-effect .rb-params { margin-left: 0; }
 .rb-effect-head { display: flex; gap: 8px; align-items: center; }
 .rb-effect-head select { flex: 1 1 auto; }
-.rb-readback { margin-top: 16px; padding: 12px 14px; border-radius: 10px; background: rgba(199, 201, 204, 0.08); border-left: 3px solid var(--green-d); }
+.rb-readback { margin-top: 16px; padding: 12px 14px; border-radius: 10px; background: rgba(255, 46, 136, 0.08); border-left: 3px solid var(--green-d); }
 .rb-readback-label { font-family: var(--mono); font-size: 10px; letter-spacing: 1px; text-transform: uppercase; color: var(--green-d); }
 .rb-readback p { margin: 4px 0 0; font-size: 13px; line-height: 1.5; }
 /* Watch it fire (item 43): a real position, checked and run, not just a sentence. */
@@ -1630,7 +1632,7 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
   display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
   padding: 10px 12px; border-radius: 10px; border: 1px solid var(--panel-brd); background: var(--panel);
 }
-.seatrow.local { border-color: rgba(199, 201, 204, 0.45); }
+.seatrow.local { border-color: rgba(255, 46, 136, 0.45); }
 .seatrow-n { font-family: var(--mono); font-size: 11px; color: var(--muted); width: 16px; }
 .seatrow-name { flex: 1 1 140px; min-width: 110px; }
 .seat-note { margin: 12px 0 0; font-size: 13px; line-height: 1.5; }
@@ -1774,13 +1776,13 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
   width: 100%; text-align: left; cursor: pointer; overflow: hidden; position: relative;
   padding: 34px 36px; border-radius: 22px; margin-bottom: 34px; color: #f4f1e8;
   background:
-    radial-gradient(600px 300px at 78% 50%, rgba(199, 201, 204,0.16), transparent 70%),
+    radial-gradient(600px 300px at 78% 50%, rgba(255, 46, 136,0.16), transparent 70%),
     linear-gradient(150deg, #0f2a1e 0%, #123c2a 60%, #175136 100%);
-  border: 1px solid rgba(199, 201, 204, 0.28);
+  border: 1px solid rgba(255, 46, 136, 0.28);
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 18px 50px rgba(0,0,0,0.5);
   transition: transform 200ms cubic-bezier(.2,.9,.3,1.1), border-color 200ms;
 }
-.hero:hover { transform: translateY(-3px); border-color: rgba(199, 201, 204,0.6); }
+.hero:hover { transform: translateY(-3px); border-color: rgba(255, 46, 136,0.6); }
 .hero-body { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; z-index: 1; }
 .hero-kicker {
   font-family: var(--mono); font-size: 10px; letter-spacing: 2.4px; text-transform: uppercase;
@@ -1938,7 +1940,7 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
 }
 .ga-card.back::after {
   content: ""; position: absolute; inset: 4px; border-radius: 3px;
-  border: 1px solid rgba(199, 201, 204,.34);
+  border: 1px solid rgba(255, 46, 136,.34);
 }
 /* The corner is the only part guaranteed not to be covered by the next card, and it has to be
    wide enough for a 10. That is the whole constraint. */
@@ -2056,18 +2058,18 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
 .bid-btn.alone { background: linear-gradient(#e0b463, #c99a44); }
 
 .draw-btn, .meld-btn, .knock-btn {
-  background: rgba(255,255,255,0.08); border: 1px solid rgba(199, 201, 204,0.5); color: var(--gold-hi);
+  background: rgba(255,255,255,0.08); border: 1px solid rgba(255, 46, 136,0.5); color: var(--gold-hi);
 }
-.draw-btn:hover, .meld-btn:hover, .knock-btn:hover { background: rgba(199, 201, 204,0.18); }
+.draw-btn:hover, .meld-btn:hover, .knock-btn:hover { background: rgba(255, 46, 136,0.18); }
 .turn-badge { background: var(--gold); color: #17140c; font-weight: 700; }
 
 /* Card backs belong to this room too — a deep green with a brass lattice, not mint stripes. */
 .card.back, .mini-back {
   background:
-    repeating-linear-gradient(45deg, rgba(199, 201, 204,0.16) 0 3px, transparent 3px 7px),
-    repeating-linear-gradient(-45deg, rgba(199, 201, 204,0.16) 0 3px, transparent 3px 7px),
+    repeating-linear-gradient(45deg, rgba(255, 46, 136,0.16) 0 3px, transparent 3px 7px),
+    repeating-linear-gradient(-45deg, rgba(255, 46, 136,0.16) 0 3px, transparent 3px 7px),
     linear-gradient(160deg, #17452f, #0e2c1e);
-  border: 1px solid rgba(199, 201, 204,0.35);
+  border: 1px solid rgba(255, 46, 136,0.35);
 }
 
 /* The Parlour palette painted every primary button brass, and its `:hover` outranked the plain
@@ -2182,9 +2184,9 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
   box-shadow:
     0 0.5px 0 var(--card-edge),
     0 1.5px 0 color-mix(in srgb, var(--card-edge) 66%, #000),
-    0 4px 8px rgba(26, 26, 28, 0.26),
-    0 10px 20px rgba(26, 26, 28, 0.20),
-    0 20px 34px rgba(26, 26, 28, 0.12);
+    0 4px 8px rgba(9, 5, 24, 0.26),
+    0 10px 20px rgba(9, 5, 24, 0.20),
+    0 20px 34px rgba(9, 5, 24, 0.12);
 }
 
 /* Sheen: a raking highlight across the stock, brighter at the top-left
@@ -2212,7 +2214,7 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
 .hand .card-btn.playable:hover,
 .hand .card-btn.playable:focus-visible {
   transform: rotateX(0deg) translateY(-16px) translateZ(46px) scale(1.04);
-  filter: drop-shadow(0 20px 26px rgba(26, 26, 28,.34));
+  filter: drop-shadow(0 20px 26px rgba(9, 5, 24,.34));
   z-index: 5;
 }
 .hand .card-btn.selected, .hand .card-btn.staged {
@@ -2234,8 +2236,8 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
     0 7px 0 color-mix(in srgb, var(--card-edge) 58%, #000),
     0 9px 0 color-mix(in srgb, var(--card-edge) 46%, #000),
     0 11px 0 color-mix(in srgb, var(--card-edge) 36%, #000),
-    0 16px 18px rgba(26, 26, 28, 0.32),
-    0 30px 40px rgba(26, 26, 28, 0.22);
+    0 16px 18px rgba(9, 5, 24, 0.32),
+    0 30px 40px rgba(9, 5, 24, 0.22);
 }
 
 /* --- the trick in the middle: cards thrown down, overlapping, lit --- */
@@ -2407,7 +2409,7 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
 /* --- woodcut --- */
 .f-woodcut {
   background: #efe6cf !important; border: 2px solid #2a1d10 !important; border-radius: 2px !important;
-  box-shadow: 0 3px 0 #b8ac93, 0 6px 12px rgba(26, 26, 28,.35) !important;
+  box-shadow: 0 3px 0 #b8ac93, 0 6px 12px rgba(9, 5, 24,.35) !important;
 }
 .f-woodcut.black { color: #2a1d10; } .f-woodcut.red { color: #8a1a12; }
 .f-woodcut .pip, .f-woodcut .pips .spot { text-shadow: 1px 1px 0 rgba(42,29,16,.3); }
@@ -2438,7 +2440,7 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
 .f-deco { background: #f7f0de !important; }
 .f-deco.black { color: #7d6220; } .f-deco.red { color: #9d1f2b; }
 .f-deco .corner { font-family: var(--serif); }
-.f-deco .holo { inset: 5px; border: 1px solid rgba(199, 201, 204,.75); border-radius: 3px; background: none; opacity: 1; }
+.f-deco .holo { inset: 5px; border: 1px solid rgba(255, 46, 136,.75); border-radius: 3px; background: none; opacity: 1; }
 
 /* --- hand drawn --- */
 .f-handdrawn { border-radius: 12px 6px 11px 5px !important; }
@@ -2471,7 +2473,7 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
 
 [data-back="monogram"]  .card.back::before { background: #1c2a44; }
 [data-back="monogram"]  .card.back::after  { content: "♠"; display: grid; place-items: center; color: #e8c46a; font-size: calc(var(--bw) * 0.42); mix-blend-mode: normal; background: none; }
-[data-back="lattice"]   .card.back::before { background: repeating-linear-gradient(45deg, rgba(199, 201, 204,.5) 0 3px, transparent 3px 7px), repeating-linear-gradient(-45deg, rgba(199, 201, 204,.5) 0 3px, transparent 3px 7px), #123b28; }
+[data-back="lattice"]   .card.back::before { background: repeating-linear-gradient(45deg, rgba(255, 46, 136,.5) 0 3px, transparent 3px 7px), repeating-linear-gradient(-45deg, rgba(255, 46, 136,.5) 0 3px, transparent 3px 7px), #123b28; }
 [data-back="ivory"]     .card.back::before { background: #f4ecdc; box-shadow: inset 0 0 0 3px #b8a06a, inset 0 0 0 4px #c9b384; }
 [data-back="stripe"]    .card.back::before { background: repeating-linear-gradient(60deg, #b4232f 0 7px, #8d1a24 7px 14px); }
 [data-back="halftone"]  .card.back::before { background: radial-gradient(circle at 3px 3px, #2b4c8c 1.5px, transparent 1.7px) 0 0/8px 8px, #dfe6f5; }
@@ -2497,7 +2499,7 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
 }
 [data-back="tartan"]    .card.back::before { background: repeating-linear-gradient(0deg, rgba(20,60,40,.65) 0 8px, transparent 8px 16px), repeating-linear-gradient(90deg, rgba(20,40,80,.6) 0 8px, transparent 8px 16px), #1d5c3c; }
 [data-back="marble"]    .card.back::before { background: radial-gradient(60% 40% at 30% 25%, #fff, transparent 60%), radial-gradient(50% 60% at 70% 70%, #dfe0e4, transparent 60%), linear-gradient(40deg, #e9eaee, #c9ccd4); }
-[data-back="circuit"]   .card.back::before { background: repeating-linear-gradient(90deg, rgba(199, 201, 204,.35) 0 1px, transparent 1px 11px), repeating-linear-gradient(0deg, rgba(199, 201, 204,.2) 0 1px, transparent 1px 7px), #0f2119; }
+[data-back="circuit"]   .card.back::before { background: repeating-linear-gradient(90deg, rgba(255, 46, 136,.35) 0 1px, transparent 1px 11px), repeating-linear-gradient(0deg, rgba(255, 46, 136,.2) 0 1px, transparent 1px 7px), #0f2119; }
 [data-back="damask"]    .card.back::before { background: radial-gradient(circle at 6px 6px, rgba(240,225,190,.55) 3px, transparent 3.4px) 0 0/12px 12px, #5a1f2e; }
 [data-back="wave"]      .card.back::before { background: radial-gradient(circle at 50% 100%, transparent 6px, #1a4f7a 6.5px, transparent 7px) 0 0/14px 8px, #0f3555; }
 [data-back="mesh"]      .card.back::before { background: radial-gradient(60% 60% at 25% 20%, #8b5cf6, transparent 65%), radial-gradient(60% 60% at 80% 75%, #22d3ee, transparent 65%), #1c1145; }
@@ -2507,11 +2509,11 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
    cigarette-case back is drawn rather than printed. */
 [data-back="artdeco"] .card.back::before {
   background:
-    repeating-linear-gradient(45deg, rgba(199, 201, 204,.55) 0 1.5px, transparent 1.5px 9px),
-    repeating-linear-gradient(-45deg, rgba(199, 201, 204,.55) 0 1.5px, transparent 1.5px 9px),
-    radial-gradient(circle at 50% 50%, transparent 22%, rgba(199, 201, 204,.28) 23% 24%, transparent 25%),
+    repeating-linear-gradient(45deg, rgba(255, 46, 136,.55) 0 1.5px, transparent 1.5px 9px),
+    repeating-linear-gradient(-45deg, rgba(255, 46, 136,.55) 0 1.5px, transparent 1.5px 9px),
+    radial-gradient(circle at 50% 50%, transparent 22%, rgba(255, 46, 136,.28) 23% 24%, transparent 25%),
     #0e0d0c;
-  box-shadow: inset 0 0 0 4px rgba(199, 201, 204,.55), inset 0 0 0 5px rgba(199, 201, 204,.18);
+  box-shadow: inset 0 0 0 4px rgba(255, 46, 136,.55), inset 0 0 0 5px rgba(255, 46, 136,.18);
 }
 /* Holo Foil: the same rainbow a hologram sticker throws, so the existing edge-glint on the
    pile's one big back (see "A DECK THAT CATCHES THE LIGHT") reads as foil catching real light
@@ -2595,10 +2597,10 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
   --rail-bg: linear-gradient(160deg, #3d0a16, #240610);
   --rail-shadow: inset 0 0 0 2px #c9a227, 0 16px 40px rgba(0,0,0,0.45);
   --felt-bg: radial-gradient(120% 90% at 50% 0, #8a1730, #4d0a18);
-  --felt-shadow: inset 0 0 0 2px rgba(199, 201, 204,0.5), inset 0 8px 30px rgba(0,0,0,0.42);
+  --felt-shadow: inset 0 0 0 2px rgba(255, 46, 136,0.5), inset 0 8px 30px rgba(0,0,0,0.42);
   --t-ink: #f6e6c4; --t-muted: rgba(246,230,196,0.68); --t-key: #e8c46a;
-  --t-line: rgba(199, 201, 204,0.32); --t-panel: rgba(0,0,0,0.24);
-  --t-seat: rgba(199, 201, 204,0.14); --t-seat-line: rgba(205, 207, 210,0.7);
+  --t-line: rgba(255, 46, 136,0.32); --t-panel: rgba(0,0,0,0.24);
+  --t-seat: rgba(255, 46, 136,0.14); --t-seat-line: rgba(205, 207, 210,0.7);
 }
 .table[data-felt="marble"], .felt-swatch[data-felt="marble"], .pp-stage[data-felt="marble"], .pack-swatch[data-felt="marble"] {
   --rail-w: 12px; --rail-r: 8px; --felt-r: 4px; --felt-pad: 24px;
@@ -2721,7 +2723,7 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
 .sw-card {
   width: 40px; height: 56px; position: relative; border-radius: 6px; flex: 0 0 auto;
   background: var(--card-bg); border: 1px solid rgba(0,0,0,.24);
-  box-shadow: 0 1px 0 var(--card-edge), 0 2px 5px rgba(26, 26, 28,.24);
+  box-shadow: 0 1px 0 var(--card-edge), 0 2px 5px rgba(9, 5, 24,.24);
 }
 .sw-card .corner { position: absolute; top: 4px; left: 5px; font-size: 12px; font-weight: 800; line-height: 1; }
 .sw-card .corner span { display: block; font-size: 9px; }
@@ -2729,14 +2731,14 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
 .sw-back {
   width: 40px; height: 56px; border-radius: 6px; flex: 0 0 auto; position: relative;
   display: grid; place-items: center; font-size: 17px; color: #e8c46a; overflow: hidden;
-  border: 1px solid rgba(0,0,0,.28); box-shadow: 0 1px 0 var(--card-edge), 0 2px 5px rgba(26, 26, 28,.24);
+  border: 1px solid rgba(0,0,0,.28); box-shadow: 0 1px 0 var(--card-edge), 0 2px 5px rgba(9, 5, 24,.24);
 }
 .sw-back.big { width: 84px; height: 118px; font-size: 34px; }
 .sw-back::before { content: ""; position: absolute; inset: 0; }
 .sw-back > * { position: relative; z-index: 1; }
 /* Reuse the deck patterns by scoping the same rules to the swatch. */
 .sw-back[data-back="monogram"]::before { background: #1c2a44; }
-.sw-back[data-back="lattice"]::before { background: repeating-linear-gradient(45deg, rgba(199, 201, 204,.5) 0 3px, transparent 3px 7px), repeating-linear-gradient(-45deg, rgba(199, 201, 204,.5) 0 3px, transparent 3px 7px), #123b28; }
+.sw-back[data-back="lattice"]::before { background: repeating-linear-gradient(45deg, rgba(255, 46, 136,.5) 0 3px, transparent 3px 7px), repeating-linear-gradient(-45deg, rgba(255, 46, 136,.5) 0 3px, transparent 3px 7px), #123b28; }
 .sw-back[data-back="ivory"]::before { background: #f4ecdc; box-shadow: inset 0 0 0 3px #b8a06a; }
 .sw-back[data-back="stripe"]::before { background: repeating-linear-gradient(60deg, #b4232f 0 6px, #8d1a24 6px 12px); }
 .sw-back[data-back="halftone"]::before { background: radial-gradient(circle at 3px 3px, #2b4c8c 1.4px, transparent 1.6px) 0 0/7px 7px, #dfe6f5; }
@@ -2754,7 +2756,7 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
 }
 .sw-back[data-back="tartan"]::before { background: repeating-linear-gradient(0deg, rgba(20,60,40,.65) 0 7px, transparent 7px 14px), repeating-linear-gradient(90deg, rgba(20,40,80,.6) 0 7px, transparent 7px 14px), #1d5c3c; }
 .sw-back[data-back="marble"]::before { background: radial-gradient(60% 40% at 30% 25%, #fff, transparent 60%), linear-gradient(40deg, #e9eaee, #c9ccd4); }
-.sw-back[data-back="circuit"]::before { background: repeating-linear-gradient(90deg, rgba(199, 201, 204,.35) 0 1px, transparent 1px 9px), repeating-linear-gradient(0deg, rgba(199, 201, 204,.2) 0 1px, transparent 1px 6px), #0f2119; }
+.sw-back[data-back="circuit"]::before { background: repeating-linear-gradient(90deg, rgba(255, 46, 136,.35) 0 1px, transparent 1px 9px), repeating-linear-gradient(0deg, rgba(255, 46, 136,.2) 0 1px, transparent 1px 6px), #0f2119; }
 .sw-back[data-back="damask"]::before { background: radial-gradient(circle at 5px 5px, rgba(240,225,190,.55) 2.6px, transparent 3px) 0 0/10px 10px, #5a1f2e; }
 .sw-back[data-back="wave"]::before { background: radial-gradient(circle at 50% 100%, transparent 5px, #1a4f7a 5.5px, transparent 6px) 0 0/12px 7px, #0f3555; }
 .sw-back[data-back="mesh"]::before { background: radial-gradient(60% 60% at 25% 20%, #8b5cf6, transparent 65%), radial-gradient(60% 60% at 80% 75%, #22d3ee, transparent 65%), #1c1145; }
@@ -2762,8 +2764,8 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
 .sw-back[data-back="deepsolid"]::before { background: #1f3a5c; }
 .sw-back[data-back="artdeco"]::before {
   background:
-    repeating-linear-gradient(45deg, rgba(199, 201, 204,.55) 0 1.5px, transparent 1.5px 8px),
-    repeating-linear-gradient(-45deg, rgba(199, 201, 204,.55) 0 1.5px, transparent 1.5px 8px),
+    repeating-linear-gradient(45deg, rgba(255, 46, 136,.55) 0 1.5px, transparent 1.5px 8px),
+    repeating-linear-gradient(-45deg, rgba(255, 46, 136,.55) 0 1.5px, transparent 1.5px 8px),
     #0e0d0c;
 }
 .sw-back[data-back="holofoil"]::before {
@@ -2866,7 +2868,7 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
 .seeall:hover {
   transform: translateY(-2px);
   border-color: var(--gold);
-  box-shadow: 0 10px 24px rgba(26, 26, 28,.18);
+  box-shadow: 0 10px 24px rgba(9, 5, 24,.18);
 }
 
 @media (max-width: 700px) {
@@ -2955,7 +2957,7 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
   border: 1px solid rgba(255,255,255,.18);
   transition: background 160ms, border-color 160ms;
 }
-.hero-more:hover { background: rgba(255,255,255,.14); border-color: rgba(199, 201, 204,.6); }
+.hero-more:hover { background: rgba(255,255,255,.14); border-color: rgba(255, 46, 136,.6); }
 
 /* Arrows live beside the board, not on top of the words. */
 .car-arrow.prev { left: 4px; }
@@ -3042,7 +3044,7 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
   box-shadow:
     0 1px 0 var(--card-edge),
     0 2px 0 color-mix(in srgb, var(--card-edge) 72%, #000),
-    0 6px 12px rgba(14, 14, 16, .34);
+    0 6px 12px rgba(9, 5, 24, .34);
   will-change: transform, opacity;
   backface-visibility: hidden;
 }
@@ -3205,7 +3207,7 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
     0 1px 0 var(--card-edge),
     0 2px 0 color-mix(in srgb, var(--card-edge) 74%, #000),
     0 3px 0 color-mix(in srgb, var(--card-edge) 60%, #000),
-    0 10px 18px rgba(14, 14, 16, .38);
+    0 10px 18px rgba(9, 5, 24, .38);
 }
 
 /* The halves come properly apart before they bridge. */
@@ -3240,7 +3242,7 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
 
 .prefs-scrim {
   position: fixed; inset: 0; z-index: 40;
-  background: rgba(18, 18, 20, 0.42);
+  background: rgba(12, 7, 30, 0.42);
   backdrop-filter: blur(4px);
   display: grid; place-items: center;
   padding: 24px;
@@ -3251,7 +3253,7 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
   background: var(--panel-solid);
   border: 1px solid var(--panel-brd);
   border-radius: 18px;
-  box-shadow: 0 30px 90px rgba(18, 18, 20, .38), 0 2px 0 rgba(255,255,255,.5) inset;
+  box-shadow: 0 30px 90px rgba(12, 7, 30, .38), 0 2px 0 rgba(255,255,255,.5) inset;
   overflow: hidden;
 }
 
@@ -3400,7 +3402,7 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
 .pp-face, .pp-back {
   position: relative; z-index: 1;
   box-shadow: 0 1px 0 var(--card-edge), 0 2px 0 color-mix(in srgb, var(--card-edge) 70%, #000),
-              0 8px 16px rgba(14, 14, 16,.36);
+              0 8px 16px rgba(9, 5, 24,.36);
 }
 .pp-face { transform: rotate(-7deg) translateX(14px); }
 .pp-back { transform: rotate(7deg) translateX(-14px); margin-left: -18px; }
@@ -3440,7 +3442,7 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
    out-specify that, not merely follow it. */
 .swatch .sw-card.card, .swatch .sw-back, .prefs-preview .sw-card.card, .prefs-preview .sw-back {
   width: 42px; height: 59px; min-height: 0; border-radius: 6px;
-  box-shadow: 0 1px 0 var(--card-edge), 0 2px 6px rgba(26, 26, 28,.26);
+  box-shadow: 0 1px 0 var(--card-edge), 0 2px 6px rgba(9, 5, 24,.26);
 }
 .designer .sw-back.big.mine { width: 84px; height: 118px; }
 .swatch .sw-card.card.face .corner { top: 4px; left: 5px; font-size: 12px; }
@@ -3784,8 +3786,8 @@ button.primary {
   letter-spacing: .01em;
   cursor: pointer;
   box-shadow:
-    0 var(--lip) 0 #4a4a4d,
-    0 calc(var(--lip) + 8px) 20px rgba(199, 201, 204, .38),
+    0 var(--lip) 0 #7a1a45,
+    0 calc(var(--lip) + 8px) 20px rgba(255, 46, 136, .38),
     0 1px 0 rgba(255,255,255,.45) inset;
   transform: translateY(0);
   transition: transform 90ms cubic-bezier(.2,.9,.3,1.3), box-shadow 90ms, filter 140ms;
@@ -3800,7 +3802,7 @@ button.primary:hover {
 }
 button.primary:active {
   transform: translateY(var(--lip));
-  box-shadow: 0 0 0 #4a4a4d, 0 2px 8px rgba(199, 201, 204, .3), 0 1px 0 rgba(255,255,255,.3) inset;
+  box-shadow: 0 0 0 #7a1a45, 0 2px 8px rgba(255, 46, 136, .3), 0 1px 0 rgba(255,255,255,.3) inset;
 }
 button.primary:disabled {
   background: var(--panel-hi); color: var(--dim); box-shadow: 0 var(--lip) 0 rgba(0,0,0,.28);
@@ -3842,12 +3844,12 @@ button.ghost.danger:hover { border-color: var(--red); color: var(--red); }
   font-weight: 600;
   box-shadow: 0 2px 0 rgba(0,0,0,.28);
 }
-.chip:hover, .kindtab:hover { color: var(--ink); border-color: var(--violet); box-shadow: 0 2px 0 rgba(0,0,0,.28), 0 0 18px rgba(110, 110, 114,.32); }
+.chip:hover, .kindtab:hover { color: var(--ink); border-color: var(--violet); box-shadow: 0 2px 0 rgba(0,0,0,.28), 0 0 18px rgba(155, 92, 255,.32); }
 .chip.on, .kindtab.on {
   color: #fff;
   background: linear-gradient(180deg, var(--hot-hi), var(--hot));
   border-color: transparent;
-  box-shadow: 0 2px 0 #4a4a4d, 0 0 22px rgba(199, 201, 204,.5);
+  box-shadow: 0 2px 0 #7a1a45, 0 0 22px rgba(255, 46, 136,.5);
 }
 .kindtab.on .kt-count { border-color: rgba(255,255,255,.55); opacity: .9; }
 
@@ -3860,7 +3862,7 @@ button.ghost.danger:hover { border-color: var(--red); color: var(--red); }
 .tabs button.on {
   color: #fff;
   background: linear-gradient(180deg, var(--hot-hi), var(--hot));
-  box-shadow: 0 0 20px rgba(199, 201, 204,.55);
+  box-shadow: 0 0 20px rgba(255, 46, 136,.55);
 }
 
 /* --- inputs --- */
@@ -3872,7 +3874,7 @@ input:not([type=range]):not([type=color]), textarea, select, .searchbox, .prefs-
 }
 input:focus, textarea:focus, select:focus {
   outline: none; border-color: var(--hot);
-  box-shadow: 0 0 0 3px rgba(199, 201, 204,.22);
+  box-shadow: 0 0 0 3px rgba(255, 46, 136,.22);
 }
 ::placeholder { color: var(--dim); }
 
@@ -3880,7 +3882,7 @@ input:focus, textarea:focus, select:focus {
 .logo3d span {
   background: linear-gradient(150deg, var(--hot) 0%, var(--violet) 100%);
   color: #fff;
-  box-shadow: 0 0 26px rgba(199, 201, 204,.6), 0 4px 0 #6a1180, 0 1px 0 rgba(255,255,255,.4) inset;
+  box-shadow: 0 0 26px rgba(255, 46, 136,.6), 0 4px 0 #6a1180, 0 1px 0 rgba(255,255,255,.4) inset;
 }
 /* The gradient used to run out on --cyan, which put the dimmest stop of the ramp under the last
    letter — the Y of DECKY visibly dropped out against the dark ground. The cyan is now a stop in
@@ -3889,7 +3891,7 @@ header h1, header .wordmark {
   background: linear-gradient(100deg, var(--gold-hi) 0%, var(--cyan-hi) 42%, var(--hot-hi) 74%, var(--gold-hi) 100%);
   -webkit-background-clip: text; background-clip: text;
   -webkit-text-fill-color: transparent;
-  filter: drop-shadow(0 0 18px rgba(199, 201, 204,.35));
+  filter: drop-shadow(0 0 18px rgba(255, 46, 136,.35));
   font-family: var(--display);
 }
 
@@ -3910,7 +3912,7 @@ header h1, header .wordmark {
 .table-wrap:has(.table[data-felt="neon"]) {
   --room-pad: 24px;
   --room-bg:
-    radial-gradient(80% 100% at 50% 0%, rgba(199, 201, 204,.16), transparent 62%),
+    radial-gradient(80% 100% at 50% 0%, rgba(255, 46, 136,.16), transparent 62%),
     radial-gradient(70% 90% at 50% 100%, rgba(76, 143, 132,.12), transparent 62%),
     #0a0620;
 }
@@ -3920,8 +3922,8 @@ header h1, header .wordmark {
     linear-gradient(180deg, #2a1a52 0%, #170d33 48%, #241548 100%);
   --rail-shadow:
     inset 0 1px 0 rgba(255,255,255,.14),
-    inset 0 0 0 1px rgba(199, 201, 204,.30),
-    0 0 46px rgba(199, 201, 204,.28),
+    inset 0 0 0 1px rgba(255, 46, 136,.30),
+    0 0 46px rgba(255, 46, 136,.28),
     0 26px 70px rgba(0,0,0,.62);
   --felt-bg:
     radial-gradient(72% 92% at 50% 30%, #2c1f6b 0%, #1a1147 46%, #0f0a2e 100%);
@@ -3940,10 +3942,10 @@ header h1, header .wordmark {
   box-shadow: 0 0 24px rgba(76, 143, 132,.28) inset;
 }
 .nt-ring { fill: none; stroke: rgba(76, 143, 132,.34); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
-.nt-ring.faint { stroke: rgba(199, 201, 204,.20); }
+.nt-ring.faint { stroke: rgba(255, 46, 136,.20); }
 
 .nt-name {
-  fill: rgba(199, 201, 204,.34);
+  fill: rgba(255, 46, 136,.34);
   font-family: var(--display); font-weight: 800; font-size: 40px; letter-spacing: 9px;
 }
 
@@ -3993,14 +3995,14 @@ header h1, header .wordmark {
   font-weight: 900;
   box-shadow:
     0 var(--lip) 0 #a97600,
-    0 calc(var(--lip) + 10px) 24px rgba(236, 237, 237,.44),
+    0 calc(var(--lip) + 10px) 24px rgba(255, 197, 49,.44),
     0 1px 0 rgba(255,255,255,.6) inset;
   transition: transform 90ms cubic-bezier(.2,.9,.3,1.3), box-shadow 90ms, filter 140ms;
 }
 .hero-slide .hero-cta:hover { transform: translateY(-1px); filter: brightness(1.06); }
 .hero-slide .hero-cta:active {
   transform: translateY(var(--lip));
-  box-shadow: 0 0 0 #a97600, 0 2px 8px rgba(236, 237, 237,.3), 0 1px 0 rgba(255,255,255,.4) inset;
+  box-shadow: 0 0 0 #a97600, 0 2px 8px rgba(255, 197, 49,.3), 0 1px 0 rgba(255,255,255,.4) inset;
 }
 .hero-more {
   background: rgba(255,255,255,.14); border-color: rgba(255,255,255,.34); color: #fff;
@@ -4014,9 +4016,9 @@ header h1, header .wordmark {
    indigo (rgba(20,10,48)) still in it; a duplicate rule this far down the file wins on source
    order regardless of what the real one says, so the button stayed a leftover navy circle
    through the whole repaint. */
-.car-arrow:hover { background: var(--hot); border-color: var(--hot); box-shadow: 0 0 24px rgba(199, 201, 204,.6); }
+.car-arrow:hover { background: var(--hot); border-color: var(--hot); box-shadow: 0 0 24px rgba(255, 46, 136,.6); }
 .car-dot::after { border-color: rgba(255,255,255,.34); }
-.car-dot.on::after { background: var(--hot); border-color: var(--hot); box-shadow: 0 0 14px rgba(199, 201, 204,.8); }
+.car-dot.on::after { background: var(--hot); border-color: var(--hot); box-shadow: 0 0 14px rgba(255, 46, 136,.8); }
 
 /* --- shelf cards lift and light up --- */
 .shelfcard {
@@ -4030,28 +4032,28 @@ header h1, header .wordmark {
 .shelfcard:hover {
   transform: translateY(-6px);
   border-color: var(--hot);
-  box-shadow: 0 3px 0 rgba(0,0,0,.34), 0 0 34px rgba(199, 201, 204,.34), 0 22px 46px rgba(4,0,20,.55);
+  box-shadow: 0 3px 0 rgba(0,0,0,.34), 0 0 34px rgba(255, 46, 136,.34), 0 22px 46px rgba(4,0,20,.55);
 }
 .shelfcard .sc-main h3 { font-weight: 800; letter-spacing: -.02em; }
 .sc-kind {
-  border-color: rgba(110, 110, 114,.5); color: var(--violet);
-  background: rgba(110, 110, 114,.10); opacity: 1;
+  border-color: rgba(155, 92, 255,.5); color: var(--violet);
+  background: rgba(155, 92, 255,.10); opacity: 1;
 }
 .sc-rating { color: var(--gold); }
 .pick-badge {
   background: linear-gradient(180deg, var(--gold-hi), var(--gold));
-  color: #241700; box-shadow: 0 0 18px rgba(236, 237, 237,.6);
+  color: #241700; box-shadow: 0 0 18px rgba(255, 197, 49,.6);
 }
 /* The play button on a tile is the loudest thing on it. */
 .sc-play {
   background: linear-gradient(180deg, var(--hot-hi), var(--hot)) !important;
   color: #fff !important; border: 0 !important;
-  box-shadow: 0 0 20px rgba(199, 201, 204,.55);
+  box-shadow: 0 0 20px rgba(255, 46, 136,.55);
   opacity: 0; transform: scale(.8);
   transition: opacity 180ms, transform 220ms cubic-bezier(.2,.9,.3,1.4);
 }
 .shelfcard:hover .sc-play, .sc-play:focus-visible { opacity: 1; transform: scale(1); }
-.star.on { color: var(--hot); text-shadow: 0 0 14px rgba(199, 201, 204,.7); }
+.star.on { color: var(--hot); text-shadow: 0 0 14px rgba(255, 46, 136,.7); }
 
 /* --- the tiles get their colour back up --- */
 .gameart { border-bottom: 1px solid rgba(255,255,255,.10); }
@@ -4108,14 +4110,14 @@ header h1, header .wordmark {
 .hand.hl-glow .card-btn.playable .card.face {
   box-shadow:
     0 0 0 1.5px var(--gold-hi),
-    0 0 0 3px rgba(199, 201, 204, .30),
+    0 0 0 3px rgba(255, 46, 136, .30),
     0 8px 22px rgba(0, 0, 0, .45);
 }
 .hand.hl-outline .card-btn.playable .card.face { box-shadow: 0 0 0 2px var(--gold); }
 .hand.hl-off .card-btn.playable .card.face { box-shadow: 0 8px 20px rgba(0,0,0,.45); }
 
 /* The game's name is printed low on the cloth, under the seats rather than through them. */
-.nt-name { font-size: 34px; letter-spacing: 12px; fill: rgba(199, 201, 204,.22); }
+.nt-name { font-size: 34px; letter-spacing: 12px; fill: rgba(255, 46, 136,.22); }
 
 /* Cloth text has to survive a dark cloth. */
 .table[data-felt="neon"] { --t-muted: rgba(214,203,250,.74); }
@@ -4183,16 +4185,16 @@ header h1, header .wordmark {
   padding: 30px 34px 26px;
   border-radius: 22px;
   background:
-    radial-gradient(120% 90% at 50% -10%, rgba(199, 201, 204,.20), transparent 62%),
+    radial-gradient(120% 90% at 50% -10%, rgba(255, 46, 136,.20), transparent 62%),
     linear-gradient(180deg, var(--panel-hi), var(--panel));
   border: 1px solid var(--panel-brd);
   box-shadow: 0 2px 0 rgba(0,0,0,.4), 0 30px 80px rgba(4,0,26,.66), 0 1px 0 rgba(255,255,255,.10) inset;
 }
 .modal-box.celebrate.won {
-  border-color: rgba(236, 237, 237,.5);
+  border-color: rgba(255, 197, 49,.5);
   box-shadow:
     0 2px 0 rgba(0,0,0,.4),
-    0 0 60px rgba(236, 237, 237,.28),
+    0 0 60px rgba(255, 197, 49,.28),
     0 30px 80px rgba(4,0,26,.66),
     0 1px 0 rgba(255,255,255,.14) inset;
 }
@@ -4210,11 +4212,11 @@ header h1, header .wordmark {
   background: linear-gradient(100deg, var(--gold-hi), var(--hot-hi) 58%, var(--cyan));
   -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
 }
-.modal-box.celebrate.won h3 { filter: drop-shadow(0 0 22px rgba(236, 237, 237,.45)); }
+.modal-box.celebrate.won h3 { filter: drop-shadow(0 0 22px rgba(255, 197, 49,.45)); }
 .cb-crown {
   display: block; font-size: 40px; line-height: 1; margin-bottom: 4px;
   color: var(--gold);
-  text-shadow: 0 0 26px rgba(236, 237, 237,.7);
+  text-shadow: 0 0 26px rgba(255, 197, 49,.7);
   animation: crown-in 620ms cubic-bezier(.2,1.4,.4,1) both;
 }
 @keyframes crown-in {
@@ -4243,8 +4245,8 @@ header h1, header .wordmark {
   border: 1px solid var(--panel-brd);
 }
 .podium li.first {
-  background: linear-gradient(90deg, rgba(236, 237, 237,.18), rgba(236, 237, 237,.04));
-  border-color: rgba(236, 237, 237,.5);
+  background: linear-gradient(90deg, rgba(255, 197, 49,.18), rgba(255, 197, 49,.04));
+  border-color: rgba(255, 197, 49,.5);
 }
 .podium li.mine .pd-name { color: var(--ink); font-weight: 800; }
 .pd-rank {
@@ -4281,7 +4283,7 @@ header h1, header .wordmark {
   margin-bottom: 34px; padding: 24px 26px 22px;
   border-radius: var(--r-lg);
   background:
-    radial-gradient(120% 90% at 10% -10%, rgba(199, 201, 204,.16), transparent 60%),
+    radial-gradient(120% 90% at 10% -10%, rgba(255, 46, 136,.16), transparent 60%),
     radial-gradient(120% 90% at 90% 110%, rgba(76, 143, 132,.12), transparent 60%),
     linear-gradient(180deg, var(--panel-hi), var(--panel));
   border: 1px solid var(--panel-brd);
@@ -4344,7 +4346,7 @@ header h1, header .wordmark {
 .dr-stats b { color: var(--ink); font-family: var(--mono); }
 .dr-notes {
   margin-bottom: 14px; padding: 11px 14px; border-radius: 10px;
-  background: rgba(236, 237, 237,.08); border: 1px solid rgba(236, 237, 237,.32);
+  background: rgba(255, 197, 49,.08); border: 1px solid rgba(255, 197, 49,.32);
   font-size: 13px;
 }
 .dr-notes b { display: block; margin-bottom: 5px; color: var(--gold-hi); font-size: 12px; }
@@ -4374,7 +4376,7 @@ header h1, header .wordmark {
   animation: card-landed 300ms cubic-bezier(.3, .9, .35, 1) both;
 }
 .bluff-claimed b { color: var(--ink); font-weight: 750; }
-.bluff-claimed.mine { border-color: var(--hot); box-shadow: 0 0 18px rgba(199, 201, 204, .26); }
+.bluff-claimed.mine { border-color: var(--hot); box-shadow: 0 0 18px rgba(255, 46, 136, .26); }
 .bluff-center .bluff-challenge { width: auto; margin-top: 0; }
 
 /* The moment a challenge resolves: the disputed cards turn face up (the log line never could
@@ -4392,7 +4394,7 @@ header h1, header .wordmark {
 }
 .bluff-reveal-verdict b { text-transform: uppercase; letter-spacing: .5px; }
 .bluff-reveal.true .bluff-reveal-verdict {
-  background: rgba(199, 201, 204, 0.14); color: var(--green-d); border: 1px solid rgba(199, 201, 204, 0.4);
+  background: rgba(255, 46, 136, 0.14); color: var(--green-d); border: 1px solid rgba(255, 46, 136, 0.4);
 }
 .bluff-reveal.lie .bluff-reveal-verdict {
   background: color-mix(in srgb, var(--red) 12%, transparent); color: var(--red);
@@ -4410,12 +4412,12 @@ header h1, header .wordmark {
   font-weight: 700; padding: 7px 14px; border-radius: 999px;
   background: var(--panel-hi); border: 1px solid var(--panel-brd); color: var(--ink);
 }
-.bluff-claim.mine { border-color: var(--hot); color: var(--hot-hi); box-shadow: 0 0 16px rgba(199, 201, 204,.28); }
+.bluff-claim.mine { border-color: var(--hot); color: var(--hot-hi); box-shadow: 0 0 16px rgba(255, 46, 136,.28); }
 .bluff-challenge {
   align-self: flex-start;
   background: linear-gradient(180deg, var(--gold-hi), var(--gold)) !important;
   color: #241700 !important;
-  box-shadow: 0 var(--lip) 0 #a97600, 0 0 22px rgba(236, 237, 237,.4);
+  box-shadow: 0 var(--lip) 0 #a97600, 0 0 22px rgba(255, 197, 49,.4);
 }
 .bluff-rankpicker { display: flex; flex-direction: column; gap: 8px; }
 /* One row that scrolls, not two rows that wrap — see the comment in Table.tsx. Edge fades
@@ -4435,8 +4437,8 @@ header h1, header .wordmark {
   animation: reflex-pulse 1.1s ease-in-out infinite;
 }
 @keyframes reflex-pulse {
-  0%, 100% { box-shadow: 0 var(--lip) 0 #4a4a4d, 0 0 22px rgba(199, 201, 204,.4); }
-  50% { box-shadow: 0 var(--lip) 0 #4a4a4d, 0 0 40px rgba(199, 201, 204,.75); }
+  0%, 100% { box-shadow: 0 var(--lip) 0 #7a1a45, 0 0 22px rgba(255, 46, 136,.4); }
+  50% { box-shadow: 0 var(--lip) 0 #7a1a45, 0 0 40px rgba(255, 46, 136,.75); }
 }
 @media (prefers-reduced-motion: reduce) { .reflex-slap { animation: none; } }
 :root[data-motion="reduced"] .reflex-slap { animation: none; }
@@ -4529,7 +4531,7 @@ header h1, header .wordmark {
   background: var(--panel-hi); color: var(--ink); cursor: pointer;
 }
 .swatch.glyph:hover { border-color: var(--panel-brd-hi); }
-.swatch.glyph.on { border-color: var(--gold, #d6af5c); box-shadow: 0 0 0 2px rgba(199, 201, 204,0.28); }
+.swatch.glyph.on { border-color: var(--gold, #d6af5c); box-shadow: 0 0 0 2px rgba(255, 46, 136,0.28); }
 
 /* ---- a whole look, in one click ---- */
 .swatches.packs { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
@@ -4780,9 +4782,9 @@ header h1, header .wordmark {
   text-align: center; padding: 54px 28px 44px;
   border-radius: 22px; margin-bottom: 34px;
   background:
-    radial-gradient(560px 280px at 50% 0%, rgba(199, 201, 204,0.14), transparent 70%),
+    radial-gradient(560px 280px at 50% 0%, rgba(255, 46, 136,0.14), transparent 70%),
     linear-gradient(160deg, #0f2a1e 0%, #123c2a 60%, #175136 100%);
-  border: 1px solid rgba(199, 201, 204, 0.28);
+  border: 1px solid rgba(255, 46, 136, 0.28);
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 18px 50px rgba(0,0,0,0.5);
   color: #f4f1e8;
 }
@@ -5141,8 +5143,8 @@ button.primary.lg { padding: 13px 28px; font-size: 16px; border-radius: 999px; }
   box-shadow:
     0 0.5px 0 var(--card-edge),
     0 1.5px 0 color-mix(in srgb, var(--card-edge) 66%, #000),
-    0 4px 8px rgba(26, 26, 28, 0.26),
-    0 10px 20px rgba(26, 26, 28, 0.20);
+    0 4px 8px rgba(9, 5, 24, 0.26),
+    0 10px 20px rgba(9, 5, 24, 0.20);
   transform: rotateX(7deg);
 }
 .attrcard::after {
@@ -5361,9 +5363,9 @@ button.primary.lg { padding: 13px 28px; font-size: 16px; border-radius: 999px; }
   position: absolute; left: 50%; bottom: -9px; transform: translateX(-50%);
   width: 34px; height: 3px; border-radius: 999px;
   background: var(--green, #d6af5c);
-  box-shadow: 0 0 12px var(--glow, rgba(199, 201, 204, .5));
+  box-shadow: 0 0 12px var(--glow, rgba(255, 46, 136, .5));
 }
-.seat.active { background: rgba(199, 201, 204, .1); box-shadow: 0 0 0 1px rgba(199, 201, 204, .34), 0 8px 26px rgba(0, 0, 0, .28); }
+.seat.active { background: rgba(255, 46, 136, .1); box-shadow: 0 0 0 1px rgba(255, 46, 136, .34), 0 8px 26px rgba(0, 0, 0, .28); }
 
 /* Seven and eight-player games (Showdown Poker, Pit) put six or seven opponents round the
    table. There is no honest ring for that on this width -- and SEAT_RING has no arrangement
@@ -5423,8 +5425,8 @@ button.primary.lg { padding: 13px 28px; font-size: 16px; border-radius: 999px; }
     backdrop-filter: blur(3px);
   }
   .opponents .seat.active {
-    background: rgba(199, 201, 204, .13);
-    border-color: rgba(199, 201, 204, .45);
+    background: rgba(255, 46, 136, .13);
+    border-color: rgba(255, 46, 136, .45);
   }
 }
 
@@ -5450,7 +5452,7 @@ button.primary.lg { padding: 13px 28px; font-size: 16px; border-radius: 999px; }
 .trump-badge.suit-H b, .trump-badge.suit-D b, .lead-badge.suit-H b, .lead-badge.suit-D b { color: #ff6b81; }
 .trump-badge.suit-S b, .trump-badge.suit-C b, .lead-badge.suit-S b, .lead-badge.suit-C b { color: #f2f4f8; }
 /* Trump is the louder of the two. */
-.trump-badge { background: rgba(199, 201, 204, .16); border-color: rgba(199, 201, 204, .42); }
+.trump-badge { background: rgba(255, 46, 136, .16); border-color: rgba(255, 46, 136, .42); }
 .trump-badge.none b { font-size: 12px; color: var(--t-muted, rgba(255, 255, 255, .6)); }
 .trick-note { font-size: 12px; color: var(--t-muted, rgba(255, 255, 255, .6)); }
 
@@ -5562,7 +5564,7 @@ button.bluff-go:disabled {
 
 /* Betting buttons read as a ladder: the safe move is the bright one, anything that commits
    more of your stack is quieter, and the all-in is marked rather than merely large. */
-.poker-actions .ghost.bet { border-color: rgba(199, 201, 204, .42); color: var(--t-ink, #fff); }
+.poker-actions .ghost.bet { border-color: rgba(255, 46, 136, .42); color: var(--t-ink, #fff); }
 .poker-actions .ghost.bet:hover:not(:disabled) { border-color: var(--green); }
 .poker-actions .ghost.bet.allin {
   border-style: dashed; border-color: rgba(255, 110, 130, .6); color: #ff9fb0;
@@ -5756,8 +5758,8 @@ button.bluff-go:disabled {
 .trick-taken { position: relative; display: flex; gap: 10px; align-items: flex-end; }
 .trick-taken .trick-card { animation: none; }
 .trick-taken .trick-card.took-it .card.face {
-  box-shadow: 0 0 0 2px var(--gold, #ffc531), 0 8px 22px rgba(236, 237, 237, .35),
-    0 1px 0 var(--card-edge), 0 4px 8px rgba(26, 26, 28, .26);
+  box-shadow: 0 0 0 2px var(--gold, #ffc531), 0 8px 22px rgba(255, 197, 49, .35),
+    0 1px 0 var(--card-edge), 0 4px 8px rgba(9, 5, 24, .26);
 }
 .trick-won {
   position: absolute; left: 50%; top: -28px; translate: -50% 0;
@@ -5807,12 +5809,12 @@ button.bluff-go:disabled {
 }
 .cb-beam.won {
   background:
-    radial-gradient(42% 56% at 50% 40%, rgba(236, 237, 237, .38), transparent 66%),
+    radial-gradient(42% 56% at 50% 40%, rgba(255, 197, 49, .38), transparent 66%),
     conic-gradient(from 200deg at 50% 40%,
-      transparent 0deg, rgba(236, 237, 237, .16) 14deg, transparent 30deg,
-      transparent 60deg, rgba(236, 237, 237, .12) 76deg, transparent 92deg,
-      transparent 150deg, rgba(236, 237, 237, .14) 168deg, transparent 186deg,
-      transparent 250deg, rgba(236, 237, 237, .10) 268deg, transparent 286deg,
+      transparent 0deg, rgba(255, 197, 49, .16) 14deg, transparent 30deg,
+      transparent 60deg, rgba(255, 197, 49, .12) 76deg, transparent 92deg,
+      transparent 150deg, rgba(255, 197, 49, .14) 168deg, transparent 186deg,
+      transparent 250deg, rgba(255, 197, 49, .10) 268deg, transparent 286deg,
       transparent 360deg);
   animation: beam-up 900ms cubic-bezier(.2, .8, .3, 1) both, beam-turn 26s linear infinite 900ms;
 }
@@ -5834,7 +5836,7 @@ button.bluff-go:disabled {
 .cb-crown { position: relative; display: block; margin-bottom: 4px; }
 .cb-mark {
   display: block; font-size: 46px; line-height: 1; color: var(--gold);
-  text-shadow: 0 0 26px rgba(236, 237, 237, .7);
+  text-shadow: 0 0 26px rgba(255, 197, 49, .7);
   animation: mark-land 700ms cubic-bezier(.2, 1.5, .35, 1) both;
   animation-duration: calc(700ms * var(--anim-scale, 1));
 }
@@ -5845,8 +5847,8 @@ button.bluff-go:disabled {
   100% { opacity: 1; scale: 1;   rotate: 0deg;   translate: 0 0; }
 }
 @keyframes mark-glow {
-  0%, 100% { text-shadow: 0 0 26px rgba(236, 237, 237, .7); }
-  50%      { text-shadow: 0 0 44px rgba(236, 237, 237, 1), 0 0 12px rgba(255, 255, 255, .8); }
+  0%, 100% { text-shadow: 0 0 26px rgba(255, 197, 49, .7); }
+  50%      { text-shadow: 0 0 44px rgba(255, 197, 49, 1), 0 0 12px rgba(255, 255, 255, .8); }
 }
 
 /*
@@ -5856,8 +5858,8 @@ button.bluff-go:disabled {
   text-shadow since this sits on a card rather than lettering.
 */
 @keyframes first-card-glow-pulse {
-  0%, 100% { box-shadow: 0 0 0 2px rgba(236, 237, 237, .85), 0 0 22px 4px rgba(236, 237, 237, .55); }
-  50%      { box-shadow: 0 0 0 3px rgba(236, 237, 237, 1), 0 0 38px 10px rgba(236, 237, 237, .85); }
+  0%, 100% { box-shadow: 0 0 0 2px rgba(255, 197, 49, .85), 0 0 22px 4px rgba(255, 197, 49, .55); }
+  50%      { box-shadow: 0 0 0 3px rgba(255, 197, 49, 1), 0 0 38px 10px rgba(255, 197, 49, .85); }
 }
 .card-btn.first-card-glow .card.face, .card-btn.first-card-glow .card.back {
   border-radius: inherit;
@@ -5865,17 +5867,17 @@ button.bluff-go:disabled {
 }
 @media (prefers-reduced-motion: reduce) {
   .card-btn.first-card-glow .card.face, .card-btn.first-card-glow .card.back {
-    animation: none; box-shadow: 0 0 0 2px rgba(236, 237, 237, .9), 0 0 20px 4px rgba(236, 237, 237, .6);
+    animation: none; box-shadow: 0 0 0 2px rgba(255, 197, 49, .9), 0 0 20px 4px rgba(255, 197, 49, .6);
   }
 }
 :root[data-motion="reduced"] .card-btn.first-card-glow .card.face,
 :root[data-motion="reduced"] .card-btn.first-card-glow .card.back {
-  animation: none; box-shadow: 0 0 0 2px rgba(236, 237, 237, .9), 0 0 20px 4px rgba(236, 237, 237, .6);
+  animation: none; box-shadow: 0 0 0 2px rgba(255, 197, 49, .9), 0 0 20px 4px rgba(255, 197, 49, .6);
 }
 .cb-ring {
   position: absolute; left: 50%; top: 50%; width: 46px; height: 46px;
   translate: -50% -50%; border-radius: 50%;
-  border: 2px solid rgba(236, 237, 237, .85); pointer-events: none;
+  border: 2px solid rgba(255, 197, 49, .85); pointer-events: none;
   animation: ring-out 900ms cubic-bezier(.15, .7, .3, 1) 340ms both;
   animation-duration: calc(900ms * var(--anim-scale, 1));
 }
@@ -5905,14 +5907,14 @@ button.bluff-go:disabled {
   to   { opacity: 1; translate: 0 0;     scale: 1; }
 }
 .modal-box.celebrate.final .podium li.first {
-  box-shadow: 0 0 0 0 rgba(236, 237, 237, .5);
+  box-shadow: 0 0 0 0 rgba(255, 197, 49, .5);
   animation: pod-in 420ms cubic-bezier(.2, .9, .3, 1.05) both,
              first-pulse 2.4s ease-out 1.1s infinite;
 }
 @keyframes first-pulse {
-  0%   { box-shadow: 0 0 0 0 rgba(236, 237, 237, .45); }
-  70%  { box-shadow: 0 0 0 12px rgba(236, 237, 237, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(236, 237, 237, 0); }
+  0%   { box-shadow: 0 0 0 0 rgba(255, 197, 49, .45); }
+  70%  { box-shadow: 0 0 0 12px rgba(255, 197, 49, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(255, 197, 49, 0); }
 }
 
 /* Last in, so nobody clicks past the ending before it has happened. */
@@ -6012,13 +6014,13 @@ button.bluff-go:disabled {
   padding: 3px 12px; border-radius: 999px; white-space: nowrap;
   font-size: 11px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase;
   color: #241700; background: linear-gradient(180deg, var(--gold-hi), var(--gold));
-  box-shadow: 0 0 0 3px rgba(199, 201, 204, .28), 0 6px 18px rgba(0, 0, 0, .4);
+  box-shadow: 0 0 0 3px rgba(255, 46, 136, .28), 0 6px 18px rgba(0, 0, 0, .4);
   animation: tell-in 220ms cubic-bezier(.2, 1.5, .4, 1) both, tell-pulse 900ms ease-in-out infinite 220ms;
 }
 @keyframes tell-in { from { opacity: 0; scale: .5; } to { opacity: 1; scale: 1; } }
 @keyframes tell-pulse {
-  0%, 100% { box-shadow: 0 0 0 3px rgba(199, 201, 204, .28), 0 6px 18px rgba(0, 0, 0, .4); }
-  50%      { box-shadow: 0 0 0 8px rgba(199, 201, 204, .06), 0 6px 18px rgba(0, 0, 0, .4); }
+  0%, 100% { box-shadow: 0 0 0 3px rgba(255, 46, 136, .28), 0 6px 18px rgba(0, 0, 0, .4); }
+  50%      { box-shadow: 0 0 0 8px rgba(255, 46, 136, .06), 0 6px 18px rgba(0, 0, 0, .4); }
 }
 @media (prefers-reduced-motion: reduce) { .kent-tell { animation: none; } }
 :root[data-motion="reduced"] .kent-tell { animation: none; }
@@ -6261,7 +6263,7 @@ button.bluff-go:disabled {
 }
 .dr .dr-line.faint { opacity: .5; }
 .dr .dr-line.thin { stroke-width: 1; }
-.dr .dr-line.gold   { stroke: rgba(199, 201, 204, .38); }
+.dr .dr-line.gold   { stroke: rgba(255, 46, 136, .38); }
 .dr .dr-line.brass  { stroke: rgba(150, 118, 60, .34); }
 .dr .dr-line.lit    { stroke: rgba(34, 211, 238, .32); }
 .dr .dr-line.chalk  {
@@ -6323,21 +6325,22 @@ button.bluff-go:disabled {
      A shade under what it was, with the warmth pushed toward red
      rather than yellow. Brass on a warmer, darker ground reads as
      brighter metal without being made any lighter itself. */
-  --bg0: #060606;
-  --bg1: #100f10;
+  --bg0: #07031a;
+  --bg1: #100a2c;
 
   /* --- metal -------------------------------------------------------
-     Steel is not one colour. A hairline that runs from lit to shadow
-     down its own height reads as a machined edge; a hairline of flat
-     rgba reads as a border. Three stops is all it takes. */
-  --brass-lo: #55575a;
-  --brass:    #c7c9cc;
-  --brass-hi: #eceded;
+     Not one colour: magenta lit, magenta in shadow. A hairline that
+     runs from lit to shadow down its own height reads as a machined
+     edge; a hairline of flat rgba reads as a border. Three stops is
+     all it takes. */
+  --brass-lo: #7a1a45;
+  --brass:    #ff2e88;
+  --brass-hi: #ff9dc4;
   --metal-edge: linear-gradient(
     180deg,
-    rgba(230, 231, 233, 0.42) 0%,
-    rgba(199, 201, 204, 0.18) 34%,
-    rgba(60, 61, 63, 0.10) 100%);
+    rgba(255, 157, 196, 0.42) 0%,
+    rgba(255, 46, 136, 0.18) 34%,
+    rgba(122, 26, 69, 0.10) 100%);
 
   /* --- glass -------------------------------------------------------
      A panel is a sheet of smoked glass held a few millimetres off the
@@ -6346,10 +6349,10 @@ button.bluff-go:disabled {
      translucent so the room's own gradients show through and no two
      panels on the page are quite the same colour — which is the tell
      that separates glass from grey paint. */
-  --glass-fill: rgba(24, 24, 25, 0.56);
-  --glass-fill-hi: rgba(34, 34, 36, 0.68);
+  --glass-fill: rgba(27, 16, 64, 0.56);
+  --glass-fill-hi: rgba(38, 22, 86, 0.68);
   --glass-blur: saturate(150%) blur(18px);
-  --glass-top: rgba(238, 238, 240, 0.10);
+  --glass-top: rgba(255, 241, 255, 0.10);
 
   /* --- elevation ---------------------------------------------------
      Four tiers, named for how far off the surface the thing is. Each
@@ -6371,32 +6374,32 @@ button.bluff-go:disabled {
   --t-slow: 620ms;
 
   /* Glow, kept on a short leash — see the LIVE section below. */
-  --lit: rgba(220, 221, 223, 0.34);
+  --lit: rgba(255, 46, 136, 0.34);
 
   --serif: "Bodoni Moda", "Hoefler Text", "Didot", Georgia, serif;
 }
 
 :root[data-theme="light"] {
-  /* Cool ivory and ink. Not warm: warmth in daylight was the one thing this room is losing. */
-  --bg0: #e6e6e7;
-  --bg1: #f5f5f6;
-  --brass-lo: #4a4a4d;
-  --brass:    #5c5c60;
-  --brass-hi: #86868a;
+  /* Same neon signage, lights on, white walls. */
+  --bg0: #eceaf8;
+  --bg1: #f6f4ff;
+  --brass-lo: #e6006b;
+  --brass:    #ff3d8f;
+  --brass-hi: #ffb3d6;
   --metal-edge: linear-gradient(
     180deg,
     rgba(255, 255, 255, 0.86) 0%,
-    rgba(92, 92, 96, 0.24) 40%,
-    rgba(50, 50, 53, 0.14) 100%);
+    rgba(230, 0, 107, 0.24) 40%,
+    rgba(122, 26, 69, 0.14) 100%);
   --glass-fill: rgba(255, 255, 255, 0.66);
   --glass-fill-hi: rgba(255, 255, 255, 0.84);
   --glass-top: rgba(255, 255, 255, 0.92);
-  --e1: 0 1px 1px rgba(20, 20, 22, .07), 0 2px 6px rgba(20, 20, 22, .07);
-  --e2: 0 1px 2px rgba(20, 20, 22, .09), 0 8px 22px rgba(20, 20, 22, .10);
-  --e3: 0 2px 3px rgba(20, 20, 22, .10), 0 18px 44px rgba(20, 20, 22, .13);
-  --e4: 0 3px 5px rgba(20, 20, 22, .12), 0 40px 90px rgba(20, 20, 22, .17);
+  --e1: 0 1px 1px rgba(70, 40, 140, .07), 0 2px 6px rgba(70, 40, 140, .07);
+  --e2: 0 1px 2px rgba(70, 40, 140, .09), 0 8px 22px rgba(70, 40, 140, .10);
+  --e3: 0 2px 3px rgba(70, 40, 140, .10), 0 18px 44px rgba(70, 40, 140, .13);
+  --e4: 0 3px 5px rgba(70, 40, 140, .12), 0 40px 90px rgba(70, 40, 140, .17);
   --shadow-panel: var(--e3);
-  --lit: rgba(92, 92, 96, 0.30);
+  --lit: rgba(230, 0, 107, 0.30);
 }
 
 /* Measured on a throttled Pixel 5 (4x CPU, the profile a mid-range Android gives a real page):
@@ -6409,8 +6412,8 @@ button.bluff-go:disabled {
 @media (hover: none) and (pointer: coarse) {
   :root {
     --glass-blur: none;
-    --glass-fill: rgba(22, 22, 24, 0.82);
-    --glass-fill-hi: rgba(32, 32, 34, 0.90);
+    --glass-fill: rgba(23, 13, 54, 0.82);
+    --glass-fill-hi: rgba(33, 19, 74, 0.90);
   }
   :root[data-theme="light"] {
     --glass-fill: rgba(255, 255, 255, 0.90);
@@ -6665,31 +6668,31 @@ button.ghost:active { transform: translateY(0); box-shadow: var(--e1); }
    it obvious without anything having to glow. */
 button.primary {
   background: linear-gradient(178deg, var(--brass-hi) 0%, var(--brass) 46%, var(--brass-lo) 100%);
-  color: #17110a;
-  border: 1px solid rgba(240, 220, 174, 0.5);
+  color: #1b0a2e;
+  border: 1px solid rgba(255, 157, 196, 0.5);
   font-weight: 700;
   letter-spacing: 0.005em;
   /* The lip: a solid dark edge under the object, then the shadow it
      throws. Take the lip away on :active and the button descends. */
   box-shadow:
-    inset 0 1px 0 rgba(255, 246, 224, 0.62),
+    inset 0 1px 0 rgba(255, 214, 235, 0.62),
     0 3px 0 var(--brass-lo),
     var(--e2);
 }
 button.primary:hover {
-  background: linear-gradient(178deg, #fbeacb 0%, var(--brass-hi) 46%, var(--brass) 100%);
-  color: #17110a;
-  border-color: rgba(255, 246, 224, 0.7);
+  background: linear-gradient(178deg, #ffcae0 0%, var(--brass-hi) 46%, var(--brass) 100%);
+  color: #1b0a2e;
+  border-color: rgba(255, 214, 235, 0.7);
   transform: translateY(-1px);
   box-shadow:
-    inset 0 1px 0 rgba(255, 250, 236, 0.7),
+    inset 0 1px 0 rgba(255, 226, 242, 0.7),
     0 4px 0 var(--brass-lo),
     var(--e3);
 }
 button.primary:active {
   transform: translateY(3px);
   box-shadow:
-    inset 0 1px 0 rgba(255, 246, 224, 0.45),
+    inset 0 1px 0 rgba(255, 214, 235, 0.45),
     0 0 0 var(--brass-lo),
     var(--e1);
 }
@@ -6708,13 +6711,13 @@ button.primary:active {
 }
 .tabs button.on {
   background: linear-gradient(178deg, var(--brass-hi), var(--brass));
-  color: #17110a;
+  color: #1b0a2e;
   box-shadow: var(--e1);
 }
 .seg-btn.on {
   background: linear-gradient(178deg, var(--brass-hi), var(--brass));
-  color: #17110a;
-  border-color: rgba(240, 220, 174, 0.5);
+  color: #1b0a2e;
+  border-color: rgba(255, 157, 196, 0.5);
 }
 
 /* ------------------------------------------------------------------
@@ -7047,7 +7050,7 @@ h2 { font-size: 30px; }
 :root[data-theme="light"] {
   /* Steel has to darken in daylight to hold its own, and then the ink
      on top of it has to go the other way. */
-  --seg-on-bg: linear-gradient(178deg, var(--brass), #38383c);
+  --seg-on-bg: linear-gradient(178deg, var(--brass), #2a1060);
   --seg-on-ink: #fafafb;
 }
 
@@ -7146,13 +7149,13 @@ h2, .modal-box h3, .panel-head h3, .crumb-title, .game-card h3 {
   0%, 100% {
     box-shadow:
       0 0.5px 0 var(--card-edge), 0 1.5px 0 color-mix(in srgb, var(--card-edge) 66%, #000),
-      0 4px 8px rgba(26, 26, 28, 0.26), 0 10px 20px rgba(26, 26, 28, 0.20), 0 20px 34px rgba(26, 26, 28, 0.12),
+      0 4px 8px rgba(9, 5, 24, 0.26), 0 10px 20px rgba(9, 5, 24, 0.20), 0 20px 34px rgba(9, 5, 24, 0.12),
       0 0 0 0 rgba(255, 255, 255, 0);
   }
   50% {
     box-shadow:
       0 0.5px 0 var(--card-edge), 0 1.5px 0 color-mix(in srgb, var(--card-edge) 66%, #000),
-      0 4px 8px rgba(26, 26, 28, 0.26), 0 10px 20px rgba(26, 26, 28, 0.20), 0 20px 34px rgba(26, 26, 28, 0.12),
+      0 4px 8px rgba(9, 5, 24, 0.26), 0 10px 20px rgba(9, 5, 24, 0.20), 0 20px 34px rgba(9, 5, 24, 0.12),
       0 0 20px 1px rgba(255, 255, 255, .38);
   }
 }
