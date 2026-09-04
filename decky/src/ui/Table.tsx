@@ -26,6 +26,7 @@ import { service, rememberSession, forgetSession, resumableSession } from '../se
 import { Board, LocalTableClient, TableClient } from '../net/tableClient';
 import { Seat, MoveRecord } from '../server/matchService';
 import { recordResult, currentStreak, currentLossStreak } from '../social/records';
+import { encodeSharedHand } from '../social/handShare';
 
 // This component holds a match id and a redacted view — never a MatchState. Every move it wants
 // to make goes to the service as an intent; the service decides, and hands back the board as
@@ -197,11 +198,16 @@ const STANDARD_PILES = new Set([
   'draw', 'discard', 'melds', 'ocean', 'center', 'pile', 'battle', 'kitty', 'stock', 'trick',
 ]);
 
-export function Table({ def, seats = 3, plan, practice = false, client: injected, mySeat, resumeMatchId, onMatchOver }: {
+export function Table({
+  def, seats = 3, plan, practice = false, client: injected, mySeat, resumeMatchId, onMatchOver, forcedHandSeed,
+}: {
   def: GameDefinition;
   seats?: number;
   /** Who is sitting where. Omitted means the classic single human against bots. */
   plan?: Seat[];
+  /** Item 73: dealt from a specific seed a `?hand=` link named, rather than a fresh random one
+   *  or whatever session was open. Never a resume — see bootLocal. */
+  forcedHandSeed?: number;
   /**
    * The referee. Omitted means the one in this tab, which is the ordinary case. An online table
    * passes a client whose referee is across a socket — the table cannot tell the difference,
@@ -258,7 +264,9 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
   // abandoned matches in the store and pointed the "unfinished game" pointer at the last of
   // them. Boot once, into a null ref.
   const bootRef = useRef<TableClient | null>(null);
-  if (bootRef.current === null) bootRef.current = injected ?? bootLocal(def, players, false, resumeMatchId);
+  if (bootRef.current === null) {
+    bootRef.current = injected ?? bootLocal(def, players, false, resumeMatchId, forcedHandSeed);
+  }
   const clientRef = bootRef as MutableRefObject<TableClient>;
   const [board, setBoard] = useState<Board>(() => clientRef.current.read(localSeats[0] ?? HUMAN));
   // One toast, two tones: a refusal is a red ✕, a status note is not.
@@ -636,6 +644,28 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
     a.click();
     a.remove();
     URL.revokeObjectURL(url);
+  }
+
+  /** Item 73: "the deal is a seed... that is a shareable link, and it does not exist." Only
+   *  offered once the seed is actually revealed (see fairness() / MatchService.reveal) — the
+   *  same fairness guarantee that keeps it secret mid-match keeps it out of a link too, so
+   *  there is nothing here for the recipient to have gained an unfair look at. Hand one's seed
+   *  specifically, not whichever hand is showing — same convention as replaySameDeal, so a
+   *  shared link and "play it again yourself" always mean the same table. */
+  function shareHand() {
+    const fair = clientRef.current.fairness();
+    const seed = fair?.revealed?.handSeeds[0];
+    if (seed === undefined) return;
+    const code = encodeSharedHand({ gameId: def.meta.id, seed, seats: view.players.length });
+    const link = `${window.location.origin}${window.location.pathname}?hand=${code}`;
+    if (!navigator.clipboard) {
+      setToast({ text: link, tone: 'info' });
+      return;
+    }
+    void navigator.clipboard.writeText(link).then(
+      () => setToast({ text: 'Hand link copied.', tone: 'info' }),
+      () => setToast({ text: link, tone: 'info' }),
+    );
   }
 
   function askTakeback() {
@@ -3020,6 +3050,9 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
             })()}
             <div className="history-actions">
               <button className="ghost" onClick={exportMatch}>Export match ↓</button>
+              {clientRef.current.fairness()?.revealed && (
+                <button className="ghost" onClick={shareHand}>Share this hand ↗</button>
+              )}
               <button className="primary" onClick={() => { setShowHistory(false); setReplayAt(null); }}>Close</button>
             </div>
           </div>
@@ -3091,7 +3124,16 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
  */
 function bootLocal(
   def: GameDefinition, players: string[] | Seat[], fresh: boolean, resumeMatchId?: string,
+  // Item 73: a hand shared as a link names its own exact seed, dealt fresh — it is never a
+  // resume (there is nothing to resume; the visitor has never seen this table) and never the
+  // default random deal either, so it bypasses both branches below outright.
+  forcedHandSeed?: number,
 ): TableClient {
+  if (forcedHandSeed !== undefined) {
+    const m = service.create(def, def.meta.id, players, undefined, undefined, forcedHandSeed);
+    rememberSession(m.matchId, def.meta.id, players.length);
+    return new LocalTableClient(m.matchId, service);
+  }
   // Asked for a specific table — the one picked off the list of games in progress.
   if (!fresh && resumeMatchId) {
     try {

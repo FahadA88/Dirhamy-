@@ -16,6 +16,7 @@ import { recordPlay } from '../library/library';
 import { dailyGame, dailyStreak, resultFor, todayKey } from '../social/daily';
 import { WebSocketApi, joinRemoteTable } from '../net/wsClient';
 import { HouseRules, applyHouseRules, decodeHouseRules } from '../library/houseRules';
+import { decodeSharedHand } from '../social/handShare';
 import { Tournament, TournamentTable, recordYourTable } from '../social/tournament';
 import { TournamentView } from './TournamentView';
 import { TeachView } from './TeachView';
@@ -63,6 +64,9 @@ export function PlayView({ startDailyTrigger }: { startDailyTrigger?: number } =
   const [houseRulesFor, setHouseRulesFor] = useState<({ gameId: string } & HouseRules) | null>(null);
   // A practice game is played but never counted. Chosen at the table, cleared when you leave it.
   const [practice, setPractice] = useState(false);
+  // Item 73: a specific deal named by a ?hand= link. Cleared the same moments practice is, so a
+  // later, ordinary game never inherits somebody else's seed by accident.
+  const [sharedHandSeed, setSharedHandSeed] = useState<number | null>(null);
   // Playing with other people: which game is being set up, and the live session once joined.
   const [onlineFor, setOnlineFor] = useState<GameDefinition | null>(null);
   const [session, setSession] = useState<OnlineSession | null>(null);
@@ -162,6 +166,28 @@ export function PlayView({ startDailyTrigger }: { startDailyTrigger?: number } =
     // calls setters, neither of which react-hooks/exhaustive-deps ever asks for in the array.
   }, []);
 
+  // Item 73: "a shareable link" for a specific deal. Skips Setup entirely — unlike a house-rules
+  // link, this is a "here's what I got" link, not an invitation to configure a table — and lands
+  // straight on the same seat count the hand was dealt for, the classic single human against
+  // bots (no seat plan set), same as opening any other game fresh. Practice, deliberately: it's
+  // somebody else's deal, and letting it write to this browser's own win/loss streak would be
+  // exactly the kind of number that looks earned and was not.
+  useEffect(() => {
+    const code = new URLSearchParams(window.location.search).get('hand');
+    if (!code) return;
+    const url = new URL(window.location.href);
+    url.searchParams.delete('hand');
+    window.history.replaceState(null, '', url.toString());
+    const decoded = decodeSharedHand(code);
+    if (!decoded) return;
+    const def = catalog.find((g) => g.meta.id === decoded.gameId);
+    if (!def) return;
+    setSharedHandSeed(decoded.seed);
+    setPractice(true);
+    setSeats(decoded.seats);
+    setGame(def);
+  }, []);
+
   // Refreshed whenever we come back to the shelf, which is the only time it is on screen.
   useEffect(() => { if (!game && !setupFor && !onlineFor) setInProgress(openGames()); },
     [game, setupFor, onlineFor]);
@@ -228,7 +254,7 @@ export function PlayView({ startDailyTrigger }: { startDailyTrigger?: number } =
         onClose={() => setTournamentFor(null)}
         onPlayTable={(seatPlan, t, table) => {
           setTournamentTable({ t, table });
-          setPlan(seatPlan); setPractice(false); setResumeId(null); setSeats(seatPlan.length);
+          setPlan(seatPlan); setPractice(false); setSharedHandSeed(null); setResumeId(null); setSeats(seatPlan.length);
           setGame(tournamentFor); setTournamentFor(null);
         }}
       />
@@ -250,11 +276,11 @@ export function PlayView({ startDailyTrigger }: { startDailyTrigger?: number } =
             // stick around for the final-score modal before leaving.
             if (tournamentTable) {
               const def = game;
-              setGame(null); setPlan(null); setPractice(false); setTournamentTable(null);
+              setGame(null); setPlan(null); setPractice(false); setSharedHandSeed(null); setTournamentTable(null);
               setTournamentFor(def);
               return;
             }
-            setSession(null); setGame(null); setPlan(null); setPractice(false); setResumeId(null); setDailyMode(false); setPuzzleMode(false);
+            setSession(null); setGame(null); setPlan(null); setPractice(false); setSharedHandSeed(null); setResumeId(null); setDailyMode(false); setPuzzleMode(false);
           }}>← {tournamentTable ? 'Bracket' : 'All games'}</button>
           <span className="crumb-title">{dailyMode ? "Today's Deal" : puzzleMode ? `${game.meta.name} · Puzzle` : tournamentTable ? `${game.meta.name} · Tournament` : game.meta.name}</span>
           {practice && <span className="practice-badge" title="Nothing here is recorded">Practice</span>}
@@ -293,6 +319,7 @@ export function PlayView({ startDailyTrigger }: { startDailyTrigger?: number } =
                 seats={session ? session.seats.length : seats}
                 plan={session ? session.seats : (plan ?? undefined)}
                 practice={practice}
+                forcedHandSeed={sharedHandSeed ?? undefined}
                 client={session?.client}
                 mySeat={session?.seat}
                 resumeMatchId={resumeId ?? undefined}
@@ -350,7 +377,7 @@ export function PlayView({ startDailyTrigger }: { startDailyTrigger?: number } =
               // Hearts, Euchre and War all "resumed" into a fresh three-handed deal.
               if (def) {
                 setSeats(seatsFor(def, resumable.seats));
-                setPlan(null); setPractice(false);
+                setPlan(null); setPractice(false); setSharedHandSeed(null);
                 setResumeId(resumable.matchId); setGame(def); setResumable(null);
               }
             }}>Resume →</button>
@@ -392,7 +419,7 @@ export function PlayView({ startDailyTrigger }: { startDailyTrigger?: number } =
                   </span>
                   <button className="primary sm" onClick={() => {
                     setResumeId(g.matchId);
-                    setPlan(null); setPractice(false); setSeats(g.seats);
+                    setPlan(null); setPractice(false); setSharedHandSeed(null); setSeats(g.seats);
                     setGame(def); setResumable(null);
                   }}>Open</button>
                 </li>
@@ -405,7 +432,7 @@ export function PlayView({ startDailyTrigger }: { startDailyTrigger?: number } =
         onPlay={(def) => {
           recordPlay(def.meta.id);
           setPlan(null);
-          setPractice(false);
+          setPractice(false); setSharedHandSeed(null);
           setResumeId(null);
           setSeats(seatsFor(def, settings.perGameSeats[def.meta.id] ?? settings.defaultSeats));
           setGame(def);
@@ -413,7 +440,7 @@ export function PlayView({ startDailyTrigger }: { startDailyTrigger?: number } =
         onSetup={(def) => { recordPlay(def.meta.id); setSetupFor(def); }}
         onPuzzle={(def) => {
           recordPlay(def.meta.id);
-          setPlan(null); setPractice(false); setResumeId(null); setDailyMode(false);
+          setPlan(null); setPractice(false); setSharedHandSeed(null); setResumeId(null); setDailyMode(false);
           setPuzzleMode(true); setGame(def);
         }}
         onTournament={(def) => { recordPlay(def.meta.id); setTournamentFor(def); }}
