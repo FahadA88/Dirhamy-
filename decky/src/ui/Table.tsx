@@ -1481,6 +1481,19 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
 
   return (
     <div className="table-wrap">
+    {/* Purely decorative: a genuinely 3D, angled rendering of the table's own rim, sized to
+        .table-surface rather than the whole of .table-wrap so it lines up with the felt alone
+        and not the score pad/log sitting below it. It has to live as a sibling of .table
+        rather than as a background painted on it — .table itself is never allowed a transform,
+        filter or perspective of its own (see the note by .drag-ghost): any of those on an
+        ancestor of the felt would silently break the dragged-card ghost's fixed positioning,
+        the same containing-block trap a colour-vision filter hit once already. A sibling has
+        none of that risk. */}
+    <div className="table-surface">
+    <div className="table-3d-shell" aria-hidden="true">
+      <div className="t3d-plane" />
+      <div className="t3d-edge" />
+    </div>
     <div className="table" data-felt={settings.tableFelt} ref={tableRef} style={{ '--tension': tension } as React.CSSProperties}>
       <TableRail felt={settings.tableFelt} />
       <div className={`felt ${dealing ? 'dealing' : ''} ${shaking ? 'felt-shake' : ''}`}>
@@ -3055,6 +3068,7 @@ export function Table({ def, seats = 3, plan, practice = false, client: injected
       {/* The pad and the log are both a record of the game, so they sit together under the
           table. On the felt the pad was clipped by the table edge and landed on whoever was
           sitting on the right. */}
+      </div>
       <div className="table-record">
       {view.matchTarget != null && (
         <ScorePad view={view} me={me} nameOf={nameOf}

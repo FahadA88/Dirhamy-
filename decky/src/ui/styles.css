@@ -410,6 +410,64 @@ h2 { letter-spacing: -0.025em; color: var(--ink); font-size: 22px; font-weight: 
    the cloth reads its colours from --t-* so text stays legible on baize as dark as midnight
    or as pale as parlour. */
 
+/* A genuinely 3D, angled rim behind the flat felt — see the note in Table.tsx by the
+   table-3d-shell div for why this has to be a sibling of .table rather than a background
+   painted on it: .table itself can never carry a transform, filter or perspective of its
+   own without breaking the dragged-card ghost's fixed positioning. Sized purely by CSS
+   (.table-surface sizes to its one flow child, .table; the shell is absolutely positioned
+   to fill that same box) — no measuring, no ResizeObserver, so it tracks every seat count
+   and viewport width for free, the same as the felt beside it. Scoped to .table-surface
+   rather than .table-wrap specifically so it lines up with the felt alone, not the score
+   pad and log sitting below it in the same wrap. Tied to the site's own --cyan rather than
+   any one felt's colours, so it re-themes with everything else instead of clashing with
+   whichever accent is live. */
+.table-surface {
+  position: relative;
+}
+.table-3d-shell {
+  position: absolute;
+  /* Extends well past the flat felt's own top edge on purpose — the flat table sits exactly
+     inside .table-surface's box, so a shell sized to match it would render almost entirely
+     hidden behind that felt. Reaching higher gives the rotated plane's far edge somewhere
+     to recede TO, so the table reads as continuing back into the screen above the part
+     that's actually playable, rather than a sliver only visible at the seams. */
+  top: -160px; left: -8px; right: -8px; bottom: 0;
+  z-index: 0;
+  pointer-events: none;
+  perspective: 1800px;
+  perspective-origin: 50% 22%;
+}
+.t3d-plane {
+  position: absolute;
+  inset: 0;
+  border-radius: 34px;
+  transform: rotateX(27deg);
+  transform-origin: 50% 100%;
+  transform-style: preserve-3d;
+  background: linear-gradient(180deg, #17142080 0%, #0a0812 55%, #050308 100%);
+  box-shadow:
+    inset 0 0 0 2px var(--cyan, #1fe3ff),
+    inset 0 0 60px rgba(31, 227, 255, 0.16),
+    0 0 80px var(--glow, rgba(31, 227, 255, .32)),
+    0 60px 100px rgba(0, 0, 0, .55);
+}
+.t3d-edge {
+  position: absolute;
+  left: 10%; right: 10%; bottom: 0; height: 30px;
+  transform: rotateX(27deg) translateZ(-15px) translateY(15px);
+  transform-origin: 50% 0%;
+  border-radius: 0 0 26px 26px;
+  background: linear-gradient(180deg, #0a0712 0%, #020103 100%);
+  box-shadow: inset 0 0 0 1px rgba(31, 227, 255, 0.35), 0 20px 40px rgba(0, 0, 0, .6);
+}
+/* Nothing here animates, so reduced-motion has nothing to opt out of — a still 3D plate is
+   decoration, not motion. Touch devices are a different problem: a perspective-transformed
+   layer is exactly the compositor cost that traced back to dropped frames on a mid-range
+   phone for the ambient backdrop above, so it drops out there the same way. */
+@media (hover: none) and (pointer: coarse) {
+  .table-3d-shell { display: none; }
+}
+
 /* Each build brings its own room, not just its own cloth. */
 .table-wrap {
   margin-top: 8px; padding: var(--room-pad, 0); border-radius: 26px;
