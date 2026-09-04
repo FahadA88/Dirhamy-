@@ -27,6 +27,7 @@ import { Board, LocalTableClient, TableClient } from '../net/tableClient';
 import { Seat, MoveRecord } from '../server/matchService';
 import { recordResult, currentStreak, currentLossStreak } from '../social/records';
 import { encodeSharedHand } from '../social/handShare';
+import { renderHandImage, handImageToBlob } from '../social/handImage';
 
 // This component holds a match id and a redacted view — never a MatchState. Every move it wants
 // to make goes to the service as an intent; the service decides, and hands back the board as
@@ -2895,6 +2896,46 @@ export function Table({
                     it) with it. Without this, the reveal a player could actually now check would
                     be reachable for a match that no longer exists. */}
                 <button className="ghost" onClick={openHistory}>History</button>
+                <button
+                  className="ghost"
+                  onClick={() => {
+                    // Item 73, the picture half: "look at this deal" without needing the
+                    // recipient to open a link and replay it. Standings only — nothing here is
+                    // gated behind reveal() the way the hand link is, because a screenshot of a
+                    // result carries no seed for anyone to have gained an unfair look at.
+                    const resultLine = iWon
+                      ? (isKent ? 'Your pair wins' : 'You win')
+                      : isKent ? `${teamOf(view.matchWinner ?? '') ?? 'The other pair'} wins`
+                      : `${nameOf(view.matchWinner ?? view.winner ?? '')} wins`;
+                    const rows = ranked.map(([p, sc], i) => ({
+                      name: isKent ? p : nameOf(p),
+                      score: String(sc),
+                      mine: isKent ? teamOf(me) === p : p === me,
+                      lead: i === 0,
+                    }));
+                    void (async () => {
+                      try { await document.fonts.ready; } catch { /* draw with whatever loaded */ }
+                      const canvas = renderHandImage({ gameName: def.meta.name, resultLine, rows });
+                      const blob = await handImageToBlob(canvas);
+                      if (!blob) { setToast({ text: 'Could not generate an image.', tone: 'info' }); return; }
+                      const file = new File([blob], `decky-${def.meta.id}.png`, { type: 'image/png' });
+                      if (navigator.canShare?.({ files: [file] })) {
+                        try { await navigator.share({ files: [file], title: `${def.meta.name} — Decky` }); return; }
+                        catch { /* cancelled or unsupported mid-flight; fall through to a download */ }
+                      }
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = `decky-${def.meta.id}-${new Date().toISOString().slice(0, 10)}.png`;
+                      document.body.appendChild(a);
+                      a.click();
+                      a.remove();
+                      URL.revokeObjectURL(url);
+                    })();
+                  }}
+                >
+                  Share as image ↓
+                </button>
                 <button className="primary" onClick={rematch}>
                   {plan ? 'Rematch — same table' : 'Play again'}
                 </button>
