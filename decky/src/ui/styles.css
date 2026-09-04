@@ -8665,4 +8665,18 @@ input[type="checkbox"]:focus-visible { outline: 2px solid var(--brass-hi); outli
      phone's landscape width without ever reaching for the horizontal scroll above. */
   .felt-content.sol { --cw: 42px; --ch: 60px; --bw: 42px; --bh: 60px; gap: 8px; }
   .sol-tableau { gap: 4px; min-height: 0; }
+
+  /* Item 97: "the seats stay in a ring sized for a tall screen and the hand runs off both
+     ends." Every non-solitaire card token was still full desktop size here (76px) because the
+     shrink at max-width:560px never fires on a landscape phone — 812px is well past that
+     threshold — even though the same short viewport is exactly what the portrait rule exists
+     to protect against. Width was never the real constraint; a short screen was, same as
+     Spider above. Shrunk enough that a full thirteen-card Hearts hand and a four-seat opponent
+     row both fit the width without the fan's edges clipping past the felt. */
+  .table .felt-content:not(.sol) { --cw: 50px; --ch: 72px; --bw: 50px; --bh: 72px; }
+  .hand { padding: 12px 0 6px; }
+  .hand .card-btn { margin-left: calc(var(--cw) * -0.42); }
+  .opponents { gap: 4px; }
+  .opponents .seat { padding: 4px 3px; }
+  .fanned .card.back { width: 18px; height: 26px; margin-left: -11px; }
 }
