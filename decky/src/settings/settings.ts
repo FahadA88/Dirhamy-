@@ -195,7 +195,7 @@ export const defaultSettings: Settings = {
   theme: 'dark',
   accent: 'teal',
   cardBack: 'lattice',
-  tableFelt: 'mahogany',
+  tableFelt: 'litedges',
   cardFace: 'classic',
   customBack: null,
   cardSize: 100,
