@@ -1,0 +1,4 @@
+# 52 games, each with its own page under /g/ — see sitemap.xml.
+User-agent: *
+Allow: /
+Sitemap: /sitemap.xml

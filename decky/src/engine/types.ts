@@ -1,0 +1,1340 @@
+// Core types for the game-definition schema and the runtime.
+// A game is DATA (GameDefinition). The engine interprets it. No game-specific code lives in the engine.
+
+export type Suit = 'C' | 'D' | 'H' | 'S' | 'JOKER';
+export type Rank =
+  | 'A' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '10' | 'J' | 'Q' | 'K'
+  | 'JOKER';
+
+export interface Card {
+  id: string;      // stable unique id, e.g. "H8" or "JOKER1"
+  rank: Rank;
+  suit: Suit;
+  /**
+   * For decks that are not a pack of playing cards.
+   *
+   * A Set card is not a rank and a suit — it is four independent properties, and the game is
+   * about the relationships between them. Rather than pretend otherwise, such a card carries its
+   * real properties here, and keeps a synthetic rank and suit so that everything already written
+   * against Card still works rather than needing a second card type threaded through the engine.
+   */
+  attrs?: Record<string, string>;
+}
+
+// ---------- Game definition (the schema) ----------
+
+export interface GameDefinition {
+  schemaVersion: string;
+  meta: {
+    id: string;
+    name: string;
+    description: string;
+    players: {
+      min: number;
+      max: number;
+      /**
+       * Seats this game can only be dealt in multiples of. A partnership game cannot seat five
+       * — somebody would have no partner — so it says two here and the seat picker offers four
+       * and six rather than four, five and six.
+       */
+      step?: number;
+    };
+    family: string;
+  };
+  deck: {
+    /**
+     * 'standard54' is a pack of cards. 'attributes' builds every combination of the properties
+     * listed below instead — three colours times three shapes times three counts is
+     * twenty-seven cards, and no two are alike.
+     */
+    base: 'standard54' | 'attributes';
+    /** Required for base 'attributes'. Order matters only for display. */
+    attributes?: { name: string; values: string[] }[];
+    includeJokers: boolean;
+    /** Jokers added per copy of the deck when includeJokers is on. Default 2. */
+    jokerCount?: number;
+    deckCount?: number;        // how many copies of the deck are shuffled together (default 1)
+    excludeRanks?: Rank[];     // ranks removed from the deck entirely (short-deck games)
+    /**
+     * Suits removed from the deck entirely.
+     *
+     * The point is not usually a smaller pack — it is a pack with fewer KINDS of card. One-suit
+     * Spider is eight copies of the spades, all 104 of them, and it is a different game from
+     * four-suit Spider rather than an easier deal of the same one.
+     */
+    excludeSuits?: Suit[];
+    /**
+     * Individual cards removed from the deck, keyed suit-then-rank the same way penaltyPoints
+     * names one card: "SQ" is the queen of spades, "H10" the ten of hearts. Applies to every
+     * copy when deckCount > 1 — a card excluded from the pack is excluded from all of it.
+     */
+    excludeCards?: string[];
+    rankOrder: Rank[];
+    /**
+     * Named card sets. `ranks` catches a whole rank at once ("every 8 is wild"); `cards` names
+     * individual cards by the same suit+rank key as excludeCards ("only the queen of spades").
+     * A card carries the tag if either list matches it.
+     */
+    tags: Record<string, { ranks: Rank[]; cards?: string[] }>;
+  };
+  zones: ZoneDef[];
+  setup: SetupStep[];
+  turnFlow: {
+    order: 'clockwise' | 'counter-clockwise';
+    startPlayer: 'dealerLeft' | 'first';
+    actionsPerTurn: { min: number; max: number };
+  };
+  actions: ActionDef[];
+  triggers: TriggerDef[];
+  endConditions: EndConditionDef[];
+  scoring: ScoringDef;
+  // Present iff this is a trick-taking game. The interpreter runs a trick-taking loop
+  // (follow suit, trump, highest card takes the trick and leads next) instead of shedding.
+  trick?: TrickConfig;
+  // Present iff this is a climbing game (President/Big Two): beat the previous play or pass;
+  // when everyone passes the pile clears and the last player to play leads again.
+  climb?: ClimbConfig;
+  // Present iff this is a fishing game (Go Fish): ask an opponent for a rank you hold; collect
+  // sets ("books") of the same rank; most books wins.
+  fish?: FishConfig;
+  // Present iff this is a rummy/melding game: draw, lay down sets (same rank) and runs
+  // (consecutive same suit), discard; first to shed their whole hand wins.
+  rummy?: RummyConfig;
+  // Present iff this is a comparison game (War): flip the top card, higher rank wins both;
+  // ties trigger a "war". No decisions — win by taking all the cards.
+  war?: WarConfig;
+  // Present iff this is a claim/challenge game — see BluffConfig.
+  bluff?: BluffConfig;
+  // Present iff this is a reflex game — see ReflexConfig.
+  reflex?: ReflexConfig;
+  // Present iff this is a betting game — see PokerConfig.
+  poker?: PokerConfig;
+  // Present iff this is a trading game — see PitConfig.
+  pit?: PitConfig;
+  // Present iff this is a capture-by-sum game — see CaptureConfig.
+  capture?: CaptureConfig;
+  // Present iff this is Kent — see KentConfig.
+  kent?: KentConfig;
+  /** A shared tableau everyone builds on — Kings Corner. */
+  layout?: LayoutConfig;
+  /** Blind draw from a neighbour's hand — Old Maid. */
+  maid?: MaidConfig;
+  /** Four face-down cards you may not look at — Dutch. */
+  swap?: SwapConfig;
+  set?: SetConfig;
+  // Present iff this is a single-player patience game: build the tableau down, the foundations
+  // up, and win by clearing the deck. No opponents, no turns, no bot.
+  solitaire?: SolitaireConfig;
+  // Present iff each hand opens with a simultaneous card exchange (Hearts).
+  handPass?: HandPassConfig;
+  // Author-written conditional rules, layered on top of whichever family this game is.
+  // Present on custom games; the classics don't need any.
+  rules?: CustomRule[];
+  /**
+   * Plays this game forbids, over and above whatever its family already forbids.
+   *
+   * Every CustomRule hook is reactive — it fires after a move and responds to it — so before
+   * these, an author could punish a play but never prevent one. A restriction is checked while
+   * the legal moves are being worked out, with the candidate card in hand.
+   *
+   * Never allowed to leave a player with nothing to do: if every move a player has would be
+   * forbidden, the restrictions are skipped for that turn. A rule that occasionally does not
+   * apply is much better than a game that cannot continue.
+   */
+  playRestrictions?: PlayRestriction[];
+}
+
+export interface PlayRestriction {
+  id: string;
+  name: string;
+  /** True for a card means that card may NOT be played. */
+  if: Predicate;
+  note?: string;
+  enabled?: boolean;
+  /**
+   * The builder ingredients this was assembled from, carried along so the editor can re-open
+   * it. The engine never reads this — a Predicate tree is not recoverable back into the
+   * choices that produced it, and without somewhere to keep them a trip through the JSON
+   * editor silently deleted an author's work.
+   */
+  draft?: unknown;
+}
+
+export interface WarConfig {
+  aceHigh: boolean;
+  roundCap: number; // safety bound: after this many flips, most cards wins
+}
+
+// Present iff this is a claim/challenge game (Cheat, "I Doubt It"): play cards face down while
+// claiming a rank; any other player may call the claim a lie. Whoever is wrong takes the whole
+// center pile. First to empty their hand wins.
+export interface BluffConfig {
+  // Ranks a claim may name. Defaults to every rank in the deck if omitted.
+  claimableRanks?: Rank[];
+}
+
+// Present iff this is a reflex game (Slapjack, Snap): players flip one card at a time onto a
+// shared pile; whenever the top card's rank is in `slapRanks` (or, for `slapMatch`, the top two
+// cards share a rank), ANY player — not just whoever's turn it is — may slap to claim the pile.
+// Whoever's slap reaches the engine first while it is still valid wins it.
+export interface ReflexConfig {
+  slapRanks: Rank[];      // e.g. ["J"] for Slapjack; [] if only slapMatch applies
+  slapMatch?: boolean;    // Snap-style: slap when the top two cards match rank
+  // Safety valve, same idea as War's roundCap: reflex games are a random walk of who's holding
+  // what, and can occasionally run long. After this many flips, whoever holds the most cards
+  // wins outright rather than the match running unbounded.
+  flipCap?: number;
+}
+
+// Present iff this is a betting game (Poker-family): a single fixed deal, one betting round,
+// then a showdown. No streets, no draws, no side pots — a player who cannot cover the current
+// bet must fold. Documented simplifications, not oversights.
+export interface PokerConfig {
+  handSize: number;       // cards dealt to each player (5 = five-card showdown)
+  startingChips: number;
+  ante: number;            // every player pays this before the deal (0 = none)
+  smallBlind: number;      // 0 = no blinds, ante-only
+  bigBlind: number;
+  minRaise: number;        // smallest amount a raise must increase the bet by
+  /**
+   * How many hands a sitting lasts. Chips carry from one hand to the next and the biggest
+   * stack at the end wins; a player reaching zero ends it there and then. One hand and out
+   * was not a game — you posted a blind, called once, and the table said "game over" with
+   * everybody still holding chips. Absent means one hand, which is what it used to be.
+   */
+  hands?: number;
+}
+
+/**
+ * Present iff this is Kent (also played as Kemps, Canes or Signal): a partnership game with no
+ * turn order at all.
+ *
+ * Everybody holds `handSize` cards and there are `poolSize` more face up in the middle. Any
+ * player may swap one of their cards for one of the pool's at any moment; the pool refreshes
+ * when it has been picked over. Collect four of a kind and you have it — but you do not say so.
+ * You signal, and your partner has to be the one who calls it. An opponent who spots the
+ * signal first calls it off and the letter goes to you instead.
+ *
+ * The signal is the whole game and it is the part that does not survive being digitised
+ * literally: across a table it is a raised eyebrow. Here it is a tell that shows on your seat
+ * and everyone can see it — so what is actually raced is the same thing that is raced at a
+ * real table, which is who is paying attention.
+ */
+/**
+ * A tableau in the middle that everybody builds on.
+ *
+ * Every other family here either keeps the table to one pile (climbing, shedding) or gives the
+ * tableau to one player (patience). This is the third thing: a shared layout of several piles,
+ * open to the whole table, where your turn is spent finding somewhere for your cards to go and
+ * the person after you inherits whatever you left.
+ *
+ * Kings Corner is the game it was written for. Sevens, Michigan and Kings in the Corner all sit
+ * on the same bones.
+ */
+/**
+ * Blind draw — Old Maid, and the family it belongs to.
+ *
+ * Everything else here draws from a pile nobody owns. This draws from a PERSON: on your turn you
+ * take one card, sight unseen, from whoever draws next after you — you pick which of their cards
+ * by position in their fan, not by what it is, because you cannot see it any more than they can
+ * choose which one you get. Any pair in a hand falls out of it the moment it forms. Whoever is
+ * still holding a card once everyone else's hand is empty is holding the one card that could
+ * never pair, and loses on that alone.
+ */
+export interface MaidConfig {
+  /** The rank with one card missing its pair — traditionally the queen. */
+  oddRank: Rank;
+}
+
+export interface LayoutConfig {
+  /** Piles seeded with one card each at the deal — the cross, in Kings Corner. */
+  piles: number;
+  /**
+   * Piles that start empty and stay shut until somebody has the one rank that opens them.
+   *
+   * They are the whole tension of the game: four extra places to unload, none of which you can
+   * use, and a king in hand is worth more for the door it opens than for the card it is.
+   */
+  cornerPiles: number;
+  /** The rank that opens a corner. */
+  cornerRank: Rank;
+  /** How a card joins a pile it is not starting. */
+  build: 'alt-color' | 'same-suit' | 'down-any';
+  handSize: number;
+  /**
+   * Whether a whole pile may be picked up and dropped on another whose top card it continues.
+   *
+   * This is the move that makes the game a game rather than a sorting exercise: it frees a pile
+   * for somebody, usually you, and deciding whether that somebody is going to be you is most of
+   * the thinking in it.
+   */
+  movePiles?: boolean;
+}
+
+/**
+ * Four cards face down in front of you that you are not allowed to look at.
+ *
+ * Dutch is the game — also met as Cabo, Pablo, Cambio and Golf. You get one look at two of your
+ * four at the start and then they go face down for good, and from there the whole game is
+ * memory against arithmetic: you are trying to have the lowest total on the table, using cards
+ * you cannot see, half of which you swapped in blind.
+ *
+ * This is the first family where two players looking at the same card see different things.
+ * Everything else here is hidden by ZONE — a hand is yours, a stock is nobody's. Here it is
+ * hidden per person: the same card in the same slot is known to whoever has looked at it and a
+ * mystery to everyone else, and it stays that way until somebody spends a seven to peek.
+ */
+export interface SwapConfig {
+  /** Cards face down in front of each player. Four, in the game everybody knows. */
+  slots: number;
+  /** How many of your own you get to look at before play starts. */
+  peekAtStart: number;
+  /** Thrown away, these let you look at one of your own. */
+  peekSelfRanks?: Rank[];
+  /** These let you look at one of somebody else's. */
+  peekOtherRanks?: Rank[];
+  /** These let you trade one of yours for one of theirs, neither of you looking. */
+  blindSwapRanks?: Rank[];
+  /** What the call is named, so the log and the button can say it. */
+  callName: string;
+  /**
+   * Safety bound, the same idea as War's `roundCap`: with the wrong table of bots, or a human
+   * table that simply refuses to call, a round has no other way to end. After this many turns
+   * with nobody calling, the round ends on its own and the lowest total — actual, not known —
+   * still wins. Nobody is penalised; it is a fallback, not a rules interaction.
+   */
+  turnCap?: number;
+  /**
+   * What it costs to call and not actually be lowest.
+   *
+   * Without a penalty the call is free and the right move is to make it on turn one every time,
+   * which is not a game. With one, calling is a claim you have to be able to back.
+   */
+  callPenalty: number;
+}
+
+export interface KentConfig {
+  handSize: number;
+  poolSize: number;
+  /**
+   * How long a tell stays up, counted in moves rather than milliseconds. The engine has no
+   * clock and must not grow one: a rule that depends on wall time cannot be replayed from a
+   * seed and a list of moves, which is the one thing every rule here has to be able to do.
+   */
+  tellPlies: number;
+  /** Letters to spell before a pair is out. K-E-N-T is four. */
+  letters: string;
+  /**
+   * A hard cap on moves within one round, the same shape as war's roundCap and swap's turnCap.
+   * There is no turn order to force a stalemate through, and nothing else stops a stubborn or
+   * hostile client from swapping and refreshing forever without ever signalling. Default 3000.
+   */
+  roundCap?: number;
+}
+
+// Present iff this is a trading game (Pit-style): no turn order at all. Any player may post an
+// open offer (give N cards of one suit, want N of another) at any time, and any OTHER player
+// holding the wanted commodity may accept it, executing the swap immediately. First to hold
+// `cornerSize` cards of a single suit wins — "corners the market".
+export interface PitConfig {
+  cornerSize: number;
+  /** A hard cap on moves within one round — see KentConfig.roundCap. Default 3000. */
+  roundCap?: number;
+}
+
+// Present iff this is a capture-by-sum game (Scopa, and the family it belongs to): a shared
+// face-up table starts with a few cards on it. Playing a card from your hand claims whichever
+// table cards its own value covers — every table card sharing its exact value, or (short of
+// that) the table's cards ALL AT ONCE if their total comes to exactly that value — and the claim
+// joins your own pile, face up, for anyone to count. Missing both and the card just joins the
+// table, waiting for a later hand to claim it. A card's value is simply where its rank sits in
+// the deck's own rankOrder (ace low at 1) — the same reckoning `cardProp: 'value'` already uses
+// for every other rule in this engine, so nothing new had to be taught for it.
+//
+// This is Scopa with one real rule cut for the engine's sake: a genuine table has you CHOOSING
+// which cards a sum-claim takes when more than one combination adds up (three cards, or two, or
+// six) — arbitrary subset choice is a real decision the interpreter has no player-choice shape
+// for yet. Here, a sum-claim can only ever be the whole table at once. It reads the same at the
+// table and it is still a real claim gated on a real sum, which is the entire point being
+// proven — it is just never an ambiguous one.
+export interface CaptureConfig {
+  tableStart: number;        // cards dealt face-up to the table before any hand is dealt
+  handSize: number;          // cards in a hand; refilled by one from the stock after every play
+  /** Extra points for a claim that leaves the table completely empty. */
+  sweepBonus?: number;
+  /** When the stock and every hand are finally empty, whoever claimed last takes what's left on
+   *  the table — nobody's claim, and nobody's turn to make one. Default true. */
+  lastClaimerTakesRest?: boolean;
+}
+
+export interface RummyConfig {
+  setMin: number; // cards of equal rank to form a set (usually 3)
+  runMin: number; // consecutive same-suit cards to form a run (usually 3)
+  /**
+   * Whether a same-suit sequence counts as a meld at all. Default true. Canasta and Hand & Foot
+   * set this false — their melds are rank-groups only, and a run there would score wrong and
+   * contradict the rules the game describes to the player.
+   */
+  allowRuns?: boolean;
+
+  // Gin-family rules. With `knock` set, melds are never laid down during play — you hold them
+  // concealed and end the hand by knocking, scoring the difference in unmatched ("deadwood") cards.
+  knock?: number;          // most deadwood you may knock with (10 in Gin; 0 = gin only)
+  ginBonus?: number;       // extra for knocking with no deadwood at all
+  undercutBonus?: number;  // extra to the defender when their deadwood matches or beats the knocker's
+  layOff?: boolean;        // the defender's spare cards may extend the knocker's melds before scoring
+
+  /**
+   * Cards tagged 'wild' in the deck stand in for any card a meld is short of — Canasta's
+   * deuces and jokers, Kalooki's jokers.
+   *
+   * Off by default, and deliberately so: finding the best arrangement of a hand becomes a much
+   * larger search once every gap has a filler, and every game that does not want wilds should
+   * not pay for the ones it does not have. `maxWildsPerMeld` keeps the search bounded and the
+   * game honest — a meld of nothing but wilds is not a meld.
+   */
+  wilds?: boolean;
+  maxWildsPerMeld?: number; // default 1, capped at 2
+  /**
+   * The wild rank climbs one step up deck.rankOrder every hand, starting from whichever rank
+   * deck.tags.wild names first (Three Thirteen: hand one's wild is a three, hand two's a four,
+   * and so on). Requires `wilds` and a single-rank `deck.tags.wild`; a game whose wild is more
+   * than one rank, or never changes, leaves this off.
+   */
+  wildRotatesByHand?: boolean;
+  /**
+   * Contract Rummy: what a hand demands before anything may be laid down at all — two sets, or
+   * a set and a run, or three runs, escalating hand to hand. The list is read by `handNumber`
+   * and wraps if a match runs past the end of it, the same way `wildRotatesByHand` wraps.
+   *
+   * Two real rules are simplified for the engine's sake. First, the genuine game holds a
+   * player's whole contract back and lays it down in one simultaneous move — here a player lays
+   * their pieces one at a time, same as ordinary melding, except each meld's SHAPE has to be one
+   * the contract still owes; once every piece is down, melding and laying off are free again for
+   * the rest of the hand. Second, a real sitting is a fixed number of hands, win or lose — this
+   * engine only knows how to end a match by score, so the target below is tuned to run about as
+   * long as the contract list, not counted hand for hand.
+   */
+  contract?: { sets: number; runs: number }[];
+}
+
+export interface ClimbConfig {
+  order: Rank[]; // rank strength, low → high (e.g. 3,4,…,K,A,2)
+  combos?: boolean;   // allow playing 2 or 3 matching-rank cards as a unit; a reply must
+                       // match the same group size (pair beats pair, triple beats triple)
+  bombSize?: number;  // N-of-a-kind that ANY player may play at ANY time, even out of turn,
+                       // beating whatever's on the pile regardless of shape or size (0/undefined = off)
+}
+
+export interface FishConfig {
+  bookSize: number; // cards of one rank that form a book (usually 4)
+}
+
+export interface TrickConfig {
+  trump: Suit | 'none';        // suit that beats all others when resolving a trick
+  /**
+   * Trump is not named by anyone — it is whatever suit the last card dealt happens to be, shown
+   * to the table and left in that hand. `trump` above is meaningless when this is set (write
+   * 'none') and is overridden the moment the deal finishes, the same way an auction's trump
+   * overrides it once the bidding closes.
+   */
+  turnedTrump?: boolean;
+  mustFollowSuit: boolean;     // must play the led suit if you hold one
+  aceHigh: boolean;            // Ace is the strongest rank (else lowest)
+  scoreBy: 'mostTricks' | 'fewestTricks' | 'penalty';
+  penaltyPoints?: Record<string, number>; // card rank/suit → points (Hearts-style), for scoreBy: 'penalty'
+  /**
+   * What a joker does in a trick, when the deck has any.
+   *
+   * 'low' is what happens if nothing says otherwise: the joker is not in rankOrder, so it is
+   * the weakest card in the pack and can never take a trick — fine for a game that only wants
+   * jokers as scoring junk, useless for one that wants them to matter.
+   *
+   * 'high' makes the joker the top card of whatever suit was led — it always counts as
+   * following suit, and only trump beats it. 'trump' makes it the top trump, so it beats
+   * everything. Leading a joker in either mode sets the led suit to trump (or, with no trump,
+   * to a suit nobody holds, which leaves the rest of the table free to play anything).
+   */
+  jokerRank?: 'low' | 'high' | 'trump';
+  bidding?: boolean;           // players bid tricks before play (Spades); overrides scoreBy with bid scoring
+  /**
+   * Combinations worth points for simply HOLDING them, scored once as the hand is dealt and
+   * before a card is played.
+   *
+   * The two halves of Pinochle, Bezique and Sixty-Six are a trick game and a melding game
+   * played with the same cards, and Decky's families are one or the other — so a game where a
+   * queen and a jack in your hand are worth forty points before you play them could not be
+   * described at all.
+   *
+   * `cards` names the combination the same way everything else here names a card: suit then
+   * rank. A hand scores a meld once per complete copy it holds.
+   */
+  melds?: { name: string; cards: string[]; points: number }[];
+  /**
+   * A meld that repeats once per suit, without being written out four times.
+   *
+   * "A king and queen of any one suit" was four literal `melds` entries — one per suit — and
+   * every game with a marriage paid that tax. A pattern is one line: `ranks` names the cards a
+   * single copy needs, one of each, ALL IN THE SAME SUIT, and it is checked against every suit
+   * in the deck the way `melds` checks one fixed combination.
+   */
+  meldPatterns?: {
+    name: string;
+    ranks: string[];
+    points: number;
+    /** Worth double when the matching suit is also trump — a royal marriage, not just a marriage. */
+    doubleInTrump?: boolean;
+  }[];
+  partnerships?: boolean;      // 4 players in 2 teams (seats 1&3 vs 2&4)
+
+  // Euchre-family rules. With `auction`, trump is not fixed by the definition — it is named
+  // during a bidding round and lives on MatchState for the duration of the hand.
+  auction?: AuctionConfig;
+  // A numeric contract auction (Bridge-style): players bid a level (1..7) and a strain (a suit,
+  // or "NT" for no-trump), each bid strictly outbidding the last, until three consecutive
+  // passes settle it. The winning bid's side becomes declarer; trump is the winning strain
+  // (or none, for NT); the target is 6 + level tricks. Mutually exclusive with `auction` — a
+  // game has one auction shape or the other.
+  numericAuction?: NumericAuctionConfig;
+  bowers?: boolean;            // the trump jack, then the same-colour jack, outrank every trump
+  /**
+   * Every jack is a trump, whatever suit it is printed in, ranked clubs–spades–hearts–diamonds
+   * above all other trumps.
+   *
+   * This is the rule a Skat player would name first if asked what makes the game itself, and
+   * nothing here could express it: `bowers` promotes two jacks, this promotes all four and
+   * takes them out of their printed suits entirely — a jack of diamonds does not follow
+   * diamonds, it follows trump.
+   */
+  jacksAreTrumps?: boolean;
+  /**
+   * The auction winner plays alone against everybody else, rather than with a partner.
+   *
+   * Partnerships here are a fixed four-seat pairing, so a three-handed game where one player
+   * takes on the other two had no way to say who was on whose side.
+   */
+  soloDeclarer?: boolean;
+  goAlone?: boolean;           // the maker may play the hand without their partner
+  euchreScoring?: boolean;     // makers 1 / all five 2 / alone-all-five 4 / set 2 to the defenders
+
+  // Hearts-family rules.
+  brokenSuit?: Suit;           // may not be LED until it has been discarded off-suit ("hearts broken")
+  leadCard?: string;           // card id (e.g. "C2") — its holder leads trick 1 and must play it
+  noPenaltyFirstTrick?: boolean; // no point-carrying card may be discarded on the opening trick
+  shootTheMoon?: boolean;      // taking EVERY penalty point scores you 0 and everyone else the full pot
+}
+
+// ---------- solitaire / patience ----------
+// The one single-player family. Instead of hands and turns it has a laid-out tableau: columns
+// you build down, foundations you build up, optional free cells, and a stock. The engine
+// synthesises all of those zones from this config, so a definition never lists them by hand.
+
+export type BuildRule =
+  | 'alt-color' | 'same-suit' | 'any-suit' | 'down-any'
+  /**
+   * One rank either way, suit irrelevant — Golf's whole rule. Every other build rule here is a
+   * descent, so a game where a 7 accepts both a 6 and an 8 could not be described at all.
+   */
+  | 'up-or-down';
+export type EmptyRule = 'any' | 'king' | 'none';
+
+export interface SolitaireConfig {
+  decks: number;               // Spider uses two
+  columns: number;
+  /**
+   * Klondike's 1,2,3… staircase, an even split, or Yukon's shape.
+   *
+   * 'yukon' is a staircase with a slab on top: one card in the first column, and every other
+   * column gets its buried cards plus five more. That uses all fifty-two, which matters because
+   * Yukon has no stock — anything left over would be out of the game for good.
+   */
+  deal: 'triangle' | 'even' | 'yukon';
+  /**
+   * Cards per column, when neither shape fits.
+   *
+   * 'even' divides the whole pack between the columns, which is right for FreeCell and wrong
+   * for any game that deals a small tableau and keeps the rest as stock — Canfield puts one
+   * card in each of four columns and the other thirty-four in the stock. Overrides `deal`.
+   */
+  dealCount?: number;
+  faceUp: 'top' | 'all';       // Klondike/Spider show only the top of each column; FreeCell shows all
+  /**
+   * How many cards at the top of each column are turned up, when `faceUp` is 'top'.
+   *
+   * Defaults to one, which is Klondike. Yukon turns up five, and that is not a detail — a game
+   * with no stock that showed only seven cards would be over before it started.
+   */
+  faceUpCount?: number;
+
+  // Stacking a card onto a tableau column.
+  build: BuildRule;            // alt-color (Klondike/FreeCell) | down-any (Spider: rank only)
+  /**
+   * Whether the rank order joins up end to end, so a king sits next to an ace.
+   *
+   * Golf without this is a game of stoppers: every king and every ace ends the chain dead, and
+   * a well-played deal still comes out about one time in twenty. With it, the chain can always
+   * be continued in principle and the game becomes a question of choosing well.
+   */
+  wrap?: boolean;
+  // Lifting more than one card at a time.
+  /**
+   * 'any' lifts a face-up card together with everything sitting on it, in whatever order it
+   * happens to be — Yukon's defining move, and the reason Yukon is winnable at all. The others
+   * require the cards above to already form a proper run.
+   */
+  moveRun: 'single' | 'built' | 'same-suit' | 'any';
+  empty: EmptyRule;            // what may be dropped into an empty column
+
+  freeCells: number;
+  foundations: number;
+  // Spider has no foundations you place onto — a complete K→A same-suit run leaves the board.
+  foundationMode: 'place' | 'auto-run';
+
+  stock: 'none' | 'waste' | 'deal-row';
+  stockTurn: number;           // cards flipped to the waste at a time
+  redeals: number;             // -1 = unlimited
+
+  /**
+   * Which rank a foundation starts from.
+   *
+   * 'ace' is what every patience here assumed: build A,2,3…K and stop. Canfield turns one card
+   * up at the start and THAT rank becomes the base for all four, so a game might run 7,8,9…K
+   * then wrap round through A,2 and finish on the six. The wrap is the whole difficulty — you
+   * are no longer waiting for aces, you are waiting for one specific rank.
+   */
+  foundationStart?: 'ace' | 'dealt';
+  /**
+   * The waste pile is somewhere to play TO, not only from.
+   *
+   * Golf is built entirely on this: there are no foundations to speak of, and the whole game is
+   * feeding tableau cards onto one growing waste pile whose top card sets what may follow. The
+   * board here has always treated the waste as a source and never a destination, which turned
+   * Golf inside out — the engine offered to move the waste card onto the tableau instead.
+   */
+  wasteIsTarget?: boolean;
+  /**
+   * A face-up pile whose top card is playable, refilled from itself rather than dealt out.
+   * Canfield's thirteen-card reserve is the other half of what makes it Canfield: a stack you
+   * can see and mostly cannot reach.
+   */
+  reserve?: number;
+}
+
+// A trump-naming auction (Euchre). Round 1 offers the turned-up card's suit; round 2 lets each
+// player name any other suit. If nobody takes it, the hand is thrown in and redealt.
+export interface AuctionConfig {
+  upcardZone: string;          // shared pile holding the kitty; its top card is turned up
+  dealerDiscards: boolean;     // ordering it up makes the dealer take the upcard and discard one
+  rounds: 1 | 2;
+}
+
+export type Strain = Suit | 'NT';
+/**
+ * A contract auction, as in Bridge.
+ *
+ * The distinguishing feature is that a bid is a NUMBER and a SUIT together, and every bid must
+ * beat the last one — first on level, then on strain. That makes the auction a real negotiation
+ * rather than a single choice, and it makes the result a contract: a promise about how many
+ * tricks the winning side will take, which the hand is then scored against.
+ *
+ * Deliberately not the whole of Bridge. There are no doubles, no vulnerability, no rubber, and
+ * no dummy — the declarer plays their own cards. What is here is the auction itself and being
+ * scored on whether you kept your word.
+ */
+export interface NumericAuctionConfig {
+  minLevel: number;   // 1
+  maxLevel: number;   // 7
+  strains: Strain[];  // bid order, weakest to strongest, e.g. ["C","D","H","S","NT"]
+  /**
+   * Tricks the contract is worth on top of the level. Bridge's "book" of six: a 3♠ contract
+   * promises 3 + 6 = 9 tricks.
+   */
+  book: number;
+  /** Points per trick bid when the contract is made. */
+  trickValue: number;
+  /** Points per trick over the contract. */
+  overtrickValue: number;
+  /** Points the other side takes per trick the contract falls short by. */
+  undertrickValue: number;
+  /** A bonus for bidding and making the top level. 0 for none. */
+  slamBonus?: number;
+  /**
+   * Score the contract on CARD POINTS taken rather than on tricks.
+   *
+   * Skat is not won by taking a number of tricks — it is won by taking 61 of the 120 points in
+   * the pack, which can be four fat tricks or eight thin ones. The points themselves already
+   * accumulate through penaltyPoints; this says to settle the contract against them.
+   */
+  makeOnCardPoints?: number;
+  /** How many consecutive passes end the auction once somebody has bid. Usually all but one. */
+  passesToClose?: number;
+  /**
+   * If the auction would otherwise pass out with nobody ever bidding, the dealer is stuck with
+   * a mandatory contract at exactly this level instead of the hand being thrown in — "stick the
+   * dealer," the same idea `auction`'s last-call rule already gives the trump-auction family,
+   * carried over to a numeric contract where somebody still has to name trump.
+   */
+  dealerMustBid?: number;
+  /**
+   * A shared pile, dealt at setup and left untouched through the whole auction (Five Hundred's
+   * kitty, Skat's skat). The winning bidder picks up every card in it, then buries the same
+   * number back down before a card is led — the same zone serves as the widow before pickup and
+   * the buried cards after, since both are just "face down and out of play" from the table's
+   * point of view. Absent or empty means no kitty at all.
+   */
+  kittyZone?: string;
+  /**
+   * Score a failed contract by the tricks the DEFENDERS actually took, not by how far short the
+   * contract fell. Bridge-style undertrickValue prices the shortfall; some games instead treat
+   * the whole hand as one contest for the tricks — whichever side ends up with more of them
+   * scores a point per trick they hold, win or lose, so a defense that barely stopped the
+   * contract scores about the same as a contract that barely failed.
+   */
+  defendersScoreOwnTricks?: boolean;
+  /**
+   * Stop playing out a hand once its outcome is mathematically locked in either direction — the
+   * defence has already taken more tricks than the declaring side could possibly make up even by
+   * winning everything left, or the declaring side has already reached its number regardless of
+   * how the rest falls. The remaining, no-longer-competitive tricks are credited to whichever
+   * side is already guaranteed them (the real-world "claim" a table makes rather than dealing
+   * out cards nobody's contest depends on anymore), and the hand is scored immediately.
+   */
+  concedeWhenDecided?: boolean;
+  /**
+   * The bid itself is just a number — nobody names a strain while the auction is still running.
+   * Whoever's bid stands when the auction closes then picks trump, as a separate decision made
+   * with full knowledge of what they actually won the right to declare. `strains` still governs
+   * what they're allowed to name (minus any bookkeeping meaning for outbidding, since a level-only
+   * auction has nothing else to break a tie on).
+   */
+  chooseTrumpAfter?: boolean;
+}
+
+/**
+ * Spotting sets on a shared board.
+ *
+ * The odd one out among the families: there are no turns, no hands, and no cards played to a
+ * pile. A board of cards is face up, everyone is looking at the same thing, and the game is
+ * whether you can see a valid combination before anybody else. A combination is valid when, for
+ * every property, the chosen cards are either all the same or all different — which is the whole
+ * rule, and the reason the deck has to be built from properties rather than ranks and suits.
+ */
+export interface SetConfig {
+  /** Cards in a valid combination. Three, in the game everyone knows. */
+  size: number;
+  /** How many are face up at once. */
+  boardSize: number;
+  /** Points for spotting one. */
+  score: number;
+  /** Points lost for calling a combination that is not one. Discourages guessing. */
+  penalty: number;
+}
+
+// A simultaneous pre-hand exchange (Hearts). Direction cycles per hand; 'hold' skips a hand.
+export type PassDir = 'left' | 'right' | 'across' | 'hold';
+export interface HandPassConfig {
+  count: number;               // cards each player passes
+  rotation: PassDir[];         // cycled by hand number: [left, right, across, hold]
+}
+
+export type Visibility = 'none' | 'owner' | 'top-public' | 'all';
+
+export interface ZoneDef {
+  id: string;
+  type: 'pile' | 'hand' | 'trick';
+  ordered: boolean;
+  faceDown: boolean;
+  visibility: Visibility;
+  shared?: boolean;
+  perPlayer?: boolean;
+}
+
+export type SetupStep =
+  | { op: 'shuffle'; zone: string }
+  // countPerPlayer is the fallback; countByPlayers overrides it for a specific seat count, for
+  // the handful of games (Crazy Eights, Go Fish, Rummy…) whose real deal size actually depends
+  // on how many are at the table rather than being one fixed number.
+  | {
+      op: 'deal'; from: string; to: string; countPerPlayer: number; countByPlayers?: Record<number, number>;
+      /**
+       * The deal grows by this many cards every hand of the match (Three Thirteen: one more
+       * each time). Applied on top of countPerPlayer/countByPlayers, using how many hands of
+       * THIS match have already been played — so hand one deals the base count, unchanged.
+       */
+      growPerHand?: number;
+    }
+  | { op: 'dealAll'; from: string; to: string } // distribute every card round-robin
+  | { op: 'move'; from: string; to: string; count: number };
+
+export interface ActionDef {
+  id: string;
+  target?: { from: string; select: 'one' };
+  when: Predicate;
+  effects: Effect[];
+}
+
+// ---------- Predicates ----------
+
+export type Predicate =
+  | { any: Predicate[] }
+  | { all: Predicate[] }
+  | { not: Predicate }
+  | { matches: MatchPredicate }
+  | { cardHasTag: string }
+  | { existsLegal: string }        // is action <id> currently legal for the player?
+  | { always: true }
+  // ----- near-programmable additions (Phase 2) -----
+  // Everything below exists so a rule an author writes in the builder is expressible as data.
+  // They are all pure reads of state, so they stay safe to evaluate inside the engine.
+  | { cmp: Comparison }            // arbitrary numeric/string comparison between two values
+  | { rankIn: Rank[] }             // the card in play is one of these ranks
+  | { suitIn: Suit[] }             // ...one of these suits
+  | { colorIs: 'red' | 'black' }
+  | { handHas: HandQuery }         // does the acting player's hand contain N of something
+  | { isFirstTurn: true }
+  /**
+   * Membership in a list a rule has been building up with `appendVar` — which suits have been
+   * led, which ranks have gone. Its own predicate rather than a string comparison, because the
+   * value arithmetic is numeric and a list is not a number.
+   */
+  | { listHas: { var: string; per?: PlayerRef; value: RuleValue } };         // nobody has played a card yet this hand
+
+/** Two values and an operator. The workhorse of author-written conditions. */
+export interface Comparison {
+  left: RuleValue;
+  op: '==' | '!=' | '>' | '>=' | '<' | '<=';
+  right: RuleValue;
+}
+
+/** "at least 3 hearts", "exactly one Ace", "any card above a 10". */
+export interface HandQuery {
+  rank?: Rank;
+  suit?: Suit;
+  color?: 'red' | 'black';
+  /** A `deck.tags` name — for a card rank/suit/color cannot pick out alone, like one specific
+   *  joker out of a pair that are otherwise identical in every field the engine tracks. */
+  tag?: string;
+  minCount?: number;               // default 1
+}
+
+/**
+ * A value inside a rule. Deliberately a closed set: an author can compose arithmetic over
+ * things the engine already knows, and nothing else. No strings are ever evaluated as code.
+ */
+export type RuleValue =
+  | { lit: number | string }
+  | { stateVar: string; per?: PlayerRef }      // a game variable, e.g. activeSuit; `per` reads one player's own
+  | { count: string }                          // cards in a zone; '$hand' = the actor's hand
+  | { cardProp: 'rank' | 'suit' | 'color' | 'value' }   // of the card in play
+  | { score: PlayerRef }                       // that player's points THIS hand
+  | { matchScore: PlayerRef }                  // ...across the match
+  | { handNumber: true }
+  | { playerCount: true }
+  | { tricksWon: PlayerRef }
+  | { add: [RuleValue, RuleValue] }
+  | { sub: [RuleValue, RuleValue] }
+  | { mul: [RuleValue, RuleValue] }
+  | { min: [RuleValue, RuleValue] }
+  | { max: [RuleValue, RuleValue] };
+
+/** Who a rule is talking about. */
+export type PlayerRef = '$me' | '$next' | '$prev' | '$all' | '$others';
+
+export interface MatchPredicate {
+  cardProp: 'suit' | 'rank' | 'color'; // color = red (H/D) vs black (C/S)
+  // compare the target card's prop against the top card of a zone,
+  // optionally preferring a state var (e.g. activeSuit) over the zone's top.
+  equalsTopOf?: string;
+  equalsStateOrTopOf?: [string, string]; // [stateVar, zoneId]
+}
+
+// ---------- Effects ----------
+
+export type Effect =
+  | { op: 'move'; card?: '$target'; from?: string; to: string; count?: number }
+  | { op: 'setState'; var: string; value: string; per?: PlayerRef; keep?: boolean } // value may be "$target.suit"/"$target.rank" or literal
+  | { op: 'if'; cond: Predicate; then: Effect[]; else?: Effect[] }
+  | { op: 'chooseSuit'; setState: string }          // pauses for the current player to pick a suit
+  | { op: 'reverseOrder' }
+  | { op: 'skipNext' }
+  | { op: 'forceDraw'; target: 'next'; from: string; count: number }
+  | { op: 'reshuffleDiscardInto'; zone: string; keepTop: boolean }
+  | { op: 'extraTurn' }                              // current player takes another turn
+  | { op: 'drawUntilPlayable'; from: string }        // draw until a legal play appears
+  | { op: 'passCards'; direction: 'left' | 'right' } // every player passes one hand card to a neighbor, simultaneously
+  // ----- near-programmable additions (Phase 2) -----
+  | { op: 'addScore'; player: PlayerRef; amount: RuleValue }
+  | {
+      op: 'setVarNum'; var: string; value: RuleValue;
+      /**
+       * Whose counter this is. Vars are one flat bag by default, which is fine for "how many
+       * hearts have fallen" and useless for "how many hearts EACH player has taken" — with no
+       * scope the second player's write clobbers the first's. `per` keys the var by player.
+       */
+      per?: PlayerRef;
+      /**
+       * Survive into the next hand. Vars are cleared on every deal, so a streak counter reset
+       * itself exactly when it became interesting.
+       */
+      keep?: boolean;
+    }
+  | { op: 'announce'; text: string }              // a line in the game log, in the author's words
+  | { op: 'endHand'; winner?: PlayerRef | 'highestScore' | 'lowestScore' }
+  | { op: 'swapHands'; withPlayer: 'next' | 'prev' }
+  | { op: 'moveMany'; from: string; to: string; count: RuleValue }
+  | { op: 'drawTo'; player: PlayerRef; from: string; count: RuleValue }
+  | { op: 'revealHand'; player: PlayerRef }
+  | { op: 'skipTo'; player: 'next' | 'prev' }
+  /**
+   * Linking rules to one another. Before these, the only way one rule could affect another was
+   * a shared global string bag plus top-to-bottom ordering — which made "count this, and when
+   * the count reaches three do that" possible but "and then stop" or "and also run the payout
+   * rule" not.
+   */
+  | { op: 'stopRules' }
+  | { op: 'runRule'; rule: string }
+  /** Appends to a delimited list held in one variable, so a rule can remember a SET. */
+  | { op: 'appendVar'; var: string; value: RuleValue; per?: PlayerRef; unique?: boolean };
+
+export interface TriggerDef {
+  on: 'drawPileEmpty' | 'cardPlayed';
+  cardHasTag?: string;
+  do: Effect[];
+}
+
+/**
+ * An author-written rule: WHEN something happens, IF a condition holds, THEN do these things.
+ *
+ * This is the near-programmable layer. A CustomRule is ordinary data — it is stored in the
+ * definition, pinned into a match like everything else, and interpreted by the same engine, so
+ * a game somebody builds in the browser runs by exactly the same referee as Hearts does.
+ */
+export interface CustomRule {
+  id: string;
+  name: string;                     // the author's label, shown in the builder and the log
+  when: RuleHook;
+  cardHasTag?: string;              // narrow a cardPlayed rule to tagged cards
+  if?: Predicate;                   // omitted = always
+  then: Effect[];
+  note?: string;                    // the author's own explanation, surfaced in the rules panel
+  enabled?: boolean;                // default true; lets an author park a rule without deleting it
+  /**
+   * The builder ingredients this was assembled from. See PlayRestriction.draft — same reason,
+   * same contract: the engine never reads it, and without it the JSON editor is a shredder.
+   */
+  draft?: unknown;
+}
+
+export type RuleHook =
+  | 'handStart'      // once, as the hand is dealt
+  | 'turnStart'      // before the acting player chooses
+  | 'turnEnd'        // after their move resolves
+  | 'cardPlayed'     // a card left a hand for a shared zone
+  | 'cardDrawn'
+  | 'trickWon'       // trick-taking only
+  | 'drawPileEmpty'
+  // Moments the engine has always had but never announced. Every one of these was a place a
+  // rule obviously wanted to sit — "double the points on the last hand", "the player who leads
+  // a heart pays for it", "whoever melds first gets a bonus" — with nothing to attach it to.
+  | 'trickLed'       // trick-taking: the first card of a trick has been played
+  | 'handEnd'        // the hand's scores are in, before the next deal
+  | 'matchEnd'       // the whole match is decided
+  | 'meldLaid'       // rummy: a set or run went down on the table
+  | 'bidMade'        // any auction: a player has named their bid
+  | 'playerOut'      // a player emptied their hand
+  | 'roundStuck';    // the player to act has no legal move; the round is about to end for it
+
+export interface EndConditionDef {
+  id: string;
+  when: { zoneCount: { zone: string; of: 'anyPlayer'; eq: number } };
+  result: 'roundOver';
+}
+
+export interface ScoringDef {
+  mode: 'firstToEmptyWins' | 'lowestPoints';
+  cardPoints?: Record<string, number | 'rankValue'>;
+  target?: number | null;
+  winner: 'lowestTotal' | 'highestTotal' | 'firstOut';
+  // A cumulative match score at or below this value ends the match immediately as a loss for
+  // whoever crossed it (e.g. Spades' "-200 and you're out"), regardless of the target above.
+  // Only meaningful alongside a negative-scoring match (bidding games where a hand can lose points).
+  bust?: number | null;
+  /**
+   * The match is exactly this many hands, win or lose on points alone — Three Thirteen plays
+   * one hand per rank from three to king and stops there, whether or not anyone has crossed
+   * `target`. Poker has always had its own version of this (`PokerConfig.hands`); this is the
+   * same idea for every other family.
+   */
+  handsCap?: number;
+}
+
+// ---------- Runtime state ----------
+
+export interface MatchState {
+  definition: GameDefinition;
+  seed: number;
+  rngState: number;
+  players: string[];        // player ids, seat order
+  zones: Record<string, Card[]>; // shared zones keyed by id; perPlayer keyed by `${id}:${playerId}`
+  turnIndex: number;        // index into players
+  direction: 1 | -1;
+  skipCount: number;        // seats to skip on next advance
+  repeatTurn: boolean;      // current player takes another turn (extra-turn cards)
+  stallCount: number;       // consecutive non-productive draws (deadlock guard)
+  // trick-taking state (unused by shedding games)
+  lead: Suit | null;        // led suit of the current trick
+  trickPlays: { player: string; card: Card }[]; // cards played into the current trick
+  /**
+   * The trick that was just taken, kept until the next card is led.
+   *
+   * Purely a report — the rules never read it. It exists because a trick used to vanish the
+   * instant it was won: four cards appeared one at a time and then the middle of the table was
+   * empty again before anyone could see who had beaten what. The table shows this until the
+   * next lead and sweeps it to the winner.
+   */
+  lastTrick?: { plays: { player: string; card: Card }[]; winner: string } | null;
+  /**
+   * The last pair of cards flipped in War, kept for the table to draw.
+   *
+   * Deliberately a copy rather than the cards themselves. The flipped pair goes straight into
+   * the winner's hand, so holding the real objects in a shared zone as well put the same card
+   * in two places at once — which broke card conservation outright and, once cards started
+   * being animated by id, gave the flying-card layer two candidate homes for one card.
+   */
+  lastBattle?: { card: Card }[] | null;
+  /** Who took the pot in lastBattle, so the table can sweep the cards to them instead of
+   *  leaving the settled pair sitting in the middle until the next flip overwrites it. */
+  lastBattleWinner?: string | null;
+  /** War: how many ties have gone to a war (three down, flip again) so far this game. */
+  warsCount: number;
+  /** Who swept every penalty point this hand, if anyone — cleared each time scoring runs. */
+  shotMoon?: string | null;
+  /** How a hand just ended, for the table to name it as more than a score delta — gin rummy's
+   *  three endings, or a bid contract made at the top of the ladder. */
+  roundOutcome?: 'gin' | 'undercut' | 'knock' | 'slam' | null;
+  tricksWon: Record<string, number>;
+  bids: Record<string, number>; // trick bids (Spades)
+  bidding: boolean;         // true while the bidding phase is open
+  // Euchre auction. trumpSuit overrides TrickConfig.trump once a hand's trump is named.
+  trumpSuit: Suit | 'none' | null;
+  auctionRound: 0 | 1 | 2;  // 0 = no auction running
+  auctionPasses: number;
+  turnedDownSuit: Suit | null; // the upcard's suit once it is turned down; barred in round 2
+  dealerIndex: number;
+  maker: string | null;     // who named trump this hand
+  alone: boolean;
+  sittingOut: string | null; // the maker's partner, when going alone
+  discarding: string | null; // the dealer, while they owe a discard after taking the upcard
+  // Cards still owed back to a numericAuction's kittyZone after the winning bidder picked it
+  // up (0 outside a bury). `discarding` names who owes them, same as the upcard discard above.
+  kittyBuryLeft: number;
+  rummyPhase: 'draw' | 'play'; // rummy turn phase
+  // climbing state (unused by other families)
+  passStreak: number;       // consecutive passes since the last play
+  lastPlayer: string | null; // who made the last play (leads when the pile clears)
+  finished: string[];       // players who have emptied their hand, in finishing order
+  climbShape: number;       // size of the group currently on the pile (1/2/3/bombSize; 0 = empty)
+  climbTopRank: string | null; // rank of the group currently on the pile
+  climbBombDeclined: Record<string, boolean>; // who has passed on interrupting THIS pile state
+  booksWon: Record<string, number>; // fishing: completed books per player
+  vars: Record<string, string>;
+  /**
+   * Var names an author asked to survive the deal. Everything in `vars` is wiped when a hand
+   * starts; these entries are copied forward instead, so a rule can count something across a
+   * whole match rather than only across one hand.
+   */
+  keepVars: string[];
+  /** Set by the stopRules effect; read and cleared by fireRules. Never persisted. */
+  stopRules: boolean;
+  /** How deep one rule calling another currently is, so a cycle stops rather than hangs. */
+  ruleDepth: number;
+  /** Whether the handEnd/matchEnd hooks have already fired for this hand. */
+  handEndFired: boolean;
+  scores: Record<string, number>;   // THIS HAND's points, set when the hand ends
+  // Points handed out by author-written rules DURING the hand. Kept separately because each
+  // family computes state.scores from scratch when the hand ends; this is folded in afterwards
+  // so a rule's points are never quietly overwritten by the family's own scoring.
+  bonus: Record<string, number>;
+  phase: 'playing' | 'roundOver';
+  winner: string | null;            // this hand's winner
+  // match play: when scoring.target is set, a match spans multiple hands, accumulating
+  // scores until someone crosses the target. When it's null, a match is exactly one hand
+  // (matchOver is true as soon as that hand ends) — this is the legacy single-hand behavior.
+  matchScores: Record<string, number>; // cumulative points across all hands played so far
+  // One row per hand that has finished, in order: what each player scored *that hand*. The
+  // running total is the sum of the column, so nothing here can disagree with matchScores.
+  // Append-only, and written in exactly one place (finalizeMatchProgress).
+  handScores: Record<string, number>[];
+  handNumber: number;                  // 1-indexed
+  matchOver: boolean;
+  matchWinner: string | null;
+  pendingChoice: { type: 'suit'; player: string; setState: string; purpose?: 'contractTrump' } | null;
+  // A simultaneous card pass in progress (e.g. "everyone passes a card left"), triggered by
+  // the passCards effect. While set, EVERY player (not just whoever's turn it is) may submit
+  // a `choosePass` move; once all have chosen, the swap resolves atomically and turn flow
+  // resumes from wherever it was paused.
+  passDirection: PassDir | null;
+  passCount: number;                     // cards each player owes this pass (1 for the sweep effect)
+  passChoices: Record<string, string[]>; // playerId -> chosen cardIds, only once they've picked in full
+  passStaged: Record<string, string[]>;  // partial picks while a multi-card pass is being assembled
+  brokenSuitPlayed: boolean;             // Hearts: has the broken suit been discarded off-suit yet
+  faceUp: Record<string, boolean>;       // solitaire: which cards are turned face up
+  redealsLeft: number;                   // solitaire: stock passes remaining (-1 = unlimited)
+  /** Patience: the rank foundations build from, when they do not build from aces. */
+  foundationBase: string | null;
+  moveCount: number;                     // solitaire: moves made, for scoring/stats
+  // bluff: the most recent claim, open to challenge until superseded by the next one.
+  pendingClaim: { player: string; count: number; claimedRank: string; cardIds: string[] } | null;
+  // bluff: lies caught (per liar) and correct challenges made (per challenger) — the two halves
+  // of the same event, tallied for whoever it happened to.
+  bluffCaught: Record<string, number>;
+  bluffCalled: Record<string, number>;
+  // bluff: what a challenge just turned up — the actual cards, face up, and whether the claim
+  // held. Persists until the next challenge resolves, the same way lastBattle sits between wars.
+  lastReveal: { claimant: string; challenger: string; claimedRank: string; cards: Card[]; wasTrue: boolean; ply: number } | null;
+  // reflex: who has been eliminated (hand empty), in elimination order — last remaining wins.
+  reflexOut: string[];
+  // reflex: the last successful slap — who, how many cards the pile handed them, and a copy
+  // of the card that had been showing — kept so the table can sweep the pile to them instead
+  // of it just vanishing into a hand count. A copy for the same reason as lastBattle: the
+  // real card already moved into the winner's hand.
+  lastSlap: { player: string; count: number; card: Card } | null;
+  // poker: chip stacks, the pot, and betting-round bookkeeping.
+  chips: Record<string, number>;
+  pot: number;
+  currentBet: number;
+  committed: Record<string, number>;      // this betting round's contribution per player
+  folded: Record<string, boolean>;
+  actedThisRound: Record<string, boolean>; // has acted since the last bet/raise
+  pokerPhase: 'bet' | 'showdown';
+  /** Did the hand actually reach a showdown (2+ players saw it through), or did everyone else
+   *  just fold? Real poker never requires a fold-winner to reveal their hand — only redact()'s
+   *  gate on this, not on `phase === 'roundOver'` alone, keeps that true here too. */
+  pokerWasShowdown: boolean | null;
+  // pit: open offers on the market. Any player may post or accept one at any time.
+  market: { id: number; player: string; give: Suit; count: number; want: Suit }[];
+  nextOfferId: number;
+  tradesCompleted: Record<string, number>; // pit: trades each player has made, either side counted
+  // kent: the tell currently showing, and how many letters each pair has spelt.
+  kentTell: { player: string; ply: number } | null;
+  /**
+   * Swap: which cards each player has actually SEEN.
+   *
+   * The one piece of state in the engine that is per-person rather than per-zone. Redaction
+   * reads it to decide what to show, so a card is face up to you and face down to the table at
+   * the same moment, which is the whole game.
+   */
+  seen: Record<string, string[]>;
+  /** Swap: the card picked up this turn, not yet placed or thrown. */
+  held: { player: string; card: Card; from: 'stock' | 'discard' } | null;
+  /** Swap: a power that has been thrown and is waiting to be aimed. */
+  pendingPower: { player: string; kind: 'peekSelf' | 'peekOther' | 'blindSwap'; firstSlot?: number } | null;
+  /** Swap: who called, and how many turns the rest of the table has left. */
+  caller: string | null;
+  callTurnsLeft: number;
+  /** Swap: turns played this round, toward the safety cap. */
+  swapTurns: number;
+  /** Layout: the seat that has already taken its one card this turn. */
+  layoutDrew: string | null;
+  /**
+   * Layout: consecutive turns in which nobody put a card anywhere.
+   *
+   * With the stock gone, passing is always legal, so a table where nobody can move would hand
+   * the turn round for ever. Once it has been all the way round with nothing played, the round
+   * is over and fewest cards wins.
+   */
+  layoutIdle: number;
+  kentLetters: Record<string, number>;
+  // numeric (Bridge-style) contract auction: the standing high bid, if any. `strain` is absent
+  // between winning the bid and actually naming trump when `chooseTrumpAfter` is on — see that
+  // flag on NumericAuctionConfig.
+  highBid: { player: string; level: number; strain?: Strain } | null;
+  // rummy: the shared melds zone is one flat pile of cards with no separators, so this is the
+  // record of where each group actually starts and ends — the length of each meld, in order.
+  // Without it, re-deriving groups from the flat array by "same rank or same suit" adjacency is
+  // ambiguous whenever one group happens to end in the same suit the next one starts with, and
+  // silently drops cards that get parsed into the wrong (and then too-short-to-keep) group.
+  rummyMeldSizes: number[];
+  ply: number;                           // moves resolved this hand, all families (rules read it)
+  log: LogEntry[];
+}
+
+export interface LogEntry {
+  t: number;
+  player: string | null;
+  text: string;
+}
+
+// A concrete move a player can submit.
+export interface Move {
+  actionId: string;
+  cardId?: string;        // for target: select one
+  choice?: string;        // e.g. chosen suit when resolving pendingChoice
+  target?: string;        // fishing: the player being asked
+  rank?: string;          // fishing: the rank being asked for
+  cards?: string[];       // rummy: the card ids that form a meld
+  alone?: boolean;        // euchre: name trump and play the hand without your partner
+  from?: string;          // solitaire: source zone id
+  to?: string;            // solitaire: destination zone id
+  claimedRank?: string;    // bluff: the rank being claimed
+  amount?: number;         // poker: bet/raise size
+  offerId?: number;        // pit: which open offer to accept/cancel
+  give?: string;           // pit: suit offered (as Suit)
+  want?: string;           // pit: suit wanted (as Suit)
+  level?: number;          // numeric auction: bid level 1..7
+  strain?: string;         // numeric auction: bid strain
+  poolId?: string;         // kent: which face-up card to take from the middle
+  slot?: number;           // swap: which of your four face-down cards
+  targetSlot?: number;     // swap: which of THEIR four, for a sight-unseen trade
+}
+
+// ---------- Redacted (per-player) view ----------
+
+export interface RedactedZone {
+  id: string;
+  visibility: Visibility;
+  cards: Card[];          // only cards this viewer is allowed to see
+  count: number;          // total count (even for hidden zones)
+  faceDown: boolean;
+}
+
+export interface RedactedState {
+  gameName: string;
+  you: string;
+  players: { id: string; handCount: number; isTurn: boolean }[];
+  /** Which way play is moving round the table — reversible in the games that carry a reverse
+   *  card. Not secret information; every player at a real table can already see this. */
+  direction: 1 | -1;
+  zones: Record<string, RedactedZone>;
+  hand: Card[];            // convenience: your own hand
+  vars: Record<string, string>;
+  phase: MatchState['phase'];
+  winner: string | null;
+  isYourTurn: boolean;
+  pendingChoice: MatchState['pendingChoice'];
+  scores: Record<string, number>;
+  log: LogEntry[];
+  // family-specific view
+  mode: 'shedding' | 'trick' | 'climb' | 'fish' | 'rummy' | 'war' | 'solitaire'
+    | 'bluff' | 'reflex' | 'poker' | 'pit' | 'set' | 'kent' | 'layout' | 'swap' | 'maid' | 'capture';
+  // solitaire
+  tableau?: { id: string; cards: Card[]; faceDown: number }[];
+  foundations?: { id: string; cards: Card[] }[];
+  freeCells?: { id: string; card: Card | null }[];
+  moveCapacity?: number;                 // solitaire: how many cards a supermove can shift right now
+  stockCount?: number;
+  wasteCards?: Card[];
+  redealsLeft?: number;
+  /**
+   * A shared layout: every pile in the middle, in order — the cross first, then the corners.
+   * `opensOn` is the rank an empty corner is waiting for, and null for a pile that takes
+   * anything, which is what lets the table draw the difference without knowing the game.
+   */
+  layoutPiles?: { id: string; cards: Card[]; opensOn: string | null }[];
+  /** A shared layout: whether this viewer has already taken their one card this turn. */
+  layoutDrawn?: boolean;
+  /** Patience: the reserve pile, top card last, and the rank foundations build from. */
+  reserve?: Card[];
+  foundationBase?: string | null;
+  moveCount?: number;
+  solMoves?: Move[];
+  rummyPhase?: 'draw' | 'play';
+  meldMoves?: { cards: string[]; label: string }[];
+  deadwood?: number;       // gin: what this viewer's unmatched cards are currently worth
+  battle?: Card[];
+  /** Who won the pair in `battle`, so the table can sweep it to them rather than show it inert. */
+  battleWinner?: string | null;
+  warsCount?: number;
+  /** Who swept every penalty point this hand, if the game plays that way and anyone did. */
+  shotMoon?: string | null;
+  /** How a hand just ended — gin rummy's three endings, or a bid contract made as a slam. */
+  roundOutcome?: 'gin' | 'undercut' | 'knock' | 'slam' | null;
+  trick?: { player: string; card: Card }[];
+  /** The trick just taken, held until somebody leads again. */
+  lastTrick?: { plays: { player: string; card: Card }[]; winner: string };
+  lead?: Suit | null;
+  tricksWon?: Record<string, number>;
+  finished?: string[];
+  climbPile?: Card[]; // the whole current group on the pile (1-3 cards; a single card back-compat)
+  booksWon?: Record<string, number>;
+  oceanCount?: number;
+  bids?: Record<string, number>;
+  bidding?: boolean;
+  teams?: string[][];
+  trumpSuit?: Suit | 'none' | null;
+  auctionRound?: 0 | 1 | 2;
+  upcard?: Card | null;
+  maker?: string | null;
+  alone?: boolean;
+  sittingOut?: string | null;
+  dealer?: string | null;
+  // match play (see MatchState)
+  matchScores: Record<string, number>;
+  /** One row per finished hand: what each player scored that hand. The scorepad reads this. */
+  handScores: Record<string, number>[];
+  handNumber: number;
+  matchOver: boolean;
+  matchWinner: string | null;
+  matchTarget: number | null;
+  matchBust: number | null;
+  // simultaneous card pass (see MatchState.passDirection)
+  passDirection: PassDir | null;
+  needsPassChoice: boolean;  // true iff a pass is pending and this viewer hasn't chosen yet
+  passWaitingOn: number;     // how many players still need to choose
+  passCount: number;         // cards owed this pass
+  passStaged: string[];      // this viewer's picks so far, for a multi-card pass
+  brokenSuitPlayed?: boolean;
+  // bluff — the claimed rank is spoken aloud in real Cheat, so everyone sees it; only the
+  // actual cards under it stay hidden until a challenge reveals them.
+  centerCount?: number;               // cards face-down in the center pile right now
+  pendingClaim?: { player: string; count: number; claimedRank: string } | null;
+  bluffCaught?: Record<string, number>;  // lies caught, per liar
+  bluffCalled?: Record<string, number>;  // correct challenges made, per challenger
+  /** What the last challenge turned up — public the moment it resolves, same as the real game. */
+  lastReveal?: { claimant: string; challenger: string; claimedRank: string; cards: Card[]; wasTrue: boolean; ply: number } | null;
+  // reflex
+  pileTop?: Card | null;
+  slapValid?: boolean;                // true iff a slap would currently succeed for THIS viewer
+  reflexOut?: string[];
+  lastSlap?: { player: string; count: number; card: Card } | null;
+  // poker
+  chips?: Record<string, number>;
+  pot?: number;
+  currentBet?: number;
+  committed?: Record<string, number>;
+  folded?: Record<string, boolean>;
+  showdown?: { player: string; cards: Card[]; label: string }[]; // revealed only once the hand ends
+  // pit
+  market?: { id: number; player: string; give: Suit; count: number; want: Suit }[];
+  tradesCompleted?: Record<string, number>;
+  /** kent: the face-up pool, whose seat is showing a tell, and the letters each pair has. */
+  kentPool?: Card[];
+  kentTell?: { player: string } | null;
+  layoutDrew?: string | null;
+  /**
+   * Swap: your own four, with a card where you know what it is and null where you do not.
+   * Everyone else's is a count and a list of the ones YOU have been shown.
+   */
+  grids?: { player: string; slots: (Card | null)[] }[];
+  held?: Card | null;
+  heldFrom?: 'stock' | 'discard' | null;
+  power?: 'peekSelf' | 'peekOther' | 'blindSwap' | null;
+  caller?: string | null;
+  kentLetters?: Record<string, number>;
+  kentWord?: string;
+  /** kent: true when your own hand is four of a kind, so the table can offer the signal. */
+  kentReady?: boolean;
+  cornerSize?: number;
+  /** set: the face-up board, and what is left behind it. Both public by design. */
+  setBoard?: Card[];
+  setDeckLeft?: number;
+  setSize?: number;
+  /** How many valid trios are actually on the board right now — not which ones. */
+  setsAvailable?: number;
+  // numeric (Bridge-style) auction
+  highBid?: { player: string; level: number; strain?: Strain } | null;
+  /** True while a contract auction is still running. */
+  contractAuction?: boolean;
+  /** How many tricks the standing contract promises, once there is one. */
+  contractTricks?: number;
+}
