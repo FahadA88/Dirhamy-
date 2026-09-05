@@ -4848,6 +4848,21 @@ header h1, header .wordmark {
 }
 .badge-detail { font-style: normal; font-size: 11px; color: var(--muted); }
 
+/* Punch-list item 79: the play calendar — a week per column, Sunday on top, same shape as a
+   GitHub contribution graph, so "did I play most days this quarter" reads at a glance instead
+   of needing eighty-four log lines added up by hand. */
+.play-calendar { display: flex; gap: 3px; overflow-x: auto; padding-bottom: 2px; }
+.pc-week { display: flex; flex-direction: column; gap: 3px; }
+.pc-day {
+  inline-size: 11px; block-size: 11px; border-radius: 3px;
+  background: var(--panel-hi); flex: 0 0 auto;
+}
+.pc-day.pc-blank { visibility: hidden; }
+.pc-day.lvl-1 { background: color-mix(in srgb, var(--emerald) 30%, var(--panel-hi)); }
+.pc-day.lvl-2 { background: color-mix(in srgb, var(--emerald) 55%, var(--panel-hi)); }
+.pc-day.lvl-3 { background: color-mix(in srgb, var(--emerald) 78%, var(--panel-hi)); }
+.pc-day.lvl-4 { background: var(--emerald); }
+
 /* ---- an empty record ---- */
 /*
    The Profile page with nothing on it yet.

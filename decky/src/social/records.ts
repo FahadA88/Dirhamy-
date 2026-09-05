@@ -98,6 +98,74 @@ export function currentLossStreak(gameId?: string): number {
   return n;
 }
 
+// Punch-list item 79: "no streaks or play calendar" — currentStreak above is a WIN streak
+// (breaks the moment you lose); this is a day streak, the kind that survives a loss and only
+// breaks when a whole day goes by with nothing played. Local calendar days, not 24-hour
+// windows, so playing at 11pm and again at 7am the same household-morning still counts as two
+// different days honestly rather than one lucky window.
+function dayKey(at: number): string {
+  const d = new Date(at);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+// Local-midnight arithmetic on the Y/M/D components, not raw milliseconds — a day key parsed
+// back through `new Date("YYYY-MM-DD")` lands at UTC midnight, which is the wrong calendar day
+// in every timezone west of Greenwich. Date's own setDate also does the right thing across a
+// DST transition, which a flat 24h subtraction would not.
+function dayBefore(key: string): string {
+  const [y, m, d] = key.split('-').map(Number);
+  const date = new Date(y, m - 1, d);
+  date.setDate(date.getDate() - 1);
+  return dayKey(date.getTime());
+}
+
+export interface PlayStreak {
+  current: number;
+  best: number;
+}
+
+/** Consecutive calendar days with at least one finished game. Alive today counts from today;
+ *  alive as of yesterday still counts (you have until midnight tonight to keep it), but two
+ *  clear days of nothing breaks it. */
+export function playStreak(): PlayStreak {
+  const days = [...new Set(allResults().map((r) => dayKey(r.at)))].sort().reverse();
+  if (days.length === 0) return { current: 0, best: 0 };
+  const today = dayKey(Date.now());
+  const yesterday = dayBefore(today);
+
+  let current = 0;
+  if (days[0] === today || days[0] === yesterday) {
+    current = 1;
+    for (let i = 1; i < days.length; i++) {
+      if (days[i] === dayBefore(days[i - 1])) current++;
+      else break;
+    }
+  }
+
+  let best = 1;
+  let run = 1;
+  for (let i = 1; i < days.length; i++) {
+    run = days[i] === dayBefore(days[i - 1]) ? run + 1 : 1;
+    if (run > best) best = run;
+  }
+  return { current, best };
+}
+
+/** The last `weeks` weeks of play, oldest first — a GitHub-style contribution grid. Every day
+ *  in range appears even if nothing was played, so the caller never has to fill gaps itself. */
+export function playCalendar(weeks = 12): { date: string; count: number }[] {
+  const counts = new Map<string, number>();
+  for (const r of allResults()) counts.set(dayKey(r.at), (counts.get(dayKey(r.at)) ?? 0) + 1);
+  const days = weeks * 7;
+  const out: { date: string; count: number }[] = [];
+  let cursor = dayKey(Date.now());
+  for (let i = 0; i < days; i++) {
+    out.unshift({ date: cursor, count: counts.get(cursor) ?? 0 });
+    cursor = dayBefore(cursor);
+  }
+  return out;
+}
+
 export interface PlayerSummary {
   played: number;
   won: number;

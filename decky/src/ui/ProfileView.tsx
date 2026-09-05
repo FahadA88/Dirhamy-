@@ -2,7 +2,8 @@ import { useMemo, useState } from 'react';
 import { useSettings } from '../settings/SettingsContext';
 import { catalog } from '../games/catalog';
 import {
-  Badge, allResults, badges, currentStreak, highlights, leaderboard, mySummary, tierFor,
+  Badge, allResults, badges, currentStreak, highlights, leaderboard, mySummary, playCalendar,
+  playStreak, tierFor,
 } from '../social/records';
 
 // Your record.
@@ -22,6 +23,11 @@ export function ProfileView({ onPlay }: { onPlay: () => void }) {
   const results = useMemo(() => allResults(), []);
   const earned = useMemo(() => badges(catalog.length), []);
   const bests = useMemo(() => highlights(), []);
+  // Punch-list item 79: a day streak (survives a loss, breaks only on a day with nothing
+  // played) is a different question from summary.streak (a WIN streak, breaks on one loss) —
+  // both are shown, clearly labelled, so neither reads as a duplicate of the other.
+  const dayStreak = useMemo(() => playStreak(), []);
+  const calendar = useMemo(() => playCalendar(12), []);
 
   // Per-game record, most-played first. Only games actually finished appear — a list of
   // nineteen zeroes is not a record of anything.
@@ -127,7 +133,9 @@ export function ProfileView({ onPlay }: { onPlay: () => void }) {
             <Stat label="Played" value={String(summary.played)} />
             <Stat label="Won" value={String(summary.won)} />
             <Stat label="Win rate" value={pct(summary.winRate)} />
-            <Stat label="Streak" value={String(summary.streak)} hint={summary.streak > 0 ? 'in a row' : 'no run yet'} />
+            <Stat label="Win streak" value={String(summary.streak)} hint={summary.streak > 0 ? 'in a row' : 'no run yet'} />
+            <Stat label="Day streak" value={String(dayStreak.current)}
+              hint={dayStreak.best > dayStreak.current ? `best ${dayStreak.best}` : dayStreak.current > 0 ? 'today' : 'play today to start one'} />
           </div>
 
           {summary.favouriteGame && (
@@ -135,6 +143,11 @@ export function ProfileView({ onPlay }: { onPlay: () => void }) {
               Most played: <b>{summary.favouriteGame}</b>.
             </p>
           )}
+
+          <section className="panel glass profile-panel">
+            <h4>Play calendar</h4>
+            <PlayCalendarGrid days={calendar} />
+          </section>
 
           {bests.length > 0 && (
             <section className="panel glass profile-panel">
@@ -223,6 +236,35 @@ function ProfileHead({ name, avatar, summary }: {
         </p>
       </div>
     </header>
+  );
+}
+
+/** GitHub-style contribution grid, one column per week, Sunday on top. Padded at the front so
+ *  the first column always starts on a real Sunday rather than a ragged partial week. */
+function PlayCalendarGrid({ days }: { days: { date: string; count: number }[] }) {
+  if (days.length === 0) return null;
+  const [fy, fm, fd] = days[0].date.split('-').map(Number);
+  const leadingBlank = new Date(fy, fm - 1, fd).getDay();
+  const padded: ({ date: string; count: number } | null)[] =
+    [...Array.from({ length: leadingBlank }, () => null), ...days];
+  const weeks: ({ date: string; count: number } | null)[][] = [];
+  for (let i = 0; i < padded.length; i += 7) weeks.push(padded.slice(i, i + 7));
+  const max = Math.max(1, ...days.map((d) => d.count));
+  const level = (n: number) => (n === 0 ? 0 : Math.min(4, Math.ceil((n / max) * 4)));
+
+  return (
+    <div className="play-calendar" role="img" aria-label={`Play calendar for the last ${days.length} days`}>
+      {weeks.map((week, wi) => (
+        <div className="pc-week" key={wi}>
+          {week.map((day, di) => (
+            day
+              ? <span key={day.date} className={`pc-day lvl-${level(day.count)}`}
+                  title={`${day.date} — ${day.count} game${day.count === 1 ? '' : 's'}`} />
+              : <span key={`b${wi}-${di}`} className="pc-day pc-blank" aria-hidden="true" />
+          ))}
+        </div>
+      ))}
+    </div>
   );
 }
 
