@@ -48,57 +48,64 @@
 }
 
 /* ------------------------------------------------------------------
-   THE CARD ROOM
-   A private room with a good table in it. Near-black walls with a warm
-   cast, brass for anything you can press, and the cloth doing the only
-   real colour in the place. The cards stay honest ivory, because that
-   is what a real deck is.
-
-   This used to be a neon sign: electric magenta leading, cyan
-   answering, everything glowing at everything else. It read as an
-   arcade, and an arcade is not what a deck of cards costs. Glow is
-   gone; depth, a hairline and a metal do the same job and cost
-   nothing at a glance. Colour is spent, not sprayed — one accent,
-   used where a hand goes.
+   THE ROOM, IN GLASS
+   Panels are glass, not paint: translucent, blurred, floating a few
+   pixels above whatever is behind them, with a shadow underneath that
+   says how high. One accent does every job colour used to be spread
+   across five lights for — a select state, a focus ring and a link
+   all reach for the same blue rather than each getting their own
+   hue — and gold is kept apart from it on purpose, the one colour
+   still spent deliberately, for winning and nothing else. The ground
+   itself is close to neutral: a single soft wash of the accent high
+   in the frame, not three saturated signs arguing with each other.
    ------------------------------------------------------------------ */
 :root {
   --daywarm: 0.3;          /* set for real at mount, from the local clock — see App.tsx */
-  --bg0: #090518;          /* the room, past midnight */
-  --bg1: #120a2e;
-  --panel: #1b1040;        /* a lit surface */
-  --panel-solid: #1b1040;
-  --panel-hi: #261656;
-  --panel-brd: rgba(150, 110, 255, 0.26);
-  --panel-brd-hi: rgba(255, 46, 136, 0.75);
-  --ink: #f6f1ff;
-  --muted: #b3a4de;
-  --dim: #7d6dab;
+  --bg0: #0a0c11;          /* the room, past midnight */
+  --bg1: #12151c;
+  --panel: rgba(255, 255, 255, 0.055);   /* glass: translucent, tinted by whatever sits behind it */
+  --panel-solid: #14171f;                /* an opaque fallback — high-contrast mode, printed output */
+  --panel-hi: rgba(255, 255, 255, 0.09);
+  --panel-brd: rgba(255, 255, 255, 0.10);
+  --panel-brd-hi: rgba(255, 255, 255, 0.24);
+  --ink: #eef0f4;
+  --muted: #99a1b0;
+  --dim: #5c6472;
 
-  /* Five lights. Magenta leads, cyan answers, gold is for winning. */
-  --hot: #ff2e88;
-  --hot-hi: #ff6aa9;
-  --cyan: #1fe3ff;
-  --cyan-hi: #7ceeff;
-  --gold: #ffc531;
-  --gold-hi: #ffdd7a;
-  --gold-dim: rgba(255, 197, 49, 0.16);
-  --violet: #9b5cff;
-  --lime: #4dffa0;
+  /* One accent. Everything that used to reach for a second or third hue reaches for this
+     instead — a select state and a focus ring should read as the same kind of "on", not as
+     two different colours that happen to appear near each other. */
+  --accent: #6c8cff;
+  --accent-hi: #93a9ff;
+  --accent-dim: rgba(108, 140, 255, 0.16);
+
+  --hot: var(--accent);
+  --hot-hi: var(--accent-hi);
+  --cyan: var(--accent);
+  --cyan-hi: var(--accent-hi);
+  --violet: var(--accent);
+  --lime: var(--accent);
+  /* Gold stays apart from the accent on purpose — the one colour still spent deliberately,
+     for winning and nothing else, so it keeps meaning something the day everything else is
+     the same blue. */
+  --gold: #d4af6a;
+  --gold-hi: #e8c98c;
+  --gold-dim: rgba(212, 175, 106, 0.16);
   --red: #c4453f;
   /* --red as small text on a panel measures ~3.7:1 here — fine for a background or a border,
      not enough for reading. A separate, brighter token for red TEXT specifically, so a warning
      nobody notices doesn't share a color with a button nobody has to read. */
   --red-text: #e56059;
-  --amber: #dfa53a;
+  --amber: #c99a4b;
 
   /* Older names, still asked for all over the sheet. Pointed at the new lights rather than
      deleted, because an undefined custom property invalidates the whole declaration. */
   --oak: var(--gold);
   --oak-hi: var(--gold-hi);
   --oak-dim: var(--gold-dim);
-  --green: var(--cyan);
-  --green-d: var(--hot);
-  --emerald: var(--violet);
+  --green: var(--accent);
+  --green-d: var(--accent);
+  --emerald: var(--accent);
 
   --card-bg: #fffdf8;
   --card-edge: #cfc6b8;    /* the thickness you see on a card's side */
@@ -108,11 +115,19 @@
   --display: "Outfit", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --serif: var(--display);   /* the serif is gone; anything asking for it gets the display face */
   --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
-  --glow: rgba(255, 46, 136, 0.45);
-  --input-bg: #150c36;
+  --glow: rgba(108, 140, 255, 0.35);
+  --input-bg: rgba(255, 255, 255, 0.05);
   --cw: 76px; --ch: 108px; --bw: 56px; --bh: 80px;
   --r-lg: 18px; --r-md: 12px; --r-pill: 999px;
-  --shadow-panel: 0 1px 0 rgba(0,0,0,.5), 0 20px 50px rgba(0, 0, 0, .62);
+
+  /* Spatial: three heights, not one flat panel shadow. A resting glass surface, one lifted a
+     little (hover, a card in hand), and one floating well clear of the page (a modal, the
+     final-match box) — each with its own blur and reach so the depth is felt, not just implied
+     by a single reused shadow at every level. */
+  --elev-1: 0 1px 1px rgba(0, 0, 0, .28), 0 8px 20px rgba(0, 0, 0, .22);
+  --elev-2: 0 2px 6px rgba(0, 0, 0, .30), 0 18px 40px rgba(0, 0, 0, .30);
+  --elev-3: 0 6px 16px rgba(0, 0, 0, .34), 0 34px 80px rgba(0, 0, 0, .40);
+  --shadow-panel: var(--elev-1);
 
   /* The drop under a pressable object: its own solid edge, then the shadow it throws. */
   --lip: 4px;
@@ -126,56 +141,61 @@
 }
 
 /*
-   Daylight — the same room with the shutters open.
+   Daylight — the same glass with the shutters open.
 
-   It used to be the old neon palette with the lights turned up: lilac walls, a violet that
-   nothing else in the app still used, and a glow that was still electric magenta long after
-   the dark theme had stopped being a nightclub. Half the audience opens this in a lit room,
-   and they got the half that was never redrawn.
-
-   Same room, same materials, same roles: warm plaster instead of near-black, brass that has
-   to darken to hold its own against white, and the cloth still doing the only real colour.
-   Ink is warm near-black rather than blue-black, because the walls are warm.
+   Same materials, same roles, same single accent: a soft neutral ground instead of near-black,
+   glass tinted dark-on-light instead of light-on-dark, and gold darkened just enough to keep
+   its footing against white. Ink is a near-black with a touch of blue in it, not warm brown,
+   because the room itself was never warm — it is glass and a pale wash of the accent, not a
+   panelled room with a lamp in it.
 */
 :root[data-theme="light"] {
-  /* Still the same neon signage, just with the lights on and white walls — not paper, not a
-     magazine. Everything saturated stays saturated. */
-  --bg0: #eceaf8;          /* the room, shutters open */
-  --bg1: #f6f4ff;
-  --panel: #ffffff;        /* a surface with something on it */
+  --bg0: #f3f4f8;          /* the room, shutters open */
+  --bg1: #f9fafc;
+  --panel: rgba(20, 22, 32, 0.045);        /* glass again, just tinted dark-on-light this time */
   --panel-solid: #ffffff;
-  --panel-hi: #ffffff;
-  --panel-brd: rgba(70, 40, 140, 0.16);
-  --panel-brd-hi: rgba(255, 46, 136, 0.6);
-  --ink: #180f34;
-  --muted: #6b5f92;
-  --dim: #9d93bd;
+  --panel-hi: rgba(20, 22, 32, 0.075);
+  --panel-brd: rgba(20, 22, 32, 0.10);
+  --panel-brd-hi: rgba(20, 22, 32, 0.22);
+  --ink: #14161f;
+  --muted: #5a6070;
+  --dim: #9aa0ac;
 
-  --hot: #e6006b;
-  --hot-hi: #ff3d8f;
-  --cyan: #0090b8;
-  --cyan-hi: #16b8e0;
-  --gold: #c98a00;
-  --gold-hi: #e6a70c;
-  --gold-dim: rgba(201, 138, 0, 0.14);
-  --violet: #7b3cf0;
-  --lime: #2f8f5c;
+  --accent: #3f5fd6;
+  --accent-hi: #5b7cea;
+  --accent-dim: rgba(63, 95, 214, 0.12);
+
+  --hot: var(--accent);
+  --hot-hi: var(--accent-hi);
+  --cyan: var(--accent);
+  --cyan-hi: var(--accent-hi);
+  --violet: var(--accent);
+  --lime: var(--accent);
+  --gold: #a97a2e;
+  --gold-hi: #c2914a;
+  --gold-dim: rgba(169, 122, 46, 0.14);
   --red: #a8352f;
   --red-text: #a8352f;   /* already ~6.5:1 against a light panel — no separate value needed */
-  --amber: #a97516;
+  --amber: #92671f;
+
+  --green: var(--accent);
+  --green-d: var(--accent);
+  --emerald: var(--accent);
 
   --card-edge: #d9d2c4;
-  --input-bg: #ffffff;
-  --glow: rgba(230, 0, 107, 0.3);
-  --shadow-panel: 0 2px 0 rgba(70, 40, 140, .10), 0 14px 34px rgba(70, 40, 140, .14);
+  --input-bg: rgba(20, 22, 32, 0.035);
+  --glow: rgba(63, 95, 214, 0.22);
+  --elev-1: 0 1px 1px rgba(30, 34, 50, .05), 0 8px 20px rgba(30, 34, 50, .08);
+  --elev-2: 0 2px 6px rgba(30, 34, 50, .06), 0 18px 40px rgba(30, 34, 50, .10);
+  --elev-3: 0 6px 16px rgba(30, 34, 50, .08), 0 34px 80px rgba(30, 34, 50, .14);
+  --shadow-panel: var(--elev-1);
 
   /* The dark-room --seg-on-bg/--seg-on-ink swap (defined at the top of this file) is an ink/
-     page-background inversion that happened to land on a lilac tint because --ink itself is
-     that colour after dark. Swap the same two roles in daylight and it lands on --ink's
-     daylight value instead: near-black indigo, flat, no glow in it at all — a selected pill
-     sitting in an otherwise electric room the one place that still looked flat. Given its own
-     colour instead of inheriting the swap: a dark violet rather than plain ink. */
-  --seg-on-bg: #3a1a70;
+     page-background inversion that happened to land on the accent's own tint because --ink
+     itself is close to it after dark. Given its own colour instead in daylight, the same way it
+     was before: the accent's own deep end, so a selected pill still reads as "on" rather than
+     just "dark". */
+  --seg-on-bg: #24377c;
   --seg-on-ink: var(--bg1);
 }
 
@@ -232,23 +252,18 @@ body {
   font-weight: 500;
   color: var(--ink);
   min-height: 100vh;
-  /* Low light in a panelled room: one warm lamp high on the left, a colder one from a window
-     on the right, and the floor falling away into the dark. Two neon signs and a purple haze
-     is a bar, and a bar is not what this is. */
-  /* Two signs in the dark and the haze between them. */
+  /* One quiet wash of the accent, high in the frame, and nothing else — the glass panels are
+     what does the work of the page from here down; the ground behind them just needs to be
+     calm enough that translucency reads as glass rather than as a window onto a light show. */
   background:
-    radial-gradient(900px 620px at 12% -8%, rgba(255, 46, 136, .26) 0%, transparent 62%),
-    radial-gradient(820px 560px at 92% 4%, rgba(31, 227, 255, .20) 0%, transparent 60%),
-    radial-gradient(700px 700px at 50% 108%, rgba(155, 92, 255, .22) 0%, transparent 62%),
+    radial-gradient(1100px 760px at 50% -12%, var(--accent-dim) 0%, transparent 62%),
     var(--bg0);
   background-attachment: fixed;
   overflow-x: hidden;
 }
 :root[data-theme="light"] body {
   background:
-    radial-gradient(900px 620px at 12% -8%, rgba(255, 46, 136, .16) 0%, transparent 62%),
-    radial-gradient(820px 560px at 92% 4%, rgba(31, 200, 255, .16) 0%, transparent 60%),
-    radial-gradient(700px 700px at 50% 108%, rgba(155, 92, 255, .14) 0%, transparent 62%),
+    radial-gradient(1100px 760px at 50% -12%, var(--accent-dim) 0%, transparent 62%),
     var(--bg0);
   background-attachment: fixed;
 }
@@ -1850,7 +1865,8 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
 .hero-body .sc-meta { color: rgba(255,255,255,0.68); }
 .hero-cta {
   margin-top: 6px; padding: 11px 22px; border-radius: 999px;
-  background: var(--gold); color: #17140c; font-weight: 800; font-size: 14px;
+  background: linear-gradient(178deg, var(--brass-hi), var(--brass));
+  color: #0d1220; font-weight: 800; font-size: 14px;
   letter-spacing: -0.01em;
 }
 .hero-art { flex: 0 0 auto; display: none; }
@@ -6415,47 +6431,40 @@ button.bluff-go:disabled {
    ================================================================== */
 
 :root {
-  /* --- the ground, deepened ----------------------------------------
-     A shade under what it was, with the warmth pushed toward red
-     rather than yellow. Brass on a warmer, darker ground reads as
-     brighter metal without being made any lighter itself. */
-  --bg0: #07031a;
-  --bg1: #100a2c;
-
-  /* --- metal -------------------------------------------------------
-     Not one colour: magenta lit, magenta in shadow. A hairline that
-     runs from lit to shadow down its own height reads as a machined
-     edge; a hairline of flat rgba reads as a border. Three stops is
-     all it takes. */
-  --brass-lo: #7a1a45;
-  --brass:    #ff2e88;
-  --brass-hi: #ff9dc4;
+  /* --- metal, recast as the accent -----------------------------------
+     The one loud object on the page used to be its own hot-pink metal,
+     independent of everything else that meant "on". Three stops of the
+     single site accent instead — lit, mid, shadow — so the primary
+     button, a focus ring and a selected tab all read as the same
+     colour meaning the same thing. */
+  --brass-lo: #3a51b8;
+  --brass:    var(--accent);
+  --brass-hi: var(--accent-hi);
   --metal-edge: linear-gradient(
     180deg,
-    rgba(255, 157, 196, 0.42) 0%,
-    rgba(255, 46, 136, 0.18) 34%,
-    rgba(122, 26, 69, 0.10) 100%);
+    rgba(255, 255, 255, 0.38) 0%,
+    rgba(108, 140, 255, 0.22) 34%,
+    rgba(58, 81, 184, 0.14) 100%);
 
   /* --- glass -------------------------------------------------------
-     A panel is a sheet of smoked glass held a few millimetres off the
-     wall: you can see the lamp through it, it picks up a highlight
-     along its top edge, and it throws a shadow. The fill is
-     translucent so the room's own gradients show through and no two
-     panels on the page are quite the same colour — which is the tell
-     that separates glass from grey paint. */
-  --glass-fill: rgba(27, 16, 64, 0.56);
-  --glass-fill-hi: rgba(38, 22, 86, 0.68);
-  --glass-blur: saturate(150%) blur(18px);
-  --glass-top: rgba(255, 241, 255, 0.10);
+     A panel is a sheet of frosted glass held a few millimetres off the
+     wall: you can see what is behind it, it picks up a highlight along
+     its top edge, and it throws a shadow. White, not a colour tint —
+     colouring the glass itself is what made no two panels agree with
+     each other; the room's own accent wash is what shows through it. */
+  --glass-fill: rgba(255, 255, 255, 0.055);
+  --glass-fill-hi: rgba(255, 255, 255, 0.09);
+  --glass-blur: saturate(140%) blur(20px);
+  --glass-top: rgba(255, 255, 255, 0.10);
 
   /* --- elevation ---------------------------------------------------
      Four tiers, named for how far off the surface the thing is. Each
      is a contact shadow plus a cast shadow, because one shadow alone
      always looks like a sticker. */
-  --e1: 0 1px 1px rgba(0,0,0,.34), 0 2px 6px rgba(0,0,0,.26);
-  --e2: 0 1px 2px rgba(0,0,0,.40), 0 8px 22px rgba(0,0,0,.34);
-  --e3: 0 2px 3px rgba(0,0,0,.44), 0 18px 44px rgba(0,0,0,.44);
-  --e4: 0 3px 5px rgba(0,0,0,.50), 0 40px 90px rgba(0,0,0,.56);
+  --e1: 0 1px 1px rgba(0,0,0,.28), 0 2px 6px rgba(0,0,0,.22);
+  --e2: 0 1px 2px rgba(0,0,0,.32), 0 8px 22px rgba(0,0,0,.28);
+  --e3: 0 2px 3px rgba(0,0,0,.36), 0 18px 44px rgba(0,0,0,.36);
+  --e4: 0 3px 5px rgba(0,0,0,.42), 0 40px 90px rgba(0,0,0,.48);
   --shadow-panel: var(--e3);
 
   /* --- motion ------------------------------------------------------
@@ -6468,32 +6477,29 @@ button.bluff-go:disabled {
   --t-slow: 620ms;
 
   /* Glow, kept on a short leash — see the LIVE section below. */
-  --lit: rgba(255, 46, 136, 0.34);
+  --lit: var(--accent-dim);
 
   --serif: "Bodoni Moda", "Hoefler Text", "Didot", Georgia, serif;
 }
 
 :root[data-theme="light"] {
-  /* Same neon signage, lights on, white walls. */
-  --bg0: #eceaf8;
-  --bg1: #f6f4ff;
-  --brass-lo: #e6006b;
-  --brass:    #ff3d8f;
-  --brass-hi: #ffb3d6;
+  --brass-lo: #2c3f9e;
+  --brass:    var(--accent);
+  --brass-hi: var(--accent-hi);
   --metal-edge: linear-gradient(
     180deg,
-    rgba(255, 255, 255, 0.86) 0%,
-    rgba(230, 0, 107, 0.24) 40%,
-    rgba(122, 26, 69, 0.14) 100%);
-  --glass-fill: rgba(255, 255, 255, 0.66);
-  --glass-fill-hi: rgba(255, 255, 255, 0.84);
-  --glass-top: rgba(255, 255, 255, 0.92);
-  --e1: 0 1px 1px rgba(70, 40, 140, .07), 0 2px 6px rgba(70, 40, 140, .07);
-  --e2: 0 1px 2px rgba(70, 40, 140, .09), 0 8px 22px rgba(70, 40, 140, .10);
-  --e3: 0 2px 3px rgba(70, 40, 140, .10), 0 18px 44px rgba(70, 40, 140, .13);
-  --e4: 0 3px 5px rgba(70, 40, 140, .12), 0 40px 90px rgba(70, 40, 140, .17);
+    rgba(255, 255, 255, 0.80) 0%,
+    rgba(63, 95, 214, 0.22) 40%,
+    rgba(44, 63, 158, 0.12) 100%);
+  --glass-fill: rgba(20, 22, 32, 0.04);
+  --glass-fill-hi: rgba(20, 22, 32, 0.07);
+  --glass-top: rgba(255, 255, 255, 0.7);
+  --e1: 0 1px 1px rgba(30, 34, 50, .05), 0 2px 6px rgba(30, 34, 50, .05);
+  --e2: 0 1px 2px rgba(30, 34, 50, .06), 0 8px 22px rgba(30, 34, 50, .07);
+  --e3: 0 2px 3px rgba(30, 34, 50, .07), 0 18px 44px rgba(30, 34, 50, .09);
+  --e4: 0 3px 5px rgba(30, 34, 50, .08), 0 40px 90px rgba(30, 34, 50, .12);
   --shadow-panel: var(--e3);
-  --lit: rgba(230, 0, 107, 0.30);
+  --lit: var(--accent-dim);
 }
 
 /* Measured on a throttled Pixel 5 (4x CPU, the profile a mid-range Android gives a real page):
@@ -6506,8 +6512,8 @@ button.bluff-go:disabled {
 @media (hover: none) and (pointer: coarse) {
   :root {
     --glass-blur: none;
-    --glass-fill: rgba(23, 13, 54, 0.82);
-    --glass-fill-hi: rgba(33, 19, 74, 0.90);
+    --glass-fill: rgba(18, 21, 28, 0.82);
+    --glass-fill-hi: rgba(24, 27, 36, 0.90);
   }
   :root[data-theme="light"] {
     --glass-fill: rgba(255, 255, 255, 0.90);

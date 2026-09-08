@@ -19,8 +19,10 @@ import { fileURLToPath } from 'node:url';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const CSS = readFileSync(join(ROOT, 'src', 'ui', 'styles.css'), 'utf8');
 
-/** Pull `--name: #hex;` pairs out of one `selector { ... }` block (first match, flat — no
- *  nested braces expected in a variable block). */
+/** Pull `--name: #hex;` or `--name: rgba(...);` pairs out of one `selector { ... }` block
+ *  (first match, flat — no nested braces expected in a variable block). The glass system's
+ *  panels are translucent rgba fills, not opaque hex, so both forms have to parse or every
+ *  check that reads --panel silently goes missing. */
 function tokensIn(selector: string): Record<string, string> {
   const start = CSS.indexOf(`${selector} {`);
   if (start < 0) throw new Error(`theme block not found: ${selector}`);
@@ -34,17 +36,37 @@ function tokensIn(selector: string): Record<string, string> {
   }
   const block = CSS.slice(bodyStart, i - 1);
   const tokens: Record<string, string> = {};
-  for (const m of block.matchAll(/--([a-zA-Z0-9-]+):\s*(#[0-9a-fA-F]{3,8})\s*;/g)) {
+  for (const m of block.matchAll(/--([a-zA-Z0-9-]+):\s*(#[0-9a-fA-F]{3,8}|rgba?\([^)]+\))\s*;/g)) {
     tokens[m[1]] = m[2];
   }
   return tokens;
 }
 
+/** [r, g, b, a] — a a plain hex is treated as fully opaque. */
+function parseColor(value: string): [number, number, number, number] {
+  if (value.startsWith('#')) {
+    let h = value.slice(1);
+    if (h.length === 3) h = h.split('').map((c) => c + c).join('');
+    const n = parseInt(h.slice(0, 6), 16);
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255, 1];
+  }
+  const parts = value.replace(/rgba?\(|\)/g, '').split(',').map((s) => parseFloat(s.trim()));
+  const [r, g, b, a = 1] = parts;
+  return [r, g, b, a];
+}
+
+/** A translucent panel's real, rendered colour depends on what sits behind it — the glass
+ *  system is built on exactly that fact. `under` is the honest stand-in for "whatever is most
+ *  commonly behind this panel": the page background, since that's what a panel floats over in
+ *  the ordinary case this check exists to catch a regression in. */
+function compositeOver(fg: [number, number, number, number], under: [number, number, number, number]): [number, number, number] {
+  const a = fg[3];
+  return [0, 1, 2].map((i) => fg[i] * a + under[i] * (1 - a)) as [number, number, number];
+}
+
 function hexToRgb(hex: string): [number, number, number] {
-  let h = hex.slice(1);
-  if (h.length === 3) h = h.split('').map((c) => c + c).join('');
-  const n = parseInt(h.slice(0, 6), 16);
-  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  const [r, g, b] = parseColor(hex);
+  return [r, g, b];
 }
 
 // WCAG 2.x relative luminance and contrast ratio — https://www.w3.org/TR/WCAG21/#dfn-relative-luminance
@@ -80,20 +102,33 @@ for (const theme of ['dark', 'light'] as const) {
 const darkTokens = tokensIn(':root');
 const lightTokens = tokensIn(':root[data-theme="light"]');
 
+function toHex([r, g, b]: [number, number, number]): string {
+  return `#${[r, g, b].map((c) => Math.round(c).toString(16).padStart(2, '0')).join('')}`;
+}
+
 let failed = false;
 for (const { theme, label, fg, bg, min } of CHECKS) {
   const tokens = theme === 'dark' ? darkTokens : lightTokens;
-  const fgHex = tokens[fg];
-  const bgHex = tokens[bg];
-  if (!fgHex || !bgHex) {
+  const fgVal = tokens[fg];
+  const bgVal = tokens[bg];
+  if (!fgVal || !bgVal) {
     failed = true;
-    console.log(`  FAIL   [${theme}] ${label} — token missing (--${fg}: ${fgHex ?? 'undefined'}, --${bg}: ${bgHex ?? 'undefined'})`);
+    console.log(`  FAIL   [${theme}] ${label} — token missing (--${fg}: ${fgVal ?? 'undefined'}, --${bg}: ${bgVal ?? 'undefined'})`);
     continue;
   }
+  // A translucent panel (the glass system's --panel) has no colour of its own to check —
+  // composite it over the page background first, the same colour a browser would actually
+  // paint, rather than let a #rrggbbaa-less parse of an rgba() silently pass or fail on noise.
+  const bgParsed = parseColor(bgVal);
+  const bg0 = parseColor(tokens.bg0);
+  const bgHex = toHex(compositeOver(bgParsed, bg0));
+  const fgParsed = parseColor(fgVal);
+  const fgHex = toHex([fgParsed[0], fgParsed[1], fgParsed[2]]);
   const ratio = contrastRatio(fgHex, bgHex);
   const ok = ratio >= min;
   if (!ok) failed = true;
-  console.log(`  ${ok ? 'PASS' : 'FAIL'}   [${theme}] ${label.padEnd(58)} ${ratio.toFixed(2)}:1 (needs ${min}:1) — --${fg} ${fgHex} on --${bg} ${bgHex}`);
+  const bgNote = bgParsed[3] < 1 ? `${bgVal} composited over --bg0 = ${bgHex}` : bgHex;
+  console.log(`  ${ok ? 'PASS' : 'FAIL'}   [${theme}] ${label.padEnd(58)} ${ratio.toFixed(2)}:1 (needs ${min}:1) — --${fg} ${fgHex} on --${bg} ${bgNote}`);
 }
 
 if (failed) {
