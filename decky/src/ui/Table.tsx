@@ -3178,6 +3178,27 @@ export function Table({
           : humanise(lastLine)}
       </div>
 
+      {/*
+        The end of a match, announced assertively rather than politely.
+
+        The region above is `polite` on purpose — it fires on every board change, and a screen
+        reader that interrupted itself for each card played would be unusable. But that meant
+        the one announcement worth interrupting for, the result, waited its turn behind the
+        running commentary. This region holds nothing at all until the match is over, so it
+        only ever speaks once.
+      */}
+      <div className="sr-only" role="alert" aria-live="assertive">
+        {view.phase === 'roundOver' && view.matchOver
+          ? (isKent
+              ? (view.matchWinner && teamOf(view.matchWinner) === teamOf(me)
+                  ? 'Your pair wins the match.'
+                  : `${teamOf(view.matchWinner ?? '') ?? 'The other pair'} wins the match.`)
+              : (view.matchWinner === me || (view.matchWinner == null && view.winner === me)
+                  ? 'You win the match.'
+                  : `${nameOf(view.matchWinner ?? view.winner ?? '')} wins the match.`))
+          : ''}
+      </div>
+
       {/* The same line, on screen — for low vision rather than no vision, where a caption
           often matters as much read as heard. Off by default; a screen reader already gets
           the region above regardless. */}

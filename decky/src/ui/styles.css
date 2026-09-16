@@ -507,6 +507,26 @@ h2 { letter-spacing: -0.025em; color: var(--ink); font-size: 22px; font-weight: 
   --room-bg: radial-gradient(70% 90% at 50% 40%, #12181c, #06090b 75%);
 }
 
+/*
+  No `perspective` here, and no `transform` or `filter` either — see the note by .drag-ghost.
+
+  This rule carried `perspective: 1200px` for a long time, which quietly did two bad things,
+  both measured in a browser rather than reasoned about:
+
+   1. The dragged-card ghost is `position: fixed` and tracks clientX/clientY. A non-none
+      `perspective` makes this element a containing block for fixed descendants, so the ghost
+      was painted at the pointer PLUS the table's own offset — 78px right and 140px above the
+      cursor at 1280x900. Dragging has been visibly wrong since the perspective was added.
+   2. Every dialog in the game — the suit picker, the hand-end box, the match-over
+      celebration — is rendered inside .felt, so `.modal { position: fixed; inset: 0 }`
+      resolved against the table instead of the viewport. The scrim covered only the felt,
+      and on a 375px screen the celebration's crown was clipped off the top because the box
+      was being centred in the table's shorter box rather than the screen's.
+
+  Nothing needed it: .hand, .fanned, .trick-area, .climb-group, .waste-fan, .sol-col and
+  .melds-row each declare their own `perspective: 1400px` further down, which is what actually
+  projects the cards.
+*/
 .table {
   position: relative;
   isolation: isolate;
@@ -514,7 +534,6 @@ h2 { letter-spacing: -0.025em; color: var(--ink); font-size: 22px; font-weight: 
   border-radius: var(--rail-r);
   background: var(--rail-bg);
   box-shadow: var(--rail-shadow);
-  perspective: 1200px;
 }
 
 .felt {
@@ -531,6 +550,43 @@ h2 { letter-spacing: -0.025em; color: var(--ink); font-size: 22px; font-weight: 
 .dressing { position: absolute; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; border-radius: var(--felt-r); }
 .dressing > svg, svg.dressing { width: 100%; height: 100%; display: block; }
 .felt-content { position: relative; z-index: 1; }
+
+/*
+  Item 4: the table fills the screen it is played on.
+
+  Measured before this rule existed: the felt took 64% of a 1280x900 window, 43% of a 768
+  tablet and 55% of a 375px phone, with the score pad, the log and the site footer stacked
+  underneath it in ordinary page flow. A card table that occupies half the screen reads as a
+  widget on a web page rather than as the thing you came to use.
+
+  The height is claimed by a chain of flex fills rather than a height on the felt itself, so
+  the rail keeps its padding and the felt keeps its own box. `flex` on .felt-content sizes it
+  without touching its inner layout, which stays block flow below 900px on purpose — see
+  worklist #93 and one-handed mode, which reorder that stack themselves.
+
+  The two constants are measured, not guessed: --table-top is the distance from the top of the
+  viewport to the top of .table-surface (the site header plus the game bar), and --table-bottom
+  clears the fixed bottom tab bar, which only exists below 900px.
+*/
+:root { --table-top: 186px; --table-bottom: 24px; }
+@media (max-width: 899px) { :root { --table-top: 176px; --table-bottom: 80px; } }
+@media (max-width: 480px) { :root { --table-top: 222px; --table-bottom: 80px; } }
+
+.table-surface {
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100dvh - var(--table-top) - var(--table-bottom));
+}
+.table-surface > .table { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; }
+.table > .felt { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; }
+.felt > .felt-content { flex: 1 1 auto; }
+
+/* A phone on its side has no room to give: the chain above would make a 400px-tall felt out of
+   a 375px-tall screen. Here the felt takes what is left and nothing more. */
+@media (orientation: landscape) and (max-height: 500px) {
+  :root { --table-top: 140px; --table-bottom: 10px; }
+  .table-surface { min-height: 0; }
+}
 /* Rail furniture sits on top of everything — it is physically above the cloth. */
 .rail-furniture { position: absolute; inset: 0; z-index: 3; pointer-events: none; }
 
@@ -1167,7 +1223,15 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
 .empty-hand { color: var(--muted); font-family: var(--mono); }
 
 /* ---------------- modal ---------------- */
-.modal { position: fixed; inset: 0; background: rgba(16, 40, 28, 0.35); backdrop-filter: blur(4px); display: grid; place-items: center; z-index: 30; }
+/* z-index 50, not 30: the bottom tab bar is fixed at 40 (see .nav-bar .tabs.nv-items), so every
+   dialog in the app was rendering UNDERNEATH it on a phone — the match-over box had "Play again"
+   sitting behind the nav. Padding so a tall box never touches the edges of a small screen, which
+   is what clipped the crown off the top of the celebration at 375px. */
+.modal {
+  position: fixed; inset: 0; background: rgba(16, 40, 28, 0.35); backdrop-filter: blur(4px);
+  display: grid; place-items: center; z-index: 50;
+  padding: max(12px, env(safe-area-inset-top)) 12px calc(12px + env(safe-area-inset-bottom));
+}
 .modal-box { background: var(--panel-solid); border: 1px solid rgba(255, 46, 136, 0.4); border-radius: 18px; padding: 28px 32px; text-align: center; max-width: 380px; max-height: min(88vh, 720px); overflow-y: auto; box-shadow: 0 20px 60px rgba(16, 64, 40, 0.22); }
 .modal-box h3 { margin: 0 0 14px; font-size: 22px; }
 .confirm-body { color: var(--muted); font-size: 14px; line-height: 1.55; margin: 0 0 20px; }
@@ -5909,6 +5973,45 @@ button.bluff-go:disabled {
    ============================================================================ */
 
 .final-modal { perspective: 1200px; }
+
+/*
+  The win takeover.
+
+  Winning was previously announced in the same 380px box used for "are you sure you want to
+  restart" — measured, about 28% of the viewport height, with the winner's name at roughly the
+  size of a section heading. The end of a match is the one moment in the whole app worth
+  staging, so it takes the screen: the box grows to 680px, the name becomes the largest thing
+  on screen by a wide margin, and the star scales with the viewport rather than sitting at a
+  fixed 46px. Everything below is sizing only — the entrance choreography above is unchanged.
+*/
+.modal-box.celebrate.final {
+  max-width: min(680px, 94vw);
+  width: min(680px, 94vw);
+  max-height: min(94vh, 1000px);
+  /* Measured: the box was 58% of a 900px-tall viewport and 64% of a phone's. A result should
+     own the screen, so it is given a floor and its contents centred within it. */
+  min-height: min(62vh, 680px);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: clamp(22px, 4.2vh, 46px) clamp(20px, 4vw, 52px);
+}
+@media (max-width: 480px) { .modal-box.celebrate.final { min-height: 74vh; } }
+.modal-box.celebrate.final h3 {
+  font-size: clamp(46px, 7.4vw, 78px);
+  line-height: 1.04;
+  margin: 2px 0 18px;
+  /* h3 carries overflow:hidden for the shine sweep; at this size that clipped descenders. */
+  padding-block: 0.06em;
+}
+/* Sized off width, not height: on a phone a vh-scaled star came out at 68px against a 40px
+   name, which made the decoration the biggest thing on screen instead of the result. */
+.modal-box.celebrate.final .cb-mark { font-size: clamp(36px, 5.6vw, 72px); }
+.modal-box.celebrate.final .cb-ring { width: clamp(36px, 5.6vw, 72px); height: clamp(36px, 5.6vw, 72px); }
+.modal-box.celebrate.final .cb-kicker { font-size: 13px; letter-spacing: .2em; }
+.modal-box.celebrate.final .podium { margin-bottom: 24px; }
+.modal-box.celebrate.final .podium li { padding: 11px 16px; font-size: 17px; }
+.modal-box.celebrate.final .pd-score { font-size: 19px; }
 
 /* The light behind it. Gold if you won, cool if you did not. */
 .cb-beam {
