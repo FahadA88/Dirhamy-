@@ -606,6 +606,18 @@ function AccessSection({ s, set }: { s: Settings; set: Setter }) {
         <Seg value={s.handFan} onChange={(v) => set('handFan', v as Settings['handFan'])}
           options={[['fan', 'Fanned'], ['straight', 'Straight']]} />
       </Row>
+      <Row label="Where the seats sit" hint="How the other players are arranged around the cloth on a wide screen. An arc is the usual table; wide pushes them out to the rails for a bigger middle, which suits a trick game everyone plays into; a row lines them along the top, the way a phone does it. On a narrow screen they are always a row." keywords="seats ring arc wide row table positions where people sit layout opponents">
+        <Seg value={s.seatRing} onChange={(v) => set('seatRing', v as Settings['seatRing'])}
+          options={[['arc', 'Arc'], ['wide', 'Wide'], ['row', 'Row']]} />
+      </Row>
+      <Row label="Where the piles sit" hint="The draw pile, the discard and whatever the game puts in the middle. Up by the seats, in the centre, or down near your own hand where you are already looking." keywords="piles draw discard stock centre position where card piles are layout">
+        <Seg value={s.pileSpot} onChange={(v) => set('pileSpot', v as Settings['pileSpot'])}
+          options={[['high', 'Up top'], ['centre', 'Centre'], ['low', 'Near you']]} />
+      </Row>
+      <Row label="Chips" hint="How a betting game draws its money. Stacked chips in the casino colours — white 1, red 5, green 25, black 100, purple 500 — flat discs without the shading, or the plain number it used to be." keywords="chips poker betting money pot stack denominations casino">
+        <Seg value={s.chipStyle} onChange={(v) => set('chipStyle', v as Settings['chipStyle'])}
+          options={[['stack', 'Stacked'], ['flat', 'Flat'], ['text', 'Just the number']]} />
+      </Row>
       <Row
         label="Carry your block list to another device"
         hint="Type this code on your other device to bring your blocks and mutes with you. Anyone who has the code can read and change that list, so treat it like a password."

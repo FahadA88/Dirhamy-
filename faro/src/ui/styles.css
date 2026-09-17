@@ -1106,7 +1106,15 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
 .fanned { display: flex; justify-content: center; }
 .fanned .card.back:first-child { margin-left: 0; }
 
-.center { display: flex; gap: 46px; justify-content: center; align-items: flex-start; margin: 34px 0; transform-style: preserve-3d; }
+/* --center-gap is the cloth the cluster already keeps above and below itself. "Where the piles
+   sit" shifts that gap rather than replacing it — an absolute margin there swung the cluster by
+   the gap plus the climb, which is how a 32px nudge moved it 66px and put the stock under a
+   seat. */
+.center {
+  --center-gap: 34px;
+  display: flex; gap: 46px; justify-content: center; align-items: flex-start;
+  margin: var(--center-gap) 0; transform-style: preserve-3d;
+}
 /* Left-handed layout (item 26): which side the draw pile sits on relative to the discard is the
    one thing here with a real "hand" to it — visual order only, so the float animations above
    (keyed to DOM position, not screen position) don't need to know this happened at all. Scoped
@@ -2699,15 +2707,19 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
 .card.back { position: relative; overflow: hidden; }
 .card.back::before { content: ""; position: absolute; inset: 0; border-radius: inherit; }
 
-[data-back="monogram"]  .card.back::before { background: #1c2a44; }
+[data-back="monogram"]  .card.back::before,
+.sw-back[data-back="monogram"]::before { background: #1c2a44; }
 [data-back="monogram"]  .card.back::after  { content: "♠"; display: grid; place-items: center; color: #e8c46a; font-size: calc(var(--bw) * 0.42); mix-blend-mode: normal; background: none; }
-[data-back="lattice"]   .card.back::before { background: repeating-linear-gradient(45deg, rgba(214, 180, 106, .5) 0 3px, transparent 3px 7px), repeating-linear-gradient(-45deg, rgba(214, 180, 106, .5) 0 3px, transparent 3px 7px), #123b28; }
+[data-back="lattice"]   .card.back::before,
+.sw-back[data-back="lattice"]::before { background: repeating-linear-gradient(45deg, rgba(214, 180, 106, .5) 0 3px, transparent 3px 7px), repeating-linear-gradient(-45deg, rgba(214, 180, 106, .5) 0 3px, transparent 3px 7px), #123b28; }
 [data-back="ivory"]     .card.back::before { background: #f4ecdc; box-shadow: inset 0 0 0 3px #b8a06a, inset 0 0 0 4px #c9b384; }
 [data-back="stripe"]    .card.back::before { background: repeating-linear-gradient(60deg, #b4232f 0 7px, #8d1a24 7px 14px); }
 [data-back="halftone"]  .card.back::before { background: radial-gradient(circle at 3px 3px, #2b4c8c 1.5px, transparent 1.7px) 0 0/8px 8px, #dfe6f5; }
 [data-back="checker"]   .card.back::before { background: conic-gradient(#101216 0 25%, #f3f0e8 0 50%, #101216 0 75%, #f3f0e8 0) 0 0/14px 14px; }
-[data-back="sunburst"]  .card.back::before { background: conic-gradient(from 0deg, #e8b23c 0 8deg, #7a2410 0 16deg); }
-[data-back="linen"]     .card.back::before { background: repeating-linear-gradient(0deg, rgba(0,0,0,.09) 0 2px, transparent 2px 4px), repeating-linear-gradient(90deg, rgba(0,0,0,.09) 0 2px, transparent 2px 4px), #c8bda4; }
+[data-back="sunburst"]  .card.back::before,
+.sw-back[data-back="sunburst"]::before { background: conic-gradient(from 0deg, #e8b23c 0 8deg, #7a2410 0 16deg); }
+[data-back="linen"]     .card.back::before,
+.sw-back[data-back="linen"]::before { background: repeating-linear-gradient(0deg, rgba(0,0,0,.09) 0 2px, transparent 2px 4px), repeating-linear-gradient(90deg, rgba(0,0,0,.09) 0 2px, transparent 2px 4px), #c8bda4; }
 [data-back="neongrid"]  .card.back::before { background: repeating-linear-gradient(0deg, rgba(74,221,255,.5) 0 1px, transparent 1px 10px), repeating-linear-gradient(90deg, rgba(74,221,255,.5) 0 1px, transparent 1px 10px), linear-gradient(#0b0f2a, #170b34); }
 [data-back="kraft"]     .card.back::before {
   /*
@@ -2730,9 +2742,11 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
 [data-back="circuit"]   .card.back::before { background: repeating-linear-gradient(90deg, rgba(214, 180, 106, .35) 0 1px, transparent 1px 11px), repeating-linear-gradient(0deg, rgba(214, 180, 106, .2) 0 1px, transparent 1px 7px), #0f2119; }
 [data-back="damask"]    .card.back::before { background: radial-gradient(circle at 6px 6px, rgba(240,225,190,.55) 3px, transparent 3.4px) 0 0/12px 12px, #5a1f2e; }
 [data-back="wave"]      .card.back::before { background: radial-gradient(circle at 50% 100%, transparent 6px, #1a4f7a 6.5px, transparent 7px) 0 0/14px 8px, #0f3555; }
-[data-back="mesh"]      .card.back::before { background: radial-gradient(60% 60% at 25% 20%, #8b5cf6, transparent 65%), radial-gradient(60% 60% at 80% 75%, #22d3ee, transparent 65%), #1c1145; }
+[data-back="mesh"]      .card.back::before,
+.sw-back[data-back="mesh"]::before { background: radial-gradient(60% 60% at 25% 20%, #8b5cf6, transparent 65%), radial-gradient(60% 60% at 80% 75%, #22d3ee, transparent 65%), #1c1145; }
 [data-back="confetti"]  .card.back::before { background: radial-gradient(circle at 4px 6px, #e03131 2px, transparent 2.4px) 0 0/17px 15px, radial-gradient(circle at 12px 13px, #1c7ed6 2px, transparent 2.4px) 0 0/17px 15px, radial-gradient(circle at 8px 2px, #f0a000 2px, transparent 2.4px) 0 0/17px 15px, #f6f1e4; }
-[data-back="deepsolid"] .card.back::before { background: #1f3a5c; }
+[data-back="deepsolid"] .card.back::before,
+.sw-back[data-back="deepsolid"]::before { background: #1f3a5c; }
 /* Art Deco: gilt linework on ink — nested chevrons and a fan of hairlines, the way a '20s
    cigarette-case back is drawn rather than printed. */
 [data-back="artdeco"] .card.back::before {
@@ -2968,14 +2982,10 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
 .sw-back::before { content: ""; position: absolute; inset: 0; }
 .sw-back > * { position: relative; z-index: 1; }
 /* Reuse the deck patterns by scoping the same rules to the swatch. */
-.sw-back[data-back="monogram"]::before { background: #1c2a44; }
-.sw-back[data-back="lattice"]::before { background: repeating-linear-gradient(45deg, rgba(214, 180, 106, .5) 0 3px, transparent 3px 7px), repeating-linear-gradient(-45deg, rgba(214, 180, 106, .5) 0 3px, transparent 3px 7px), #123b28; }
 .sw-back[data-back="ivory"]::before { background: #f4ecdc; box-shadow: inset 0 0 0 3px #b8a06a; }
 .sw-back[data-back="stripe"]::before { background: repeating-linear-gradient(60deg, #b4232f 0 6px, #8d1a24 6px 12px); }
 .sw-back[data-back="halftone"]::before { background: radial-gradient(circle at 3px 3px, #2b4c8c 1.4px, transparent 1.6px) 0 0/7px 7px, #dfe6f5; }
 .sw-back[data-back="checker"]::before { background: conic-gradient(#101216 0 25%, #f3f0e8 0 50%, #101216 0 75%, #f3f0e8 0) 0 0/12px 12px; }
-.sw-back[data-back="sunburst"]::before { background: conic-gradient(from 0deg, #e8b23c 0 8deg, #7a2410 0 16deg); }
-.sw-back[data-back="linen"]::before { background: repeating-linear-gradient(0deg, rgba(0,0,0,.09) 0 2px, transparent 2px 4px), repeating-linear-gradient(90deg, rgba(0,0,0,.09) 0 2px, transparent 2px 4px), #c8bda4; }
 .sw-back[data-back="neongrid"]::before { background: repeating-linear-gradient(0deg, rgba(74,221,255,.5) 0 1px, transparent 1px 8px), repeating-linear-gradient(90deg, rgba(74,221,255,.5) 0 1px, transparent 1px 8px), linear-gradient(#0b0f2a, #170b34); }
 .sw-back[data-back="kraft"]::before {
   background:
@@ -2990,9 +3000,7 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
 .sw-back[data-back="circuit"]::before { background: repeating-linear-gradient(90deg, rgba(214, 180, 106, .35) 0 1px, transparent 1px 9px), repeating-linear-gradient(0deg, rgba(214, 180, 106, .2) 0 1px, transparent 1px 6px), #0f2119; }
 .sw-back[data-back="damask"]::before { background: radial-gradient(circle at 5px 5px, rgba(240,225,190,.55) 2.6px, transparent 3px) 0 0/10px 10px, #5a1f2e; }
 .sw-back[data-back="wave"]::before { background: radial-gradient(circle at 50% 100%, transparent 5px, #1a4f7a 5.5px, transparent 6px) 0 0/12px 7px, #0f3555; }
-.sw-back[data-back="mesh"]::before { background: radial-gradient(60% 60% at 25% 20%, #8b5cf6, transparent 65%), radial-gradient(60% 60% at 80% 75%, #22d3ee, transparent 65%), #1c1145; }
 .sw-back[data-back="confetti"]::before { background: radial-gradient(circle at 4px 6px, #e03131 1.8px, transparent 2.2px) 0 0/15px 13px, radial-gradient(circle at 11px 11px, #1c7ed6 1.8px, transparent 2.2px) 0 0/15px 13px, #f6f1e4; }
-.sw-back[data-back="deepsolid"]::before { background: #1f3a5c; }
 .sw-back[data-back="artdeco"]::before {
   background:
     repeating-linear-gradient(45deg, rgba(214, 180, 106, .55) 0 1.5px, transparent 1.5px 8px),
@@ -5488,24 +5496,24 @@ button.primary.lg { padding: 13px 28px; font-size: 16px; border-radius: 999px; }
     z-index: 2;
   }
   .opponents .seat { position: absolute; pointer-events: auto; width: 146px; padding: 9px 10px; }
-  .seat.at-l  { left: 0;                top: 152px; }
-  .seat.at-r  { right: 0;               top: 152px; }
+  .seat.at-l  { left: 0;   top: var(--ring-side-top, 152px); }
+  .seat.at-r  { right: 0;  top: var(--ring-side-top, 152px); }
   /* Clear of the side seats by a whole seat width plus a gap. At 13% of the felt these
      landed within a pixel or two of the seat below them and the two panels overlapped. */
-  .seat.at-tl { left: 172px;            top: 2%; }
-  .seat.at-tr { right: 172px;           top: 2%; }
+  .seat.at-tl { left: var(--ring-inset, 172px);  top: var(--ring-top, 2%); }
+  .seat.at-tr { right: var(--ring-inset, 172px); top: var(--ring-top, 2%); }
   .seat.at-t  { left: 50%; transform: translateX(-50%); top: 0; }
 
   /* Two opponents face each other across the table rather than hugging the top. */
-  .ring-2 .seat.at-l, .ring-2 .seat.at-r { top: 96px; }
+  .ring-2 .seat.at-l, .ring-2 .seat.at-r { top: var(--ring-side-top-2, 96px); }
 
   /* Item 23's "where the seats sit": swaps which side of the ring each named position renders
      on, so the whole opponent ring mirrors along with the hand and the piles. Only the l/r/tl/tr
      rules have a side to swap — .at-t is already centred and needs nothing. */
   [data-hand="left"] .seat.at-l  { left: auto;   right: 0; }
   [data-hand="left"] .seat.at-r  { right: auto;  left: 0; }
-  [data-hand="left"] .seat.at-tl { left: auto;   right: 172px; }
-  [data-hand="left"] .seat.at-tr { right: auto;  left: 172px; }
+  [data-hand="left"] .seat.at-tl { left: auto;   right: var(--ring-inset, 172px); }
+  [data-hand="left"] .seat.at-tr { right: auto;  left: var(--ring-inset, 172px); }
 
   /* Room for the ring. The top band belongs to the seats along the top, the gutters to the
      ones on either side, so whatever the game puts in the middle never lands on a player.
@@ -5513,6 +5521,74 @@ button.primary.lg { padding: 13px 28px; font-size: 16px; border-radius: 999px; }
      paying 148px of empty cloth above the board and 156px down either side for seats that
      do not exist. */
   .felt-content:has(> .opponents) { padding: 148px 156px 0; }
+
+  /* ---- the ring's shape, chosen in Settings -> The table ----------------------
+     'arc' above is the shape the table has always had. The two below move the same
+     five named positions, so nothing that reads a seat — the flying-card layer aims
+     at '.opponents .seat' — has to know which shape is on. They set the variables
+     the arc's own rules read rather than restating left/right, because a more
+     specific left/right beats the handedness mirror's `left: auto` and leaves a
+     seat pinned on both sides. */
+
+  /* Wide: seats out on the rails, for a bigger middle. Worth it on a trick game
+     where the whole table plays into the centre. */
+  :root[data-seatring="wide"] {
+    --ring-inset: 212px;
+    --ring-side-top: 104px;
+    --ring-side-top-2: 64px;
+    --ring-top: 0px;
+  }
+  :root[data-seatring="wide"] .felt-content:has(> .opponents) { padding: 142px 176px 0; }
+
+  /* Row: everyone along the top, evenly spaced, the way the phone layout already
+     does it. The ring becomes a flex row rather than five absolute positions, so
+     the at-* rules are overridden wholesale rather than moved. */
+  :root[data-seatring="row"] .opponents {
+    position: absolute; inset: 0 0 auto; display: flex;
+    justify-content: center; align-items: flex-start; gap: 18px;
+    padding: 0 12px;
+  }
+  :root[data-seatring="row"] .opponents .seat {
+    position: static; left: auto; right: auto; top: auto; transform: none;
+    flex: 0 1 146px; min-width: 0;
+  }
+  :root[data-seatring="row"] .felt-content:has(> .opponents) { padding: 140px 24px 0; }
+
+  /* ---- where the piles sit ----------------------------------------------------
+     The centre cluster (draw, discard, the trick, a market) can sit up by the seats
+     or down near the hand you are already looking at.
+
+     In pixels, not per cent. A percentage block margin resolves against the
+     containing block's WIDTH, not its height, so `margin-block: -6%` on a felt a
+     thousand pixels across moved the cluster sixty pixels — straight into the seats
+     — while reading like a small nudge.
+
+     The climb is per ring because each ring leaves a different amount of headroom
+     between the lowest seat and the cluster: measured at a five-seat table, 45px
+     under the arc, 37px under the row and 37px under the wide ring once its top
+     padding matches. Each takes that minus a dozen pixels of air, so "Up top" moves
+     as far as it can without a seat and the stock sharing a pixel. Going down is
+     easier — there is 98px of legroom above the hand in every ring. */
+  :root { --pile-climb: 40px; }
+  :root[data-seatring="wide"] { --pile-climb: 32px; }
+  :root[data-seatring="row"]  { --pile-climb: 28px; }
+  :root[data-pilespot="high"] .felt-content > .center {
+    margin-block: calc(var(--center-gap) - var(--pile-climb)) calc(var(--center-gap) + var(--pile-climb));
+  }
+  :root[data-pilespot="low"]  .felt-content > .center {
+    margin-block: calc(var(--center-gap) + 40px) calc(var(--center-gap) - 40px);
+  }
+}
+
+/* Below the ring breakpoint the seats are already a row across the top, so the ring
+   shapes have nothing to do. The pile shift still does. */
+@media (max-width: 899px) {
+  :root[data-pilespot="high"] .felt-content > .center {
+    margin-block: calc(var(--center-gap) - 16px) calc(var(--center-gap) + 16px);
+  }
+  :root[data-pilespot="low"]  .felt-content > .center {
+    margin-block: calc(var(--center-gap) + 20px) calc(var(--center-gap) - 20px);
+  }
   .felt-content { min-height: 520px; }
 
   /*
@@ -8901,3 +8977,52 @@ input[type="checkbox"]:focus-visible { outline: 2px solid var(--brass-hi); outli
   .opponents .seat { padding: 4px 3px; }
   .fanned .card.back { width: 18px; height: 26px; margin-left: -11px; }
 }
+
+/* ============================================================
+   CHIPS
+
+   A betting game's money used to be three text pills. These are the
+   discs themselves: a stack per denomination, each chip a disc with a
+   dark rim and a dashed edge inlay, offset upward so a stack reads as
+   a stack rather than one thick coin.
+
+   The denominations' colours live in Chips.tsx and deliberately do not
+   follow the accent — they are a convention a player already reads, the
+   same reason a printed deck keeps its own colours.
+   ============================================================ */
+.chipstack {
+  display: inline-flex; align-items: center; gap: 9px;
+  padding-inline-start: 7px;
+}
+.cs-piles { display: inline-flex; align-items: flex-end; gap: 4px; }
+.cs-pile {
+  position: relative; display: inline-block;
+  width: 17px;
+  /* Each chip after the first sits 4px up, so the pile is 3px of disc plus 4px a chip. */
+  height: calc(13px + var(--cs-n, 0) * 4px);
+}
+.cs-chip {
+  position: absolute; left: 0; bottom: calc(var(--chip-i) * 4px);
+  width: 17px; height: 13px; border-radius: 50% / 46%;
+  background:
+    radial-gradient(120% 140% at 50% 15%, color-mix(in srgb, var(--chip-ink) 70%, #fff) 0%, var(--chip-ink) 46%, var(--chip-edge) 100%);
+  box-shadow:
+    0 0 0 1px var(--chip-edge),
+    0 1px 0 var(--chip-edge);
+}
+/* The edge inlay: four dashes round the rim, which is what tells a chip from a button. */
+.cs-chip::after {
+  content: ""; position: absolute; inset: 2px 2.5px;
+  border-radius: inherit;
+  border: 1px dashed color-mix(in srgb, var(--chip-ring) 78%, transparent);
+  opacity: .85;
+}
+/* Flat: the same discs without the relief, for anyone who finds the shading busy. */
+.chipstack.s-flat .cs-chip {
+  background: var(--chip-ink);
+  box-shadow: 0 0 0 1px var(--chip-edge);
+}
+.chipstack.s-flat .cs-chip::after { border-style: solid; opacity: .6; }
+.cs-text { white-space: nowrap; }
+
+:root[data-motion="reduced"] .cs-chip { transition: none; }

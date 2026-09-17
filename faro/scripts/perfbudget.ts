@@ -23,13 +23,20 @@ const BUDGETS: Budget[] = [
   { pattern: /^vendor-.*\.js$/, maxKB: 200, label: 'vendor (react/react-dom) JS' },
   { pattern: /^CreateView-.*\.js$/, maxKB: 250, label: 'Create view JS (lazy-loaded)' },
   { pattern: /^OnlineTable-.*\.js$/, maxKB: 40, label: 'online table JS (lazy-loaded)' },
-  // 260 -> 264. Eight of the seventeen card faces had stopped working: they were written
-  // against the old corner-index markup and their rules no longer matched anything, so they
-  // cost bytes and rendered as the classic face. Making them real again is net new CSS.
-  // Worth knowing before this is raised again: the eighteen card-back patterns are written
-  // out twice, once for `.card.back::before` and once for `.sw-back::before`, which is about
-  // 2.9 KB of duplication that a shared selector list would recover.
-  { pattern: /^index-.*\.css$/, maxKB: 264, label: 'stylesheet' },
+  // 264 -> 268, in two steps and for two reasons. First: eight of the seventeen card faces
+  // had stopped working — written against the old corner-index markup, their rules no longer
+  // matched anything, so they cost bytes and rendered as the classic face. Making them real
+  // again is net new CSS. Second: the table-layout settings (where the seats sit, where the
+  // piles sit) and the drawn chips are new surface.
+  //
+  // A correction to what this comment used to claim. It said the card-back patterns were
+  // "about 2.9 KB of duplication that a shared selector list would recover", on the strength
+  // of the deck rules and the swatch rules looking alike. Diffing all twenty pairs: six are
+  // byte-identical and have now been merged into shared selectors. The other fourteen differ
+  // on purpose — the swatch scales its pattern down (checker 14px -> 12px, confetti 17px ->
+  // 15px, wave 14x8 -> 12x7 and so on) so the print still reads at 40x56 instead of turning
+  // into mush. That is tuning, not debt, and merging them would have flattened it.
+  { pattern: /^index-.*\.css$/, maxKB: 268, label: 'stylesheet' },
 ];
 
 const files = readdirSync(DIST);

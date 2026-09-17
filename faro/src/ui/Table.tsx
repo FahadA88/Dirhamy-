@@ -2,6 +2,7 @@ import { MutableRefObject, useEffect, useMemo, useRef, useState } from 'react';
 import { Card, GameDefinition, Move, RedactedState } from '../engine/types';
 import { SUIT_SYMBOLS, buildDeck } from '../engine/deck';
 import { CardFace } from './Card';
+import { ChipStack } from './Chips';
 import { AttrCard, describeAttrs } from './AttrCard';
 import { TableDressing, TableRail, FeltDust, SeasonalDrift } from './TableDressing';
 import { CountUp } from './CountUp';
@@ -2601,10 +2602,10 @@ export function Table({
         ) : isPoker ? (
           <div className="poker-controls">
             <div className="poker-info">
-              <span className="chip">Pot · {view.pot ?? 0}</span>
-              <span className="chip">Your chips · {view.chips?.[me] ?? 0}</span>
+              <ChipStack amount={view.pot ?? 0} label="Pot" />
+              <ChipStack amount={view.chips?.[me] ?? 0} label="Your chips" />
               {(view.currentBet ?? 0) > (view.committed?.[me] ?? 0) && (
-                <span className="chip">To call · {(view.currentBet ?? 0) - (view.committed?.[me] ?? 0)}</span>
+                <ChipStack amount={(view.currentBet ?? 0) - (view.committed?.[me] ?? 0)} label="To call" />
               )}
             </div>
             <div className="hand hl-off poker-hand" data-slot="hand" role="group" aria-label={`Your hand, ${hand.length} cards`}>

@@ -27,6 +27,9 @@ export type CardFace =
   | 'minimal' | 'block' | 'typographic' | 'woodcut' | 'duplex'
   | 'chunky' | 'mono' | 'contrast' | 'deco' | 'handdrawn' | 'neon' | 'linen';
 export type TextSize = 's' | 'm' | 'l' | 'xl';
+export type SeatRing = 'arc' | 'wide' | 'row';
+export type ChipStyle = 'stack' | 'flat' | 'text';
+export type PileSpot = 'centre' | 'high' | 'low';
 /** Simulates the app through a colour-vision deficiency, so a player choosing the
  *  colour-safe face or checking a design decision can see it the way it is meant to help,
  *  rather than taking the "colour-safe" label on faith. */
@@ -173,6 +176,17 @@ export interface Settings {
   /** A curved fan (the traditional look) or a straight row — some players find the leaning
    *  edges harder to read than a plain line of overlapping cards. */
   handFan: 'fan' | 'straight';
+  /** How the opponent ring is arranged around the felt. 'arc' is the shape the table has
+   *  always had; 'wide' pushes the seats out to the rails for a bigger middle; 'row' lines
+   *  them along the top, which is what a phone already does and what some people prefer on a
+   *  big screen too. */
+  seatRing: SeatRing;
+  /** Where the draw/discard cluster sits on the cloth. Some games want it up by the seats,
+   *  some want it down near your hand where you are already looking. */
+  pileSpot: PileSpot;
+  /** How a betting game draws its money. 'stack' is chips with an edge and a rim, 'flat' the
+   *  same discs without the relief, 'text' the plain number it used to be. */
+  chipStyle: ChipStyle;
   /** A few seconds to take back a misclick before the table moves on. 0 turns it off. */
   undoGraceMs: number;
   /** Optional clock. 0 is no clock at all, which is the default. */
@@ -238,6 +252,9 @@ export const defaultSettings: Settings = {
   oneHandedMode: false,
   handedness: 'right',
   handFan: 'fan',
+  seatRing: 'arc',
+  pileSpot: 'centre',
+  chipStyle: 'stack',
   // Long enough to catch a misclick, short enough that nobody waits on it.
   undoGraceMs: 3000,
   turnSeconds: 0,
@@ -454,6 +471,9 @@ const ALLOWED = {
   homeLayout: Object.keys(HOME_LAYOUTS),
   handedness: ['right', 'left'],
   handFan: ['fan', 'straight'],
+  seatRing: ['arc', 'wide', 'row'],
+  pileSpot: ['centre', 'high', 'low'],
+  chipStyle: ['stack', 'flat', 'text'],
 } as const;
 
 /** How loud, and which categories are on — the shape `playSound` actually needs. */
@@ -574,6 +594,8 @@ export function applySettings(s: Settings): void {
   root.setAttribute('data-motion', resolveMotion(s.motion));
   root.style.setProperty('--anim-scale', String(ANIM_SCALE[s.animSpeed]));
   root.setAttribute('data-density', s.density);
+  root.setAttribute('data-seatring', s.seatRing);
+  root.setAttribute('data-pilespot', s.pileSpot);
   root.setAttribute('data-surface', s.surface);
   root.setAttribute('data-face', s.cardFace);
   root.setAttribute('data-back', s.cardBack);
