@@ -2,88 +2,169 @@ import { SuitShape, IllustratedSuitShape, SuitId } from './Suit';
 
 // Jacks, queens and kings.
 //
-// These used to be the letter J, Q or K set enormous in the middle of the card over a pale
-// ghost of the suit. That is what a card looks like when nobody has drawn one: the rank is
-// already in both corners, so the middle was saying the same thing twice and saying it badly.
+// A court card is a figure mirrored about the middle, so it reads either way up in a fanned
+// hand: one <g> of shapes, then the same <g> turned half a turn about the centre of the panel.
 //
-// A court card is a figure, and a real one is mirrored about the middle — the top half drawn
-// and the bottom half the same drawing turned upside down, so it reads either way up in a
-// fanned hand. That is exactly how this is built: one <g> of shapes, then the same <g> again
-// rotated half a turn about the centre of the panel.
+// Everything is drawn inside y 0..70 and turned about (50, 75). The ten units either side of
+// the midline are deliberately empty. The previous draft drew each half down to y=75, so the
+// two robes met edge to edge and the figure came out as a single dark oval with the gold rule
+// — the one thing that makes a card read as a court card — buried inside it.
 //
-// Deliberately geometric rather than a woodcut. At ninety pixels across, detail turns to
-// mud; flat shapes with two inks and a gold hold their edges all the way down to a thumbnail.
+// Deliberately geometric rather than a woodcut: at ninety pixels across, detail turns to mud.
+// Three stroke weights only, so the drawing loses its parts in a deliberate order as it
+// shrinks rather than a ragged one.
+const W_MAIN = 1.6;   // silhouette and head
+const W_SECOND = 1;   // costume linework
+const W_DETAIL = 0.7; // gilt trim
 
 const GOLD = '#c39a45';
 const GOLD_HI = '#e8c877';
+const STOCK = 'var(--card-bg,#fdfcf7)';
 
-/** The half-figure. Everything is drawn inside 0..75 so it can be turned about (50, 75). */
+/** The head. An oval with a jaw and a neck, not a circle with two dots — that is what made the
+ *  old figure read as a snowman balanced on a mound. */
+function Head({ mouth }: { mouth?: boolean }) {
+  return (
+    <g>
+      {/* neck, so the head joins the shoulders instead of floating above them */}
+      <path d="M45.5 44h9v7h-9z" fill="currentColor" opacity=".55" />
+      <path d="M50 23c6 0 10.5 4.2 10.5 10.2v4.6c0 7.2-4.6 12.4-10.5 12.4s-10.5-5.2-10.5-12.4v-4.6
+               C39.5 27.2 44 23 50 23z"
+        fill={STOCK} stroke="currentColor" strokeWidth={W_MAIN} strokeLinejoin="round" />
+      <ellipse cx="45.8" cy="34" rx="1.15" ry="1.5" fill="currentColor" />
+      <ellipse cx="54.2" cy="34" rx="1.15" ry="1.5" fill="currentColor" />
+      <path d="M50 35.6v3.4" stroke="currentColor" strokeWidth={W_SECOND} strokeLinecap="round" fill="none" />
+      {mouth !== false && (
+        <path d="M46.8 42h6.4" stroke="currentColor" strokeWidth={W_SECOND} strokeLinecap="round" fill="none" />
+      )}
+    </g>
+  );
+}
+
+/** The shoulders and body, shared by all three. Narrow at the collar, wide at the hem. */
+function Robe() {
+  return (
+    <path d="M22 70v-8c0-7 6-12 14-14l6-2h16l6 2c8 2 14 7 14 14v8z" fill="currentColor" />
+  );
+}
+
+/** An arm reaching out to the right, and the hand that holds the prop. Without these the
+ *  sceptre was a gold stick standing beside the figure with nothing attached to it. */
+function ArmAndHand() {
+  return (
+    <g>
+      <path d="M63 50c7 .5 12.5 3.5 15 8.5l-5.2 2.8c-1.8-3.6-5.6-5.6-10.6-6z" fill="currentColor" />
+      <rect x="73.8" y="56.2" width="9.8" height="7" rx="3.2" fill={STOCK} stroke="currentColor" strokeWidth={W_SECOND} />
+    </g>
+  );
+}
+
+/** The prop's shaft, running through the hand. Each rank caps it differently. */
+function Shaft() {
+  return <rect x="77.3" y="26" width="2.6" height="44" rx="1.3" fill={GOLD} />;
+}
+
+/** The half-figure. Everything sits inside y 0..70 so it can be turned about (50, 75). */
 function Half({ rank, suit, illustrated }: { rank: 'J' | 'Q' | 'K'; suit: SuitId; illustrated?: boolean }) {
   return (
     <g>
-      {/* the robe */}
-      <path d="M18 75V63c0-9 8-15 18-17l14-3 14 3c10 2 18 8 18 17v12z" fill="currentColor" />
-      {/* its lining, in the stock colour and trimmed in gold, so the figure is not one flat slab */}
-      <path d="M50 45l-13 7 13 23 13-23z" fill="var(--card-bg,#fdfcf7)" />
-      <path d="M50 45l-13 7 13 23 13-23z" fill="none" stroke={GOLD} strokeWidth="1.2" />
-      <path d="M23 75c1-11 8-17 19-20M77 75c-1-11-8-17-19-20" fill="none" stroke={GOLD}
-        strokeWidth="1.3" opacity=".9" />
-      {/* the suit worn on the chest */}
-      <g transform="translate(43 57) scale(.14)" fill="currentColor" opacity=".85">
+      <Robe />
+
+      {/* Costume, flanking the chest suit rather than running under it — this is where the
+          three ranks are actually told apart at card size, not by the hat. The king is the
+          heaviest in gold, the queen the lightest, the jack the plainest. */}
+      {/* The placket down the front, which is where the three ranks are actually told apart
+          at card size — not by the hat, which is four pixels tall on a phone. An earlier draft
+          flanked the chest with two panels instead; mirrored, the four of them closed into a
+          white ring through the middle of the card that read as a letter O. */}
+      {rank === 'J' && (
+        // a baldric, crossing the robe under the placket
+        <path d="M37.5 50.5l-5.5 4.5 15 19 5-4z" fill={GOLD} opacity=".9" />
+      )}
+      <path d="M50 48.5l7.5 3.5v18h-15v-18z" fill={STOCK} stroke={GOLD} strokeWidth={W_SECOND} strokeLinejoin="round" />
+      {rank === 'K' && (
+        <g stroke={GOLD} strokeWidth={W_DETAIL} fill="none" opacity=".9">
+          <path d="M44.6 53.5v15.5M55.4 53.5v15.5M43.4 55.5h13.2" />
+        </g>
+      )}
+      {rank === 'Q' && (
+        <path d="M42.5 68l2.5 2.6 2.5-2.6 2.5 2.6 2.5-2.6 2.5 2.6 2.5-2.6" fill="none"
+          stroke={GOLD} strokeWidth={W_DETAIL} strokeLinejoin="round" opacity=".9" />
+      )}
+
+      {/* the suit worn on the chest — the one mark that says what suit the card is, so it sits
+          on top of the costume rather than half-hidden behind a panel of it */}
+      <g transform="translate(44.3 54.3) scale(.115)" fill="currentColor">
         {illustrated ? <IllustratedSuitShape suit={suit} /> : <SuitShape suit={suit} />}
       </g>
 
-      {/* head */}
-      <circle cx="50" cy="34" r="11" fill="var(--card-bg,#fdfcf7)" stroke="currentColor" strokeWidth="1.8" />
-      <circle cx="46" cy="33" r="1.4" fill="currentColor" />
-      <circle cx="54" cy="33" r="1.4" fill="currentColor" />
-      <path d="M47 39h6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" fill="none" />
+      <ArmAndHand />
+      <Shaft />
+      <Head mouth={rank !== 'K'} />
 
       {rank === 'K' && (
         <g>
-          {/* a beard, which is the only thing that tells a king from a jack at this size */}
-          <path d="M39 37c0 9 5 15 11 15s11-6 11-15c0 5-5 8-11 8s-11-3-11-8z" fill="currentColor" opacity=".92" />
+          {/* a full beard, which is what separates a king from a jack at a glance */}
+          <path d="M39.5 36.5c0 9.5 4.7 16.5 10.5 16.5s10.5-7 10.5-16.5c-1.2 4.2-5.2 6.8-10.5 6.8
+                   s-9.3-2.6-10.5-6.8z" fill="currentColor" />
+          <path d="M45.5 40.5h9" stroke={STOCK} strokeWidth={W_SECOND} strokeLinecap="round" fill="none" opacity=".5" />
           {/* crown */}
-          <path d="M36 23l3-11 5 7 6-10 6 10 5-7 3 11z" fill={GOLD} stroke={GOLD_HI} strokeWidth=".9" />
-          <rect x="36" y="23" width="28" height="5" rx="1.8" fill={GOLD} stroke={GOLD_HI} strokeWidth=".9" />
-          <circle cx="50" cy="25.5" r="1.6" fill="currentColor" />
-          {/* sceptre */}
-          <rect x="82" y="40" width="2.6" height="35" rx="1.3" fill={GOLD} />
-          <circle cx="83.3" cy="36" r="4" fill={GOLD} stroke={GOLD_HI} strokeWidth=".9" />
+          <path d="M36 19.5l1.5-13.5 5.5 6.5 7-9.5 7 9.5 5.5-6.5 1.5 13.5z" fill={GOLD} stroke={GOLD_HI} strokeWidth={W_DETAIL} />
+          <rect x="35.6" y="19.5" width="28.8" height="5" rx="1.8" fill={GOLD} stroke={GOLD_HI} strokeWidth={W_DETAIL} />
+          <circle cx="43" cy="22" r="1.3" fill="currentColor" />
+          <circle cx="50" cy="22" r="1.3" fill="currentColor" />
+          <circle cx="57" cy="22" r="1.3" fill="currentColor" />
+          {/* the orb the sceptre carries */}
+          <circle cx="78.6" cy="21.5" r="4.4" fill={GOLD} stroke={GOLD_HI} strokeWidth={W_DETAIL} />
+          <path d="M78.6 14.5v3.2" stroke={GOLD} strokeWidth={W_SECOND} strokeLinecap="round" />
         </g>
       )}
 
       {rank === 'Q' && (
         <g>
-          {/* hair falling either side */}
-          <path d="M38 33c-1-8 4-13 12-13s13 5 12 13c-2-5-6-7-12-7s-10 2-12 7z" fill="currentColor" />
-          <path d="M39 35c-3 7-3 13-1 18l-4 1c-3-7-2-14 1-20zM61 35c3 7 3 13 1 18l4 1c3-7 2-14-1-20z"
-            fill="currentColor" opacity=".85" />
-          {/* coronet */}
-          <path d="M39 22c2-6 5-8 11-8s9 2 11 8c-3-2-7-3-11-3s-8 1-11 3z" fill={GOLD} stroke={GOLD_HI} strokeWidth=".9" />
-          <circle cx="50" cy="15" r="2.2" fill={GOLD_HI} />
-          {/* a flower, held */}
-          <rect x="83" y="44" width="2.5" height="31" rx="1.25" fill={GOLD} />
-          <g fill={GOLD} stroke={GOLD_HI} strokeWidth=".8">
-            <circle cx="84" cy="38" r="3.4" />
-            <circle cx="79" cy="41" r="3" />
-            <circle cx="89" cy="41" r="3" />
-            <circle cx="84" cy="44" r="3" />
+          {/* hair, falling either side of the face */}
+          <path d="M38.8 33c-1-8.5 4.2-13.8 11.2-13.8s12.2 5.3 11.2 13.8c-2.2-5.2-6.2-7.4-11.2-7.4
+                   s-9 2.2-11.2 7.4z" fill="currentColor" />
+          <path d="M38.6 35.5c-3.6 8-3.6 14.2-1.6 19.5l-4.6 1.2c-3-7.4-2.4-14.8 1.2-21.5z
+                   M61.4 35.5c3.6 8 3.6 14.2 1.6 19.5l4.6 1.2c3-7.4 2.4-14.8-1.2-21.5z"
+            fill="currentColor" opacity=".9" />
+          {/* a pearl coronet rather than a crown */}
+          <path d="M38.8 20.5c2-6.2 5.6-8.8 11.2-8.8s9.2 2.6 11.2 8.8c-3.2-2.2-7.2-3.2-11.2-3.2
+                   s-8 1-11.2 3.2z" fill={GOLD} stroke={GOLD_HI} strokeWidth={W_DETAIL} />
+          <circle cx="43" cy="15.5" r="1.7" fill={GOLD_HI} />
+          <circle cx="50" cy="13.4" r="2" fill={GOLD_HI} />
+          <circle cx="57" cy="15.5" r="1.7" fill={GOLD_HI} />
+          {/* a rose, held */}
+          <g fill={GOLD} stroke={GOLD_HI} strokeWidth={W_DETAIL}>
+            <circle cx="78.6" cy="21.5" r="3.4" />
+            <circle cx="74.4" cy="24.2" r="2.8" />
+            <circle cx="82.8" cy="24.2" r="2.8" />
+            <circle cx="78.6" cy="26.6" r="2.8" />
           </g>
         </g>
       )}
 
       {rank === 'J' && (
         <g>
-          {/* a cap, worn at an angle, with a feather */}
-          <path d="M37 25c1-8 6-12 13-12s12 4 13 12c-4-4-8-6-13-6s-9 2-13 6z" fill="currentColor" />
-          <path d="M37 25h26v3.4H37z" fill={GOLD} stroke={GOLD_HI} strokeWidth=".7" />
-          <path d="M63 23c5-5 10-8 15-8-3 4-5 8-5 12-3-2-6-3-10-4z" fill={GOLD} stroke={GOLD_HI} strokeWidth=".7" />
+          {/* a soft cap set at an angle, with a feather */}
+          <path d="M37 24.5c.5-8.2 6-12.8 13-12.8s12.5 4.6 13 12.8c-4-4.4-8-6.4-13-6.4s-9 2-13 6.4z"
+            fill="currentColor" />
+          <path d="M36.6 24.5h26.8v3.6H36.6z" fill={GOLD} stroke={GOLD_HI} strokeWidth={W_DETAIL} />
+          <path d="M63.4 22.4c5.4-5.6 10.8-8.6 15.8-8.6-3.2 4.2-5 8.6-5 12.8-3.2-2.2-6.4-3.6-10.8-4.2z"
+            fill={GOLD} stroke={GOLD_HI} strokeWidth={W_DETAIL} />
           {/* a halberd */}
-          <rect x="82" y="36" width="2.4" height="39" rx="1.2" fill={GOLD} />
-          <path d="M83.2 27l6 7-6 7-6-7z" fill={GOLD} stroke={GOLD_HI} strokeWidth=".9" />
+          <path d="M78.6 12.8l6.6 7.6-6.6 7.6-6.6-7.6z" fill={GOLD} stroke={GOLD_HI} strokeWidth={W_DETAIL} />
         </g>
       )}
+    </g>
+  );
+}
+
+/** The double rule down the middle, drawn in the gap the two halves leave for it. */
+function Midline() {
+  return (
+    <g stroke={GOLD} strokeWidth={W_SECOND} opacity=".75">
+      <path d="M8 73.5h84M8 76.5h84" />
     </g>
   );
 }
@@ -94,54 +175,50 @@ export function CourtFigure({ rank, suit, illustrated }: { rank: 'J' | 'Q' | 'K'
       preserveAspectRatio="xMidYMid meet">
       <Half rank={rank} suit={suit} illustrated={illustrated} />
       <g transform="rotate(180 50 75)"><Half rank={rank} suit={suit} illustrated={illustrated} /></g>
-      {/* the rule down the middle, which is what makes it read as a court card */}
-      <g stroke={GOLD} strokeWidth="1" opacity=".65">
-        <path d="M6 73.5h88M6 76.5h88" />
-      </g>
+      <Midline />
     </svg>
   );
 }
 
-// The joker's own half-figure, same construction as a court card — mirrored top and bottom
-// about the panel centre — but its own character rather than a fourth rank grafted onto the
-// same body. A three-point cap stands in for the crown, a grin for the court cards' flat
-// mouth, and the one prop every court figure holds out to the side becomes a bauble on a
-// stick — a jester's own mock-sceptre — in exactly the king's sceptre position.
+// The joker's own half-figure, built the same way but its own character rather than a fourth
+// rank grafted onto the same body: a scalloped motley collar in place of the court robe's plain
+// shoulder line, a three-point belled cap in place of the crown, a grin in place of the court
+// cards' level mouth, and a marotte — a jester's mock-sceptre — in the hand where a king holds
+// his real one.
 //
-// Built at the same weight as the crown on purpose: one bold zigzag silhouette rather than a
-// woven, curling one. An earlier draft drew the cap as a looping curved ribbon and tiled three
-// small diamonds across the collar — striking at card size, mud at thumbnail size, which is
-// the one failure mode this whole file exists to avoid (see the header comment above).
+// Built at the crown's weight on purpose: one bold zigzag silhouette rather than a woven,
+// curling one. An earlier draft drew the cap as a looping ribbon and tiled small diamonds
+// across the collar — striking at card size, mud at thumbnail size, which is the one failure
+// mode this whole file exists to avoid.
 function JokerHalf() {
   return (
     <g>
-      {/* the collar, scalloped into points rather than the court robe's plain shoulder line */}
-      <path d="M19 75V64c0-2 1-4 3-5l7 9 8-10 8 10 8-10 7 9c2 1 3 3 3 5v11z" fill="currentColor" />
-      {/* one gold notch at the collar's centre point, the single "motley" accent this palette
-          allows rather than a pattern tiled across it */}
-      <path d="M46 62l4 6 4-6" fill="none" stroke={GOLD} strokeWidth="1.4" strokeLinecap="round" />
-      <path d="M22 75c1-9 7-14 17-16M78 75c-1-9-7-14-17-16" fill="none" stroke={GOLD}
-        strokeWidth="1.3" opacity=".9" />
+      {/* the motley collar, scalloped into points */}
+      <path d="M22 70v-7c0-2.5 1.2-4.5 3.4-5.6l6.6 8.6 7.6-10 8 10 7.6-10 6.6 8.6
+               c2.2 1.1 3.4 3.1 3.4 5.6v7z" fill="currentColor" />
+      <path d="M45.6 57.5l4.4 6 4.4-6" fill="none" stroke={GOLD} strokeWidth={W_SECOND} strokeLinecap="round" />
+      <path d="M31 70c1-7.5 5.5-12 13-14M69 70c-1-7.5-5.5-12-13-14" fill="none"
+        stroke={GOLD} strokeWidth={W_DETAIL} opacity=".85" />
 
-      {/* head */}
-      <circle cx="50" cy="34" r="11" fill="var(--card-bg,#fdfcf7)" stroke="currentColor" strokeWidth="1.8" />
-      <circle cx="46" cy="33" r="1.4" fill="currentColor" />
-      <circle cx="54" cy="33" r="1.4" fill="currentColor" />
-      {/* a grin, curved rather than the court cards' flat mouth — the one expression the size
-          allows, and enough to read as "amused" rather than the court cards' level gaze */}
-      <path d="M44.5 38c3 3.5 8 3.5 11 0" stroke="currentColor" strokeWidth="1.3"
+      <ArmAndHand />
+      <Shaft />
+      <Head mouth={false} />
+      {/* a grin — the one expression this size allows, and enough to read as amused rather
+          than the court cards' level gaze */}
+      <path d="M45.4 40c2.6 3.2 6.6 3.2 9.2 0" stroke="currentColor" strokeWidth={W_SECOND}
         strokeLinecap="round" fill="none" />
 
-      {/* the three-point cap, built exactly like the crown's zigzag ribbon — same technique,
-          three peaks instead of the crown's implied four, a bell at each tip instead of a band */}
-      <path d="M35 25l4-13 6 8 5-11 5 11 6-8 4 13z" fill="currentColor" />
-      <circle cx="39" cy="12" r="2.6" fill={GOLD} stroke={GOLD_HI} strokeWidth=".8" />
-      <circle cx="50" cy="9" r="2.6" fill={GOLD} stroke={GOLD_HI} strokeWidth=".8" />
-      <circle cx="61" cy="12" r="2.6" fill={GOLD} stroke={GOLD_HI} strokeWidth=".8" />
+      {/* the three-point cap, built like the crown's zigzag — three peaks, a bell at each tip */}
+      <path d="M35.5 22.5l4-13 6 8 4.5-11 4.5 11 6-8 4 13z" fill="currentColor" />
+      <circle cx="39.5" cy="9.5" r="2.6" fill={GOLD} stroke={GOLD_HI} strokeWidth={W_DETAIL} />
+      <circle cx="50" cy="6.5" r="2.6" fill={GOLD} stroke={GOLD_HI} strokeWidth={W_DETAIL} />
+      <circle cx="60.5" cy="9.5" r="2.6" fill={GOLD} stroke={GOLD_HI} strokeWidth={W_DETAIL} />
 
-      {/* the marotte, held out where every other court figure's one prop goes */}
-      <rect x="82" y="40" width="2.6" height="35" rx="1.3" fill={GOLD} />
-      <circle cx="83.3" cy="36" r="4" fill="var(--card-bg,#fdfcf7)" stroke={GOLD} strokeWidth="1.1" />
+      {/* the marotte's own little head, on the end of the stick */}
+      <circle cx="78.6" cy="21.5" r="4.2" fill={STOCK} stroke={GOLD} strokeWidth={W_SECOND} />
+      <circle cx="77" cy="20.8" r=".8" fill={GOLD} />
+      <circle cx="80.2" cy="20.8" r=".8" fill={GOLD} />
+      <path d="M76.8 23.4c1.2 1.4 2.4 1.4 3.6 0" fill="none" stroke={GOLD} strokeWidth={W_DETAIL} strokeLinecap="round" />
     </g>
   );
 }
@@ -152,9 +229,7 @@ export function JokerFigure() {
       preserveAspectRatio="xMidYMid meet">
       <JokerHalf />
       <g transform="rotate(180 50 75)"><JokerHalf /></g>
-      <g stroke={GOLD} strokeWidth="1" opacity=".65">
-        <path d="M6 73.5h88M6 76.5h88" />
-      </g>
+      <Midline />
     </svg>
   );
 }
