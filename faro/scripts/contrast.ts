@@ -151,9 +151,10 @@ for (const theme of ['dark', 'light'] as const) {
  *  A wordmark with a band of invisible letters in the middle is the thing that reads as broken
  *  from across the room, so every stop of the foil is checked here. 3:1 rather than 4.5:1 is
  *  WCAG's own threshold for text this size — the wordmark is 30px at weight 600. */
-function foilStops(selectorNeedle: string): string[] {
-  const at = CSS.indexOf(selectorNeedle);
-  if (at < 0) throw new Error(`foil rule not found: ${selectorNeedle}`);
+function foilStops(selectorNeedle: RegExp): string[] {
+  const hit = selectorNeedle.exec(CSS);
+  if (!hit) throw new Error(`foil rule not found: ${selectorNeedle}`);
+  const at = hit.index;
   const open = CSS.indexOf('background: linear-gradient(', at);
   if (open < 0) throw new Error(`foil gradient not found after ${selectorNeedle}`);
   let depth = 0, i = CSS.indexOf('(', open);
@@ -184,9 +185,10 @@ let failed = false;
 
 for (const theme of ['dark', 'light'] as const) {
   const tokens = theme === 'dark' ? darkTokens : lightTokens;
-  const needle = theme === 'dark'
-    ? '.foil,\nheader h1, header .wordmark,'
-    : ':root[data-theme="light"] .foil,';
+  // Matched on the rule's own shape rather than an exact string: the selector list has been
+  // reflowed once already (a dead-class sweep put each selector on its own line) and a check
+  // that breaks on whitespace is a check that gets deleted rather than fixed.
+  const needle = theme === 'dark' ? /(?<!\])\n\.foil\s*,/ : /:root\[data-theme="light"\]\s*\.foil\s*,/;
   const bg0 = toHex([parseColor(tokens.bg0)[0], parseColor(tokens.bg0)[1], parseColor(tokens.bg0)[2]]);
   foilStops(needle).forEach((stop, n) => {
     let hex: string;

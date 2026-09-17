@@ -139,6 +139,14 @@ const SEAT_RING: Record<number, string[]> = {
   4: ['l', 'tl', 'tr', 'r'],
   5: ['l', 'tl', 't', 'tr', 'r'],
 };
+/** A stable 0-5 for a seat id, so the same player keeps the same disc colour all match and two
+ *  seats next to each other never land on the same one. */
+function seatHue(id: string): number {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (Math.imul(h, 31) + id.charCodeAt(i)) >>> 0;
+  return h % 6;
+}
+
 const SUIT_NAMES: Record<string, string> = { C: 'Clubs', D: 'Diamonds', H: 'Hearts', S: 'Spades' };
 const SHAPE_NAME: Record<number, string> = { 1: 'single', 2: 'pair', 3: 'triple', 4: 'four', 5: 'five' };
 
@@ -1345,6 +1353,20 @@ export function Table({
   };
   const personalityOf = (id: string) => (isBotSeat(id) ? personalityFor(matchId, id) : null);
 
+  // A phone has about eight hundred pixels of height and the site chrome was taking a hundred
+  // and twenty of them to show a header and a tab bar nobody reads while playing a hand. The
+  // table says it is open; the stylesheet hides the shell on small screens and hands the space
+  // to the felt. Cleared on unmount so leaving the table brings the site back.
+  // Wide screens have the room, so the record starts open there and folded on a phone.
+  const [recordOpen, setRecordOpen] = useState(
+    () => typeof window === 'undefined' || window.matchMedia('(min-width: 900px)').matches,
+  );
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-playing', 'yes');
+    return () => document.documentElement.removeAttribute('data-playing');
+  }, []);
+
   function react(seat: string, text: string) {
     if (reactionTimer.current) window.clearTimeout(reactionTimer.current);
     setReaction({ seat, text });
@@ -1582,6 +1604,13 @@ export function Table({
                 },
               } : {})}>
               <div className="seat-head">
+                {/* A seat used to be a name over a fan of card backs in a glass box, which reads
+                    as a row of UI panels rather than as people sitting round a table. The disc
+                    is the smallest thing that reads as somebody: an initial, tinted per seat so
+                    four of them are told apart at a glance. */}
+                <span className="seat-av" aria-hidden="true" data-seat-hue={seatHue(p.id)}>
+                  {(nameOf(p.id) || '?').trim().charAt(0).toUpperCase()}
+                </span>
                 <span className="seat-name" title={personalityOf(p.id)?.label}>{nameOf(p.id)}</span>
                 {teamOf(p.id) && <span className="team-tag">{teamOf(p.id)}</span>}
               </div>
@@ -3211,18 +3240,29 @@ export function Table({
           table. On the felt the pad was clipped by the table edge and landed on whoever was
           sitting on the right. */}
       </div>
-      <div className="table-record">
-      {view.matchTarget != null && (
-        <ScorePad view={view} me={me} nameOf={nameOf}
-          lowWins={def.scoring.winner === 'lowestTotal'} />
-      )}
-      {settings.showLog && (
-        <div className="log">
-          <div className="log-head">Game log</div>
-          {view.log.slice().reverse().map((e) => (<div key={e.t} className="log-row">{humanise(e.text)}</div>))}
-        </div>
-      )}
-      </div>
+      {/* The running score and the log are reference, not the game. On a wide screen they sit
+          under the felt where they cost nothing. On a phone they were costing 227px below the
+          fold — the whole reason the hand ended up off screen — so there they fold away behind
+          their own summary and open when somebody actually wants them. A <details> rather than
+          state of our own: it is the element for exactly this, and it keeps the keyboard and
+          screen-reader behaviour without any of it having to be written. */}
+      <details className="table-record" open={recordOpen}
+        onToggle={(e) => setRecordOpen((e.currentTarget as HTMLDetailsElement).open)}>
+        <summary className="tr-summary">
+          <span>Scores &amp; log</span>
+          <span className="tr-hint" aria-hidden="true">{recordOpen ? 'Hide' : 'Show'}</span>
+        </summary>
+        {view.matchTarget != null && (
+          <ScorePad view={view} me={me} nameOf={nameOf}
+            lowWins={def.scoring.winner === 'lowestTotal'} />
+        )}
+        {settings.showLog && (
+          <div className="log">
+            <div className="log-head">Game log</div>
+            {view.log.slice().reverse().map((e) => (<div key={e.t} className="log-row">{humanise(e.text)}</div>))}
+          </div>
+        )}
+      </details>
     </div>
   );
 }

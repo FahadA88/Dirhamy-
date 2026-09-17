@@ -410,26 +410,14 @@ h2 { letter-spacing: -0.025em; color: var(--ink); font-size: 22px; font-weight: 
 
 /* ---------------- library ---------------- */
 .cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
-.game-card {
-  position: relative; padding: 18px; display: flex; flex-direction: column; gap: 10px;
-  transform-style: preserve-3d; transition: transform 0.12s ease-out; will-change: transform; overflow: hidden;
-}
-.game-card-glow { display: none; }
-.game-card { border-radius: var(--r-lg); padding: 20px; gap: 12px; }
-.game-card:hover { border-color: var(--ink); }
-.game-card-head { display: flex; align-items: center; gap: 8px; }
-.game-card h3 { margin: 0; font-size: 21px; letter-spacing: -0.4px; }
+
 .fam-badge {
   font-family: var(--mono); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase;
   background: transparent; color: var(--muted); padding: 3px 9px;
   border-radius: var(--r-pill); border: 1px solid var(--panel-brd);
 }
 /* Rules blurbs vary from one line to a paragraph; clamping keeps the grid even. */
-.game-card p {
-  color: var(--muted); font-size: 14px; line-height: 1.55; flex: 1; margin: 0;
-  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 5; overflow: hidden;
-}
-.game-card-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+
 .players { color: var(--muted); font-size: 11px; font-family: var(--mono); letter-spacing: 0.04em; }
 
 /* ---------------- table ----------------
@@ -1041,12 +1029,7 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
 
 /* --- the picker: four tables in miniature, built from the same tokens --- */
 .felt-pick { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.felt-opt {
-  display: flex; flex-direction: column; gap: 7px; text-align: left; cursor: pointer;
-  padding: 9px; border-radius: 12px; font: inherit; color: inherit;
-  background: var(--panel); border: 1px solid var(--panel-brd); transition: 0.16s;
-}
-.felt-opt:hover { border-color: var(--ac45); transform: translateY(-2px); }
+
 .felt-opt.on { border-color: var(--green); box-shadow: 0 0 0 2px var(--glow), 0 8px 22px rgba(16,64,40,0.14); }
 .felt-swatch {
   position: relative; display: block; height: 62px; padding: var(--rail-w); overflow: hidden;
@@ -1353,8 +1336,12 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
 .field > span { color: var(--muted); }
 .field.row { flex-direction: row; align-items: center; gap: 10px; }
 .field.row > span { color: var(--ink); }
-.field input[type=text], .field input:not([type]), .field input[type=number], .field select, .desc, .json-edit,
-.cust-field input:not([type=range]) {
+.field input[type=text],
+.field input:not([type]),
+.field input[type=number],
+.field select,
+.desc,
+.json-edit {
   background: var(--input-bg); color: var(--ink); border: 1px solid var(--panel-brd); border-radius: 8px; padding: 9px 11px; font: inherit;
 }
 .field input:focus, .desc:focus, .json-edit:focus { outline: none; border-color: var(--green); box-shadow: 0 0 0 3px var(--ac14); }
@@ -1492,7 +1479,6 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
 :root[data-density="compact"] .field { margin: 6px 0; }
 :root[data-density="compact"] .center { margin: 20px 0; gap: 30px; }
 :root[data-density="compact"] .app { padding-top: max(12px, env(safe-area-inset-top)); }
-:root[data-density="compact"] .cust-field { margin: 8px 0; }
 
 /* ---------------- reduced motion ---------------- */
 :root[data-motion="reduced"] .floaty,
@@ -1591,9 +1577,7 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
 }
 .match-hand i { font-style: normal; color: var(--muted); }
 .match-hand { font-family: var(--mono); color: var(--green-d); letter-spacing: 0.3px; }
-.match-chips { display: flex; gap: 12px; flex-wrap: wrap; }
-.match-chip { color: var(--muted); font-family: var(--mono); }
-.match-chip b { color: var(--ink); }
+
 .match-chip.you b { color: var(--green-d); }
 
 .match-scoreboard { margin: 14px 0; padding: 12px 16px; border-radius: 10px; background: var(--ac06); border: 1px solid var(--ac20); text-align: left; }
@@ -2558,8 +2542,6 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
 }
 .match-hand { color: rgba(255,255,255,.92); font-weight: 600; font-size: 14px; }
 .match-hand i { color: rgba(255,255,255,.6); }
-.match-chip { color: rgba(255,255,255,.82); }
-.match-chip b { color: #fff; }
 
 /* ============================================================
    SIXTEEN FACES
@@ -3118,7 +3100,7 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
   .car-arrow { width: 34px; height: 34px; font-size: 20px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .hero-slide.turn-fwd, .hero-slide.turn-back { animation: none; }
+
 }
 .sc-kind {
   font-family: var(--mono); font-size: 9px; letter-spacing: 1.3px; text-transform: uppercase;
@@ -3137,15 +3119,10 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
 .hero-slide .hero { padding: 30px 34px 78px; align-items: flex-start; min-height: 300px; }
 .hero-body h2 { font-size: clamp(30px, 4vw, 46px); line-height: 1.02; }
 .hero-art { align-self: center; }
-
-/* The peeks read as the next board waiting, not as a cropped screenshot. */
-.hero-peek { top: 26px; bottom: 52px; width: 22%; opacity: .38; }
+/* The peeks read as the next board waiting { top: 26px; bottom: 52px; width: 22%; opacity: .38; }
 .hero-peek.left  { left: -3%;  }
 .hero-peek.right { right: -3%; }
-.hero-peek::after {
-  content: ""; position: absolute; inset: 0;
-  background: linear-gradient(90deg, rgba(8,20,15,.72), rgba(8,20,15,0));
-}
+
 .hero-peek.right::after { background: linear-gradient(270deg, rgba(8,20,15,.72), rgba(8,20,15,0)); }
 
 /* Meta on one line: it is a spec strip, and a wrapped one looks broken. */
@@ -3201,9 +3178,7 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
 /* Arrows live beside the board, not on top of the words. */
 .car-arrow.prev { left: 4px; }
 .car-arrow.next { right: 4px; }
-
-/* Peeks: the next board waiting its turn, in the same green as the live one. */
-.hero-peek {
+/* Peeks: the next board waiting its turn {
   width: 54px; top: 40px; bottom: 40px; opacity: 1;
   background: linear-gradient(150deg, #0d241a 0%, #103826 100%);
   border-radius: 18px;
@@ -3211,7 +3186,7 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
 .hero-peek.left  { left: 40px;  transform: rotateY(24deg) translateZ(-90px); transform-origin: right center; }
 .hero-peek.right { right: 40px; transform: rotateY(-24deg) translateZ(-90px); transform-origin: left center; }
 .hero-peek .gameart { display: none; }
-.hero-peek::after { background: linear-gradient(90deg, rgba(0,0,0,.42), rgba(0,0,0,0)); }
+
 .hero-peek.right::after { background: linear-gradient(270deg, rgba(0,0,0,.42), rgba(0,0,0,0)); }
 
 /* The kind badge reads in full or not at all. */
@@ -4246,15 +4221,16 @@ header h1, header .wordmark {
   font-weight: 700;
 }
 .hero-more:hover { background: rgba(255,255,255,.24); border-color: #fff; }
-
-/* car-arrow itself is set once, near the carousel — see the comment there. This section only
-   restyles the hover and the dots, which were the two things the palette sweep actually meant
+/* car-arrow itself is set once,
+near the carousel — see the comment there. This section only
+   restyles the hover and the dots,
+which were the two things the palette sweep actually meant
    to touch here; the arrow's own background used to be repeated below with the old neon
-   indigo (rgba(20,10,48)) still in it; a duplicate rule this far down the file wins on source
-   order regardless of what the real one says, so the button stayed a leftover navy circle
-   through the whole repaint. */
-.car-arrow:hover { background: var(--hot); border-color: var(--hot); box-shadow: 0 0 24px var(--ac55); }
-.car-dot::after { border-color: rgba(255,255,255,.34); }
+   indigo (rgba(20,
+10,
+48)) still in it; a duplicate rule this far down the file wins on source
+   order regardless of what the real one says { background: var(--hot); border-color: var(--hot); box-shadow: 0 0 24px var(--ac55); }
+
 .car-dot.on::after { background: var(--hot); border-color: var(--hot); box-shadow: 0 0 14px var(--ac75); }
 
 /* --- shelf cards lift and light up --- */
@@ -4560,7 +4536,7 @@ header h1, header .wordmark {
 .describe-steps li.live { color: var(--ink); }
 .describe-steps li.live .ds-mark { animation: ds-pulse 1s ease-in-out infinite; color: var(--cyan); }
 @keyframes ds-pulse { 50% { opacity: .25; } }
-.ds-done { color: var(--lime) !important; }
+
 .ds-done .ds-mark { color: var(--lime); }
 .ds-failed { color: var(--red) !important; }
 .ds-failed .ds-mark { color: var(--red); }
@@ -4843,7 +4819,6 @@ header h1, header .wordmark {
 }
 .save-mix-actions { display: flex; gap: 6px; }
 .save-mix-actions button { flex: 1 1 auto; }
-
 
 /* ---- animation speed ---- */
 /* Every timed thing multiplies its own duration by this, so one control moves them together. */
@@ -5521,6 +5496,16 @@ button.primary.lg { padding: 13px 28px; font-size: 16px; border-radius: 999px; }
      paying 148px of empty cloth above the board and 156px down either side for seats that
      do not exist. */
   .felt-content:has(> .opponents) { padding: 148px 156px 0; }
+  /* Your own hand is not in the middle — it is along the bottom edge, a long way under the
+     side seats — so it has no reason to pay for their gutters. Inside them it got 592px of a
+     904px felt, which for an eighteen-card hand meant a 34px sliver per card: narrower than a
+     fingertip. Only the row of cards breaks out: the line above it — your name, your bid, the
+     buttons — stays inside the gutters, because that one sits at the same height as the side
+     seats and would run straight under them.
+
+     This lived in the max-width: 899px block, which is the opposite of what the paragraph
+     above describes and the reason a thirteen-card hand hung off both edges of a phone. */
+  .felt-content > .you > .hand { margin-inline: -156px; }
 
   /* ---- the ring's shape, chosen in Settings -> The table ----------------------
      'arc' above is the shape the table has always had. The two below move the same
@@ -5614,14 +5599,6 @@ button.primary.lg { padding: 13px 28px; font-size: 16px; border-radius: 999px; }
   .felt-content:not(:has(> .center)) > .you { margin-block: auto; }
   /* Two opponents sit opposite each other, not along the top. Nothing is up there to clear. */
   .felt-content:has(.opponents.ring-2) { padding-top: 40px; }
-  /* Your own hand is not in the middle — it is along the bottom edge, a long way under the
-     side seats — so it has no reason to pay for their gutters. Inside them it got 592px of a
-     904px felt, which for an eighteen-card hand meant a 34px sliver per card: narrower than a
-     fingertip, and narrow enough that the middle of a card belonged to the card in front of
-     it. Only the row of cards breaks out: the line above it — your name, your bid, the buttons —
-     stays inside the gutters, because that one sits at the same height as the side seats and
-     would run straight under them. */
-  .felt-content > .you > .hand { margin-inline: -156px; }
   /* One opponent sits alone at the top and needs less headroom than three across. */
   .ring-1 ~ * { }
   .opponents.ring-1 ~ .center, .opponents.ring-1 ~ .bid-area { margin-top: 0; }
@@ -6422,7 +6399,6 @@ button.bluff-go:disabled {
   .capture-table { max-width: 100%; }
 }
 
-
 /* ============================================================================
    CARDS IN FLIGHT
    The one layer everything travels through. A card that changes places gets a
@@ -6498,7 +6474,6 @@ button.bluff-go:disabled {
 @media (prefers-reduced-motion: reduce) { .card-preview { animation: none; transform: scale(1.3); } }
 :root[data-motion="reduced"] .card-preview { animation: none; transform: scale(1.3); }
 
-
 /* ============================================================================
    THE TABLE MENU
    History, take back and restart used to be three permanent buttons on the row
@@ -6541,7 +6516,6 @@ button.bluff-go:disabled {
 /* Your own figures on the hand row, in the same shape as everybody else's on their seat. */
 .you-head .seat-stat { font-size: 12px; color: var(--t-muted, var(--muted)); font-variant-numeric: tabular-nums; }
 .you-head .seat-stat i { font-style: normal; margin-left: 3px; opacity: .72; }
-
 
 /* ============================================================================
    THE DEALER'S MURMUR
@@ -6587,7 +6561,6 @@ button.bluff-go:disabled {
 @media (prefers-reduced-motion: reduce) { .felt-say { animation: none; } }
 :root[data-motion="reduced"] .felt-say { animation: none; }
 
-
 /* ============================================================================
    A PATIENCE BOARD ON A PHONE
    These have to sit at the end of the sheet. `.sol-tableau` is declared up with
@@ -6621,7 +6594,6 @@ button.bluff-go:disabled {
 @media (max-width: 480px) {
   .sol-tableau { gap: 4px; }
 }
-
 
 /* ============================================================================
    NINE MARKS FOR NINE CLOTHS
@@ -6807,7 +6779,6 @@ button.bluff-go:disabled {
     -webkit-backdrop-filter: none !important;
   }
 }
-
 /* ------------------------------------------------------------------
    1 · THE VOICE
 
@@ -6816,16 +6787,19 @@ button.bluff-go:disabled {
    typography can do — it is why the same face is on the front of
    every fashion magazine — and it costs one 46KB file.
 
-   It is spent on titles and on numbers, and nowhere else. Body copy
-   stays in the sans, because a high-contrast serif at 14px is a
+   It is spent on titles and on numbers,
+and nowhere else. Body copy
+   stays in the sans,
+because a high-contrast serif at 14px is a
    worse read and pretending otherwise is how a page ends up looking
    like a wedding invitation.
    ------------------------------------------------------------------ */
-h1, h2, h3,
+h1,
+h2,
+h3,
 .display,
 .hero-body h2,
 .sc-main h3,
-.game-card h3,
 .crumb-title {
   font-family: var(--serif);
   font-weight: 700;
@@ -6843,7 +6817,6 @@ h1 {
   letter-spacing: 0.01em;
 }
 h2 { font-size: 25px; font-weight: 700; letter-spacing: -0.014em; }
-.game-card h3 { font-size: 23px; letter-spacing: -0.012em; }
 
 /* The wordmark, set in the display face rather than the mono it was
    using — the mono said "developer tool", which is the opposite of
@@ -6874,22 +6847,30 @@ header h1, header .wordmark {
   padding: 4px 11px;
 }
 :root[data-theme="light"] .fam-badge { color: #5c4620; }
-
 /* Digits line up in columns wherever there is more than one of them.
    Scores that jitter as they tick are the cheapest-looking thing on
    a screen with numbers on it. */
-.score, .sc-main, .scorepad, .scorepad td, .scorepad th,
-.count, .stat-n, .lb-row, .match-chip b, .seat-score {
+.score,
+.sc-main,
+.scorepad,
+.scorepad td,
+.scorepad th,
+.count,
+.stat-n,
+.lb-row,
+.seat-score {
   font-variant-numeric: tabular-nums;
 }
-
-/* Foil. A brass gradient clipped to the letterforms, for the two
-   places that deserve it: the name of the site, and having won.
-   Everywhere else this would be a gradient on text, which is the
+/* Foil. A brass gradient clipped to the letterforms,
+for the two
+   places that deserve it: the name of the site,
+and having won.
+   Everywhere else this would be a gradient on text,
+which is the
    first thing that reads as generic. */
 .foil,
-header h1, header .wordmark,
-.win-banner h2 {
+header h1,
+header .wordmark {
   /* The dark stop sits at 78%, not 62%. Polished metal is mostly
      bright with one dark band low down where it turns away from the
      light — put the dark band in the middle and the letterforms lose
@@ -6906,10 +6887,9 @@ header h1, header .wordmark,
   color: transparent;
   -webkit-text-fill-color: transparent;
 }
-
 :root[data-theme="light"] .foil,
-:root[data-theme="light"] header h1, :root[data-theme="light"] header .wordmark,
-:root[data-theme="light"] .win-banner h2 {
+:root[data-theme="light"] header h1,
+:root[data-theme="light"] header .wordmark {
   /* Same metal, lit from the other side. On ivory the bright stops are
      the ones that disappear, so the gradient runs dark-to-bright-to-dark
      instead — polished brass seen against a white wall rather than a
@@ -6933,23 +6913,34 @@ header h1, header .wordmark,
   font-weight: 700;
   letter-spacing: -0.008em;
 }
-
 /* ------------------------------------------------------------------
    2 · GLASS
 
    Every panel in the app already carries .glass or .game-card. They
-   get the same treatment: a translucent fill over a blur, a lit top
-   edge, and a shadow. The `::before` is the highlight — one hairline
-   along the top inside edge, which is what a sheet of glass does
-   under a lamp and what a border-top cannot fake, because a border
+   get the same treatment: a translucent fill over a blur,
+a lit top
+   edge,
+and a shadow. The `::before` is the highlight — one hairline
+   along the top inside edge,
+which is what a sheet of glass does
+   under a lamp and what a border-top cannot fake,
+because a border
    is the same brightness all the way across.
    ------------------------------------------------------------------ */
 /* .modal-card and .game-card never matched anything real — the markup uses .modal-box and
    .shelfcard. Every dialog and every shelf card sat on the old flat --panel-solid fill this
-   whole section was written to replace, which is why the app's two most-seen surfaces (every
-   round-over screen, every card on the front page) never actually became glass. Added rather
-   than renamed, since removing the dead names risks nothing and costs nothing. */
-.glass, .game-card, .panel, .sheet, .modal-card, .pop, .shelfcard, .modal-box {
+   whole section was written to replace,
+which is why the app's two most-seen surfaces (every
+   round-over screen,
+every card on the front page) never actually became glass. Added rather
+   than renamed,
+since removing the dead names risks nothing and costs nothing. */
+.glass,
+.panel,
+.sheet,
+.pop,
+.shelfcard,
+.modal-box {
   position: relative;
   background: var(--glass-fill);
   -webkit-backdrop-filter: var(--glass-blur);
@@ -6968,12 +6959,15 @@ header h1, header .wordmark,
               transform var(--t-mid) var(--ease),
               background-color var(--t-mid) var(--ease);
 }
-
 /* The specular: a single soft band across the top-left corner. One
-   highlight, placed where the room's own key light is — the body
-   background puts its warm lamp at 10% from the left, and this
+   highlight,
+placed where the room's own key light is — the body
+   background puts its warm lamp at 10% from the left,
+and this
    agrees with it. */
-.glass::before, .game-card::before, .shelfcard::before, .modal-box::before {
+.glass::before,
+.shelfcard::before,
+.modal-box::before {
   content: "";
   position: absolute;
   inset: 0;
@@ -6985,11 +6979,9 @@ header h1, header .wordmark,
     transparent 58%);
   opacity: 0.9;
 }
-
-/* Lift on hover, and let a little more light through. A card that
-   rises 2px and brightens is doing what a physical card does when
-   you pick up its edge. */
-.game-card:hover, .shelfcard:hover, .shelfcard:focus-within {
+/* Lift on hover,
+.shelfcard:hover,
+.shelfcard:focus-within {
   transform: translateY(-3px);
   background-color: var(--glass-fill-hi);
   box-shadow: var(--e4);
@@ -7134,12 +7126,9 @@ button:focus-visible, a:focus-visible, [role="button"]:focus-visible {
   animation: lux-breathe 3.4s var(--ease) infinite;
   border-color: var(--brass) !important;
 }
-.drop-ok, .legal-target, .sol-col.drop-ok {
+.sol-col.drop-ok {
   box-shadow: 0 0 0 2px var(--brass-hi), 0 0 26px -4px var(--lit);
   transition: box-shadow var(--t-fast) var(--ease);
-}
-.win-banner, .winner-row {
-  box-shadow: 0 0 0 1px var(--brass), 0 0 44px -6px var(--lit), var(--e4);
 }
 
 /* ------------------------------------------------------------------
@@ -7257,16 +7246,24 @@ body::after {
 }
 .card-btn:hover .card.face::after,
 .card.face.lit::after { opacity: 1; }
-
 /* ------------------------------------------------------------------
    9 · WEIGHT
 
    Expensive things are slow to start and slow to stop. The transitions
-   above this section were mostly `0.14s` with no curve named, which is
+   above this section were mostly `0.14s` with no curve named,
+which is
    the browser default and reads as a web page rather than an object.
    ------------------------------------------------------------------ */
-.crumbs, .tabs, .glass, .game-card, .fam-badge, .seg-btn,
-.seat, .match-bar, .scorepad, .shelfcard, .modal-box {
+.crumbs,
+.tabs,
+.glass,
+.fam-badge,
+.seg-btn,
+.seat,
+.match-bar,
+.scorepad,
+.shelfcard,
+.modal-box {
   transition-timing-function: var(--ease);
 }
 
@@ -7367,18 +7364,22 @@ h2 { font-size: 30px; }
   .car-arrow.prev:hover { transform: translateX(-2px); }
   .car-arrow.next:hover { transform: translateX(2px); }
 }
-
 /* ------------------------------------------------------------------
    12 · ONE VOICE FOR TITLES
 
    Nineteen rules in this sheet name `--display` directly. Every one was
    written when there was only one face and it meant "the title face" —
-   but half of them are on headings and half are on labels, chips and
-   readouts, and only the first half should now be the Didone.
+   but half of them are on headings and half are on labels,
+chips and
+   readouts,
+and only the first half should now be the Didone.
 
-   The rule of thumb: if it is the NAME of something, it is the serif.
-   If it is a label about something, or a number you read at a glance,
-   it stays the sans, which is what a sans is for.
+   The rule of thumb: if it is the NAME of something,
+it is the serif.
+   If it is a label about something,
+or a number you read at a glance,
+it stays the sans,
+which is what a sans is for.
    ------------------------------------------------------------------ */
 .profile-head h2,
 .badge h4,
@@ -7387,7 +7388,6 @@ h2 { font-size: 30px; }
 .online-none h3,
 .modal-box.intro h3,
 .hero-title,
-.gh-title,
 .sc-name {
   font-family: var(--serif);
   font-weight: 700;
@@ -7476,25 +7476,31 @@ header::after {
   0%   { background-position: 130% 0; }
   100% { background-position: -130% 0; }
 }
-
 /* ------------------------------------------------------------------
    18 · PRESSED INTO THE SURFACE
 
    A section heading reads as engraved rather than printed with two
    hairline shadows in opposite directions — one shade lighter than
-   the panel just above the letterforms, one shade darker just below.
+   the panel just above the letterforms,
+one shade darker just below.
    It has to be tuned per theme: on a near-black panel the highlight
-   can be almost nothing and still read, but on ivory the roles nearly
-   swap in strength, or the whole thing washes out to invisible.
+   can be almost nothing and still read,
+but on ivory the roles nearly
+   swap in strength,
+or the whole thing washes out to invisible.
    ------------------------------------------------------------------ */
-h2, .modal-box h3, .panel-head h3, .crumb-title, .game-card h3 {
+h2,
+.modal-box h3,
+.panel-head h3,
+.crumb-title {
   text-shadow: 0 1px 0 var(--emboss-hi), 0 -1px 0 var(--emboss-lo);
 }
 /* The foil headings (see ONE VOICE, "1 · THE VOICE") clip a metal gradient to the letterforms
-   and set the fill transparent — a shadow sitting behind a transparent fill shows straight
-   through it, which would double the letter up rather than press it in. Foil already reads as
+and set the fill transparent — a shadow sitting behind a transparent fill shows straight
+   through it,
+which would double the letter up rather than press it in. Foil already reads as
    dimensional on its own; it does not also want to be embossed. */
-.foil, .win-banner h2 { text-shadow: none; }
+.foil { text-shadow: none; }
 
 /* ------------------------------------------------------------------
    19 · A DECK THAT CATCHES THE LIGHT
@@ -7717,18 +7723,23 @@ h2, .modal-box h3, .panel-head h3, .crumb-title, .game-card h3 {
 .card-btn.shake .card.face, .card-btn.shake .card.back {
   box-shadow: 0 0 0 2px var(--red-text), 0 8px 18px color-mix(in srgb, var(--red) 35%, transparent);
 }
-
 /* ------------------------------------------------------------------
-   27 · GRAIN, WHERE THE BLUR ATE IT
+   27 · GRAIN,
+WHERE THE BLUR ATE IT
 
    The whole page already carries a fine grain (see THE ROOM ITSELF,
-   above) — but a glass panel's own `backdrop-filter: blur()` blurs
-   that grain away along with everything else behind it, so every
+above) — but a glass panel's own `backdrop-filter: blur()` blurs
+   that grain away along with everything else behind it,
+so every
    panel on the page is smoother than the page underneath it. Each
-   one gets its own tiny turbulence layer instead, low enough that it
+   one gets its own tiny turbulence layer instead,
+low enough that it
    is felt rather than seen.
    ------------------------------------------------------------------ */
-.glass::after, .panel::after, .game-card::after, .shelfcard::after, .modal-box::after {
+.glass::after,
+.panel::after,
+.shelfcard::after,
+.modal-box::after {
   content: "";
   position: absolute; inset: 0; z-index: 2; pointer-events: none;
   border-radius: inherit;
@@ -8060,30 +8071,28 @@ button.primary, button.ghost {
 @media (max-width: 620px) {
   .maid-card { margin-left: -22px; }
 }
-
 /* ==================================================================
    31 · SEVENTY-THREE MORE
 
    A second pass over the same ground THE SEAM OF METAL and its
-   neighbours opened: more material, more depth, more of the table
+   neighbours opened: more material,
+more depth,
+more of the table
    reacting to what is actually happening on it. Same law as before —
    every animated rule here respects prefers-reduced-motion and
-   data-motion="reduced", every colour comes off the existing tokens,
-   and nothing here is a redesign of something that already worked.
+   data-motion="reduced",
+every colour comes off the existing tokens,
+and nothing here is a redesign of something that already worked.
    ------------------------------------------------------------------ */
 
 /* ---- 31.1 · surfaces ---- */
 
-/* Leather-stitched borders: a dashed inner line a few pixels shy of the real edge, the way a
+/* Leather-stitched borders: a dashed inner line a few pixels shy of the real edge,
+the way a
    bound leather panel is stitched rather than simply cut. Opt-in — most panels already have a
-   material of their own (glass, felt) and a stitch line on every one of them would be a shop
-   window, not a room. */
-.stitched { position: relative; }
-.stitched::before {
-  content: ""; position: absolute; inset: 8px; border-radius: calc(var(--r-lg, 18px) - 8px);
-  border: 1px dashed color-mix(in srgb, var(--panel-brd) 130%, transparent);
-  pointer-events: none;
-}
+   material of their own (glass,
+felt) and a stitch line on every one of them would be a shop
+   window { position: relative; }
 
 /* Marble panel headers: a thin, quiet vein under the rule a section heading already sits above
    nothing on — cool stone rather than a flat line. */
@@ -8341,11 +8350,11 @@ input[type="checkbox"]:focus-visible { outline: 2px solid var(--brass-hi); outli
   71% { filter: brightness(0.97); }
   86% { filter: brightness(1.02); }
 }
-.foil, .win-banner h2 {
+.foil {
   animation: gold-flicker 6.4s ease-in-out infinite;
 }
 @media (prefers-reduced-motion: reduce) { .foil, .win-banner h2 { animation: none; } }
-:root[data-motion="reduced"] .foil, :root[data-motion="reduced"] .win-banner h2 { animation: none; }
+:root[data-motion="reduced"] .foil { animation: none; }
 
 /* A warm haze at the felt's far edge — the table fading into the room around it rather than
    stopping at a hard line. */
@@ -9050,3 +9059,226 @@ input[type="checkbox"]:focus-visible { outline: 2px solid var(--brass-hi); outli
 }
 .contract-list .cl-num { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
 .contract-list .cl-num input { width: 58px; padding: 5px 8px; font: inherit; }
+
+/* ============================================================
+   THE SEAT, AS A PERSON
+
+   A seat was a name over a fan of card backs inside a glass box.
+   Four of those read as a row of interface panels, not as people
+   sitting round a table — and they ate the felt, which is the thing
+   the whole screen is supposed to be.
+
+   The panel goes. What is left is a disc with an initial, the name,
+   a tight stack of backs and the count: the smallest set of marks
+   that says "somebody is sitting here holding this many cards".
+   ============================================================ */
+.seat {
+  background: none;
+  border: 0;
+  box-shadow: none;
+  padding: 6px 8px;
+}
+.seat-head { display: flex; align-items: center; justify-content: center; gap: 8px; }
+.seat-av {
+  flex: 0 0 auto;
+  width: 28px; height: 28px; border-radius: 50%;
+  display: grid; place-items: center;
+  font-family: var(--display); font-weight: 800; font-size: 13px; line-height: 1;
+  color: var(--bg0);
+  background: var(--seat-tint, var(--accent));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--seat-tint, var(--accent)) 55%, transparent),
+              0 2px 6px rgba(0, 0, 0, .35);
+}
+/* Six tints, a stable one per seat. Deliberately not the accent for every seat — telling four
+   players apart is the job here, and four identical discs do not do it. */
+.seat-av[data-seat-hue="0"] { --seat-tint: #d9a441; }
+.seat-av[data-seat-hue="1"] { --seat-tint: #54b9a6; }
+.seat-av[data-seat-hue="2"] { --seat-tint: #c3708f; }
+.seat-av[data-seat-hue="3"] { --seat-tint: #7f9cd6; }
+.seat-av[data-seat-hue="4"] { --seat-tint: #9ab663; }
+.seat-av[data-seat-hue="5"] { --seat-tint: #c98f6a; }
+
+.seat .seat-name {
+  font-size: 12px; font-weight: 650; letter-spacing: .01em;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+/* The stack sits under the disc, tight — it says "cards" and the chip says how many. A fan
+   wide enough to count was never counted; people read the number. */
+.seat .fanned { margin-top: 6px; justify-content: center; }
+.seat .fanned > * { margin-inline-start: calc(var(--bw) * -0.74); }
+.seat .fanned > *:first-child { margin-inline-start: 0; }
+.seat .seat-stats { margin-top: 5px; }
+
+/* Whose turn it is has to survive losing the panel, so it becomes a ring on the person. */
+.seat.active { background: none; box-shadow: none; }
+.seat.active .seat-av {
+  box-shadow: 0 0 0 2px var(--accent), 0 0 14px var(--ac45), 0 2px 6px rgba(0, 0, 0, .35);
+}
+.seat.active .seat-name { color: var(--ink); }
+
+/* ============================================================
+   THE TABLE TAKES THE SCREEN
+
+   A phone has about eight hundred pixels of height. The site header
+   and the tab bar were taking a hundred and twenty of them to offer
+   navigation nobody uses in the middle of a hand — and the felt was
+   left at two thirds of the screen with the hand below the fold.
+
+   While a table is open (Table.tsx sets data-playing), the shell gets
+   out of the way on anything phone-sized. The table has its own
+   "← All games" crumb, so there is still a way back; it is simply not
+   a persistent bar any more.
+   ============================================================ */
+@media (max-width: 899px) {
+  :root[data-playing="yes"] .nav-bar,
+  :root[data-playing="yes"] .nav-rail,
+  :root[data-playing="yes"] .nav-centre,
+  :root[data-playing="yes"] .nav-dock,
+  :root[data-playing="yes"] .nav-dock-head,
+  :root[data-playing="yes"] .nav-plate,
+  :root[data-playing="yes"] .site-footer { display: none; }
+  :root[data-playing="yes"] main { padding-block: 0; }
+  :root[data-playing="yes"] { --table-top: 96px; --table-bottom: 8px; }
+}
+
+/* ============================================================
+   LANDSCAPE ON A PHONE
+
+   Eight hundred and sixteen pixels of overflow, the felt at 153% of
+   the viewport and the opponents off the top of it entirely: turning
+   the phone sideways produced a table you could not see.
+
+   Sideways is a different shape, not a narrower one, so it gets its
+   own arrangement rather than the portrait stack squeezed. The seats
+   become a row of discs along the top with no card fan — there is no
+   room for one and the count says the same thing — the middle keeps
+   what is left, and the hand runs along the bottom on smaller cards.
+   ============================================================ */
+@media (orientation: landscape) and (max-height: 540px) {
+  /* Set on the felt, not on :root. applySettings writes --cw and --ch as INLINE styles on the
+     root element for the card-size preference, and an inline style beats any stylesheet rule
+     however specific — so a :root override here did nothing at all and the cards stayed at
+     their full 76x108 in a 375px-tall window. Redefining them on a descendant works because
+     the inline value is only inherited down, not applied to every element. */
+  .felt, .felt-content, .you, .hand {
+    --cw: 44px; --ch: 62px; --bw: 32px; --bh: 45px;
+  }
+  :root[data-playing="yes"] { --table-top: 52px; --table-bottom: 4px; }
+
+  .table-surface { min-height: 0; }
+  .felt-content:has(> .opponents) { padding: 56px 10px 0 !important; }
+
+  /* Seats: a row of people along the top, nothing else. */
+  .opponents {
+    position: absolute !important; inset: 0 0 auto !important;
+    display: flex !important; justify-content: center; align-items: flex-start;
+    gap: 14px; padding: 2px 8px;
+  }
+  .opponents .seat {
+    position: static !important; left: auto !important; right: auto !important;
+    top: auto !important; transform: none !important;
+    width: auto !important; padding: 2px 4px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .opponents .seat .seat-head { gap: 6px; }
+  .opponents .seat .seat-av { width: 22px; height: 22px; font-size: 11px; }
+  .opponents .seat .seat-name { font-size: 11px; max-width: 74px; }
+  /* The fan is the first thing to go: at this height it is three pixels of card edge. */
+  .opponents .seat .fanned { display: none; }
+  .opponents .seat .seat-stats { margin-top: 0; }
+
+  /* The middle, and the hand under it, on what is left. The centre is a flex item that grows
+     to fill the felt by default (that is what made the table full-screen on a desktop); here
+     there is nothing spare to fill, so it takes its natural height and the felt takes the sum
+     rather than the other way round. */
+  .table-surface { min-height: 0 !important; }
+  .felt-content > .center { flex: 0 0 auto !important; margin-block: 4px !important; gap: 16px; }
+  .felt > .felt-content { flex: 0 0 auto; }
+  .felt-content:has(> .opponents) { padding: 40px 10px 0 !important; }
+  .trick-empty { padding-block: 10px !important; }
+  /* A flat 520px floor is set for narrow screens further up this sheet, on the reasoning that a
+     phone's table needs a minimum to look like a table. Sideways the whole viewport is 375px,
+     so that floor alone was 145px taller than the screen — it is the single number that kept
+     the felt off the bottom of the page however small the cards got. */
+  .felt-content { min-height: 0 !important; }
+  .you { margin-top: 4px; padding-top: 6px; }
+  .you-head { margin-bottom: 4px; }
+  .hand { gap: 4px; }
+  .felt { padding: 8px 10px; }
+}
+
+/* The score and the log, folded. A <details> so the disclosure is the browser's, not ours. */
+.table-record > .tr-summary {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 10px 14px; margin-top: 10px;
+  border-radius: var(--r-md); cursor: pointer;
+  font-size: 13px; font-weight: 650; color: var(--muted);
+  background: var(--panel); border: 1px solid var(--panel-brd);
+  list-style: none;
+}
+.table-record > .tr-summary::-webkit-details-marker { display: none; }
+.table-record > .tr-summary:hover { color: var(--ink); border-color: var(--panel-brd-hi); }
+.table-record > .tr-summary .tr-hint { font-family: var(--mono); font-size: 11px; color: var(--dim); }
+.table-record[open] > .tr-summary { margin-bottom: 4px; }
+/* A wide screen has the room and never needed the fold, so the summary is not shown there. */
+@media (min-width: 900px) {
+  .table-record > .tr-summary { display: none; }
+}
+
+/* While a table is open on a phone, the crumb bar is the only chrome left, so it earns its
+   height rather than taking a hundred pixels of it: one line, the game's name, a way back. */
+@media (max-width: 899px) {
+  :root[data-playing="yes"] .crumbs {
+    padding: 6px 10px; gap: 8px; margin-bottom: 6px;
+    flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none;
+  }
+  :root[data-playing="yes"] .crumbs::-webkit-scrollbar { display: none; }
+  :root[data-playing="yes"] .crumbs > * { flex: 0 0 auto; }
+  :root[data-playing="yes"] .crumb-title { font-size: 14px; }
+  :root[data-playing="yes"] main > div { padding-block: 0; }
+  :root[data-playing="yes"] .table-wrap { margin-block: 0; }
+}
+
+/* ============================================================
+   THE HAND HAS TO FIT THE SCREEN
+
+   The fan overlaps each card by 30% of its width, which is right on a
+   desktop and runs a thirteen-card hand off both edges of a phone: at
+   375px a Hearts hand was cut off at the Q on the left and the 8 on
+   the right, and the cards you could not see were the ones you could
+   not play.
+
+   The overlap is the lever, not the card size — shrinking cards to fit
+   thirteen of them makes every card unreadable to save the two at the
+   ends. So it tightens with the screen, and if a hand is still too wide
+   (twenty cards in Hand and Foot) the row scrolls sideways rather than
+   spilling.
+   ============================================================ */
+@media (max-width: 899px) {
+  /* A fan is the wrong shape for a narrow screen. It sweeps wider than the cards it holds —
+     each card is rotated about a point below the row — so thirteen cards spilled off both
+     edges, and a scroller under a rotated, 3D-tilted row only moved the spill sideways.
+     Wrapping to two lines collides, because the rows overlap by design.
+
+     So: one straight row, and the overlap does the fitting. The markup already publishes --n,
+     how many cards are in the hand, for the fan's own arc — the same number sets how hard the
+     row closes up. Five cards sit loosely, thirteen sit tight, and the row fits either way
+     without any card becoming a sliver until it has to. */
+  .hand {
+    max-width: 100%;
+    flex-wrap: nowrap;
+    justify-content: center;
+    padding-block: 10px 4px;
+    min-height: 0;
+  }
+  .hand .card-btn {
+    --overlap: clamp(0.30, calc((var(--n) - 5) * 0.033 + 0.30), 0.62);
+    transform: none;
+    margin-left: calc(var(--cw) * -1 * var(--overlap));
+  }
+  .hand .card-btn:first-child { margin-left: 0; }
+  .hand .card-btn.playable:hover,
+  .hand .card-btn.playable:focus-visible,
+  .hand .card-btn.selected,
+  .hand .card-btn.staged { transform: translateY(-10px); }
+}
