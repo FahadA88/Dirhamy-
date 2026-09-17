@@ -60,6 +60,50 @@ function clearDraft(): void {
   try { localStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ }
 }
 
+/** Which suit outranks which in the auction, weakest first.
+ *  Most contract games rank them alphabetically — clubs, diamonds, hearts, spades — and that
+ *  is what this emits until somebody moves one. Skat does not: it ranks diamonds, hearts,
+ *  spades, clubs, and until this control existed no game with a different order could be built
+ *  here at all. Moving a suit swaps it with its neighbour, so the list is always exactly the
+ *  four suits in some order and can never be left with one missing or one twice. */
+const SUIT_ORDER_DEFAULT: Suit[] = ['C', 'D', 'H', 'S'];
+const SUIT_WORD: Record<string, string> = { C: 'Clubs', D: 'Diamonds', H: 'Hearts', S: 'Spades' };
+
+function StrainOrder({ value, onChange }: { value: Suit[]; onChange: (v: Suit[]) => void }) {
+  const order = value.length === 4 ? value : SUIT_ORDER_DEFAULT;
+  const move = (i: number, by: number) => {
+    const j = i + by;
+    if (j < 0 || j >= order.length) return;
+    const next = [...order];
+    [next[i], next[j]] = [next[j], next[i]];
+    onChange(next);
+  };
+  const custom = order.join('') !== SUIT_ORDER_DEFAULT.join('');
+  return (
+    <fieldset className="field strain-fieldset">
+      <legend>Suit order in the auction, weakest first</legend>
+      <ul className="strain-order">
+        {order.map((suit, i) => (
+          <li key={suit}>
+            <span className="so-rank">{i + 1}</span>
+            <span className="so-name">{SUIT_WORD[suit]}</span>
+            <button type="button" className="ghost sm" disabled={i === 0}
+              aria-label={`Move ${SUIT_WORD[suit]} down the order`} onClick={() => move(i, -1)}>↑</button>
+            <button type="button" className="ghost sm" disabled={i === order.length - 1}
+              aria-label={`Move ${SUIT_WORD[suit]} up the order`} onClick={() => move(i, 1)}>↓</button>
+          </li>
+        ))}
+      </ul>
+      <span className="hint">
+        {custom
+          ? `${SUIT_WORD[order[3]]} outranks ${SUIT_WORD[order[2]]}, and ${SUIT_WORD[order[0]]} is the cheapest bid.`
+          : 'The usual order. Skat, for one, ranks them diamonds, hearts, spades, clubs.'}
+        {custom && <> <button type="button" className="linky" onClick={() => onChange([])}>Back to the usual order</button></>}
+      </span>
+    </fieldset>
+  );
+}
+
 export function CreateView({ onPlay }: { onPlay?: (def: GameDefinition) => void } = {}) {
   const { settings } = useSettings();
   const savedDraft = useMemo(loadDraft, []);
@@ -599,6 +643,9 @@ export function CreateView({ onPlay }: { onPlay?: (def: GameDefinition) => void 
                   </span>
                   <div className="field row"><Switch on={knobs.contractNoTrump} onChange={(v) => set('contractNoTrump', v)} aria-label="No-trump is a biddable strain" />
                 <span aria-hidden="true">No-trump is a biddable strain</span></div>
+                  <StrainOrder value={knobs.contractStrainOrder} onChange={(v) => set('contractStrainOrder', v)} />
+                  <NumField label="Cards to the kitty (0 for none) — the winner picks them up and buries the same number"
+                    value={knobs.contractKittySize} onChange={(v) => set('contractKittySize', v)} />
                   <div className="field row"><Switch on={knobs.contractOnCardPoints} onChange={(v) => set('contractOnCardPoints', v)} aria-label="Settle the contract on card points taken, not tricks (Skat)" />
                 <span aria-hidden="true">Settle the contract on card points taken, not tricks (Skat)</span></div>
                   {knobs.contractOnCardPoints ? (

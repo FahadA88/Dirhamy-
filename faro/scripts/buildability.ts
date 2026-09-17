@@ -96,9 +96,7 @@ const KNOWN_GAPS: Record<string, string> = {
   Canfield: 'default-value bookkeeping only, not a missing rule — see file header',
   'Sixty-Six': 'an explicit zero-point penalty override cannot be told apart from "never priced"',
   Pinochle: 'literal named melds beyond the one marriage pattern — no generic meld editor',
-  Skat: 'non-alphabetical trump suit order — no reorderable strain list',
   'Three Thirteen': 'a wild rank that climbs one step every hand — no such knob in the builder',
-  'Five Hundred': 'the kitty — pick up and bury — has no knob in the builder yet',
   'Contract Rummy': 'a per-hand list of set/run combinations — no knob for a whole escalating list',
 };
 

@@ -53,6 +53,21 @@ export interface Knobs {
   contractMaxLevel: number;  // how high the bidding may go
   contractBook: number;      // tricks the level sits on top of (Bridge's six; 0 for a short deal)
   contractNoTrump: boolean;  // NT is a biddable strain, alongside the four suits
+  /**
+   * The order the biddable strains rank in, weakest first. The builder used to emit
+   * C-D-H-S because that is alphabetical and it is what most contract games use — but Skat
+   * ranks them D-H-S-C, and a game whose whole auction turns on which suit outranks which
+   * could not be built here at all. An empty array means "the usual order", so an author who
+   * never opens this control gets exactly what they got before.
+   */
+  contractStrainOrder: Suit[];
+  /**
+   * How many cards go face down to a kitty before the auction, for the winning bidder to pick
+   * up and bury the same number back. Five Hundred's three, Skat's two, Five Hundred's cousins
+   * anywhere from one to five. 0 means no kitty at all, which is what every contract game the
+   * builder could express before this existed was stuck with.
+   */
+  contractKittySize: number;
   contractTrickValue: number;      // points per trick bid, once made
   contractOvertrickValue: number;  // points per trick over the contract
   contractUndertrickValue: number; // points the defence takes per trick the contract falls short
@@ -408,6 +423,8 @@ export const defaultKnobs: Knobs = {
   deckCount: 1,
   excludeRanks: [],
   excludeCards: [],
+  contractStrainOrder: [],
+  contractKittySize: 0,
   wildCards: [],
   rankOrder: [],
   includeJokers: false,
@@ -452,6 +469,25 @@ function extraZones(knobs: Knobs, taken: Set<string>): GameDefinition['zones'] {
       visibility: (knobs.extraPiles[i]?.faceUp ? 'all' : 'none') as 'all' | 'none',
       shared: true,
     }));
+}
+
+/** How many cards the kitty holds. Only a contract auction can have one — a trump auction
+ *  already uses the kitty pile for its turned-up card, and two mechanics cannot share it. */
+function kittyCards(knobs: Knobs): number {
+  if (!knobs.contractAuction || knobs.trumpAuction) return 0;
+  return clampInt(knobs.contractKittySize ?? 0, 0, 5);
+}
+
+/** The biddable strains, weakest first. A custom order is honoured only if it names all four
+ *  suits exactly once; anything else falls back to the alphabetical default rather than
+ *  shipping an auction with a suit missing or bid twice. No-trump, where it is in play, always
+ *  sits above every suit — that is what "no trump" means in every game that has it. */
+function strainList(knobs: Knobs): Strain[] {
+  const SUITS: Suit[] = ['C', 'D', 'H', 'S'];
+  const custom = knobs.contractStrainOrder ?? [];
+  const valid = custom.length === 4 && SUITS.every((x) => custom.filter((y) => y === x).length === 1);
+  const order = valid ? custom : SUITS;
+  return (knobs.contractNoTrump ? [...order, 'NT'] : [...order]) as Strain[];
 }
 
 export function buildDefinition(knobs: Knobs, id = 'draft'): GameDefinition {
@@ -1023,17 +1059,25 @@ function buildTrickDefinition(knobs: Knobs, id: string): GameDefinition {
     deck: deckOf(knobs, { maxDecks: 2 }),
     zones: [
       { id: 'draw', type: 'pile', ordered: true, faceDown: true, visibility: 'none', shared: true },
-      // The auction needs somewhere to turn a card up from.
+      // The auction needs somewhere to turn a card up from — and a contract auction with a
+      // kitty needs somewhere to bury into. Same pile either way, but a turned-up card is
+      // public and a buried one is nobody's business until the hand is over.
       ...(knobs.trumpAuction
         ? [{ id: 'kitty', type: 'pile' as const, ordered: true, faceDown: false, visibility: 'top-public' as const, shared: true }]
-        : []),
+        : kittyCards(knobs) > 0
+          ? [{ id: 'kitty', type: 'pile' as const, ordered: false, faceDown: true, visibility: 'none' as const, shared: true }]
+          : []),
       { id: 'trick', type: 'trick', ordered: true, faceDown: false, visibility: 'all', shared: true },
       { id: 'hand', type: 'hand', ordered: false, faceDown: true, visibility: 'owner', perPlayer: true },
     ],
     setup: [
       { op: 'shuffle', zone: 'draw' },
       dealStep(knobs, 'draw', 'hand'),
-      ...(knobs.trumpAuction ? [{ op: 'move' as const, from: 'draw', to: 'kitty', count: 1 }] : []),
+      ...(knobs.trumpAuction
+        ? [{ op: 'move' as const, from: 'draw', to: 'kitty', count: 1 }]
+        : kittyCards(knobs) > 0
+          ? [{ op: 'move' as const, from: 'draw', to: 'kitty', count: kittyCards(knobs) }]
+          : []),
     ],
     turnFlow: { order: knobs.direction, startPlayer: 'first', actionsPerTurn: { min: 1, max: 1 } },
     actions: [],
@@ -1070,7 +1114,8 @@ function buildTrickDefinition(knobs: Knobs, id: string): GameDefinition {
       numericAuction: knobs.contractAuction ? {
         minLevel: Math.max(1, Math.min(knobs.contractMinLevel, knobs.contractMaxLevel)),
         maxLevel: Math.max(1, knobs.contractMaxLevel),
-        strains: (knobs.contractNoTrump ? ['C', 'D', 'H', 'S', 'NT'] : ['C', 'D', 'H', 'S']) as Strain[],
+        strains: strainList(knobs),
+        ...(kittyCards(knobs) > 0 ? { kittyZone: 'kitty' } : {}),
         book: Math.max(0, knobs.contractBook),
         trickValue: Math.max(1, knobs.contractTrickValue),
         overtrickValue: Math.max(0, knobs.contractOvertrickValue),
@@ -1259,6 +1304,10 @@ export function knobsFromDefinition(def: GameDefinition): Knobs {
     contractMaxLevel: def.trick?.numericAuction?.maxLevel ?? 7,
     contractBook: def.trick?.numericAuction?.book ?? 0,
     contractNoTrump: def.trick?.numericAuction ? def.trick.numericAuction.strains.includes('NT') : true,
+    contractStrainOrder: (def.trick?.numericAuction?.strains ?? []).filter((x) => x !== 'NT') as Suit[],
+    contractKittySize: def.trick?.numericAuction?.kittyZone
+      ? (def.setup ?? []).reduce((n, st) => (st.op === 'move' && st.to === def.trick?.numericAuction?.kittyZone ? n + (st.count ?? 0) : n), 0)
+      : 0,
     contractTrickValue: def.trick?.numericAuction?.trickValue ?? 10,
     contractOvertrickValue: def.trick?.numericAuction?.overtrickValue ?? 3,
     contractUndertrickValue: def.trick?.numericAuction?.undertrickValue ?? 12,
