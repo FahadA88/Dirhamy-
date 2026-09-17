@@ -614,6 +614,11 @@ function AccessSection({ s, set }: { s: Settings; set: Setter }) {
         <Seg value={s.pileSpot} onChange={(v) => set('pileSpot', v as Settings['pileSpot'])}
           options={[['high', 'Up top'], ['centre', 'Centre'], ['low', 'Near you']]} />
       </Row>
+      <Row label="Arrange the table by hand" hint="The two presets above cover most tables, but where a seat sits is easier to point at than to pick from a list. Open a game, then Table menu → Arrange the table, and drag the seats and the piles where you want them. What you set is kept in per cent of the cloth, so it holds on a phone and a desktop alike." keywords="arrange drag seats piles move custom position layout by hand reset">
+        {s.tableArrangement
+          ? <button className="ghost sm" onClick={() => set('tableArrangement', null)}>Clear what I arranged</button>
+          : <span className="muted">Nothing arranged by hand yet.</span>}
+      </Row>
       <Row label="Chips" hint="How a betting game draws its money. Stacked chips in the casino colours — white 1, red 5, green 25, black 100, purple 500 — flat discs without the shading, or the plain number it used to be." keywords="chips poker betting money pot stack denominations casino">
         <Seg value={s.chipStyle} onChange={(v) => set('chipStyle', v as Settings['chipStyle'])}
           options={[['stack', 'Stacked'], ['flat', 'Flat'], ['text', 'Just the number']]} />

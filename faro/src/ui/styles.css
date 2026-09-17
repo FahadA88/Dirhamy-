@@ -9282,3 +9282,60 @@ input[type="checkbox"]:focus-visible { outline: 2px solid var(--brass-hi); outli
   .hand .card-btn.selected,
   .hand .card-btn.staged { transform: translateY(-10px); }
 }
+
+/* ============================================================
+   ARRANGE THE TABLE
+
+   Presets cover most people — an arc or a row, piles high or low —
+   but "where the seats sit" is the kind of preference that is easier
+   to point at than to pick from a list. In arrange mode a seat and
+   the pile cluster are draggable, and where they land is kept in per
+   cent of the felt so the same arrangement holds on a phone and a
+   desktop, at any card size, in any game.
+   ============================================================ */
+.arrange-bar {
+  position: absolute; inset: 8px 8px auto; z-index: 6;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 8px 12px; border-radius: var(--r-md);
+  background: color-mix(in srgb, var(--panel-solid) 92%, transparent);
+  border: 1px solid var(--accent);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, .4);
+  font-size: 13px; color: var(--ink);
+}
+.felt[data-arranging] { cursor: grab; }
+/* Nothing on the cloth should look playable while the table is being rearranged. */
+.felt[data-arranging] .card-btn,
+.felt[data-arranging] .pile,
+.felt[data-arranging] .hand { pointer-events: none; opacity: .55; }
+
+.seat.draggable {
+  cursor: grab;
+  touch-action: none;
+  outline: 1px dashed color-mix(in srgb, var(--accent) 70%, transparent);
+  outline-offset: 4px;
+  border-radius: var(--r-md);
+}
+.seat.draggable:active { cursor: grabbing; }
+.seat.draggable:focus-visible { outline: 2px solid var(--accent-hi); }
+
+.arrange-puck {
+  position: absolute; z-index: 5;
+  translate: -50% -50%;
+  width: 46px; height: 46px; border-radius: 50%;
+  display: grid; place-items: center;
+  font-size: 18px; line-height: 1; color: var(--bg0);
+  background: var(--accent);
+  border: 0; cursor: grab; touch-action: none;
+  box-shadow: 0 0 0 4px var(--ac28), 0 6px 18px rgba(0, 0, 0, .45);
+}
+.arrange-puck:active { cursor: grabbing; }
+.arrange-puck:focus-visible { box-shadow: 0 0 0 4px var(--accent-hi), 0 6px 18px rgba(0, 0, 0, .45); }
+
+/* A dragged pile position beats whichever preset "Where the piles sit" chose. Absolute rather
+   than a margin shift, because a dragged point is a point, not a nudge. */
+.felt-content[data-piles="set"] > .center {
+  position: absolute;
+  left: var(--pile-x); top: var(--pile-y);
+  translate: -50% -50%;
+  margin: 0 !important;
+}

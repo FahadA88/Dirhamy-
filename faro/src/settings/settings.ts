@@ -29,6 +29,18 @@ export type CardFace =
 export type TextSize = 's' | 'm' | 'l' | 'xl';
 export type SeatRing = 'arc' | 'wide' | 'row';
 export type ChipStyle = 'stack' | 'flat' | 'text';
+
+/** A point on the felt, in per cent of its box, so a saved arrangement survives a different
+ *  screen, a different card size and a different game. */
+export interface FeltSpot { x: number; y: number }
+
+/** Where a player has dragged things. Seats are keyed by their RING SLOT — l, tl, t, tr, r —
+ *  rather than by player id, because the same arrangement should hold whoever is sitting there
+ *  and whatever game is being played. Null anywhere means "wherever the chosen preset puts it". */
+export interface TableArrangement {
+  seats: Partial<Record<'l' | 'tl' | 't' | 'tr' | 'r', FeltSpot>>;
+  piles: FeltSpot | null;
+}
 export type PileSpot = 'centre' | 'high' | 'low';
 /** Simulates the app through a colour-vision deficiency, so a player choosing the
  *  colour-safe face or checking a design decision can see it the way it is meant to help,
@@ -187,6 +199,9 @@ export interface Settings {
   /** How a betting game draws its money. 'stack' is chips with an edge and a rim, 'flat' the
    *  same discs without the relief, 'text' the plain number it used to be. */
   chipStyle: ChipStyle;
+  /** Positions dragged by hand in "Arrange the table". Overrides the seat-ring and pile-spot
+   *  presets for whatever it names, and leaves the rest to them. */
+  tableArrangement: TableArrangement | null;
   /** A few seconds to take back a misclick before the table moves on. 0 turns it off. */
   undoGraceMs: number;
   /** Optional clock. 0 is no clock at all, which is the default. */
@@ -255,6 +270,7 @@ export const defaultSettings: Settings = {
   seatRing: 'arc',
   pileSpot: 'centre',
   chipStyle: 'stack',
+  tableArrangement: null,
   // Long enough to catch a misclick, short enough that nobody waits on it.
   undoGraceMs: 3000,
   turnSeconds: 0,

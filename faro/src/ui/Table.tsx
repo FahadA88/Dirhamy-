@@ -3,6 +3,7 @@ import { Card, GameDefinition, Move, RedactedState } from '../engine/types';
 import { SUIT_SYMBOLS, buildDeck } from '../engine/deck';
 import { CardFace } from './Card';
 import { ChipStack } from './Chips';
+import { useArrange } from './useArrange';
 import { AttrCard, describeAttrs } from './AttrCard';
 import { TableDressing, TableRail, FeltDust, SeasonalDrift } from './TableDressing';
 import { CountUp } from './CountUp';
@@ -1357,6 +1358,18 @@ export function Table({
   // and twenty of them to show a header and a tab bar nobody reads while playing a hand. The
   // table says it is open; the stylesheet hides the shell on small screens and hands the space
   // to the felt. Cleared on unmount so leaving the table brings the site back.
+  // "Arrange the table": while it is on, a seat and the pile cluster can be dragged anywhere on
+  // the cloth and stay there. Off by default and per-player, not per-game — somebody who wants
+  // their own seat plan wants it at every table.
+  const [arranging, setArranging] = useState(false);
+  const feltRef = useRef<HTMLDivElement | null>(null);
+  const arrangement = settings.tableArrangement;
+  const { startDrag: startArrangeDrag, nudge } = useArrange(
+    () => feltRef.current,
+    arrangement,
+    (next) => setSetting('tableArrangement', next),
+  );
+
   // Wide screens have the room, so the record starts open there and folded on a phone.
   const [recordOpen, setRecordOpen] = useState(
     () => typeof window === 'undefined' || window.matchMedia('(min-width: 900px)').matches,
@@ -1550,7 +1563,14 @@ export function Table({
     </div>
     <div className="table" data-felt={settings.tableFelt} ref={tableRef} style={{ '--tension': tension } as React.CSSProperties}>
       <TableRail felt={settings.tableFelt} />
-      <div className={`felt ${dealing ? 'dealing' : ''} ${shaking ? 'felt-shake' : ''}`}>
+      <div ref={feltRef} data-arranging={arranging ? 'yes' : undefined}
+        className={`felt ${dealing ? 'dealing' : ''} ${shaking ? 'felt-shake' : ''}`}>
+      {arranging && (
+        <div className="arrange-bar" role="status">
+          <span>Drag a seat or the piles. Arrow keys nudge, shift for bigger steps.</span>
+          <button className="ghost sm" onClick={() => setArranging(false)}>Done</button>
+        </div>
+      )}
         {rippleKey > 0 && <span key={rippleKey} className="turn-ripple" aria-hidden="true" />}
       <TableDressing felt={settings.tableFelt} title={def.meta.name} />
       <FeltDust />
@@ -1564,7 +1584,29 @@ export function Table({
         onStart={() => { setDealing(true); playSound('shuffle', settings); }}
         onDone={() => setDealing(false)}
       />}
-      <div className="felt-content">
+      <div className="felt-content"
+        data-piles={arrangement?.piles ? 'set' : undefined}
+        style={arrangement?.piles
+          ? ({ ['--pile-x' as string]: `${arrangement.piles.x}%`, ['--pile-y' as string]: `${arrangement.piles.y}%` })
+          : undefined}>
+        {/* One puck rather than a handler on each family's own centre: ten families render
+            their own middle (a trick, an auction, a market, a board) and none of them wants to
+            know about dragging. The puck sits over whichever one is on screen. */}
+        {arranging && (
+          <button
+            className="arrange-puck"
+            aria-label="The card piles — drag to move, or use the arrow keys"
+            style={{ left: `${arrangement?.piles?.x ?? 50}%`, top: `${arrangement?.piles?.y ?? 44}%` }}
+            onPointerDown={(e) => { e.preventDefault(); startArrangeDrag(e, 'piles'); }}
+            onKeyDown={(e) => {
+              const step = e.shiftKey ? 5 : 1;
+              const d: Record<string, [number, number]> = {
+                ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step],
+              };
+              if (d[e.key]) { e.preventDefault(); nudge('piles', d[e.key][0], d[e.key][1], arrangement?.piles ?? undefined); }
+            }}
+          >⠿<span className="sr-only"> Move the piles</span></button>
+        )}
       {/*
         What just happened, on the table.
 
@@ -1585,6 +1627,10 @@ export function Table({
           // How many backs to draw. A neat, readable fan beats a dozen slivers; the exact
           // number is on the chip below, which is where anyone actually reads it.
           const backs = Math.max(1, Math.min(p.handCount, 6));
+          // The ring slot is what an arrangement is keyed by, so the same plan holds whoever
+          // is sitting there and whatever game it is.
+          const slot = (SEAT_RING[opponents.length]?.[i] ?? 't') as 'l' | 'tl' | 't' | 'tr' | 'r';
+          const spot = arrangement?.seats?.[slot];
           return (
             // A keyboard player can pick a rank but had no way to complete the ask — the seat
             // itself was a click-only target with no role, tabIndex, or key handler. It's a real
@@ -1593,8 +1639,22 @@ export function Table({
             // eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events
             <div key={p.id}
               data-slot={`seat:${p.id}`}
-              className={`seat at-${SEAT_RING[opponents.length]?.[i] ?? 't'} ${p.isTurn ? 'active' : ''} ${askable ? 'askable' : ''}`}
-              onClick={() => { if (askable) submit({ actionId: 'ask', target: p.id, rank: askRank! }); }}
+              className={`seat at-${slot} ${p.isTurn ? 'active' : ''} ${askable ? 'askable' : ''} ${arranging ? 'draggable' : ''}`}
+              style={spot ? { left: `${spot.x}%`, top: `${spot.y}%`, right: 'auto', transform: 'none' } : undefined}
+              {...(arranging ? {
+                onPointerDown: (e: React.PointerEvent<HTMLElement>) => { e.preventDefault(); startArrangeDrag(e, slot); },
+                tabIndex: 0,
+                role: 'application' as const,
+                'aria-label': `${nameOf(p.id)}'s seat — drag to move, or use the arrow keys`,
+                onKeyDown: (e: React.KeyboardEvent) => {
+                  const step = e.shiftKey ? 5 : 1;
+                  const d: Record<string, [number, number]> = {
+                    ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step],
+                  };
+                  if (d[e.key]) { e.preventDefault(); nudge(slot, d[e.key][0], d[e.key][1], spot); }
+                },
+              } : {})}
+              onClick={() => { if (askable && !arranging) submit({ actionId: 'ask', target: p.id, rank: askRank! }); }}
               {...(askable ? {
                 role: 'button' as const,
                 tabIndex: 0,
@@ -2439,6 +2499,15 @@ export function Table({
                   <button role="menuitem" onClick={() => { setTableMenu(false); openHistory(); }}>
                     History<i>every move so far</i>
                   </button>
+                  <button role="menuitem" onClick={() => { setTableMenu(false); setArranging((v) => !v); }}>
+                    {arranging ? 'Done arranging' : 'Arrange the table'}
+                    <i>{arranging ? 'put the seats and piles back to playing' : 'drag the seats and the piles where you want them'}</i>
+                  </button>
+                  {settings.tableArrangement && (
+                    <button role="menuitem" onClick={() => { setTableMenu(false); setSetting('tableArrangement', null); }}>
+                      Reset the arrangement<i>back to the layout chosen in Settings</i>
+                    </button>
+                  )}
                   {view.phase === 'playing' && !takeback && (
                     <button role="menuitem" onClick={() => { setTableMenu(false); askTakeback(); }}>
                       Take back<i>ask the table to undo your last move</i>
