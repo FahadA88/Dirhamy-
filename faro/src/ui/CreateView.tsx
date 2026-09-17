@@ -104,6 +104,52 @@ function StrainOrder({ value, onChange }: { value: Suit[]; onChange: (v: Suit[])
   );
 }
 
+/** Contract Rummy's escalating demand: what each hand owes before anything may go down. One
+ *  row per hand, in order. Empty means no contract, which is every other rummy — and is what
+ *  an author who never opens this gets. The engine wraps the list if a match outlasts it. */
+function ContractList({ value, onChange }: { value: { sets: number; runs: number }[]; onChange: (v: { sets: number; runs: number }[]) => void }) {
+  const rows = value;
+  const setAt = (i: number, key: 'sets' | 'runs', n: number) =>
+    onChange(rows.map((r, j) => (j === i ? { ...r, [key]: Math.max(0, Math.min(6, n)) } : r)));
+  return (
+    <fieldset className="field strain-fieldset">
+      <legend>What each hand must lay down before anything else (Contract Rummy)</legend>
+      {rows.length === 0 ? (
+        <span className="hint">
+          No contract — melds go down whenever they are ready, the way most rummies play.{' '}
+          <button type="button" className="linky" onClick={() => onChange([{ sets: 2, runs: 0 }])}>Add a first hand</button>
+        </span>
+      ) : (
+        <>
+          <ul className="strain-order contract-list">
+            {rows.map((r, i) => (
+              <li key={i}>
+                <span className="so-rank">{i + 1}</span>
+                <label className="cl-num">sets
+                  <input type="number" min={0} max={6} value={r.sets}
+                    onChange={(e) => setAt(i, 'sets', Number(e.target.value))} />
+                </label>
+                <label className="cl-num">runs
+                  <input type="number" min={0} max={6} value={r.runs}
+                    onChange={(e) => setAt(i, 'runs', Number(e.target.value))} />
+                </label>
+                <button type="button" className="ghost sm" aria-label={`Remove hand ${i + 1}`}
+                  onClick={() => onChange(rows.filter((_, j) => j !== i))}>Remove</button>
+              </li>
+            ))}
+          </ul>
+          <span className="hint">
+            <button type="button" className="linky"
+              onClick={() => onChange([...rows, { ...rows[rows.length - 1] }])}>Add another hand</button>
+            {' · '}
+            <button type="button" className="linky" onClick={() => onChange([])}>No contract at all</button>
+          </span>
+        </>
+      )}
+    </fieldset>
+  );
+}
+
 export function CreateView({ onPlay }: { onPlay?: (def: GameDefinition) => void } = {}) {
   const { settings } = useSettings();
   const savedDraft = useMemo(loadDraft, []);
@@ -807,6 +853,9 @@ export function CreateView({ onPlay }: { onPlay?: (def: GameDefinition) => void 
                 <>
                   <div className="field"><span>Wilds allowed in one meld</span>
                     <Seg options={[[1, 'One'], [2, 'Two']]} value={knobs.rummyMaxWilds} onChange={(v) => set('rummyMaxWilds', v)} /></div>
+                  <div className="field row"><Switch on={knobs.rummyWildRotates} onChange={(v) => set('rummyWildRotates', v)} aria-label="The wild rank climbs one step every hand (Three Thirteen)" />
+                <span aria-hidden="true">The wild rank climbs one step every hand (Three Thirteen)</span></div>
+                  <ContractList value={knobs.rummyContract} onChange={(v) => set('rummyContract', v)} />
                   <div className="mini-label">Which cards are wild</div>
                   <RankGrid selected={knobs.wildRanks} onToggle={(r) => toggleRank('wildRanks', r)} />
                   <CardPicker label="…or name individual wild cards" selected={knobs.wildCards}
@@ -1209,9 +1258,22 @@ export function CreateView({ onPlay }: { onPlay?: (def: GameDefinition) => void 
             <div className="field row"><Switch on={knobs.matchPlay} onChange={(v) => set('matchPlay', v)} aria-label="Play to a target score across multiple hands" />
                 <span aria-hidden="true">Play to a target score across multiple hands</span></div>
             {knobs.matchPlay && (
-              <label className="field"><span>Points to win the match</span>
-                <input type="number" value={knobs.pointTarget} onChange={(e) => set('pointTarget', parseInt(e.target.value || '0', 10))} /></label>
+              <>
+                <label className="field"><span>Points to win the match</span>
+                  <input type="number" value={knobs.pointTarget} onChange={(e) => set('pointTarget', parseInt(e.target.value || '0', 10))} /></label>
+                <NumField label="Stop after this many hands however the score stands (0 = the target decides)"
+                  value={knobs.handsCap} onChange={(v) => set('handsCap', v)} />
+                <div className="field"><span>Who wins the match</span>
+                  <Seg value={knobs.winMode === 'firstOut' ? 'lowestTotal' : knobs.winMode}
+                    onChange={(v) => set('winMode', v as Knobs['winMode'])}
+                    options={[['lowestTotal', 'Lowest score'], ['highestTotal', 'Highest score']]} /></div>
+              </>
             )}
+            <NumField label="Cards added to every deal each hand (0 = a fixed deal; Three Thirteen grows from 3 to 13)"
+              value={knobs.handGrowsPerHand} onChange={(v) => set('handGrowsPerHand', v)} />
+            <div className="field"><span>Who leads the first hand</span>
+              <Seg value={knobs.startPlayer} onChange={(v) => set('startPlayer', v as Knobs['startPlayer'])}
+                options={[['dealerLeft', 'Left of the dealer'], ['first', 'Seat one']]} /></div>
           </Section>
         </div>
 

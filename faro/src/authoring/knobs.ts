@@ -68,6 +68,12 @@ export interface Knobs {
    * builder could express before this existed was stuck with.
    */
   contractKittySize: number;
+  /**
+   * Cards left under the turned-up card in a trump auction. Euchre's twenty-four-card pack
+   * deals twenty, and all four that are left sit in the kitty with the top one face up — the
+   * builder only ever put one there, so a rebuilt Euchre was four cards short of a deck.
+   */
+  trumpKittySize: number;
   contractTrickValue: number;      // points per trick bid, once made
   contractOvertrickValue: number;  // points per trick over the contract
   contractUndertrickValue: number; // points the defence takes per trick the contract falls short
@@ -138,6 +144,18 @@ export interface Knobs {
   rummyLayOff: boolean;     // spare cards may extend melds already on the table
   rummyWilds: boolean;      // cards tagged wild stand in for whatever a meld is short of
   rummyMaxWilds: number;    // how many wilds one meld may absorb (1 or 2)
+  /**
+   * The wild rank climbs one step every hand — Three Thirteen's threes, then fours, then
+   * fives, up to kings. Needs wilds on and a wild named as a single rank; a game whose wild is
+   * a joker, or more than one rank, or never moves, leaves this off.
+   */
+  rummyWildRotates: boolean;
+  /**
+   * Contract Rummy: what each hand demands before anything may be laid down — two sets, then a
+   * set and a run, then two runs, and so on. One entry per hand, in order; the engine wraps if
+   * a match outlasts the list. Empty means no contract, which is every other rummy.
+   */
+  rummyContract: { sets: number; runs: number }[];
   rummyGinBonus: number;    // extra for knocking with no deadwood at all
   rummyUndercutBonus: number; // extra to the defender who matches or beats the knocker
   // war
@@ -278,6 +296,24 @@ export interface Knobs {
   matchPlay: boolean;
   pointTarget: number;
   // scoring
+  /**
+   * The match stops after this many hands however the score stands — Three Thirteen is eleven
+   * hands, three through king, and out. 0 means the target alone decides, which is every game
+   * that plays until somebody reaches a number.
+   */
+  handsCap: number;
+  /**
+   * Cards added to every hand's deal each hand — Three Thirteen starts at three and grows to
+   * thirteen. 0 is a fixed deal, which is almost every game.
+   */
+  handGrowsPerHand: number;
+  /** Who leads the very first hand: the seat left of the dealer, as most games deal, or seat
+   *  one. Only visible where it matters, but it was hardcoded to 'first' for every family the
+   *  builder produced and half the classics say dealerLeft. */
+  startPlayer: 'dealerLeft' | 'first';
+  /** True when the shipped game priced no card at all — which is a real choice (plain Rummy
+   *  charges nothing for deadwood) and not the same as "never said". */
+  pricesNothing: boolean;
   perRankPoints: Record<string, number>;
   jokerPoints: number;
   /**
@@ -356,6 +392,8 @@ export const defaultKnobs: Knobs = {
   rummyLayOff: true,
   rummyWilds: false,
   rummyMaxWilds: 1,
+  rummyWildRotates: false,
+  rummyContract: [],
   rummyGinBonus: 25,
   rummyUndercutBonus: 25,
   warRoundCap: 800,
@@ -425,6 +463,7 @@ export const defaultKnobs: Knobs = {
   excludeCards: [],
   contractStrainOrder: [],
   contractKittySize: 0,
+  trumpKittySize: 1,
   wildCards: [],
   rankOrder: [],
   includeJokers: false,
@@ -450,6 +489,10 @@ export const defaultKnobs: Knobs = {
   winMode: 'firstOut',
   matchPlay: false,
   pointTarget: 100,
+  handsCap: 0,
+  handGrowsPerHand: 0,
+  startPlayer: 'dealerLeft',
+  pricesNothing: false,
   perRankPoints: { ...defaultPoints },
   jokerPoints: 50,
   cardValues: {},
@@ -552,6 +595,7 @@ function dealStep(knobs: Knobs, from: string, to: string) {
   return {
     op: 'deal' as const, from, to, countPerPlayer: knobs.handSize,
     ...(table.length ? { countByPlayers: Object.fromEntries(table) } : {}),
+    ...(clampInt(knobs.handGrowsPerHand, 0, 4) > 0 ? { growPerHand: clampInt(knobs.handGrowsPerHand, 0, 4) } : {}),
   };
 }
 
@@ -619,6 +663,7 @@ function buildSwapDefinition(knobs: Knobs, id: string): GameDefinition {
       mode: 'lowestPoints', winner: 'lowestTotal',
       cardPoints: Object.fromEntries(RANKS_13.map((r) => [r, knobs.perRankPoints[r] ?? defaultPoints[r] ?? 0])),
       target: matchTarget(knobs),
+      ...(clampInt(knobs.handsCap, 0, 60) > 0 ? { handsCap: clampInt(knobs.handsCap, 0, 60) } : {}),
     },
     swap: {
       slots: clampInt(knobs.swapSlots, 3, 6),
@@ -729,7 +774,7 @@ function buildSolitaireDefinition(knobs: Knobs, id: string): GameDefinition {
       deckCount: clampInt(knobs.solDecks, 1, 2),
     },
     zones: [], setup: [],
-    turnFlow: { order: 'clockwise', startPlayer: 'first', actionsPerTurn: { min: 1, max: 1 } },
+    turnFlow: { order: 'clockwise', startPlayer: knobs.startPlayer, actionsPerTurn: { min: 1, max: 1 } },
     actions: [], triggers: [], endConditions: [],
     scoring: { mode: 'lowestPoints', winner: 'lowestTotal', cardPoints: {}, target: null },
     solitaire: {
@@ -781,6 +826,24 @@ function autoSolitaireDescription(k: Knobs): string {
   return `A patience laid out in ${k.solColumns} columns. Build the columns downward ${build}.${wrap} ${finish} ${gap}${shown}${reserve}${cells}${stock}`;
 }
 
+/** What each card costs whoever is still holding it. Was inline in the shedding builder and
+ *  nowhere else, which is how every rummy the editor produced came out scoring zero for every
+ *  card — deadwood was free, so a hand never cost anything and a match ran until the move cap
+ *  noticed rather than until somebody lost. */
+function pricedCards(knobs: Knobs): Record<string, number | 'rankValue'> {
+  if (knobs.pricesNothing) return {};
+  // No joker in the pack, no price on one. A stray JOKER entry is harmless at run time but it
+  // is a lie in the definition, and it is the one thing that stopped a rebuilt Three Thirteen
+  // from being byte-for-byte the shipped game.
+  const cardPoints: Record<string, number | 'rankValue'> =
+    knobs.includeJokers ? { JOKER: knobs.jokerPoints } : {};
+  for (const r of RANKS_13) cardPoints[r] = knobs.perRankPoints[r] ?? 0;
+  // Suits and single cards override the per-rank prices; `default` catches whatever is left.
+  for (const [k, v] of Object.entries(knobs.cardValues)) cardPoints[k] = v;
+  if (knobs.unpricedScoreRankValue) cardPoints.default = 'rankValue';
+  return cardPoints;
+}
+
 function buildRummyDefinition(knobs: Knobs, id: string): GameDefinition {
   return {
     schemaVersion: CURRENT_SCHEMA,
@@ -797,10 +860,10 @@ function buildRummyDefinition(knobs: Knobs, id: string): GameDefinition {
       { id: 'hand', type: 'hand', ordered: false, faceDown: true, visibility: 'owner', perPlayer: true },
     ],
     setup: [{ op: 'shuffle', zone: 'draw' }, dealStep(knobs, 'draw', 'hand'), { op: 'move', from: 'draw', to: 'discard', count: 1 }],
-    turnFlow: { order: 'clockwise', startPlayer: 'first', actionsPerTurn: { min: 1, max: 1 } },
+    turnFlow: { order: 'clockwise', startPlayer: knobs.startPlayer, actionsPerTurn: { min: 1, max: 1 } },
     actions: [], triggers: [],
     endConditions: [{ id: 'handEmpty', when: { zoneCount: { zone: 'hand', of: 'anyPlayer', eq: 0 } }, result: 'roundOver' }],
-    scoring: { mode: 'lowestPoints', winner: 'lowestTotal', cardPoints: {}, target: matchTarget(knobs) },
+    scoring: { mode: 'lowestPoints', winner: knobs.winMode, cardPoints: pricedCards(knobs), target: matchTarget(knobs), ...(clampInt(knobs.handsCap, 0, 60) > 0 ? { handsCap: clampInt(knobs.handsCap, 0, 60) } : {}) },
     rummy: {
       setMin: clampInt(knobs.rummySetMin, 2, 4), runMin: clampInt(knobs.rummyRunMin, 2, 5),
       knock: knobs.rummyKnock ? clampInt(knobs.rummyKnockAt, 0, 30) : undefined,
@@ -809,6 +872,11 @@ function buildRummyDefinition(knobs: Knobs, id: string): GameDefinition {
       layOff: knobs.rummyLayOff || undefined,
       wilds: knobs.rummyWilds && hasWilds(knobs) ? true : undefined,
       maxWildsPerMeld: knobs.rummyWilds ? clampInt(knobs.rummyMaxWilds, 1, 2) : undefined,
+      // Both of these need wilds to mean anything, so neither is emitted without them.
+      wildRotatesByHand: knobs.rummyWilds && knobs.rummyWildRotates && hasWilds(knobs) ? true : undefined,
+      contract: knobs.rummyContract.length
+        ? knobs.rummyContract.map((c) => ({ sets: clampInt(c.sets, 0, 6), runs: clampInt(c.runs, 0, 6) }))
+        : undefined,
     },
   };
 }
@@ -827,10 +895,10 @@ function buildWarDefinition(knobs: Knobs, id: string): GameDefinition {
       { id: 'hand', type: 'hand', ordered: true, faceDown: true, visibility: 'none', perPlayer: true },
     ],
     setup: [{ op: 'shuffle', zone: 'draw' }, { op: 'dealAll', from: 'draw', to: 'hand' }],
-    turnFlow: { order: 'clockwise', startPlayer: 'first', actionsPerTurn: { min: 1, max: 1 } },
+    turnFlow: { order: 'clockwise', startPlayer: knobs.startPlayer, actionsPerTurn: { min: 1, max: 1 } },
     actions: [], triggers: [],
     endConditions: [{ id: 'handEmpty', when: { zoneCount: { zone: 'hand', of: 'anyPlayer', eq: 0 } }, result: 'roundOver' }],
-    scoring: { mode: 'lowestPoints', winner: 'highestTotal', cardPoints: {}, target: matchTarget(knobs) },
+    scoring: { mode: 'lowestPoints', winner: 'highestTotal', cardPoints: {}, target: matchTarget(knobs), ...(clampInt(knobs.handsCap, 0, 60) > 0 ? { handsCap: clampInt(knobs.handsCap, 0, 60) } : {}) },
     war: { aceHigh: knobs.aceHigh, roundCap: clampInt(knobs.warRoundCap, 100, 5000) },
   };
 }
@@ -850,7 +918,7 @@ function buildBluffDefinition(knobs: Knobs, id: string): GameDefinition {
       { id: 'hand', type: 'hand', ordered: false, faceDown: true, visibility: 'owner', perPlayer: true },
     ],
     setup: [{ op: 'shuffle', zone: 'center' }, { op: 'dealAll', from: 'center', to: 'hand' }],
-    turnFlow: { order: 'clockwise', startPlayer: 'first', actionsPerTurn: { min: 1, max: 1 } },
+    turnFlow: { order: 'clockwise', startPlayer: knobs.startPlayer, actionsPerTurn: { min: 1, max: 1 } },
     actions: [], triggers: [], endConditions: [],
     scoring: { mode: 'lowestPoints', winner: 'highestTotal', cardPoints: {}, target: null },
     bluff: knobs.bluffClaimRanks.length ? { claimableRanks: [...knobs.bluffClaimRanks] } : {},
@@ -873,7 +941,7 @@ function buildReflexDefinition(knobs: Knobs, id: string): GameDefinition {
       { id: 'hand', type: 'hand', ordered: true, faceDown: true, visibility: 'none', perPlayer: true },
     ],
     setup: [{ op: 'shuffle', zone: 'draw' }, { op: 'dealAll', from: 'draw', to: 'hand' }],
-    turnFlow: { order: 'clockwise', startPlayer: 'first', actionsPerTurn: { min: 1, max: 1 } },
+    turnFlow: { order: 'clockwise', startPlayer: knobs.startPlayer, actionsPerTurn: { min: 1, max: 1 } },
     actions: [], triggers: [], endConditions: [],
     scoring: { mode: 'lowestPoints', winner: 'highestTotal', cardPoints: {}, target: null },
     reflex: {
@@ -898,7 +966,7 @@ function buildPokerDefinition(knobs: Knobs, id: string): GameDefinition {
       { id: 'hand', type: 'hand', ordered: false, faceDown: true, visibility: 'owner', perPlayer: true },
     ],
     setup: [{ op: 'shuffle', zone: 'draw' }, { op: 'deal', from: 'draw', to: 'hand', countPerPlayer: clampInt(knobs.pokerHandSize, 3, 7) }],
-    turnFlow: { order: 'clockwise', startPlayer: 'first', actionsPerTurn: { min: 1, max: 1 } },
+    turnFlow: { order: 'clockwise', startPlayer: knobs.startPlayer, actionsPerTurn: { min: 1, max: 1 } },
     actions: [], triggers: [], endConditions: [],
     scoring: { mode: 'lowestPoints', winner: 'highestTotal', cardPoints: {}, target: null },
     poker: {
@@ -928,7 +996,7 @@ function buildPitDefinition(knobs: Knobs, id: string): GameDefinition {
       { id: 'hand', type: 'hand', ordered: false, faceDown: true, visibility: 'owner', perPlayer: true },
     ],
     setup: [{ op: 'shuffle', zone: 'draw' }, { op: 'dealAll', from: 'draw', to: 'hand' }],
-    turnFlow: { order: 'clockwise', startPlayer: 'first', actionsPerTurn: { min: 1, max: 1 } },
+    turnFlow: { order: 'clockwise', startPlayer: knobs.startPlayer, actionsPerTurn: { min: 1, max: 1 } },
     actions: [], triggers: [], endConditions: [],
     scoring: { mode: 'lowestPoints', winner: 'highestTotal', cardPoints: {}, target: null },
     pit: { cornerSize: clampInt(knobs.pitCornerSize, 4, 13) },
@@ -955,7 +1023,7 @@ function buildKentDefinition(knobs: Knobs, id: string): GameDefinition {
       { id: 'hand', type: 'hand', ordered: false, faceDown: true, visibility: 'owner', perPlayer: true },
     ],
     setup: [{ op: 'shuffle', zone: 'draw' }, { op: 'deal', from: 'draw', to: 'hand', countPerPlayer: hand }],
-    turnFlow: { order: 'clockwise', startPlayer: 'first', actionsPerTurn: { min: 1, max: 1 } },
+    turnFlow: { order: 'clockwise', startPlayer: knobs.startPlayer, actionsPerTurn: { min: 1, max: 1 } },
     actions: [], triggers: [], endConditions: [],
     scoring: { mode: 'lowestPoints', winner: 'highestTotal', cardPoints: {}, target: null },
     kent: {
@@ -983,7 +1051,7 @@ function buildSetDefinition(knobs: Knobs, id: string): GameDefinition {
     },
     deck: { base: 'attributes', attributes: props, includeJokers: false, rankOrder: [], tags: {} },
     zones: [], setup: [],
-    turnFlow: { order: 'clockwise', startPlayer: 'first', actionsPerTurn: { min: 1, max: 1 } },
+    turnFlow: { order: 'clockwise', startPlayer: knobs.startPlayer, actionsPerTurn: { min: 1, max: 1 } },
     actions: [], triggers: [], endConditions: [],
     scoring: { mode: 'lowestPoints', winner: 'highestTotal', cardPoints: {}, target: null },
     set: {
@@ -1009,11 +1077,11 @@ function buildFishDefinition(knobs: Knobs, id: string): GameDefinition {
       { id: 'hand', type: 'hand', ordered: false, faceDown: true, visibility: 'owner', perPlayer: true },
     ],
     setup: [{ op: 'shuffle', zone: 'ocean' }, dealStep(knobs, 'ocean', 'hand')],
-    turnFlow: { order: 'clockwise', startPlayer: 'first', actionsPerTurn: { min: 1, max: 1 } },
+    turnFlow: { order: 'clockwise', startPlayer: knobs.startPlayer, actionsPerTurn: { min: 1, max: 1 } },
     actions: [],
     triggers: [],
     endConditions: [],
-    scoring: { mode: 'lowestPoints', winner: 'highestTotal', cardPoints: {}, target: matchTarget(knobs) },
+    scoring: { mode: 'lowestPoints', winner: 'highestTotal', cardPoints: {}, target: matchTarget(knobs), ...(clampInt(knobs.handsCap, 0, 60) > 0 ? { handsCap: clampInt(knobs.handsCap, 0, 60) } : {}) },
     fish: { bookSize: clampInt(knobs.bookSize, 2, 4) },
   };
 }
@@ -1036,11 +1104,11 @@ function buildClimbDefinition(knobs: Knobs, id: string): GameDefinition {
       { id: 'hand', type: 'hand', ordered: false, faceDown: true, visibility: 'owner', perPlayer: true },
     ],
     setup: [{ op: 'shuffle', zone: 'draw' }, { op: 'dealAll', from: 'draw', to: 'hand' }],
-    turnFlow: { order: knobs.direction, startPlayer: 'first', actionsPerTurn: { min: 1, max: 1 } },
+    turnFlow: { order: knobs.direction, startPlayer: knobs.startPlayer, actionsPerTurn: { min: 1, max: 1 } },
     actions: [],
     triggers: [],
     endConditions: [{ id: 'handEmpty', when: { zoneCount: { zone: 'hand', of: 'anyPlayer', eq: 0 } }, result: 'roundOver' }],
-    scoring: { mode: 'lowestPoints', winner: 'lowestTotal', cardPoints: {}, target: matchTarget(knobs) },
+    scoring: { mode: 'lowestPoints', winner: knobs.winMode, cardPoints: {}, target: matchTarget(knobs), ...(clampInt(knobs.handsCap, 0, 60) > 0 ? { handsCap: clampInt(knobs.handsCap, 0, 60) } : {}) },
     climb: { order, combos: knobs.climbCombos || undefined, bombSize: knobs.climbBombSize > 0 ? clampInt(knobs.climbBombSize, 4, 6) : undefined },
   };
 }
@@ -1074,22 +1142,31 @@ function buildTrickDefinition(knobs: Knobs, id: string): GameDefinition {
       { op: 'shuffle', zone: 'draw' },
       dealStep(knobs, 'draw', 'hand'),
       ...(knobs.trumpAuction
-        ? [{ op: 'move' as const, from: 'draw', to: 'kitty', count: 1 }]
+        ? [{ op: 'move' as const, from: 'draw', to: 'kitty', count: clampInt(knobs.trumpKittySize, 1, 8) }]
         : kittyCards(knobs) > 0
           ? [{ op: 'move' as const, from: 'draw', to: 'kitty', count: kittyCards(knobs) }]
           : []),
     ],
-    turnFlow: { order: knobs.direction, startPlayer: 'first', actionsPerTurn: { min: 1, max: 1 } },
+    turnFlow: { order: knobs.direction, startPlayer: knobs.startPlayer, actionsPerTurn: { min: 1, max: 1 } },
     actions: [],
     triggers: [],
     endConditions: [{ id: 'handsEmpty', when: { zoneCount: { zone: 'hand', of: 'anyPlayer', eq: 0 } }, result: 'roundOver' }],
     scoring: {
       mode: 'lowestPoints',
-      // Penalty and fewest-tricks scoring both want LOW cumulative scores to win a match
-      // (Hearts-style); most-tricks and bidding want HIGH cumulative scores to win (Spades-style).
-      winner: knobs.trickScoreBy === 'penalty' || knobs.trickScoreBy === 'fewestTricks' ? 'lowestTotal' : 'highestTotal',
+      // Penalty and fewest-tricks scoring usually want LOW cumulative scores to win a match
+      // (Hearts-style); most-tricks and bidding want HIGH (Spades-style). That inference was
+      // the only thing deciding it, and it is wrong for two of the classics: Briscola and Skat
+      // both move card points to whoever takes the trick — "penalty" in the engine's sense —
+      // but in both games the player who collects the MOST points wins. The author's own
+      // choice wins where they have made one; the inference is only the starting suggestion.
+      winner: knobs.winMode === 'lowestTotal' || knobs.winMode === 'highestTotal'
+        ? knobs.winMode
+        : (knobs.trickScoreBy === 'penalty' || knobs.trickScoreBy === 'fewestTricks' ? 'lowestTotal' : 'highestTotal'),
       cardPoints: {}, target: matchTarget(knobs),
-      bust: knobs.trickBidding && knobs.matchPlay && knobs.bustEnabled ? -Math.abs(clampInt(knobs.bustScore, 10, 2000)) : null,
+      ...(clampInt(knobs.handsCap, 0, 60) > 0 ? { handsCap: clampInt(knobs.handsCap, 0, 60) } : {}),
+      ...(knobs.trickBidding && knobs.matchPlay && knobs.bustEnabled
+        ? { bust: -Math.abs(clampInt(knobs.bustScore, 10, 2000)) }
+        : {}),
     },
     trick: {
       // Turned trump overrides the fixed-trump knob outright — the definition's own trump field
@@ -1202,11 +1279,7 @@ function buildSheddingDefinition(knobs: Knobs, id: string): GameDefinition {
     : [{ op: 'move', from: 'draw', to: 'hand', count: 1 }];
   const drawWhen: Predicate = knobs.canAlwaysDraw ? { always: true } : { not: { existsLegal: 'playCard' } };
 
-  const cardPoints: Record<string, number | 'rankValue'> = { JOKER: knobs.jokerPoints };
-  for (const r of RANKS_13) cardPoints[r] = knobs.perRankPoints[r] ?? 0;
-  // Suits and single cards override the per-rank prices; `default` catches whatever is left.
-  for (const [k, v] of Object.entries(knobs.cardValues)) cardPoints[k] = v;
-  if (knobs.unpricedScoreRankValue) cardPoints.default = 'rankValue';
+  const cardPoints = pricedCards(knobs);
 
   return {
     schemaVersion: CURRENT_SCHEMA,
@@ -1226,7 +1299,7 @@ function buildSheddingDefinition(knobs: Knobs, id: string): GameDefinition {
       dealStep(knobs, 'draw', 'hand'),
       { op: 'move', from: 'draw', to: 'discard', count: 1 },
     ],
-    turnFlow: { order: knobs.direction, startPlayer: 'first', actionsPerTurn: { min: 1, max: 1 } },
+    turnFlow: { order: knobs.direction, startPlayer: knobs.startPlayer, actionsPerTurn: { min: 1, max: 1 } },
     actions: [
       { id: 'playCard', target: { from: 'hand', select: 'one' }, when: { any: matchClauses }, effects: playEffects },
       { id: 'drawCard', when: drawWhen, effects: drawEffects },
@@ -1239,6 +1312,7 @@ function buildSheddingDefinition(knobs: Knobs, id: string): GameDefinition {
       mode: knobs.winMode === 'firstOut' ? 'firstToEmptyWins' : 'lowestPoints',
       cardPoints,
       target: matchTarget(knobs),
+      ...(clampInt(knobs.handsCap, 0, 60) > 0 ? { handsCap: clampInt(knobs.handsCap, 0, 60) } : {}),
       winner: knobs.winMode,
     },
   };
@@ -1262,7 +1336,14 @@ export function knobsFromDefinition(def: GameDefinition): Knobs {
   const drawAction = def.actions.find((a) => a.id === 'drawCard');
   const cp = def.scoring.cardPoints || {};
   const perRank: Record<string, number> = {};
-  for (const r of RANKS_13) perRank[r] = typeof cp[r] === 'number' ? (cp[r] as number) : (defaultPoints[r] ?? 0);
+  const pricedAnything = RANKS_13.some((r) => typeof cp[r] === 'number');
+  for (const r of RANKS_13) {
+    perRank[r] = typeof cp[r] === 'number'
+      ? (cp[r] as number)
+      : pricedAnything ? 0 : (defaultPoints[r] ?? 0);
+  }
+  // ...and if it priced nothing at all, it stays priced at nothing on the way back out.
+  const pricesNothing = !pricedAnything && Object.keys(cp).length === 0;
   const wildDrawRanks = tagRanks('wildDraw');
   const wildRanks = tagRanks('wild').filter((r) => !wildDrawRanks.includes(r));
 
@@ -1305,6 +1386,9 @@ export function knobsFromDefinition(def: GameDefinition): Knobs {
     contractBook: def.trick?.numericAuction?.book ?? 0,
     contractNoTrump: def.trick?.numericAuction ? def.trick.numericAuction.strains.includes('NT') : true,
     contractStrainOrder: (def.trick?.numericAuction?.strains ?? []).filter((x) => x !== 'NT') as Suit[],
+    trumpKittySize: def.trick?.auction
+      ? ((def.setup ?? []).find((st) => st.op === 'move' && st.to === 'kitty') as { count?: number } | undefined)?.count ?? 1
+      : 1,
     contractKittySize: def.trick?.numericAuction?.kittyZone
       ? (def.setup ?? []).reduce((n, st) => (st.op === 'move' && st.to === def.trick?.numericAuction?.kittyZone ? n + (st.count ?? 0) : n), 0)
       : 0,
@@ -1355,6 +1439,8 @@ export function knobsFromDefinition(def: GameDefinition): Knobs {
     rummyKnock: def.rummy?.knock !== undefined,
     rummyKnockAt: def.rummy?.knock ?? 10,
     rummyLayOff: !!def.rummy?.layOff,
+    rummyWildRotates: !!def.rummy?.wildRotatesByHand,
+    rummyContract: (def.rummy?.contract ?? []).map((c) => ({ sets: c.sets, runs: c.runs })),
     rummyWilds: !!def.rummy?.wilds,
     rummyMaxWilds: def.rummy?.maxWildsPerMeld ?? 1,
     rummyGinBonus: def.rummy?.ginBonus ?? 25,
@@ -1407,7 +1493,11 @@ export function knobsFromDefinition(def: GameDefinition): Knobs {
     winMode: def.scoring.winner,
     matchPlay: typeof def.scoring.target === 'number',
     pointTarget: typeof def.scoring.target === 'number' ? def.scoring.target : 100,
-    perRankPoints: perRank,
+    handsCap: def.scoring.handsCap ?? 0,
+    handGrowsPerHand: ((def.setup ?? []).find((st) => st.op === 'deal') as { growPerHand?: number } | undefined)?.growPerHand ?? 0,
+    startPlayer: def.turnFlow.startPlayer,
+    perRankPoints: pricesNothing ? {} : perRank,
+    pricesNothing,
     jokerPoints: typeof cp.JOKER === 'number' ? (cp.JOKER as number) : 50,
     cardValues: Object.fromEntries(
       Object.entries(cp).filter(([k, v]) => typeof v === 'number' && k !== 'JOKER' && k !== 'default'
@@ -1484,7 +1574,7 @@ function clampInt(n: number, lo: number, hi: number): number { return Math.max(l
 // null = a match is exactly one hand (legacy). A number = play repeated hands, accumulating
 // score, until someone crosses it.
 function matchTarget(knobs: Knobs): number | null {
-  return knobs.matchPlay ? clampInt(knobs.pointTarget, 10, 2000) : null;
+  return knobs.matchPlay ? clampInt(knobs.pointTarget, 1, 2000) : null;
 }
 
 function autoDescription(k: Knobs): string {

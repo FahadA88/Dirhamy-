@@ -14,6 +14,7 @@
 // bidding shape, jacksAreTrumps, meld patterns, swap ranks, whatever — survives the trip, because
 // that's the actual claim "buildable from scratch" is making.
 
+import { simulate } from '../src/engine/simulator';
 import { catalog } from '../src/games/catalog';
 import { buildDefinition, knobsFromDefinition } from '../src/authoring/knobs';
 
@@ -95,9 +96,11 @@ const KNOWN_GAPS: Record<string, string> = {
   Golf: 'default-value bookkeeping only, not a missing rule — see file header',
   Canfield: 'default-value bookkeeping only, not a missing rule — see file header',
   'Sixty-Six': 'an explicit zero-point penalty override cannot be told apart from "never priced"',
+  'Gin Rummy': 'its draw pile is named "stock"; the builder names every draw pile "draw" — same '
+    + 'game, different label, and renaming zones is not something the guided builder offers',
+  'Hand and Foot': 'a second hand dealt face down to a "foot" zone that a player picks up once '
+    + 'their first hand is gone — a whole extra deal step and zone with no knob behind it',
   Pinochle: 'literal named melds beyond the one marriage pattern — no generic meld editor',
-  'Three Thirteen': 'a wild rank that climbs one step every hand — no such knob in the builder',
-  'Contract Rummy': 'a per-hand list of set/run combinations — no knob for a whole escalating list',
 };
 
 let failed = false;
@@ -112,20 +115,38 @@ for (const game of catalog) {
 
   const knobs = knobsFromDefinition(game);
   const rebuilt = buildDefinition(knobs, game.meta.id) as unknown as Record<string, unknown>;
-  const original = (game as unknown as Record<string, unknown>)[family];
-  const roundTripped = rebuilt[family];
+  const shipped = game as unknown as Record<string, unknown>;
 
-  if (sameShape(original, roundTripped)) continue;
+  // Everything the rebuild has to reproduce. This used to be the family object alone, and that
+  // gave a false pass for years: every rummy the editor produced came out with an EMPTY
+  // scoring.cardPoints — deadwood cost nothing, so a hand was free and a match ran three to
+  // seven times longer than the real game — and the check never saw it, because cardPoints is
+  // not inside def.rummy. Three Thirteen also silently lost its eleven-hand cap and its
+  // growing deal, and half the classics lost their dealer-left lead. Whatever the family
+  // object does not cover, these do.
+  const PARTS: { key: string; get: (d: Record<string, unknown>) => unknown }[] = [
+    { key: family, get: (d) => d[family] },
+    { key: 'scoring', get: (d) => d.scoring },
+    { key: 'turnFlow', get: (d) => d.turnFlow },
+    { key: 'setup', get: (d) => d.setup },
+  ];
+
+  const differing = PARTS.filter((part) => !sameShape(part.get(shipped), part.get(rebuilt)));
+  if (differing.length === 0) continue;
+
+  const original = differing[0].get(shipped);
+  const roundTripped = differing[0].get(rebuilt);
+  const where = differing.map((d) => d.key).join(', ');
 
   const known = KNOWN_GAPS[game.meta.name];
   if (known) {
     knownGaps.push(game.meta.name);
-    console.log(`  KNOWN  ${game.meta.name} (${family}) — ${known}`);
+    console.log(`  KNOWN  ${game.meta.name} (${where}) — ${known}`);
     continue;
   }
   failed = true;
   newGaps.push(game.meta.name);
-  console.log(`  GAP    ${game.meta.name} (${family})`);
+  console.log(`  GAP    ${game.meta.name} (${where})`);
   console.log(`         shipped:   ${JSON.stringify(original)}`);
   console.log(`         rebuilt:   ${JSON.stringify(roundTripped)}`);
 }
@@ -138,5 +159,38 @@ if (failed) {
 } else {
   console.log('No undocumented gaps — every classic\'s family rules round-trip through the guided builder, or their gap is a known, written-down one.');
 }
+
+// ---------------------------------------------------------------------------------------
+// Second phase: play them.
+//
+// Everything above compares definitions. That is necessary and it is not sufficient — for a
+// long time every rummy the editor produced came out with an empty scoring.cardPoints, so
+// deadwood cost nothing and a rebuilt Three Thirteen ran 791 moves against the real game's
+// 221. The definitions looked fine because the difference was not inside def.rummy. A rebuild
+// that plays three times longer than the game it claims to be is not a rebuild of that game,
+// so the length is checked directly.
+console.log('\nPlaying the rebuilt classics against the shipped ones:');
+const PLAYABLE = [
+  'Three Thirteen', 'Contract Rummy', 'Rummy', 'Gin Rummy', 'Whist', 'Briscola',
+  'Skat', 'Euchre', 'Hearts', 'Five Hundred', 'Hokm', 'Bridge',
+];
+for (const name of PLAYABLE) {
+  const shipped = catalog.find((g) => g.meta.name === name);
+  if (!shipped) { console.log(`  SKIP   ${name} — not in the catalog`); continue; }
+  const rebuilt = buildDefinition(knobsFromDefinition(shipped), `rebuild-${shipped.meta.id}`);
+  const seats = Math.max(shipped.meta.players.min, Math.min(4, shipped.meta.players.max));
+  const a = simulate(shipped, seats, 12);
+  const b = simulate(rebuilt, seats, 12);
+  const ratio = b.avgMoves / Math.max(1, a.avgMoves);
+  // Half to double. Bot choices are seeded per definition id, so two builds of the same game
+  // are not expected to be identical move for move — but they are expected to be the same
+  // LENGTH of game, and a missing rule always shows up as a large multiple.
+  const ok = b.terminated === b.games && b.maxMovesHit === 0 && b.winnable && ratio > 0.5 && ratio < 2;
+  if (!ok) failed = true;
+  console.log(`  ${ok ? 'PASS' : 'FAIL'}   ${name.padEnd(16)} shipped ${a.avgMoves.toFixed(0).padStart(5)} moves, `
+    + `rebuilt ${b.avgMoves.toFixed(0).padStart(5)} (x${ratio.toFixed(2)}), `
+    + `${b.terminated}/${b.games} finished, winnable=${b.winnable}`);
+}
+
 console.log(failed ? '\nBUILDABILITY: FAILED' : '\nBUILDABILITY: all checks passed');
 process.exit(failed ? 1 : 0);
