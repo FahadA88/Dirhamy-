@@ -101,7 +101,6 @@
   /* Older names, still asked for all over the sheet. Pointed at the new lights rather than
      deleted, because an undefined custom property invalidates the whole declaration. */
   --oak: var(--gold);
-  --oak-hi: var(--gold-hi);
   --oak-dim: var(--gold-dim);
   --green: var(--accent);
   --green-d: var(--accent);
@@ -113,7 +112,9 @@
   --card-black: #15161c;
 
   --display: "Outfit", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --serif: var(--display);   /* the serif is gone; anything asking for it gets the display face */
+  /* --serif is the Didone further down this file. It used to be aliased to --display here,
+     which was dead the moment the second :root block redefined it — two :root blocks, later
+     wins — so the comment claiming "the serif is gone" was the opposite of what shipped. */
   --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
   --glow: rgba(108, 140, 255, 0.35);
   --input-bg: rgba(255, 255, 255, 0.05);
@@ -125,9 +126,6 @@
      final-match box) — each with its own blur and reach so the depth is felt, not just implied
      by a single reused shadow at every level. */
   --elev-1: 0 1px 1px rgba(0, 0, 0, .28), 0 8px 20px rgba(0, 0, 0, .22);
-  --elev-2: 0 2px 6px rgba(0, 0, 0, .30), 0 18px 40px rgba(0, 0, 0, .30);
-  --elev-3: 0 6px 16px rgba(0, 0, 0, .34), 0 34px 80px rgba(0, 0, 0, .40);
-  --shadow-panel: var(--elev-1);
 
   /* The drop under a pressable object: its own solid edge, then the shadow it throws. */
   --lip: 4px;
@@ -136,8 +134,6 @@
      this dark room --ink is a warm cream, so the swap already reads as brass-adjacent. Named
      separately from --ink/--bg1 themselves because that accident does not survive daylight —
      see the light override below. */
-  --seg-on-bg: var(--ink);
-  --seg-on-ink: var(--bg1);
 }
 
 /*
@@ -186,8 +182,6 @@
   --input-bg: rgba(20, 22, 32, 0.035);
   --glow: rgba(63, 95, 214, 0.22);
   --elev-1: 0 1px 1px rgba(30, 34, 50, .05), 0 8px 20px rgba(30, 34, 50, .08);
-  --elev-2: 0 2px 6px rgba(30, 34, 50, .06), 0 18px 40px rgba(30, 34, 50, .10);
-  --elev-3: 0 6px 16px rgba(30, 34, 50, .08), 0 34px 80px rgba(30, 34, 50, .14);
   --shadow-panel: var(--elev-1);
 
   /* The dark-room --seg-on-bg/--seg-on-ink swap (defined at the top of this file) is an ink/
@@ -813,9 +807,7 @@ h2 { letter-spacing: -0.025em; color: var(--ink); font-size: 22px; font-weight: 
   .sol-tableau { gap: 4px; }
   .sol-group { flex-wrap: nowrap; gap: 4px; }
   .sol-slot.waste { width: calc(var(--cw) * 1.5); }
-  .felt-content.sol .card.face .corner { font-size: 10px; top: 3px; left: 3px; }
-  .felt-content.sol .card.face .corner span { font-size: 8px; }
-  .felt-content.sol .card.face .pip { font-size: 15px; }
+  .felt-content.sol .card.face .corner { top: 3px; left: 3px; }
   .felt-content.sol .card.face .pips { display: none; }
 }
 
@@ -1147,12 +1139,23 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
   display: flex; flex-direction: column; align-items: center; gap: calc(var(--ch) * 0.012);
 }
 .card.face .ix-rank {
-  font-weight: 800; font-size: calc(var(--ch) * 0.108); line-height: .9;
-  letter-spacing: -0.045em; font-variant-numeric: lining-nums tabular-nums;
+  /* Sized to its own glyphs. Something upstream gives this a grid box, and a grid box in a
+     column flex parent took the parent's width — which on the ten pushed a 12px numeral into a
+     39px block, dragging the index suit under it out over the corner pip. Every other rank is
+     one character wide, so the fault only ever showed on the ten. */
+  display: block; width: max-content;
+  font-weight: 800; font-size: calc(var(--ch) * 0.122); line-height: .9;
+  /* -0.045em collapsed the ten's two digits into one mark — it was the one rank you could not
+     read at 44px. Enough tracking to sit tight, not enough to weld 1 and 0 together. */
+  letter-spacing: -0.018em; font-variant-numeric: lining-nums tabular-nums;
 }
-.card.face .ix-suit { display: block; width: calc(var(--ch) * 0.076); height: calc(var(--ch) * 0.076); }
-.card.face .corner.tl { top: calc(var(--ch) * 0.038); left: calc(var(--cw) * 0.065); }
-.card.face .corner.br { bottom: calc(var(--ch) * 0.038); right: calc(var(--cw) * 0.065); transform: rotate(180deg); }
+/* The ten is the only two-character rank, so at one size for all thirteen it is either a
+   cramped single mark or wide enough to run into the corner pip. A printed deck condenses it
+   instead, and so does this. */
+.card.face .ix-rank.two { font-size: calc(var(--ch) * 0.112); letter-spacing: -0.035em; }
+.card.face .ix-suit { display: block; width: calc(var(--ch) * 0.078); height: calc(var(--ch) * 0.078); }
+.card.face .corner.tl { top: calc(var(--ch) * 0.034); left: calc(var(--cw) * 0.05); }
+.card.face .corner.br { bottom: calc(var(--ch) * 0.034); right: calc(var(--cw) * 0.05); transform: rotate(180deg); }
 
 /* --- the frame --- */
 /* A hairline inside the trim. Every printed deck has one; without it the face is ink floating
@@ -1164,12 +1167,22 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
 }
 
 /* --- the ace --- */
+/* Every deck makes something of the ace, and a single hairline circle under a soft drop shadow
+   is not it — that reads as a UI button, and because it was mixed from currentColor it came out
+   as visible grey on the black suits and a barely-there pink on the red ones, so the four aces
+   did not even look like four of the same thing. A double rule instead: an outer hairline and
+   an inner one drawn tight to the mark, both at the same strength whatever colour the suit is,
+   with the suit itself scaled up to earn the ornament. */
 .card.face .pip { position: absolute; inset: 0; display: grid; place-items: center; z-index: 1; }
-.card.face .pip svg { width: calc(var(--ch) * 0.34); height: calc(var(--ch) * 0.34); }
+.card.face .pip svg { width: calc(var(--ch) * 0.40); height: calc(var(--ch) * 0.40); }
 .card.face .pip .ace-ring {
-  position: absolute; width: calc(var(--ch) * 0.44); height: calc(var(--ch) * 0.44);
-  border-radius: 50%; border: 1px solid color-mix(in srgb, currentColor 26%, transparent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 7%, transparent);
+  position: absolute; width: calc(var(--ch) * 0.52); height: calc(var(--ch) * 0.52);
+  border-radius: 50%;
+  border: 1px solid color-mix(in srgb, currentColor 34%, transparent);
+}
+.card.face .pip .ace-ring::after {
+  content: ''; position: absolute; inset: calc(var(--ch) * 0.022); border-radius: 50%;
+  border: 1px solid color-mix(in srgb, currentColor 20%, transparent);
 }
 
 /* --- the pips --- */
@@ -1178,10 +1191,10 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
    the centre column of a seven, an eight and a ten inside the side columns instead, which is
    worse — the pips actually overlapped. The field has to be wide, and a pip has to be small
    enough that the gap between the centre column and a side column can hold one. */
-.card.face .pips { position: absolute; inset: 11% 9%; z-index: 1; }
+.card.face .pips { position: absolute; inset: 10% 5%; z-index: 1; }
 .card.face .pips .spot {
   position: absolute; display: block;
-  width: calc(var(--ch) * 0.12); height: calc(var(--ch) * 0.12);
+  width: calc(var(--ch) * 0.146); height: calc(var(--ch) * 0.146);
 }
 .card.face .pips .spot svg { display: block; width: 100%; height: 100%; }
 
@@ -1709,11 +1722,17 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
 .mini-card { width: 34px; }
 /* At this size a full card face is a smudge, so the preview shows the corner only — the part
    you actually read when a hand is fanned. */
+/* Every part of the corner index now takes its size from --cw/--ch, which is what lets one set
+   of rules serve a 42px thumbnail and a 120px card on the table. A thumbnail that overrides
+   `width`/`height` but leaves --cw/--ch at the table's values gets a table-sized rank on a
+   thumbnail-sized card, so each of these sets the variables instead of setting a font-size that
+   the index no longer reads. */
 .mini-card .card.face {
+  --cw: 34px; --ch: 48px;
   width: 34px; height: 48px; font-size: 0;
   align-items: flex-start; justify-content: flex-start; padding: 3px 4px;
 }
-.mini-card .card.face .corner { font-size: 10px; line-height: 1.05; }
+.mini-card .card.face .corner { line-height: 1.05; }
 /* Show the top-left corner and nothing else. */
 .mini-card .card.face > *:not(.corner.tl) { display: none; }
 .mini-back {
@@ -2226,7 +2245,11 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
 
 /* Suit letters. Colour-blind players can read a suit without separating any two colours. */
 .suitletter {
-  display: block; font-size: 0.62em; font-weight: 800; letter-spacing: 0.5px;
+  /* Sized off the card, not off an inherited em. At 0.62em it took its size from the page's
+     root font and so stayed about ten pixels whatever the card was — fine on a big card, a
+     third of the index height on a small one, which is what pushed the letters face's corner
+     down into the pip field at hand size. */
+  display: block; font-size: calc(var(--ch) * 0.07); font-weight: 800; letter-spacing: 0.2px;
   line-height: 1; margin-top: 1px; opacity: 0.9;
 }
 
@@ -2237,8 +2260,12 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
 .card.face.f-big-index .corner.tl {
   font-size: calc(var(--cw) * 0.42); line-height: 0.92; top: 6%; left: 8%;
 }
-.card.face.f-big-index .corner.tl span { font-size: 0.62em; }
-.card.face.f-big-index .corner.br { font-size: calc(var(--cw) * 0.2); }
+.card.face.f-big-index .corner.tl .ix-rank,
+.card.face.f-big-index .corner.tl .ix-rank.two { font-size: calc(var(--cw) * 0.56); letter-spacing: -.05em; }
+.card.face.f-big-index .corner.tl .ix-suit { width: calc(var(--cw) * 0.2); height: calc(var(--cw) * 0.2); }
+.card.face.f-big-index .corner.br .ix-rank,
+.card.face.f-big-index .corner.br .ix-rank.two { font-size: calc(var(--cw) * 0.2); }
+.card.face.f-big-index .corner.br .ix-suit { width: calc(var(--cw) * 0.13); height: calc(var(--cw) * 0.13); }
 
 /* Text scale. Everything that isn't a card grows together, so nothing overlaps. */
 body { font-size: calc(15px * var(--text-scale, 1)); }
@@ -2523,10 +2550,20 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
 .shapemark[data-suit="D"] { clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
 .shapemark[data-suit="C"] { border-radius: 4px; }
 
+/* The face variants below were written against the old markup, where the corner index was a
+   bare rank with a <span> for the suit and the rank took its size by inheritance. The index is
+   now a <b class="ix-rank"> over an <svg class="ix-suit">, both of which carry their own size,
+   so every `.f-x .corner { font-size }` and every `.f-x .corner span` stopped reaching
+   anything — eight of the seventeen faces had quietly become the classic face wearing a
+   different background. They address the real elements now. The `display: none` rules needed
+   the `.card.face` prefix for the same reason: `.card.face .pip` and `.card.face .court-art`
+   set `display: grid` at a higher specificity, so a bare `.f-x .pip { display: none }` lost
+   and the ace and the courts kept drawing underneath. */
+
 /* --- minimal line --- */
 .f-minimal { background: #fff !important; border: 1px solid #cfcabe; }
-.f-minimal .pip, .f-minimal .pips .spot { font-weight: 300; opacity: .75; }
-.f-minimal .corner { font-weight: 500; }
+.f-minimal .pip, .f-minimal .pips .spot { opacity: .75; }
+.card.face.f-minimal .ix-rank { font-weight: 500; }
 .f-minimal .court-art { opacity: .55; }
 
 /* --- solid block: the card IS the suit --- */
@@ -2536,13 +2573,20 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
 .f-block .corner, .f-block .pip, .f-block .pips .spot, .f-block .court-art { color: #fff; }
 
 /* --- typographic: the rank fills the card --- */
-.f-typographic .pips, .f-typographic .pip, .f-typographic .court-art { display: none; }
+.card.face.f-typographic .pips,
+.card.face.f-typographic .pip,
+.card.face.f-typographic .court-art { display: none; }
 .f-typographic .corner.br { display: none; }
-.f-typographic .corner.tl {
+.card.face.f-typographic .corner.tl {
   inset: 0; top: 0; left: 0; width: 100%; height: 100%;
-  display: grid; place-items: center; font-size: calc(var(--cw) * 0.62); letter-spacing: -.06em;
+  display: grid; place-items: center;
 }
-.f-typographic .corner.tl span { position: absolute; top: 6%; right: 8%; font-size: calc(var(--cw) * 0.16); }
+.card.face.f-typographic .corner.tl .ix-rank,
+.card.face.f-typographic .corner.tl .ix-rank.two { font-size: calc(var(--cw) * 0.62); letter-spacing: -.06em; }
+.card.face.f-typographic .corner.tl .ix-suit {
+  position: absolute; top: 6%; right: 8%;
+  width: calc(var(--cw) * 0.16); height: calc(var(--cw) * 0.16);
+}
 
 /* --- woodcut --- */
 .f-woodcut {
@@ -2550,46 +2594,74 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
   box-shadow: 0 3px 0 #b8ac93, 0 6px 12px rgba(9, 5, 24,.35) !important;
 }
 .f-woodcut.black { color: #2a1d10; } .f-woodcut.red { color: #8a1a12; }
-.f-woodcut .pip, .f-woodcut .pips .spot { text-shadow: 1px 1px 0 rgba(42,29,16,.3); }
+.f-woodcut .pip, .f-woodcut .pips .spot { filter: drop-shadow(1px 1px 0 rgba(42,29,16,.3)); }
 
 /* --- duplex: corners only --- */
-.f-duplex .pips, .f-duplex .pip, .f-duplex .court-art { display: none; }
+.card.face.f-duplex .pips,
+.card.face.f-duplex .pip,
+.card.face.f-duplex .court-art { display: none; }
 
 /* --- chunky --- */
 .f-chunky { border-radius: 14px !important; border-width: 2px !important; }
-.f-chunky .corner { font-weight: 900; font-size: calc(var(--cw) * 0.26); }
-.f-chunky .corner span { font-size: 0.72em; }
-.f-chunky .pips .spot { font-size: 1.15em; }
+.card.face.f-chunky .ix-rank { font-weight: 900; font-size: calc(var(--cw) * 0.2); }
+.card.face.f-chunky .ix-rank.two { font-size: calc(var(--cw) * 0.145); letter-spacing: -.06em; }
+.card.face.f-chunky .ix-suit { width: calc(var(--cw) * 0.13); height: calc(var(--cw) * 0.13); }
+.card.face.f-chunky .pips .spot { width: calc(var(--ch) * 0.158); height: calc(var(--ch) * 0.158); }
 
 /* --- monospaced --- */
-.f-mono .corner { font-family: var(--mono); font-weight: 700; }
-.f-mono .corner span { font-size: 0.66em; opacity: .8; }
+.card.face.f-mono .ix-rank { font-family: var(--mono); font-weight: 700; }
+.card.face.f-mono .ix-suit { width: calc(var(--ch) * 0.066); height: calc(var(--ch) * 0.066); opacity: .8; }
 .f-mono .pip, .f-mono .pips .spot { opacity: .82; }
 
 /* --- high contrast --- */
 .f-contrast { background: #fff !important; border: 2px solid #000 !important; color: #000 !important; }
 .f-contrast.red { color: #000 !important; }
-.f-contrast .corner { font-weight: 900; font-size: calc(var(--cw) * 0.3); color: #000; }
-.f-contrast .pips, .f-contrast .court-art { display: none; }
+.f-contrast .corner { color: #000; }
+/* This face exists for players who cannot read a small card, and it already clears the pips,
+   the courts and the second index off the face to make room. Leaving the rank at not much more
+   than the classic size wasted every bit of that room — it is the only mark on the card, so it
+   gets the card. */
+.card.face.f-contrast .corner.tl { inset: 0; display: grid; place-items: center; }
+.card.face.f-contrast .ix-rank { font-weight: 900; font-size: calc(var(--cw) * 0.58); letter-spacing: -.05em; }
+.card.face.f-contrast .ix-rank.two { font-size: calc(var(--cw) * 0.46); letter-spacing: -.07em; }
+.card.face.f-contrast .ix-suit {
+  position: absolute; top: 6%; left: 8%;
+  width: calc(var(--cw) * 0.2); height: calc(var(--cw) * 0.2);
+}
+.card.face.f-contrast .pips,
+.card.face.f-contrast .pip,
+.card.face.f-contrast .court-art { display: none; }
 .f-contrast .corner.br { display: none; }
 .f-contrast::after { display: none; }
 
 /* --- deco --- */
 .f-deco { background: #f7f0de !important; }
 .f-deco.black { color: #7d6220; } .f-deco.red { color: #9d1f2b; }
-.f-deco .corner { font-family: var(--serif); }
+/* The rank stays on the display face on both of these. A Didone's four is a hairline diagonal
+   and a hairline crossbar over one thick stem, and at index size those hairlines disappear
+   entirely — the four rendered as a one on the deco and hand-drawn faces, which is a wrong card
+   rather than an ugly one. The serif still sets the rest of the corner. */
+.card.face.f-deco .ix-rank { font-family: var(--display); font-size: calc(var(--ch) * 0.112); }
+.card.face.f-deco .ix-rank.two { font-size: calc(var(--ch) * 0.1); }
 .f-deco .holo { inset: 5px; border: 1px solid rgba(255, 46, 136,.75); border-radius: 3px; background: none; opacity: 1; }
 
 /* --- hand drawn --- */
 .f-handdrawn { border-radius: 12px 6px 11px 5px !important; }
-.f-handdrawn .corner { font-family: var(--serif); transform: rotate(-2deg); }
+.f-handdrawn .corner { transform: rotate(-2deg); }
+.card.face.f-handdrawn .ix-rank { font-family: var(--display); font-size: calc(var(--ch) * 0.112); }
+.card.face.f-handdrawn .ix-rank.two { font-size: calc(var(--ch) * 0.1); }
 .f-handdrawn .corner.br { transform: rotate(178deg); }
-.f-handdrawn .pips .spot { transform: translate(-50%, -50%) rotate(4deg) !important; }
+/* This used to hard-set the whole transform with !important, which threw away the half-turn
+   every pip below the midline is supposed to carry — on the hand-drawn face alone, the bottom
+   half of every number card was printed the right way up. The tilt now adds to the flip
+   instead of replacing it. */
+.f-handdrawn .pips .spot { transform: translate(-50%, -50%) rotate(calc(var(--flip, 0deg) + 4deg)); }
 
 /* --- neon outline --- */
 .f-neon { background: linear-gradient(160deg, #16162a, #0d0d1a) !important; border-color: #2f2f5c !important; }
 .f-neon.red { color: #ff5db1; } .f-neon.black { color: #22d3ee; }
-.f-neon .corner, .f-neon .pip, .f-neon .pips .spot, .f-neon .court-art { text-shadow: 0 0 8px currentColor, 0 0 18px currentColor; }
+.f-neon .ix-rank { text-shadow: 0 0 8px currentColor, 0 0 18px currentColor; }
+.f-neon .ix-suit, .f-neon .pip, .f-neon .pips .spot, .f-neon .court-art { filter: drop-shadow(0 0 3px currentColor) drop-shadow(0 0 7px currentColor); }
 
 /* --- linen stock --- */
 .f-linen {
@@ -2863,8 +2935,11 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
   background: var(--card-bg); border: 1px solid rgba(0,0,0,.24);
   box-shadow: 0 1px 0 var(--card-edge), 0 2px 5px rgba(9, 5, 24,.24);
 }
-.sw-card .corner { position: absolute; top: 4px; left: 5px; font-size: 12px; font-weight: 800; line-height: 1; }
-.sw-card .corner span { display: block; font-size: 9px; }
+/* The swatch is now a box holding a real <CardFace>, so the card inside fills it and takes the
+   swatch's dimensions as its card variables — every size on the face derives from those. */
+.sw-card { --cw: 40px; --ch: 56px; padding: 0; overflow: hidden; }
+.sw-card > .card.face { width: 100%; height: 100%; border-radius: inherit; }
+.sw-card .corner { line-height: 1; }
 
 .sw-back {
   width: 40px; height: 56px; border-radius: 6px; flex: 0 0 auto; position: relative;
@@ -3568,25 +3643,23 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
 /* The preview cards carry `.card` as well as `.sw-card`, so they inherit the table's full size
    unless told otherwise. At thumbnail scale they need the swatch's dimensions, not the felt's. */
 .pp-face, .pp-back {
+  --cw: 42px; --ch: 59px;
   width: 42px !important; height: 59px !important;
   min-width: 0; border-radius: 6px;
 }
-.pp-face .corner { top: 4px; left: 5px; font-size: 12px; }
-.pp-face .corner span { display: block; font-size: 9px; }
 .pp-back { font-size: 18px; }
 
 /* A swatch is a real card — same classes, same rules — which means `.card.face` sets it to the
    size of a card on the table and it bursts out of its grid cell. The swatch dimensions have to
    out-specify that, not merely follow it. */
-.swatch .sw-card.card, .swatch .sw-back, .prefs-preview .sw-card.card, .prefs-preview .sw-back {
+.swatch .sw-card, .swatch .sw-back, .prefs-preview .sw-card, .prefs-preview .sw-back {
   width: 42px; height: 59px; min-height: 0; border-radius: 6px;
   box-shadow: 0 1px 0 var(--card-edge), 0 2px 6px rgba(9, 5, 24,.26);
 }
 .designer .sw-back.big.mine { width: 84px; height: 118px; }
-.swatch .sw-card.card.face .corner { top: 4px; left: 5px; font-size: 12px; }
-.swatch .sw-card.card.face .corner span { display: block; font-size: 9px; }
+.swatch .sw-card, .prefs-preview .sw-card { --cw: 42px; --ch: 59px; }
 /* Whatever a face style adds — pips, blocks, glows — stays inside the swatch. */
-.swatch .sw-card.card { overflow: hidden; }
+.swatch .sw-card { overflow: hidden; }
 
 /* A `<button>` does not reliably report its own content height as a grid item in Chromium — the
    card inside is 59px tall and the button still measures 34, so the rows collapse and the
@@ -5453,7 +5526,7 @@ button.primary.lg { padding: 13px 28px; font-size: 16px; border-radius: 999px; }
      would run straight under them. */
   .felt-content > .you > .hand { margin-inline: -156px; }
   /* One opponent sits alone at the top and needs less headroom than three across. */
-  .ring-1 ~ * { --ring-top: 0; }
+  .ring-1 ~ * { }
   .opponents.ring-1 ~ .center, .opponents.ring-1 ~ .bid-area { margin-top: 0; }
 }
 

@@ -1,5 +1,6 @@
 import { Card } from '../engine/types';
 import { useSettings } from '../settings/SettingsContext';
+import { CardFace as CardFaceId } from '../settings/settings';
 import { Suit, SuitId } from './Suit';
 import { CourtFigure, JokerFigure } from './Court';
 
@@ -15,26 +16,37 @@ const LONG_RANK: Record<string, string> = { A: 'Ace', J: 'Jack', Q: 'Queen', K: 
 const LONG_SUIT: Record<string, string> = { S: 'spades', H: 'hearts', D: 'diamonds', C: 'clubs' };
 
 // Real playing cards show their value as a pip arrangement, not one big symbol in the middle.
-// Each entry is a column of vertical positions (0 = top, 1 = bottom); the middle column is
-// listed separately so odd counts centre correctly. Pips below the halfway line are flipped,
-// exactly as they are on a printed card.
+// Positions are per cent of the pip field (see `.pips` in styles.css), which is a little inside
+// the card so the outer columns clear the corner indices. Pips below the halfway line are
+// flipped, exactly as they are on a printed card.
+//
+// Two grids, as a printed deck uses: ranks 2 to 8 sit on three rows with the seven's and
+// eight's extra pips half-way between them, and the nine and ten sit on four tighter rows.
+// Measured against a Bicycle rider-back, pip ink should span about 18% to 82% of the card's
+// width; before these numbers it spanned 25% to 75%, which is what left the wide empty gutter
+// down the middle of every even rank.
 const PIPS: Record<string, { x: number; y: number }[]> = {
-  '2':  [{ x: 50, y: 16 }, { x: 50, y: 84 }],
-  '3':  [{ x: 50, y: 16 }, { x: 50, y: 50 }, { x: 50, y: 84 }],
-  '4':  [{ x: 28, y: 16 }, { x: 72, y: 16 }, { x: 28, y: 84 }, { x: 72, y: 84 }],
-  '5':  [{ x: 28, y: 16 }, { x: 72, y: 16 }, { x: 50, y: 50 }, { x: 28, y: 84 }, { x: 72, y: 84 }],
-  '6':  [{ x: 28, y: 16 }, { x: 72, y: 16 }, { x: 28, y: 50 }, { x: 72, y: 50 }, { x: 28, y: 84 }, { x: 72, y: 84 }],
-  '7':  [{ x: 28, y: 16 }, { x: 72, y: 16 }, { x: 50, y: 33 }, { x: 28, y: 50 }, { x: 72, y: 50 }, { x: 28, y: 84 }, { x: 72, y: 84 }],
-  '8':  [{ x: 28, y: 16 }, { x: 72, y: 16 }, { x: 50, y: 33 }, { x: 28, y: 50 }, { x: 72, y: 50 }, { x: 50, y: 67 }, { x: 28, y: 84 }, { x: 72, y: 84 }],
-  '9':  [{ x: 28, y: 14 }, { x: 72, y: 14 }, { x: 28, y: 38 }, { x: 72, y: 38 }, { x: 50, y: 50 }, { x: 28, y: 62 }, { x: 72, y: 62 }, { x: 28, y: 86 }, { x: 72, y: 86 }],
-  '10': [{ x: 28, y: 14 }, { x: 72, y: 14 }, { x: 50, y: 26 }, { x: 28, y: 38 }, { x: 72, y: 38 }, { x: 28, y: 62 }, { x: 72, y: 62 }, { x: 50, y: 74 }, { x: 28, y: 86 }, { x: 72, y: 86 }],
+  '2':  [{ x: 50, y: 14 }, { x: 50, y: 86 }],
+  '3':  [{ x: 50, y: 14 }, { x: 50, y: 50 }, { x: 50, y: 86 }],
+  '4':  [{ x: 27, y: 14 }, { x: 73, y: 14 }, { x: 27, y: 86 }, { x: 73, y: 86 }],
+  '5':  [{ x: 27, y: 14 }, { x: 73, y: 14 }, { x: 50, y: 50 }, { x: 27, y: 86 }, { x: 73, y: 86 }],
+  '6':  [{ x: 27, y: 14 }, { x: 73, y: 14 }, { x: 27, y: 50 }, { x: 73, y: 50 }, { x: 27, y: 86 }, { x: 73, y: 86 }],
+  '7':  [{ x: 27, y: 14 }, { x: 73, y: 14 }, { x: 50, y: 32 }, { x: 27, y: 50 }, { x: 73, y: 50 }, { x: 27, y: 86 }, { x: 73, y: 86 }],
+  '8':  [{ x: 27, y: 14 }, { x: 73, y: 14 }, { x: 50, y: 32 }, { x: 27, y: 50 }, { x: 73, y: 50 }, { x: 50, y: 68 }, { x: 27, y: 86 }, { x: 73, y: 86 }],
+  '9':  [{ x: 27, y: 14 }, { x: 73, y: 14 }, { x: 27, y: 38 }, { x: 73, y: 38 }, { x: 50, y: 50 }, { x: 27, y: 62 }, { x: 73, y: 62 }, { x: 27, y: 86 }, { x: 73, y: 86 }],
+  '10': [{ x: 27, y: 14 }, { x: 73, y: 14 }, { x: 50, y: 26 }, { x: 27, y: 38 }, { x: 73, y: 38 }, { x: 27, y: 62 }, { x: 73, y: 62 }, { x: 50, y: 74 }, { x: 27, y: 86 }, { x: 73, y: 86 }],
 };
 
-export function CardFace({ card }: { card: Card }) {
+/** `faceOverride` draws the card in a face other than the one currently chosen. Settings uses
+ *  it so each swatch is the real thing — the same component, the same rules — rather than a
+ *  hand-written imitation of a corner index that drifts out of date every time the real index
+ *  changes. It had: the swatches were still the pre-2024 markup, a bare rank with a <span> for
+ *  the suit, so the row of seventeen faces showed seventeen copies of the same thing. */
+export function CardFace({ card, faceOverride }: { card: Card; faceOverride?: CardFaceId }) {
   const { settings } = useSettings();
   const red = card.suit === 'H' || card.suit === 'D';
   const label = card.rank === 'JOKER' ? '★' : card.rank;
-  const face = settings.cardFace;
+  const face = faceOverride ?? settings.cardFace;
   // A real pack's two jokers are not identical: one is printed in colour, the other plain. The
   // first joker built per deck copy (deck.ts's `JOKER1`) is that colour one — every other joker
   // stays the plain black it always was. A game does not have to care which is which for this to
@@ -64,8 +76,10 @@ export function CardFace({ card }: { card: Card }) {
       {/* A hairline frame inside the trim, the way a printed deck is cut. */}
       <div className="face-frame" aria-hidden="true" />
       <div className="corner tl">
-        <b className="ix-rank">{label}</b>
-        <Suit suit={suit} className="ix-suit" illustrated={settings.illustratedSuits} />
+        <b className={`ix-rank${label.length > 1 ? ' two' : ''}`}>{label}</b>
+        {/* A joker's rank mark IS a star, so printing the star suit under it said the same
+            thing twice in the same corner. It keeps the mark and drops the echo. */}
+        {card.rank !== 'JOKER' && <Suit suit={suit} className="ix-suit" illustrated={settings.illustratedSuits} />}
         {face === 'letters' && <b className="suitletter">{SUIT_LETTER[card.suit]}</b>}
       </div>
 
@@ -76,8 +90,12 @@ export function CardFace({ card }: { card: Card }) {
       ) : pips ? (
         <div className="pips" aria-hidden="true">
           {pips.map((p, i) => (
+            // The half-turn is published as --flip as well as baked into the transform, so a
+            // face variant that wants to add a tilt can add to it instead of replacing it.
             <span key={i} className="spot"
-              style={{ left: `${p.x}%`, top: `${p.y}%`, transform: `translate(-50%,-50%) rotate(${p.y > 55 ? 180 : 0}deg)` }}>
+              style={{ left: `${p.x}%`, top: `${p.y}%`,
+                ['--flip' as string]: `${p.y > 55 ? 180 : 0}deg`,
+                transform: `translate(-50%,-50%) rotate(${p.y > 55 ? 180 : 0}deg)` }}>
               <Suit suit={suit} illustrated={settings.illustratedSuits} />
             </span>
           ))}
@@ -95,8 +113,8 @@ export function CardFace({ card }: { card: Card }) {
       )}
 
       <div className="corner br">
-        <b className="ix-rank">{label}</b>
-        <Suit suit={suit} className="ix-suit" illustrated={settings.illustratedSuits} />
+        <b className={`ix-rank${label.length > 1 ? ' two' : ''}`}>{label}</b>
+        {card.rank !== 'JOKER' && <Suit suit={suit} className="ix-suit" illustrated={settings.illustratedSuits} />}
         {(face === 'letters' || face === 'shapes') && <b className="suitletter">{SUIT_LETTER[card.suit]}</b>}
       </div>
     </div>

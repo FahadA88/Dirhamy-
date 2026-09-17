@@ -23,7 +23,13 @@ const BUDGETS: Budget[] = [
   { pattern: /^vendor-.*\.js$/, maxKB: 200, label: 'vendor (react/react-dom) JS' },
   { pattern: /^CreateView-.*\.js$/, maxKB: 250, label: 'Create view JS (lazy-loaded)' },
   { pattern: /^OnlineTable-.*\.js$/, maxKB: 40, label: 'online table JS (lazy-loaded)' },
-  { pattern: /^index-.*\.css$/, maxKB: 260, label: 'stylesheet' },
+  // 260 -> 264. Eight of the seventeen card faces had stopped working: they were written
+  // against the old corner-index markup and their rules no longer matched anything, so they
+  // cost bytes and rendered as the classic face. Making them real again is net new CSS.
+  // Worth knowing before this is raised again: the eighteen card-back patterns are written
+  // out twice, once for `.card.back::before` and once for `.sw-back::before`, which is about
+  // 2.9 KB of duplication that a shared selector list would recover.
+  { pattern: /^index-.*\.css$/, maxKB: 264, label: 'stylesheet' },
 ];
 
 const files = readdirSync(DIST);

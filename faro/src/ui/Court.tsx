@@ -193,10 +193,16 @@ export function CourtFigure({ rank, suit, illustrated }: { rank: 'J' | 'Q' | 'K'
 function JokerHalf() {
   return (
     <g>
-      {/* the motley collar, scalloped into points */}
-      <path d="M22 70v-7c0-2.5 1.2-4.5 3.4-5.6l6.6 8.6 7.6-10 8 10 7.6-10 6.6 8.6
-               c2.2 1.1 3.4 3.1 3.4 5.6v7z" fill="currentColor" />
-      <path d="M45.6 57.5l4.4 6 4.4-6" fill="none" stroke={GOLD} strokeWidth={W_SECOND} strokeLinecap="round" />
+      {/* The same shoulders as the courts. An earlier draft scalloped the hem into points,
+          which put a jagged edge exactly where the mirrored halves come closest and turned the
+          middle of the card into a black scribble. The motley lives on the collar and the cap
+          instead, well away from the midline. */}
+      <Robe />
+      <path d="M38 50l4 5 4-5 4 5 4-5 4 5 4-5" fill="none" stroke={GOLD}
+        strokeWidth={W_SECOND} strokeLinejoin="round" strokeLinecap="round" />
+      <circle cx="42" cy="59" r="1.9" fill={GOLD} />
+      <circle cx="50" cy="63" r="1.9" fill={GOLD} />
+      <circle cx="58" cy="59" r="1.9" fill={GOLD} />
       <path d="M31 70c1-7.5 5.5-12 13-14M69 70c-1-7.5-5.5-12-13-14" fill="none"
         stroke={GOLD} strokeWidth={W_DETAIL} opacity=".85" />
 

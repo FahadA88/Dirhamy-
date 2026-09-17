@@ -7,6 +7,14 @@ import { adoptSyncCode, pullSafety, pushSafety, syncCode } from '../social/safet
 import { hostInfo } from '../net/host';
 import { ENGINE_CHANGELOG } from '../engine/changelog';
 import { canSpeak } from './speech';
+import { CardFace as CardFaceArt } from './Card';
+import type { Card } from '../engine/types';
+
+// The one card every face swatch and the live preview are drawn with. An ace, because that is
+// where a face shows what it makes of an ornament; a diamond, because it is the suit that tells
+// the four-colour face apart from the classic one — on a heart both are red and the two swatches
+// would be identical.
+const SWATCH_CARD: Card = { id: 'AD', rank: 'A', suit: 'D' };
 import {
   ACCENTS, AVATARS, AccentId, BACKS, CARD_SIZE_MAX, CARD_SIZE_MIN, CardBack, CardFace, CustomBack,
   CustomFelt, FACES, FELTS, HOME_LAYOUTS, HomeLayout, MAX_BACK_IMAGE, MyLook, Settings, TableFelt,
@@ -358,8 +366,8 @@ function CardsSection({ s, set }: { s: Settings; set: Setter }) {
             <button key={f} className={`swatch ${s.cardFace === f ? 'on' : ''}`}
               title={FACES[f].note} aria-pressed={s.cardFace === f}
               onClick={() => set('cardFace', f)}>
-              <span className={`sw-card card face f-${f} ${f === 'block' || f === 'neon' ? 'black' : 'red'}`}>
-                <span className="corner tl">A<span>♥</span></span>
+              <span className="sw-card">
+                <CardFaceArt card={SWATCH_CARD} faceOverride={f} />
               </span>
               <em>{FACES[f].name}</em>
             </button>
@@ -718,8 +726,8 @@ function Preview() {
       <span className="pp-title">Preview</span>
       <div className="pp-stage" data-felt={settings.tableFelt}>
         <span className="pp-felt" />
-        <span className={`sw-card card face f-${settings.cardFace} red pp-face`}>
-          <span className="corner tl">A<span>♥</span></span>
+        <span className="sw-card pp-face">
+          <CardFaceArt card={SWATCH_CARD} />
         </span>
         <span
           className={`sw-back pp-back ${settings.cardBack === 'custom' ? 'mine' : ''}`}
