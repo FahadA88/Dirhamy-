@@ -558,6 +558,17 @@ export function applySettings(s: Settings): void {
     ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
     : s.theme;
   root.setAttribute('data-theme', theme);
+
+  // The stylesheet's story is that there is one accent and everything reaches for it. That was
+  // only true of the stylesheet's own default: this function wrote the player's chosen accent
+  // into the legacy --green family and left --accent at the built-in blue, so a player on Teal
+  // got teal buttons and a blue focus ring. The accent tokens follow the choice now, and the
+  // accent-at-a-strength ladder below them follows in turn. A dark room wants the brighter end
+  // of the preset and a light room the deeper end, or the ring disappears into the ground.
+  const accent = theme === 'dark' ? a.emerald : a.green;
+  const accentHi = theme === 'dark' ? a.lime : a.emerald;
+  root.style.setProperty('--accent', accent);
+  root.style.setProperty('--accent-hi', accentHi);
   // 'system' asks the machine. The stylesheet already honours the media query on its own, but
   // the app reads data-motion in JS too, so it has to resolve to a real answer here.
   root.setAttribute('data-motion', resolveMotion(s.motion));
