@@ -1915,7 +1915,7 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
 /* Desktop has room for every control at once, so the toggle that folds them away is phone-only. */
 .filters-toggle { display: none; }
 @media (max-width: 780px) {
-  .filters-toggle { display: inline-flex; flex: 0 0 auto; min-height: 44px; align-items: center; }
+  .filters-toggle, .browse-toggle { display: inline-flex; flex: 0 0 auto; min-height: 44px; align-items: center; }
   .searchbox { min-height: 44px; }
   .filter-chips[data-open="no"] { display: none; }
   .filter-chips[data-open="yes"] { flex-basis: 100%; }
@@ -1942,7 +1942,7 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
   background-repeat: no-repeat;
 }
 .filter-chips select:hover { border-color: var(--ink); }
-.chip.on { border-color: var(--gold); color: var(--gold-hi); background: var(--gold-dim); }
+.chip.on { border-color: var(--accent); color: var(--accent-hi); background: var(--accent-dim); }
 
 /* --- featured: a dealt hand, a name, one verb --- */
 .hero {
@@ -4119,9 +4119,7 @@ input:focus, textarea:focus, select:focus {
    letter — the Y of the old DECKY wordmark visibly dropped out against the dark ground. The cyan is now a stop in
    the middle and both ends land bright, so no letter of the name is ever the faint one. */
 header h1, header .wordmark {
-  background: linear-gradient(100deg, var(--gold-hi) 0%, var(--accent-hi) 42%, var(--accent) 74%, var(--gold-hi) 100%);
-  -webkit-background-clip: text; background-clip: text;
-  -webkit-text-fill-color: transparent;
+  /* The ink is the Foil rule further down; this only carries the glow. */
   filter: drop-shadow(0 0 18px var(--ac35));
   font-family: var(--display);
 }
@@ -6780,15 +6778,7 @@ header h1, header .wordmark {
   font-weight: 600;
   letter-spacing: 0.005em;
 }
-:root[data-theme="light"] header h1, :root[data-theme="light"] header .wordmark {
-  background: linear-gradient(100deg,
-    color-mix(in srgb, var(--gold) 72%, #000) 0%,
-    color-mix(in srgb, var(--accent) 82%, #000) 42%,
-    color-mix(in srgb, var(--accent) 62%, #000) 74%,
-    color-mix(in srgb, var(--gold) 72%, #000) 100%);
-  -webkit-background-clip: text; background-clip: text;
-  filter: none;
-}
+:root[data-theme="light"] header h1, :root[data-theme="light"] header .wordmark { filter: none; }
 
 /* An eyebrow: letterspaced, small, and sitting on a hairline that
    runs out to the end of its line. The rule is the part that makes
@@ -6833,7 +6823,7 @@ header h1, header .wordmark,
     #fdf1d6 0%,
     var(--brass-hi) 26%,
     var(--brass) 58%,
-    var(--brass-lo) 78%,
+    color-mix(in srgb, var(--accent) 66%, #000) 78%,
     var(--brass-hi) 100%);
   -webkit-background-clip: text;
   background-clip: text;
@@ -6850,11 +6840,11 @@ header h1, header .wordmark,
      black one. */
   background: linear-gradient(
     168deg,
-    #6a4f16 0%,
-    #a87a12 30%,
-    #d8b45c 52%,
-    #8a6516 74%,
-    #5c4413 100%);
+    color-mix(in srgb, var(--gold) 58%, #000) 0%,
+    color-mix(in srgb, var(--gold) 82%, #000) 30%,
+    color-mix(in srgb, var(--gold) 96%, #fff) 52%,
+    color-mix(in srgb, var(--gold) 76%, #000) 74%,
+    color-mix(in srgb, var(--gold) 54%, #000) 100%);
   -webkit-background-clip: text;
   background-clip: text;
 }

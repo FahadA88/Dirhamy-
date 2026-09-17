@@ -188,6 +188,12 @@ export function BrowseView({ onPlay, onSetup, onPuzzle, onTournament, onTeach, o
           onChange={(e) => setFilters((f) => ({ ...f, query: e.target.value }))}
           aria-label="Search games"
         />
+        {/* Kept out of .filter-chips on purpose: that collapses on a phone, and this is how
+            you get to the whole library. A filter narrows what you are looking at; this changes
+            which page you are on. */}
+        <button className="chip browse-toggle" onClick={() => { setBrowsing(!browsing); setFilters({}); }}>
+          {shown ? '← Front page' : 'Browse all'}
+        </button>
         <button
           className={`chip filters-toggle ${activeFilters ? 'on' : ''}`}
           aria-expanded={filtersOpen}
@@ -229,9 +235,6 @@ export function BrowseView({ onPlay, onSetup, onPuzzle, onTournament, onTeach, o
               {SORTS.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
             </select>
           )}
-          <button className="chip" onClick={() => { setBrowsing(!browsing); setFilters({}); }}>
-            {shown ? '← Front page' : 'Browse all'}
-          </button>
         </div>
       </div>
 

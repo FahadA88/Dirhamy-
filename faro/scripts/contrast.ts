@@ -24,21 +24,33 @@ const CSS = readFileSync(join(ROOT, 'src', 'ui', 'styles.css'), 'utf8');
  *  panels are translucent rgba fills, not opaque hex, so both forms have to parse or every
  *  check that reads --panel silently goes missing. */
 function tokensIn(selector: string): Record<string, string> {
-  const start = CSS.indexOf(`${selector} {`);
-  if (start < 0) throw new Error(`theme block not found: ${selector}`);
-  const bodyStart = CSS.indexOf('{', start) + 1;
-  let depth = 1;
-  let i = bodyStart;
-  while (depth > 0 && i < CSS.length) {
-    if (CSS[i] === '{') depth += 1;
-    else if (CSS[i] === '}') depth -= 1;
-    i += 1;
-  }
-  const block = CSS.slice(bodyStart, i - 1);
+  // This stylesheet has five :root blocks and two light-theme blocks, and a later one shadows
+  // an earlier one — which is how --serif ended up defined twice with the first definition's
+  // comment describing the opposite of what shipped. Reading only the first block meant the
+  // checker could not see --brass, --gold or anything else declared further down, so whole
+  // families of colour were invisible to it. All matching blocks are merged in cascade order.
+  const needle = `${selector} {`;
   const tokens: Record<string, string> = {};
-  for (const m of block.matchAll(/--([a-zA-Z0-9-]+):\s*(#[0-9a-fA-F]{3,8}|rgba?\([^)]+\))\s*;/g)) {
-    tokens[m[1]] = m[2];
+  let found = 0;
+  for (let at = CSS.indexOf(needle); at >= 0; at = CSS.indexOf(needle, at + 1)) {
+    // Only a rule that starts a line — otherwise `:root` matches inside `:root[data-theme=...]`.
+    const lineStart = CSS.lastIndexOf('\n', at) + 1;
+    if (CSS.slice(lineStart, at).trim() !== '') continue;
+    found += 1;
+    const bodyStart = CSS.indexOf('{', at) + 1;
+    let depth = 1;
+    let i = bodyStart;
+    while (depth > 0 && i < CSS.length) {
+      if (CSS[i] === '{') depth += 1;
+      else if (CSS[i] === '}') depth -= 1;
+      i += 1;
+    }
+    const block = CSS.slice(bodyStart, i - 1);
+    for (const m of block.matchAll(/--([a-zA-Z0-9-]+):\s*(#[0-9a-fA-F]{3,8}|rgba?\([^)]+\)|var\(--[a-zA-Z0-9-]+\)|color-mix\([^;]+\))\s*;/g)) {
+      tokens[m[1]] = m[2];
+    }
   }
+  if (!found) throw new Error(`theme block not found: ${selector}`);
   return tokens;
 }
 
@@ -53,6 +65,40 @@ function parseColor(value: string): [number, number, number, number] {
   const parts = value.replace(/rgba?\(|\)/g, '').split(',').map((s) => parseFloat(s.trim()));
   const [r, g, b, a = 1] = parts;
   return [r, g, b, a];
+}
+
+/** Resolve `color-mix(in srgb, <a> <p>%, <b>)` the way a browser does, so a token written that
+ *  way can be checked rather than skipped. Only the srgb, two-colour, one-percentage form is
+ *  handled, because that is the only form this stylesheet uses — anything else throws rather
+ *  than guessing, since a check that silently passes on a colour it could not read is worse
+ *  than no check. */
+function resolveMix(value: string, tokens: Record<string, string>): string {
+  const m = value.match(/^color-mix\(\s*in\s+srgb\s*,\s*(.+?)\s+([\d.]+)%\s*,\s*(.+?)\s*\)$/);
+  if (!m) throw new Error(`cannot resolve: ${value}`);
+  const p = parseFloat(m[2]) / 100;
+  const side = (v: string): [number, number, number, number] => {
+    const t = v.trim();
+    if (t === 'transparent') return [0, 0, 0, 0];
+    const varMatch = t.match(/^var\(\s*--([a-zA-Z0-9-]+)\s*\)$/);
+    if (varMatch) return parseColor(deref(varMatch[1], tokens));
+    return parseColor(t);
+  };
+  const a = side(m[1]);
+  const b = side(m[3]);
+  const out = [0, 1, 2].map((i) => a[i] * p + b[i] * (1 - p));
+  const alpha = a[3] * p + b[3] * (1 - p);
+  return `rgba(${out.map((x) => Math.round(x)).join(', ')}, ${alpha})`;
+}
+
+/** Follow `var(--x)` chains and colour-mixes down to something parseColor understands. */
+function deref(name: string, tokens: Record<string, string>, depth = 0): string {
+  if (depth > 8) throw new Error(`--${name} does not resolve to a colour`);
+  const v = (tokens[name] ?? '').trim();
+  if (!v) throw new Error(`token missing: --${name}`);
+  const varMatch = v.match(/^var\(\s*--([a-zA-Z0-9-]+)\s*\)$/);
+  if (varMatch) return deref(varMatch[1], tokens, depth + 1);
+  if (v.startsWith('color-mix(')) return resolveMix(v, tokens);
+  return v;
 }
 
 /** A translucent panel's real, rendered colour depends on what sits behind it — the glass
@@ -99,6 +145,34 @@ for (const theme of ['dark', 'light'] as const) {
   );
 }
 
+/** The site's name and the win banner are painted with a gradient clipped to the letterforms,
+ *  so a token check never saw them: three separate rules had accumulated over the same three
+ *  words, and between them one stop sat at 1.07:1 on dark and another at about 1.9:1 on light.
+ *  A wordmark with a band of invisible letters in the middle is the thing that reads as broken
+ *  from across the room, so every stop of the foil is checked here. 3:1 rather than 4.5:1 is
+ *  WCAG's own threshold for text this size — the wordmark is 30px at weight 600. */
+function foilStops(selectorNeedle: string): string[] {
+  const at = CSS.indexOf(selectorNeedle);
+  if (at < 0) throw new Error(`foil rule not found: ${selectorNeedle}`);
+  const open = CSS.indexOf('background: linear-gradient(', at);
+  if (open < 0) throw new Error(`foil gradient not found after ${selectorNeedle}`);
+  let depth = 0, i = CSS.indexOf('(', open);
+  const start = i;
+  do { if (CSS[i] === '(') depth += 1; else if (CSS[i] === ')') depth -= 1; i += 1; } while (depth > 0);
+  const inner = CSS.slice(start + 1, i - 1);
+  // Split on commas that are not inside nested parens, drop the angle, drop the positions.
+  const parts: string[] = [];
+  let buf = '', d = 0;
+  for (const ch of inner) {
+    if (ch === '(') d += 1;
+    if (ch === ')') d -= 1;
+    if (ch === ',' && d === 0) { parts.push(buf); buf = ''; continue; }
+    buf += ch;
+  }
+  parts.push(buf);
+  return parts.slice(1).map((x) => x.trim().replace(/\s+[\d.]+%$/, ''));
+}
+
 const darkTokens = tokensIn(':root');
 const lightTokens = tokensIn(':root[data-theme="light"]');
 
@@ -107,6 +181,34 @@ function toHex([r, g, b]: [number, number, number]): string {
 }
 
 let failed = false;
+
+for (const theme of ['dark', 'light'] as const) {
+  const tokens = theme === 'dark' ? darkTokens : lightTokens;
+  const needle = theme === 'dark'
+    ? '.foil,\nheader h1, header .wordmark,'
+    : ':root[data-theme="light"] .foil,';
+  const bg0 = toHex([parseColor(tokens.bg0)[0], parseColor(tokens.bg0)[1], parseColor(tokens.bg0)[2]]);
+  foilStops(needle).forEach((stop, n) => {
+    let hex: string;
+    try {
+      const varMatch = stop.match(/^var\(\s*--([a-zA-Z0-9-]+)\s*\)$/);
+      const raw = varMatch ? deref(varMatch[1], tokens)
+        : stop.startsWith('color-mix(') ? resolveMix(stop, tokens)
+        : stop;
+      const c = parseColor(raw);
+      hex = toHex([c[0], c[1], c[2]]);
+    } catch (e) {
+      failed = true;
+      console.log(`  FAIL   [${theme}] wordmark foil stop ${n + 1} — unreadable (${stop}): ${(e as Error).message}`);
+      return;
+    }
+    const ratio = contrastRatio(hex, bg0);
+    const ok = ratio >= 3;
+    if (!ok) failed = true;
+    console.log(`  ${ok ? 'PASS' : 'FAIL'}   [${theme}] ${`wordmark foil stop ${n + 1} of 5`.padEnd(58)} ${ratio.toFixed(2)}:1 (needs 3:1) — ${hex} on --bg0 ${bg0}`);
+  });
+}
+
 for (const { theme, label, fg, bg, min } of CHECKS) {
   const tokens = theme === 'dark' ? darkTokens : lightTokens;
   const fgVal = tokens[fg];
