@@ -1,4 +1,4 @@
-# Master Build Spec — Player-Built Card Game Platform (working title: **Decky**)
+# Master Build Spec — Player-Built Card Game Platform (**Faro**)
 
 > **Purpose of this document.** This is the single, authoritative build prompt for a product where people play card games and create their own using a standard 54-card deck (52 + 2 jokers). Hand it to a coding assistant or a small team and start building. Every locked architectural decision below is a constraint, not a suggestion — do not re-open them.
 
@@ -395,7 +395,7 @@ Effects that fire on engine events rather than as chosen moves — where "what h
 4. **Moderation ownership.** Who reviews the queue at launch (founder-in-the-loop vs. trusted-user flags vs. purely automated), and what's the SLA? Affects whether M6 needs an admin UI or just a DB-backed queue.
 5. **AI co-pilot cost & latency budget.** Per-edit LLM calls have cost/latency; cache aggressively and debounce. Confirm acceptable round-trip and a monthly cost ceiling before M5.
 6. **Community game longevity vs. schema evolution.** When the schema version bumps, how are old published definitions migrated or pinned? Proposal: definitions are immutable per version and the interpreter stays backward-compatible across `schemaVersion` — confirm the compatibility policy before opening the commons.
-7. **Naming/brand.** "Decky" is a placeholder; lock the name before public launch (affects domain, moderation of impersonation, etc.).
+7. **Naming/brand.** The name is **Faro** — after the faro shuffle and the 19th-century banking game, so it carries deck heritage without tying the site to any one game. Locked; "decky" stays on the reserved-names list so nobody can impersonate the old name.
 8. **Card-game IP.** Confirm the shipped classics are used under their generic/public-domain rules and names (Uno-like ≠ "Uno"); the family is "shedding/matching," not a branded product.
 
 ---
