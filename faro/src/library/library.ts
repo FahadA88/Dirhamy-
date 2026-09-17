@@ -526,12 +526,19 @@ export function mechanicsOf(def: GameDefinition): string[] {
     if (def.trick.auction) out.push('trump auction', 'bidding for trump', 'auction');
     else if (def.trick.trump && def.trick.trump !== 'none') out.push('trump');
     if (def.trick.turnedTrump) out.push('trump from a turned card');
+    if (def.trick.stockDraw) out.push('stock', 'draw after every trick', 'small hand');
+    if (def.trick.lastTrickBonus) out.push('last trick scores');
+    if (def.trick.bagPenalty) out.push('sandbags', 'overtrick penalty');
+    if (def.trick.hookDealer) out.push('the hook', 'dealer cannot make the bids add up');
     if (def.trick.bidding) out.push('bidding');
     if (def.trick.numericAuction) out.push('numeric contract bidding', 'bidding');
     if (def.trick.numericAuction?.kittyZone) out.push('kitty', 'widow', 'bury');
     if (def.trick.scoreBy === 'penalty') out.push('trick-avoidance', 'penalty cards');
   }
-  if (def.climb) out.push('climbing', 'beat the pile or pass');
+  if (def.climb) {
+    out.push('climbing', 'beat the pile or pass');
+    if (def.climb.exchange) out.push('card exchange', 'the loser pays the winner');
+  }
   if (def.fish) out.push('fishing', 'asking for cards');
   if (def.rummy) {
     out.push('melding', 'sets and runs');

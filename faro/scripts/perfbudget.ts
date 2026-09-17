@@ -36,7 +36,12 @@ const BUDGETS: Budget[] = [
   // on purpose — the swatch scales its pattern down (checker 14px -> 12px, confetti 17px ->
   // 15px, wave 14x8 -> 12x7 and so on) so the print still reads at 40x56 instead of turning
   // into mush. That is tuning, not debt, and merging them would have flattened it.
-  { pattern: /^index-.*\.css$/, maxKB: 268, label: 'stylesheet' },
+  //
+  // 268 -> 272: the trick games that now keep a stock (Briscola, Sixty-Six) need it drawn —
+  // the face-up trump lying half under the back of the pile, with a count, and a second
+  // arrangement for phones and landscape where there is no room to the right of the trick.
+  // Without it the rule is implemented and invisible, which is the same as not having it.
+  { pattern: /^index-.*\.css$/, maxKB: 272, label: 'stylesheet' },
 ];
 
 const files = readdirSync(DIST);

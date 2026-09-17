@@ -10,7 +10,7 @@ const only = process.argv[2]?.toLowerCase();
 
 function deckOf(d: GameDefinition): string {
   const k = d.deck;
-  const bits = [k.base];
+  const bits: string[] = [k.base];
   if (k.deckCount && k.deckCount > 1) bits.push(`x${k.deckCount}`);
   if (k.includeJokers) bits.push(`+${k.jokerCount ?? 2} joker`);
   if (k.excludeRanks?.length) bits.push(`no ${k.excludeRanks.join('')}`);
@@ -28,7 +28,7 @@ function dealOf(d: GameDefinition): string {
   if (step.op === 'dealAll') return 'the whole pack';
   const bits = [`${step.countPerPlayer}`];
   if (step.countByPlayers) bits.push(`by seats ${JSON.stringify(step.countByPlayers)}`);
-  if (step.growPerHand) bits.push(`+${step.growPerHand}/hand`);
+  if (step.growPerHand) bits.push(`${step.growPerHand > 0 ? '+' : ''}${step.growPerHand}/hand`);
   const others = (d.setup ?? []).filter((s) => s.op === 'move' || (s.op === 'deal' && s !== step));
   for (const o of others as Record<string, unknown>[]) bits.push(`${o.count ?? o.countPerPlayer} → ${o.to}`);
   return bits.join(', ');

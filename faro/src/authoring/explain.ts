@@ -190,12 +190,23 @@ export function explainGame(def: GameDefinition): string[] {
   } else if (def.trick) {
     out.push(def.trick.mustFollowSuit ? 'Follow the suit that was led if you can.' : 'Play any card you like to a trick.');
     if (def.trick.auction) out.push('Trump is decided by bidding at the start of each hand.');
-    else if (def.trick.trump && def.trick.trump !== 'none') out.push(`${capitalize(suitWord(def.trick.trump))} are trump.`);
+    else if (def.trick.turnedTrump) {
+      out.push(def.trick.turnedTrumpFrom === 'stock'
+        ? 'A card is turned face up beside the stock and its suit is trump — and it is the last card anybody draws.'
+        : 'The last card dealt is turned face up and its suit is trump for the hand.');
+    } else if (def.trick.trump && def.trick.trump !== 'none') out.push(`${capitalize(suitWord(def.trick.trump))} are trump.`);
+    if (def.trick.stockDraw) out.push('Everyone draws back up to a full hand after every trick, the winner first, until the stock runs out.');
+    if (def.trick.lastTrickBonus) out.push(`Taking the last trick of the hand is worth ${def.trick.lastTrickBonus}.`);
+    if (def.trick.hookDealer) out.push('The dealer bids last and may not make the bids add up — somebody has to miss.');
+    if (def.trick.bagPenalty) out.push(`Overtricks are a point each and a debt: every ${def.trick.bagPenalty.per} of them costs ${Math.abs(def.trick.bagPenalty.points)}.`);
     out.push(def.trick.scoreBy === 'penalty' ? 'Points are bad — take as few as you can.'
       : def.trick.scoreBy === 'fewestTricks' ? 'Take as few tricks as possible.' : 'Take as many tricks as possible.');
   } else if (def.climb) {
     out.push('Beat the last play or pass. When everyone passes, the pile clears.');
     out.push('First player out of cards wins.');
+    if (def.climb.exchange) {
+      out.push(`Before every hand after the first, whoever finished last hands the winner their ${def.climb.exchange.top} best cards and takes ${def.climb.exchange.top} rubbish ones back.`);
+    }
   } else if (def.fish) {
     out.push(`Ask an opponent for a rank you already hold. Collect ${def.fish.bookSize} of a kind to make a book.`);
   } else if (def.rummy) {

@@ -307,6 +307,46 @@ export interface Knobs {
    * thirteen. 0 is a fixed deal, which is almost every game.
    */
   handGrowsPerHand: number;
+  /**
+   * Trump is turned off the STOCK rather than out of the last hand dealt.
+   *
+   * Whist leaves the turned card in the hand it landed in; Briscola and Sixty-Six lay it face
+   * up beside a stock, where it is both the trump and the last card anybody will draw. Only
+   * means anything alongside `turnedTrump`.
+   */
+  turnedTrumpFromStock: boolean;
+  /**
+   * Everybody draws back up to their dealt hand size after each trick, winner first, until the
+   * stock runs dry. The difference between a hand of three with a pack behind it and a hand of
+   * twenty with nothing.
+   */
+  stockDraw: boolean;
+  /** Points to whoever takes the last trick of the hand. Sixty-Six pays ten; 0 is no bonus. */
+  lastTrickBonus: number;
+  /**
+   * Spades' sandbags: overtricks are a point each AND a running debt. Every this-many of them
+   * across a match costs `bagPenaltyPoints`. 0 turns the rule off, which is how every bidding
+   * game the builder made used to behave.
+   */
+  bagPenaltyPer: number;
+  bagPenaltyPoints: number;
+  /**
+   * Oh Hell's hook: the dealer bids last and may not name the number that would make the bids
+   * add up to the tricks available, so the table can never all be right.
+   */
+  hookDealer: boolean;
+  /**
+   * Cards buried in the kitty count toward the declarer's card points — true of Skat, where
+   * burying an ace banks eleven rather than throwing them away.
+   */
+  contractKittyScores: boolean;
+  /**
+   * President's exchange: how many of their best cards the last-placed player hands the winner
+   * before each hand after the first, getting the winner's worst back. 0 is no exchange.
+   */
+  climbExchangeTop: number;
+  /** The same swap between second and second-last, at four seats or more. 0 is none. */
+  climbExchangeSecond: number;
   /** Who leads the very first hand: the seat left of the dealer, as most games deal, or seat
    *  one. Only visible where it matters, but it was hardcoded to 'first' for every family the
    *  builder produced and half the classics say dealerLeft. */
@@ -491,6 +531,15 @@ export const defaultKnobs: Knobs = {
   pointTarget: 100,
   handsCap: 0,
   handGrowsPerHand: 0,
+  turnedTrumpFromStock: false,
+  stockDraw: false,
+  lastTrickBonus: 0,
+  bagPenaltyPer: 0,
+  bagPenaltyPoints: 100,
+  hookDealer: false,
+  contractKittyScores: false,
+  climbExchangeTop: 0,
+  climbExchangeSecond: 0,
   startPlayer: 'dealerLeft',
   pricesNothing: false,
   perRankPoints: { ...defaultPoints },
@@ -595,7 +644,9 @@ function dealStep(knobs: Knobs, from: string, to: string) {
   return {
     op: 'deal' as const, from, to, countPerPlayer: knobs.handSize,
     ...(table.length ? { countByPlayers: Object.fromEntries(table) } : {}),
-    ...(clampInt(knobs.handGrowsPerHand, 0, 4) > 0 ? { growPerHand: clampInt(knobs.handGrowsPerHand, 0, 4) } : {}),
+    // Negative shrinks the deal every hand — Oh Hell counts seven down to one, which is the
+    // whole shape of that game and could not be said here at all while this clamped at zero.
+    ...(clampInt(knobs.handGrowsPerHand, -6, 6) !== 0 ? { growPerHand: clampInt(knobs.handGrowsPerHand, -6, 6) } : {}),
   };
 }
 
@@ -1109,7 +1160,15 @@ function buildClimbDefinition(knobs: Knobs, id: string): GameDefinition {
     triggers: [],
     endConditions: [{ id: 'handEmpty', when: { zoneCount: { zone: 'hand', of: 'anyPlayer', eq: 0 } }, result: 'roundOver' }],
     scoring: { mode: 'lowestPoints', winner: knobs.winMode, cardPoints: {}, target: matchTarget(knobs), ...(clampInt(knobs.handsCap, 0, 60) > 0 ? { handsCap: clampInt(knobs.handsCap, 0, 60) } : {}) },
-    climb: { order, combos: knobs.climbCombos || undefined, bombSize: knobs.climbBombSize > 0 ? clampInt(knobs.climbBombSize, 4, 6) : undefined },
+    climb: {
+      order,
+      combos: knobs.climbCombos || undefined,
+      bombSize: knobs.climbBombSize > 0 ? clampInt(knobs.climbBombSize, 4, 6) : undefined,
+      exchange: clampInt(knobs.climbExchangeTop, 0, 5) > 0 ? {
+        top: clampInt(knobs.climbExchangeTop, 1, 5),
+        ...(clampInt(knobs.climbExchangeSecond, 0, 5) > 0 ? { second: clampInt(knobs.climbExchangeSecond, 1, 5) } : {}),
+      } : undefined,
+    },
   };
 }
 
@@ -1193,6 +1252,7 @@ function buildTrickDefinition(knobs: Knobs, id: string): GameDefinition {
         maxLevel: Math.max(1, knobs.contractMaxLevel),
         strains: strainList(knobs),
         ...(kittyCards(knobs) > 0 ? { kittyZone: 'kitty' } : {}),
+        ...(kittyCards(knobs) > 0 && knobs.contractKittyScores ? { kittyScoresToDeclarer: true } : {}),
         book: Math.max(0, knobs.contractBook),
         trickValue: Math.max(1, knobs.contractTrickValue),
         overtrickValue: Math.max(0, knobs.contractOvertrickValue),
@@ -1218,6 +1278,15 @@ function buildTrickDefinition(knobs: Knobs, id: string): GameDefinition {
       // partner to sit out at all; the auction winner plays alone against the whole table.
       soloDeclarer: knobs.soloDeclarer && (knobs.trumpAuction || knobs.contractAuction) ? true : undefined,
       turnedTrump: knobs.turnedTrump && !knobs.trumpAuction && !knobs.contractAuction ? true : undefined,
+      turnedTrumpFrom: knobs.turnedTrump && knobs.turnedTrumpFromStock
+        && !knobs.trumpAuction && !knobs.contractAuction ? 'stock' : undefined,
+      // Only worth saying when the deal actually leaves a stock to draw from.
+      stockDraw: knobs.stockDraw ? true : undefined,
+      lastTrickBonus: clampInt(knobs.lastTrickBonus, 0, 100) > 0 ? clampInt(knobs.lastTrickBonus, 0, 100) : undefined,
+      bagPenalty: knobs.trickBidding && clampInt(knobs.bagPenaltyPer, 0, 30) > 0
+        ? { per: clampInt(knobs.bagPenaltyPer, 1, 30), points: -Math.abs(clampInt(knobs.bagPenaltyPoints, 1, 500)) }
+        : undefined,
+      hookDealer: knobs.trickBidding && knobs.hookDealer ? true : undefined,
       // Hearts rules only make sense alongside penalty scoring.
       shootTheMoon: knobs.trickScoreBy === 'penalty' && knobs.shootTheMoon ? true : undefined,
       brokenSuit: knobs.trickScoreBy === 'penalty' && knobs.brokenSuitLead ? knobs.brokenSuit : undefined,
@@ -1414,6 +1483,15 @@ export function knobsFromDefinition(def: GameDefinition): Knobs {
     jacksAreTrumps: !!def.trick?.jacksAreTrumps,
     soloDeclarer: !!def.trick?.soloDeclarer,
     turnedTrump: !!def.trick?.turnedTrump,
+    turnedTrumpFromStock: def.trick?.turnedTrumpFrom === 'stock',
+    stockDraw: !!def.trick?.stockDraw,
+    lastTrickBonus: def.trick?.lastTrickBonus ?? 0,
+    bagPenaltyPer: def.trick?.bagPenalty?.per ?? 0,
+    bagPenaltyPoints: Math.abs(def.trick?.bagPenalty?.points ?? 100),
+    hookDealer: !!def.trick?.hookDealer,
+    contractKittyScores: !!def.trick?.numericAuction?.kittyScoresToDeclarer,
+    climbExchangeTop: def.climb?.exchange?.top ?? 0,
+    climbExchangeSecond: def.climb?.exchange?.second ?? 0,
     meldMarriage: !!def.trick?.meldPatterns?.length,
     meldMarriagePoints: def.trick?.meldPatterns?.[0]?.points ?? 20,
     bookSize: def.fish?.bookSize ?? 4,

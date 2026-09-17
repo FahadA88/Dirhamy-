@@ -634,8 +634,27 @@ export function CreateView({ onPlay }: { onPlay?: (def: GameDefinition) => void 
                 <span aria-hidden="true">Must follow the led suit if able</span></div>
                 <div className="field row"><Switch on={knobs.aceHigh} onChange={(v) => set('aceHigh', v)} aria-label="Ace is the highest card" />
                 <span aria-hidden="true">Ace is the highest card</span></div>
+                {/* A trick game with a stock behind it is a different game from one that deals
+                    the whole pack: what you hold is a rolling window rather than your whole
+                    hand. Briscola and Sixty-Six are built on it and it had no control here. */}
+                <div className="field row"><Switch on={knobs.stockDraw} onChange={(v) => set('stockDraw', v)} aria-label="Draw back up from a stock after every trick" />
+                <span aria-hidden="true">Draw back up from a stock after every trick (winner first){knobs.stockDraw ? ' — leave cards undealt above for it to draw from' : ''}</span></div>
+                <NumField label="Points for taking the last trick (0 = none)"
+                  value={knobs.lastTrickBonus} onChange={(v) => set('lastTrickBonus', v)} />
                 <div className="field row"><Switch on={knobs.trickBidding} onChange={(v) => set('trickBidding', v)} aria-label="Players bid tricks before play" />
                 <span aria-hidden="true">Players bid tricks before play</span></div>
+                {knobs.trickBidding && <>
+                  {/* Spades' sandbags, and Oh Hell's hook — the two rules that make a bidding
+                      game about hitting a number rather than taking as much as you can. */}
+                  <NumField label="Overtricks that cost you (0 = overtricks are free)"
+                    value={knobs.bagPenaltyPer} onChange={(v) => set('bagPenaltyPer', v)} />
+                  {knobs.bagPenaltyPer > 0 && (
+                    <NumField label="What every that-many overtricks costs"
+                      value={knobs.bagPenaltyPoints} onChange={(v) => set('bagPenaltyPoints', v)} />
+                  )}
+                  <div className="field row"><Switch on={knobs.hookDealer} onChange={(v) => set('hookDealer', v)} aria-label="Hook the dealer — they may not bid the number that makes the bids add up" />
+                <span aria-hidden="true">Hook the dealer — bidding last, they may not name the number that would make the bids add up, so somebody has to miss</span></div>
+                </>}
                 {/* All four jacks out of their printed suits and into trump, ranked above every
                     other trump card — the rule a Skat player would name first. bowers only
                     promotes two jacks and leaves the printed suit alone for the other two, so
@@ -669,9 +688,13 @@ export function CreateView({ onPlay }: { onPlay?: (def: GameDefinition) => void 
                       set('contractAuction', v === 'contract');
                       set('turnedTrump', v === 'turned');
                     }} /></div>
-                {knobs.turnedTrump && (
-                  <span className="mini-label">Whatever suit the last card dealt turns out to be, shown to the table and left in that hand — nobody names it, nobody bids for it.</span>
-                )}
+                {knobs.turnedTrump && <>
+                  <div className="field row"><Switch on={knobs.turnedTrumpFromStock} onChange={(v) => set('turnedTrumpFromStock', v)} aria-label="Turn it off the stock instead of out of the last hand dealt" />
+                <span aria-hidden="true">Turn it off the stock, face up beside the pile, as the last card anybody draws</span></div>
+                  <span className="mini-label">{knobs.turnedTrumpFromStock
+                    ? 'Briscola and Sixty-Six: the card sits face up under the stock all hand, so everybody can see what trump is and count down to who gets it.'
+                    : 'Whist: whatever suit the last card dealt turns out to be, shown to the table and left in that hand — nobody names it, nobody bids for it.'}</span>
+                </>}
                 {knobs.contractAuction && <>
                   <span className="mini-label">Each bid must beat the last on level first, then on strain — clubs, diamonds, hearts, spades, no-trump. Three passes settle it, and the winning side has promised that many tricks.</span>
                   <div className="two">
@@ -692,6 +715,10 @@ export function CreateView({ onPlay }: { onPlay?: (def: GameDefinition) => void 
                   <StrainOrder value={knobs.contractStrainOrder} onChange={(v) => set('contractStrainOrder', v)} />
                   <NumField label="Cards to the kitty (0 for none) — the winner picks them up and buries the same number"
                     value={knobs.contractKittySize} onChange={(v) => set('contractKittySize', v)} />
+                  {knobs.contractKittySize > 0 && (
+                    <div className="field row"><Switch on={knobs.contractKittyScores} onChange={(v) => set('contractKittyScores', v)} aria-label="What is buried in the kitty still counts for the declarer" />
+                <span aria-hidden="true">What is buried there still counts for the declarer (Skat) — so burying an ace banks it rather than losing it</span></div>
+                  )}
                   <div className="field row"><Switch on={knobs.contractOnCardPoints} onChange={(v) => set('contractOnCardPoints', v)} aria-label="Settle the contract on card points taken, not tricks (Skat)" />
                 <span aria-hidden="true">Settle the contract on card points taken, not tricks (Skat)</span></div>
                   {knobs.contractOnCardPoints ? (
@@ -1150,6 +1177,15 @@ export function CreateView({ onPlay }: { onPlay?: (def: GameDefinition) => void 
                 <span aria-hidden="true">Allow pairs & triples {knobs.climbCombos ? '(a reply must match the shape)' : '(single cards only)'}</span></div>
               <div className="field row"><Switch on={knobs.climbBombSize > 0} onChange={(v) => set('climbBombSize', v ? 4 : 0)} aria-label="Bombs — four of a kind beats any pile, playable even out of turn" />
                 <span aria-hidden="true">Bombs — four of a kind beats any pile, playable even out of turn</span></div>
+              {/* The rule President is named for. Without it every hand is independent and
+                  finishing first is a label rather than a position worth defending. */}
+              <NumField label="Cards the last player pays the winner before each new hand (0 = no exchange)"
+                value={knobs.climbExchangeTop} onChange={(v) => set('climbExchangeTop', v)} />
+              {knobs.climbExchangeTop > 0 && <>
+                <NumField label="And between second and second-last, at four seats or more"
+                  value={knobs.climbExchangeSecond} onChange={(v) => set('climbExchangeSecond', v)} />
+                <span className="mini-label">The loser hands over their best cards and takes the winner's worst back — no choice about it, which is exactly what makes winning worth defending. Needs more than one hand: set a hand limit under Match play.</span>
+              </>}
             </Section>
           )}
 

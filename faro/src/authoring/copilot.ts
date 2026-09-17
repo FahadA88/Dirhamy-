@@ -471,6 +471,15 @@ function describeChange(field: keyof Knobs, value: unknown): string {
     case 'trickScoreBy': return value === 'mostTricks' ? 'Win: most tricks' : 'Win: fewest tricks';
     case 'direction': return `Direction → ${value}`;
     case 'winMode': return value === 'firstOut' ? 'Win: first to empty' : value === 'highestTotal' ? 'Win: highest points' : 'Win: lowest points';
+    case 'stockDraw': return value ? 'Draw back up after every trick' : 'No stock — the whole pack is dealt';
+    case 'turnedTrumpFromStock': return value ? 'Trump turned off the stock' : 'Trump turned out of the last hand dealt';
+    case 'lastTrickBonus': return value ? `Last trick is worth ${value}` : 'Last trick scores nothing extra';
+    case 'bagPenaltyPer': return value ? `Every ${value} overtricks cost you` : 'Overtricks are free';
+    case 'bagPenaltyPoints': return `Overtrick penalty: ${value}`;
+    case 'hookDealer': return value ? 'The dealer is hooked' : 'The dealer bids freely';
+    case 'contractKittyScores': return value ? 'The kitty counts for the declarer' : 'The kitty scores for nobody';
+    case 'climbExchangeTop': return value ? `Last pays the winner ${value} cards between hands` : 'No exchange between hands';
+    case 'climbExchangeSecond': return value ? `And ${value} between second and second-last` : 'No exchange for the middle seats';
     case 'includeJokers': return value ? 'Include jokers' : 'No jokers';
     case 'reshuffleWhenEmpty': return value ? 'Reshuffle discard when draw runs out' : 'Round ends when draw runs out';
     default: return String(field);

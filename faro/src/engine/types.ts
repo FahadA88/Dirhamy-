@@ -424,6 +424,19 @@ export interface ClimbConfig {
                        // match the same group size (pair beats pair, triple beats triple)
   bombSize?: number;  // N-of-a-kind that ANY player may play at ANY time, even out of turn,
                        // beating whatever's on the pile regardless of shape or size (0/undefined = off)
+  /**
+   * The exchange President is named for: before every hand after the first, the bottom of the
+   * table pays the top.
+   *
+   * The player who finished last hands over their `top` best cards and gets the President's
+   * worst back; with `second` set and enough seats, the second-from-last and the second-placed
+   * swap that many too. It is what makes the titles mean anything — without it each hand is
+   * independent and being President is a label rather than a position.
+   *
+   * The Scum has no choice about which cards go (their best, by rule) and the President's
+   * return is their lowest, which is what a President would pick anyway.
+   */
+  exchange?: { top: number; second?: number };
 }
 
 export interface FishConfig {
@@ -439,6 +452,26 @@ export interface TrickConfig {
    * overrides it once the bidding closes.
    */
   turnedTrump?: boolean;
+  /**
+   * WHERE the turned card comes from.
+   *
+   * 'lastDealt' is Whist: the last card of the deal is turned face up and stays in the hand it
+   * landed in. 'stock' is Briscola and Sixty-Six: the whole pack is not dealt, the next card off
+   * the stock is turned face up beside it, and that card is the last one anybody draws — so the
+   * player who takes it has been looking at it all game.
+   */
+  turnedTrumpFrom?: 'lastDealt' | 'stock';
+  /**
+   * Draw back up to the dealt hand size after every trick, winner first, until the stock is out.
+   *
+   * This is the difference between a game of three cards and a game of twenty. With a stock
+   * behind it a hand is a rolling window: what you hold is never the whole of what you will
+   * play, so a card you throw away now is not a card you have lost. Every game here dealt its
+   * whole pack out, which quietly turned Briscola into open-handed Briscola.
+   */
+  stockDraw?: boolean;
+  /** Points to the winner of the LAST trick of the hand, on top of the cards in it. */
+  lastTrickBonus?: number;
   mustFollowSuit: boolean;     // must play the led suit if you hold one
   aceHigh: boolean;            // Ace is the strongest rank (else lowest)
   scoreBy: 'mostTricks' | 'fewestTricks' | 'penalty';
@@ -457,6 +490,20 @@ export interface TrickConfig {
    */
   jokerRank?: 'low' | 'high' | 'trump';
   bidding?: boolean;           // players bid tricks before play (Spades); overrides scoreBy with bid scoring
+  /**
+   * Spades' sandbag rule: overtricks are counted, and the count is eventually punished.
+   *
+   * A team that makes its bid scores a point for each trick it took beyond it — a "bag". Bags
+   * carry from hand to hand, and every `per` of them costs `points` and comes back off the
+   * count. Without it an overtrick is free, which makes underbidding strictly better than
+   * bidding honestly — the exact thing the rule exists to stop.
+   */
+  bagPenalty?: { per: number; points: number };
+  /**
+   * Oh Hell's hook: the dealer, bidding last, may not bid the number that would make the bids
+   * add up to the tricks available. Somebody has to miss.
+   */
+  hookDealer?: boolean;
   /**
    * Combinations worth points for simply HOLDING them, scored once as the hand is dealt and
    * before a card is played.
@@ -684,6 +731,14 @@ export interface NumericAuctionConfig {
    */
   kittyZone?: string;
   /**
+   * The cards buried in the kitty count toward the DECLARER's card points at the end.
+   *
+   * True of Skat, where the two cards in the skat are the declarer's whether they picked them
+   * up or not — which is why burying an ace there is a way of banking eleven points rather
+   * than throwing them away.
+   */
+  kittyScoresToDeclarer?: boolean;
+  /**
    * Score a failed contract by the tricks the DEFENDERS actually took, not by how far short the
    * contract fell. Bridge-style undertrickValue prices the shortfall; some games instead treat
    * the whole hand as one contest for the tricks — whichever side ends up with more of them
@@ -760,6 +815,9 @@ export type SetupStep =
        * The deal grows by this many cards every hand of the match (Three Thirteen: one more
        * each time). Applied on top of countPerPlayer/countByPlayers, using how many hands of
        * THIS match have already been played — so hand one deals the base count, unchanged.
+       *
+       * Negative shrinks it instead (Oh Hell counts down), and the result never falls below one
+       * card — a hand of zero is not a hand.
        */
       growPerHand?: number;
     }
@@ -1017,6 +1075,22 @@ export interface MatchState {
   bidding: boolean;         // true while the bidding phase is open
   // Euchre auction. trumpSuit overrides TrickConfig.trump once a hand's trump is named.
   trumpSuit: Suit | 'none' | null;
+  /**
+   * The card trump was turned from, when it was turned rather than named.
+   *
+   * Kept for the table to show. In Whist it is a card in the last seat's hand; in Briscola and
+   * Sixty-Six it lies face up beside the stock and is the last card drawn — which is why a
+   * player needs to be able to see WHICH card it is, not just what suit it made trump.
+   */
+  trumpCard: Card | null;
+  /**
+   * How many cards this hand was dealt, so a game with a stock knows what to refill to.
+   *
+   * The deal size is not a constant: it moves with the seat count, and with the hand number in
+   * a game whose deal grows or shrinks. Reading it back off a hand mid-trick would be wrong,
+   * so it is recorded once, as the cards go out.
+   */
+  dealSize: number;
   auctionRound: 0 | 1 | 2;  // 0 = no auction running
   auctionPasses: number;
   turnedDownSuit: Suit | null; // the upcard's suit once it is turned down; barred in round 2
@@ -1262,6 +1336,10 @@ export interface RedactedState {
   bidding?: boolean;
   teams?: string[][];
   trumpSuit?: Suit | 'none' | null;
+  /** The card trump was turned from, when it lies face up on the table rather than in a hand. */
+  trumpCard?: Card | null;
+  /** True when the pile beside the trick is a stock players draw from after every trick. */
+  stockDraw?: boolean;
   auctionRound?: 0 | 1 | 2;
   upcard?: Card | null;
   maker?: string | null;

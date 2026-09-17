@@ -44,7 +44,10 @@ for (const name of names) {
   for (let i = 0; i < 120; i++) {
     await page.waitForTimeout(70);
     if (await page.locator('.refused').count()) refusals++;
-    const sel = '.card-btn.playable:not([disabled]), .sol-card.live:not([disabled]), .draw-btn, .meld-btn, .bomb-btn, .knock-btn, .bid-btn, .suit-btn, .sol-slot.stock, .modal .primary';
+    // .cr-bid is the contract auction's grid of level-and-strain buttons. Without it Skat,
+    // Bridge, Five Hundred and Contract Whist sat in the auction for the whole run and reported
+    // zero moves — which read as "clean" because nothing had a chance to go wrong.
+    const sel = '.card-btn.playable:not([disabled]), .sol-card.live:not([disabled]), .draw-btn, .meld-btn, .bomb-btn, .knock-btn, .bid-btn, .cr-bid, .suit-btn, .sol-slot.stock, .modal .primary';
     const c = page.locator(sel);
     const n = await c.count();
     if (n === 0) continue;

@@ -12,8 +12,8 @@ import { GameDefinition } from '../engine/types';
 // eight thin ones, which is why a hand is played for the cards in it rather than the count.
 //
 // Deliberately not the whole game: the bid and the declaration happen in one step rather than
-// bidding a value and naming the game afterwards, there is no skat to pick up and bury, and no
-// grand or null contracts. What is here is the shape — bid, play alone, and make 61.
+// bidding a value and naming the game afterwards, and there are no grand or null contracts.
+// What is here is the shape — bid, take the skat, bury two, play alone, and make 61.
 export const skat: GameDefinition = {
   schemaVersion: '1.0',
   meta: {
@@ -24,7 +24,9 @@ export const skat: GameDefinition = {
       + 'Every jack is a trump — clubs, spades, hearts, diamonds, above everything else — and a '
       + 'jack never follows its printed suit. There are 120 card points in the pack and the '
       + 'declarer needs 61 of them: aces 11, tens 10, kings 4, queens 3, jacks 2. Make it and '
-      + 'you score your bid; miss and it costs you double.',
+      + 'you score your bid; miss and it costs you double. Two cards are dealt face down as the '
+      + 'skat: the auction winner picks them up and buries two of their own, and whatever is '
+      + 'buried there counts toward their 61.',
     players: { min: 3, max: 3 },
     family: 'trick-taking',
   },
@@ -41,11 +43,18 @@ export const skat: GameDefinition = {
     { id: 'draw', type: 'pile', ordered: true, faceDown: true, visibility: 'none', shared: true },
     { id: 'trick', type: 'trick', ordered: true, faceDown: false, visibility: 'all', shared: true },
     { id: 'hand', type: 'hand', ordered: false, faceDown: true, visibility: 'owner', perPlayer: true },
+    // The two cards the game is named after. Face down and nobody's until the auction settles.
+    // Called 'kitty' because that is what the engine calls a pile the auction winner picks up
+    // and buries back into; a Skat player calls it the skat, and so does every line of text a
+    // player actually reads.
+    { id: 'kitty', type: 'pile', ordered: true, faceDown: true, visibility: 'none', shared: true },
   ],
   setup: [
     { op: 'shuffle', zone: 'draw' },
-    // Ten each; the last two are the skat, left face down and out of play here.
+    // Ten each, then the skat. A real dealer goes three, skat, four, three; the order the cards
+    // come off a shuffled pack makes no difference to anything, so this deals the hands first.
     { op: 'deal', from: 'draw', to: 'hand', countPerPlayer: 10 },
+    { op: 'move', from: 'draw', to: 'kitty', count: 2 },
   ],
   turnFlow: { order: 'clockwise', startPlayer: 'first', actionsPerTurn: { min: 1, max: 1 } },
   actions: [],
@@ -76,6 +85,11 @@ export const skat: GameDefinition = {
       undertrickValue: 0,
       // 61 of the 120 in the pack.
       makeOnCardPoints: 61,
+      // The winner of the auction takes the skat into hand and buries two back down — and
+      // whatever is buried there still counts for them at the end, which is what makes the
+      // choice of what to bury a real decision rather than a tidy-up.
+      kittyZone: 'kitty',
+      kittyScoresToDeclarer: true,
     },
   },
 };

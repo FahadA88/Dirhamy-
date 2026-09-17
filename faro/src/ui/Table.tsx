@@ -459,6 +459,10 @@ export function Table({
     [myLegal],
   );
   const canPassBid = myLegal.some((m) => m.actionId === 'passBid');
+  // The bid buttons used to be generated from the size of the hand, which is right until a game
+  // takes one of them away. Oh Hell's hook bars the dealer from the number that would make the
+  // bids add up, and a button the service is going to refuse is worse than no button at all.
+  const bidMoves = useMemo(() => myLegal.filter((m) => m.actionId === 'bid'), [myLegal]);
   const knockMoves = useMemo(() => myLegal.filter((m) => m.actionId === 'knock'), [myLegal]);
   const layOffMoves = useMemo(() => myLegal.filter((m) => m.actionId === 'layOff'), [myLegal]);
   const discardMoves = useMemo(
@@ -1818,6 +1822,15 @@ export function Table({
         </div>
       ) : view.mode === 'trick' && view.bidding ? (
         <div className="center bid-area">
+          {/* You bid knowing what trump is, and in Oh Hell it is a different suit every hand —
+              so the turned card has to be on the table while the bidding is happening, not
+              only once the first trick is led. */}
+          {view.trumpCard && (
+            <div className="pile" data-slot="upcard">
+              <CardFace card={view.trumpCard} />
+              <div className="pile-label">Turned for trump</div>
+            </div>
+          )}
           {view.isYourTurn ? (
             <div className="bid-panel">
               <div className="bid-title">
@@ -1827,12 +1840,15 @@ export function Table({
                 <button className="ghost sm estimate-btn" onClick={showHandStrength}>Estimate</button>
               </div>
               <div className="bid-buttons">
-                {Array.from({ length: view.hand.length + 1 }, (_, n) => (
-                  <button key={n} className="bid-btn" onClick={() => submit({ actionId: 'bid', choice: String(n) })}>
-                    {n === 0 ? 'Nil' : n}
+                {bidMoves.map((m) => (
+                  <button key={m.choice} className="bid-btn" onClick={() => submit(m)}>
+                    {m.choice === '0' ? 'Nil' : m.choice}
                   </button>
                 ))}
               </div>
+              {bidMoves.length === view.hand.length && (
+                <span className="bid-hook">You are the dealer — you cannot make the bids add up.</span>
+              )}
             </div>
           ) : <div className="trick-empty">Bidding…</div>}
         </div>
@@ -1901,6 +1917,24 @@ export function Table({
               <span className="trick-note">{nameOf(view.maker)} called it{view.alone ? ' alone' : ''}</span>
             )}
           </div>
+          {/* A trick game with a stock behind it (Briscola, Sixty-Six) is a different game from
+              one where the whole pack is dealt, and the difference is only playable if you can
+              see it: how many cards are left, and which card the trump was turned from — the
+              one everybody is counting down to, because it is the last card drawn. */}
+          {(view.trumpCard || (view.stockDraw && (view.zones.draw?.count ?? 0) > 0)) && (
+            <div className="trick-stock">
+              {view.trumpCard && (
+                <div className="stock-trump"><CardFace card={view.trumpCard} /></div>
+              )}
+              {/* Cards left over from a deal are not a stock. Oh Hell turns a card for trump and
+                  leaves the rest of the pack face down and out of the game — counting them at
+                  the table would promise a draw that never comes. */}
+              {view.stockDraw && (view.zones.draw?.count ?? 0) > 0 && <>
+                <div className="stock-back"><div className={backCls} /></div>
+                <div className="pile-label">Stock · {view.zones.draw?.count ?? 0}</div>
+              </>}
+            </div>
+          )}
         </div>
       ) : isFish ? (
         <div className="center">

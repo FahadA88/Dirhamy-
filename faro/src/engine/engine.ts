@@ -51,6 +51,8 @@ export function createMatch(
     chips?: Record<string, number>;
     /** Kent only: the letters each pair has already spelt. */
     kentLetters?: Record<string, number>;
+    /** Climbing games only: last hand's finishing order, so the exchange knows who owes whom. */
+    lastFinished?: string[];
     /** Author-written counters that asked to survive the deal, and their names. */
     vars?: Record<string, string>;
     keepVars?: string[];
@@ -79,6 +81,8 @@ export function createMatch(
     bids: {},
     bidding: !!def.trick?.bidding,
     trumpSuit: (def.trick?.auction || def.trick?.turnedTrump) ? null : (def.trick?.trump ?? null),
+    trumpCard: null,
+    dealSize: 0,
     auctionRound: 0,
     auctionPasses: 0,
     turnedDownSuit: null,
@@ -284,13 +288,15 @@ export function createMatch(
       state.rngState = rngState;
     } else if (step.op === 'deal') {
       const base = step.countByPlayers?.[players.length] ?? step.countPerPlayer;
-      const count = base + (step.growPerHand ?? 0) * (state.handNumber - 1);
+      // A shrinking deal (Oh Hell) must stop at one rather than run through zero into negative.
+      const count = Math.max(1, base + (step.growPerHand ?? 0) * (state.handNumber - 1));
       for (let i = 0; i < count; i++) {
         for (const p of players) {
           const card = state.zones[step.from].pop();
           if (card) state.zones[zoneKey(def, step.to, p)].push(card);
         }
       }
+      if (step.to === 'hand') state.dealSize = count;
     } else if (step.op === 'dealAll') {
       let seat = 0;
       while (state.zones[step.from].length) {
@@ -311,13 +317,34 @@ export function createMatch(
   // sits on top of the last seat's hand — turn it up, tell the table, and leave it exactly
   // where it landed; it is a card in that hand like any other from the next trick onward.
   if (def.trick?.turnedTrump) {
-    const lastSeat = players[players.length - 1];
-    const hand = state.zones[zoneKey(def, 'hand', lastSeat)] || [];
-    const turned = hand[hand.length - 1];
-    if (turned) {
-      state.trumpSuit = turned.suit;
-      log(state, null, `${short(lastSeat)} turns up ${cardLabel(turned)} — trump is ${turned.suit}.`);
+    if (def.trick.turnedTrumpFrom === 'stock') {
+      // Briscola and Sixty-Six turn the card off the STOCK instead, and lay it face up
+      // half-under the pile. It is trump, and it is also the last card anybody draws — so it
+      // sits at the bottom of the stock, in plain view, all game.
+      const pile = state.zones[drawZone.id] || [];
+      const turned = pile.pop();
+      if (turned) {
+        pile.unshift(turned);
+        state.trumpSuit = turned.suit;
+        state.trumpCard = turned;
+        log(state, null, `${cardLabel(turned)} is turned beside the stock — trump is ${turned.suit}.`);
+      }
+    } else {
+      const lastSeat = players[players.length - 1];
+      const hand = state.zones[zoneKey(def, 'hand', lastSeat)] || [];
+      const turned = hand[hand.length - 1];
+      if (turned) {
+        state.trumpSuit = turned.suit;
+        state.trumpCard = turned;
+        log(state, null, `${short(lastSeat)} turns up ${cardLabel(turned)} — trump is ${turned.suit}.`);
+      }
     }
+  }
+
+  // President's exchange: the table pays up before a card is played. Nothing to do on hand one,
+  // because nobody has finished anywhere yet.
+  if (def.climb?.exchange && carry?.lastFinished?.length) {
+    runClimbExchange(state, def.climb.exchange, carry.lastFinished);
   }
 
   // Seed activeSuit from the starter card if there is a discard top.
@@ -1718,6 +1745,7 @@ export function nextHand(state: MatchState, seed: number): MatchState {
     // is the stack you sit down with for the next one.
     chips: state.definition.poker ? { ...state.chips } : undefined,
     kentLetters: state.definition.kent ? { ...state.kentLetters } : undefined,
+    lastFinished: state.definition.climb ? state.finished.slice() : undefined,
     // Author counters that asked to survive the deal. Everything else in vars is deliberately
     // wiped: a hand starts clean unless a rule said otherwise.
     keepVars: state.keepVars.slice(),
@@ -1885,7 +1913,15 @@ function trickLegalMoves(state: MatchState, playerId: string): Move[] {
   // Bidding phase: bid 0..handSize tricks.
   if (state.bidding) {
     const n = (state.zones[`hand:${playerId}`] || []).length;
-    return Array.from({ length: n + 1 }, (_, i) => ({ actionId: 'bid', choice: String(i) }));
+    let bids = Array.from({ length: n + 1 }, (_, i) => i);
+    // Oh Hell's hook. The dealer bids last, and is barred from the one number that would make
+    // the bids add up to the tricks on the table — so somebody at the table has to miss, every
+    // single hand. It is the joke the game is named after.
+    if (def.trick?.hookDealer && Object.keys(state.bids).length === state.players.length - 1) {
+      const sum = Object.values(state.bids).reduce((a, b) => a + b, 0);
+      bids = bids.filter((b) => b + sum !== n);
+    }
+    return bids.map((i) => ({ actionId: 'bid', choice: String(i) }));
   }
   const cfg = def.trick!;
   const hand = state.zones[`hand:${playerId}`] || [];
@@ -2114,6 +2150,45 @@ export function trickValueOf(s: MatchState, card: Card): number {
   return category * 10000 + trickStrength(s, card);
 }
 
+/**
+ * Everybody draws back up to the dealt hand size, starting with whoever took the trick.
+ *
+ * The order matters and is not a detail: the trick winner draws first, so when the stock is
+ * down to its last cards it is the winner who gets the better of them — and the very last card
+ * drawn is the turned trump, which everybody has been able to see all game and count down to.
+ *
+ * Once the stock is out, nobody draws and the hands simply run down. Players are only topped up
+ * while there is enough for everyone, so the table never ends up with hands of different sizes
+ * — which would hand the odd card to whoever happened to win a trick at the right moment.
+ */
+/**
+ * What one card is worth under a trick game's own points table.
+ *
+ * Three ways to name a card, all additive: by rank ("A"), by suit ("H" — every heart), or by
+ * the exact card ("SQ"). Pulled out of the trick resolver because the skat is scored with the
+ * same table and had no way to ask.
+ */
+function trickCardPoints(s: MatchState, card: Card): number {
+  const table = s.definition.trick?.penaltyPoints;
+  if (!table) return 0;
+  return (table[card.rank] ?? 0) + (table[card.suit] ?? 0) + (table[card.suit + card.rank] ?? 0);
+}
+
+function drawFromStock(s: MatchState, winner: string): void {
+  const pile = s.zones['draw'] ?? [];
+  if (pile.length === 0) return;
+  const seats = activeSeats(s);
+  const start = Math.max(0, seats.indexOf(winner));
+  const order = seats.slice(start).concat(seats.slice(0, start));
+  const short_ = order.filter((p) => (s.zones[`hand:${p}`] || []).length < s.dealSize);
+  if (pile.length < short_.length) return;
+  for (const p of short_) {
+    const card = pile.pop();
+    if (!card) break;
+    s.zones[`hand:${p}`].push(card);
+  }
+}
+
 function resolveTrick(s: MatchState, trickZoneId: string): void {
   const cfg = s.definition.trick!;
   const value = (c: Card) => trickValueOf(s, c);
@@ -2136,11 +2211,7 @@ function resolveTrick(s: MatchState, trickZoneId: string): void {
   // Hearts-style penalty points travel to the trick winner.
   if (cfg.scoreBy === 'penalty' && cfg.penaltyPoints) {
     let pts = 0;
-    for (const { card } of s.trickPlays) {
-      pts += cfg.penaltyPoints[card.rank] ?? 0;      // by rank
-      pts += cfg.penaltyPoints[card.suit] ?? 0;      // by suit (e.g. every Heart)
-      pts += cfg.penaltyPoints[card.suit + card.rank] ?? 0; // a specific card (e.g. "SQ")
-    }
+    for (const { card } of s.trickPlays) pts += trickCardPoints(s, card);
     s.scores[winner.player] = (s.scores[winner.player] ?? 0) + pts;
   }
 
@@ -2156,8 +2227,20 @@ function resolveTrick(s: MatchState, trickZoneId: string): void {
 
   if (settleContractEarlyIfDecided(s)) return;
 
+  // Draw back up from the stock, winner first — the rule that makes a three-card hand a game.
+  if (cfg.stockDraw) drawFromStock(s, winner.player);
+
   // Round ends when every hand still in play is empty.
-  if (activeSeats(s).every((p) => (s.zones[`hand:${p}`] || []).length === 0)) endTrickRound(s);
+  if (activeSeats(s).every((p) => (s.zones[`hand:${p}`] || []).length === 0)) {
+    // The last trick of the hand is worth something of its own in some games — Sixty-Six pays
+    // ten for it. Awarded here rather than in the scorer because only this point in the play
+    // knows which trick was the last one.
+    if (cfg.lastTrickBonus) {
+      s.scores[winner.player] = (s.scores[winner.player] ?? 0) + cfg.lastTrickBonus;
+      log(s, winner.player, `${short(winner.player)} takes the last trick — ${cfg.lastTrickBonus}.`);
+    }
+    endTrickRound(s);
+  }
 }
 
 /**
@@ -2398,6 +2481,15 @@ export function scoreContract(s: MatchState): void {
   */
   if (cfg.makeOnCardPoints) {
     const target = cfg.makeOnCardPoints;
+    // The two cards buried in the skat are the declarer's, whether they ever picked them up or
+    // not — which is why burying an ace there banks eleven points rather than losing them.
+    if (cfg.kittyScoresToDeclarer && cfg.kittyZone) {
+      const pts = (s.zones[cfg.kittyZone] ?? []).reduce((a, c) => a + trickCardPoints(s, c), 0);
+      if (pts > 0) {
+        s.scores[bid.player] = (s.scores[bid.player] ?? 0) + pts;
+        log(s, bid.player, `The skat is worth ${pts} to ${short(bid.player)}.`);
+      }
+    }
     const got = declaring.reduce((a, p) => a + (s.scores[p] ?? 0), 0);
     if (got >= target) {
       declarerPts = bid.level;
@@ -2446,7 +2538,7 @@ export function trickTeams(s: MatchState): string[][] {
   return s.players.map((p) => [p]);
 }
 
-function endTrickRound(s: MatchState): void {
+export function endTrickRound(s: MatchState): void {
   const cfg = s.definition.trick!;
   s.phase = 'roundOver';
 
@@ -2492,6 +2584,20 @@ function endTrickRound(s: MatchState): void {
       const teamBid = team.reduce((a, p) => a + (s.bids[p] ?? 0), 0);
       const teamTricks = team.reduce((a, p) => a + (s.tricksWon[p] ?? 0), 0);
       let score = teamTricks >= teamBid ? teamBid * 10 + (teamTricks - teamBid) : -teamBid * 10;
+      // Sandbags. Overtricks are worth a point each and are also a debt: they pile up across the
+      // whole match, and every tenth one costs 100 and comes back off the pile. That is what
+      // stops a team bidding four and taking eight every hand.
+      if (cfg.bagPenalty && teamTricks > teamBid) {
+        const key = `${team[0]}:bags`;
+        const held = (parseInt(s.vars[key] ?? '0', 10) || 0) + (teamTricks - teamBid);
+        const hits = Math.floor(held / cfg.bagPenalty.per);
+        if (hits > 0) {
+          score += hits * cfg.bagPenalty.points;
+          log(s, null, `${short(team[0])}${cfg.partnerships ? "'s team" : ''} bagged out — ${hits * cfg.bagPenalty.points}.`);
+        }
+        s.vars[key] = String(held % cfg.bagPenalty.per);
+        if (!s.keepVars.includes('bags')) s.keepVars.push('bags');
+      }
       // Nil bids score individually: +100 made, -100 failed.
       for (const p of team) if ((s.bids[p] ?? -1) === 0) score += (s.tricksWon[p] ?? 0) === 0 ? 100 : -100;
       for (const p of team) s.scores[p] = score;
@@ -2533,6 +2639,50 @@ function endTrickRound(s: MatchState): void {
 }
 
 // ---------- climbing family (President / Big Two) ----------
+
+/**
+ * The exchange, run on a freshly dealt hand.
+ *
+ * Strictly one-directional and not a decision: the loser hands over their best cards and takes
+ * back the winner's worst. That asymmetry is the point — the President is being paid for
+ * winning, and the Scum is paying. Nothing here asks either of them anything, so it happens
+ * between the deal and the first turn and is over before anyone is on play.
+ *
+ * Seats that are no longer at the table are skipped rather than crashing the deal.
+ */
+function runClimbExchange(
+  s: MatchState,
+  cfg: NonNullable<NonNullable<MatchState['definition']['climb']>['exchange']>,
+  order: string[],
+): void {
+  const seated = order.filter((p) => s.players.includes(p));
+  if (seated.length < 2) return;
+  const strength = (c: Card) => climbRank(s.definition, c.rank);
+
+  const pairs: { high: string; low: string; count: number }[] = [
+    { high: seated[0], low: seated[seated.length - 1], count: cfg.top },
+  ];
+  if (cfg.second && seated.length >= 4) {
+    pairs.push({ high: seated[1], low: seated[seated.length - 2], count: cfg.second });
+  }
+
+  for (const { high, low, count } of pairs) {
+    if (high === low || count <= 0) continue;
+    const winner = s.zones[`hand:${high}`] ?? [];
+    const loser = s.zones[`hand:${low}`] ?? [];
+    const n = Math.min(count, winner.length, loser.length);
+    if (n === 0) continue;
+
+    const best = loser.slice().sort((a, b) => strength(b) - strength(a)).slice(0, n);
+    const worst = winner.slice().sort((a, b) => strength(a) - strength(b)).slice(0, n);
+    const bestIds = new Set(best.map((c) => c.id));
+    const worstIds = new Set(worst.map((c) => c.id));
+
+    s.zones[`hand:${low}`] = loser.filter((c) => !bestIds.has(c.id)).concat(worst);
+    s.zones[`hand:${high}`] = winner.filter((c) => !worstIds.has(c.id)).concat(best);
+    log(s, null, `${short(low)} pays ${short(high)} ${best.map(cardLabel).join(' ')} and takes ${worst.map(cardLabel).join(' ')} back.`);
+  }
+}
 
 function climbRank(def: MatchState['definition'], rank: string): number {
   const i = def.climb!.order.indexOf(rank as never);
@@ -5440,6 +5590,15 @@ export function redact(state: MatchState, viewer: string): RedactedState {
     bidding: state.definition.trick?.bidding ? state.bidding : undefined,
     teams: state.definition.trick?.partnerships ? trickTeams(state) : undefined,
     trumpSuit: state.definition.trick ? trumpOf(state) : undefined,
+    /*
+      Face up on the table from the moment it is turned, so it is nobody's secret to redact —
+      but only when it is turned off the STOCK. Whist turns the last card DEALT, and that card
+      stays in the hand it landed in; drawing it again beside the table would put a second copy
+      of somebody's card on the felt.
+    */
+    trumpCard: state.definition.trick?.turnedTrumpFrom === 'stock' ? state.trumpCard : undefined,
+    /** Whether the pile beside the trick is a stock anybody draws from, or just leftovers. */
+    stockDraw: state.definition.trick?.stockDraw || undefined,
     auctionRound: state.definition.trick?.auction ? state.auctionRound : undefined,
     // The auction is public by definition — bids are spoken aloud. The contract that comes out
     // of it is the single most important fact at the table, so everyone sees it.

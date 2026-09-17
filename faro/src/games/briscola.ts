@@ -18,12 +18,16 @@ export const briscola: GameDefinition = {
     name: 'Briscola',
     description:
       'A forty-card pack — nothing from eight to ten. You never have to follow suit: play '
-      + 'anything you like on any trick. Diamonds are the briscola and beat everything else. '
-      + 'Only twelve cards score: an Ace is 11, a Three is 10, a King 4, a Queen 3, a Jack 2, '
+      + 'anything you like on any trick. Three cards each, and the next card off the stock is '
+      + 'turned face up beside it: that suit is the briscola — trump — for the whole hand, and '
+      + 'that card is the last one anybody draws. Everyone draws back up to three after every '
+      + 'trick, winner first. Only twelve cards score: an Ace is 11, a Three is 10, a King 4, a Queen 3, a Jack 2, '
       + 'and everything else nothing at all. The three sits just under the ace in strength, so '
       + 'it is both the card you most want to take and the one you least want to lead. Sixty of '
       + 'the 120 points wins.',
-    players: { min: 2, max: 6 },
+    // Two or four. Three needs a two taken out of the pack so the deal comes out even, and six
+    // is played in fixed threes — neither is the game people mean by Briscola.
+    players: { min: 2, max: 4, step: 2 },
     family: 'trick-taking',
   },
   deck: {
@@ -42,11 +46,9 @@ export const briscola: GameDefinition = {
   ],
   setup: [
     { op: 'shuffle', zone: 'draw' },
-    // Forty cards, dealt out as evenly as the table allows.
-    {
-      op: 'deal', from: 'draw', to: 'hand', countPerPlayer: 8,
-      countByPlayers: { 2: 20, 3: 13, 4: 10, 5: 8, 6: 6 },
-    },
+    // Three each. The rest stays as a stock, which is the whole game: what you hold is a
+    // rolling window on the pack rather than the pack itself.
+    { op: 'deal', from: 'draw', to: 'hand', countPerPlayer: 3 },
   ],
   turnFlow: { order: 'clockwise', startPlayer: 'first', actionsPerTurn: { min: 1, max: 1 } },
   actions: [],
@@ -56,7 +58,11 @@ export const briscola: GameDefinition = {
   ],
   scoring: { mode: 'lowestPoints', winner: 'highestTotal', cardPoints: {}, target: 60 },
   trick: {
-    trump: 'D',
+    // Named by nobody — turned off the stock. See turnedTrump.
+    trump: 'none',
+    turnedTrump: true,
+    turnedTrumpFrom: 'stock',
+    stockDraw: true,
     // The rule that makes it itself.
     mustFollowSuit: false,
     aceHigh: true,

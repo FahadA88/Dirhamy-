@@ -5776,6 +5776,46 @@ button.primary.lg { padding: 13px 28px; font-size: 16px; border-radius: 999px; }
 .trump-badge { background: var(--ac14); border-color: var(--ac45); }
 .trump-badge.none b { font-size: 12px; color: var(--t-muted, rgba(255, 255, 255, .6)); }
 .trick-note { font-size: 12px; color: var(--t-muted, rgba(255, 255, 255, .6)); }
+/* Why one of the numbers is missing. A control that silently has a hole in it reads as a bug. */
+.bid-hook { display: block; margin-top: 8px; font-size: 12px; color: var(--muted); }
+
+/* The stock, for the trick games that keep one (Briscola, Sixty-Six).
+   The turned trump lies face up UNDER the back of the pile, half out, exactly the way it sits
+   on a real table — which is the point: it is public, it is trump, and it is the last card
+   anybody draws, so a player needs to see which card it is and how close it is. */
+.trick-stock {
+  position: absolute; top: 50%; right: -6px; transform: translateY(-50%);
+  display: grid; justify-items: center; gap: 4px;
+  pointer-events: none;
+}
+.trick-stock .stock-trump { transform: rotate(90deg) translateX(14%); }
+.trick-stock .stock-back { margin-top: -26%; }
+.trick-stock .card {
+  width: calc(var(--cw) * .58); height: calc(var(--ch) * .58);
+  border-radius: calc(var(--cr, 10px) * .6);
+  font-size: calc(var(--cw) * .58 / 4.2);
+}
+.trick-stock .pile-label { margin-top: 2px; }
+/* Sideways, and on a phone, the felt has no room to the right of the trick — put it under. */
+@media (max-width: 720px), (orientation: landscape) and (max-height: 540px) {
+  .trick-stock {
+    position: static; transform: none;
+    grid-auto-flow: column; align-items: center; gap: 8px; margin-top: 6px;
+  }
+  .trick-stock .stock-trump { transform: rotate(90deg) scale(.8); }
+  .trick-stock .stock-back { margin-top: 0; }
+  /* The badges hang 30px BELOW the trick on a wide table, where there is 30px to hang into.
+     On a phone the hand panel starts 18px under it, so trump — the thing that decides every
+     trick — was printed half-under the panel. Put both back in the flow instead, stacked under
+     the cards: the trick area is the one .center that has rows to give, and letting them become
+     ordinary flex items in a row would have stood them BESIDE the trick rather than under it. */
+  .center.trick-area { flex-wrap: wrap; }
+  .trick-meta {
+    position: static; transform: none;
+    width: 100%; justify-content: center; order: 3; margin-top: 8px;
+  }
+  .trick-stock { width: 100%; justify-content: center; order: 2; }
+}
 
 /* The game log is the story of the hand, not a debug console. It was monospace green on a
    dark panel, every line the same weight and colour, so nothing stood out and the whole

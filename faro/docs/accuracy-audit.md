@@ -1,6 +1,10 @@
 # Accuracy audit: 55 shipped games
 
-Phase 6. A divergence table, written **before** anything is changed.
+Phase 6 wrote the divergence table below, **before** anything was changed. Phase 7 fixed
+everything it marked wrong; what was done is recorded under "What was done about them".
+
+The table itself is left as it was written, in the present tense, because it is the argument
+the fixes answer — rewriting it to say "used to" would lose the reason any of this happened.
 
 ## How this was done
 
@@ -27,10 +31,10 @@ findings are cited at the bottom.
 |---|---|---|
 | Crazy Eights | OK | 5 each, 7 for two; 8 wild; 8=50, court=10, A=1, rest face value. |
 | Switch | OK | A recognised UK variant set: 8 skips, Q reverses, 2 draws two, joker wild. |
-| Spades | **WRONG** | No sandbag penalty. See S1. |
+| Spades | **WRONG** · fixed | No sandbag penalty. See S1. |
 | Hearts | OK | Pass 3 left/right/across/hold, 2♣ leads, no points on trick one, hearts break, shoot the moon. |
 | Euchre | OK | 24 cards, 5 each, 4 to the kitty, bowers, go alone, to 10. |
-| President | SIMPLIFIED | No card exchange between President and Scum between hands — the rule the game is named for. See S2. |
+| President | SIMPLIFIED · fixed | No card exchange between President and Scum between hands — the rule the game is named for. See S2. |
 | Go Fish | OK | Books of four; 7 cards, 5 at five or more players. |
 | Rummy | SIMPLIFIED | Target 30 is a short game rather than the usual 100+. Deliberate pacing. |
 | Gin Rummy | OK | Knock at 10, gin 25, undercut 25, to 100. |
@@ -44,9 +48,9 @@ findings are cited at the bottom.
 | Forty Thieves | OK | 2 decks, 10×4, same-suit, one card at a time, one pass of the stock. |
 | Tri Peaks | OK | Up-or-down with the ace wrapping. |
 | Whist | OK | 13 each, trump turned, game is 5. |
-| Briscola | **WRONG** | Deals the whole pack instead of 3 with a stock, and fixes trump to diamonds instead of turning it up. See S3. |
+| Briscola | **WRONG** · fixed | Deals the whole pack instead of 3 with a stock, and fixes trump to diamonds instead of turning it up. See S3. |
 | Napoleon | OK | 5 each, bids 3–5, declarer alone. |
-| Sixty-Six | **WRONG** | Deals 10 each of a 24-card pack with no stock, and fixes trump to hearts. See S4. |
+| Sixty-Six | **WRONG** · fixed | Deals 10 each of a 24-card pack with no stock, and fixes trump to hearts. See S4. |
 | Snap | OK | Slap on a match. |
 | Palace | OK | House game. |
 | Three Thirteen | OK | Deal grows 3→13, wild climbs with it, eleven hands. |
@@ -62,7 +66,7 @@ findings are cited at the bottom.
 | Trio | OK | Set-matching, not a card classic. |
 | Kent | OK | Four-card pool, signalling, K-E-N-T letters. |
 | Five Hundred | OK | 43 cards with the joker, bids 6–10, kitty of 3, bowers. |
-| Oh Hell | **WRONG** | Fixed hand size, fixed spade trump, and no hook on the dealer's bid. See S5. |
+| Oh Hell | **WRONG** · fixed | Fixed hand size, fixed spade trump, and no hook on the dealer's bid. See S5. |
 | Black Maria | OK | 3–4 players, Q♠ 13, K♠ 10, A♠ 7, passing. |
 | Big Two | OK | 3–2 ranking, combinations, bombs. |
 | Egyptian Ratscrew | SIMPLIFIED | Slaps on jacks and doubles; no sandwiches and no face-card challenge. |
@@ -73,11 +77,32 @@ findings are cited at the bottom.
 | Continental Rummy | OK | Runs of four, two decks plus jokers. |
 | Canfield | OK | Reserve of 13, four columns, draw three, unlimited redeals. |
 | Pinochle | OK | Double pack, 12 each, the full meld table including a run in trumps. |
-| Skat | **WRONG** | The two-card skat is never dealt. See S6. |
+| Skat | **WRONG** · fixed | The two-card skat is never dealt. See S6. |
 | Hokm | OK | House variant with the two jokers on a timing clock — its own rules, stated. |
 | Ninety-Nine | OK | Three lives, to 5. |
 | Scopa | OK | 40 cards, 3 each, 4 on the table, sweeps, last capture takes the rest. |
 | Contract Rummy | OK | Seven escalating contracts. |
+
+## What was done about them (phase 7)
+
+All six are fixed, and `scripts/accuracy.ts` (`npm run accuracy`, and part of `npm test`) holds
+a check for each. Every one of those checks was written to fail against the definitions as they
+shipped, and they deal, bid and play rather than reading a flag back off the definition — a test
+that only reads the definition proves the definition was edited, not that the rule works.
+
+| Finding | Fix | New engine surface |
+|---|---|---|
+| S1 Spades | Bags carry across the match; every tenth costs 100 and the count resets. | `trick.bagPenalty` |
+| S2 President | Five hands, and from the second on the Scum pays the President their two best cards for the President's two worst. The Vice pair swap one. | `climb.exchange` |
+| S3 Briscola | Three each, trump turned off the stock and drawn last, everyone draws back up after each trick. Two or four players — three needs a stripped pack. | `trick.stockDraw`, `trick.turnedTrumpFrom` |
+| S4 Sixty-Six | Six each of the twenty-four, twelve in the stock, trump turned, last trick worth 10. | `trick.lastTrickBonus` |
+| S5 Oh Hell | Seven cards down to one, a fresh trump turned each deal, and the dealer hooked off the bid that would make the bids add up. | `trick.hookDealer`, negative `growPerHand` |
+| S6 Skat | Two cards to the skat, picked up and buried by the declarer, and what is buried still counts toward their 61. | `numericAuction.kittyScoresToDeclarer` |
+
+Every one of those is a knob in the guided builder too, not just a field in a file — the
+buildability check would fail otherwise, and did until they were wired up. So a game anybody
+builds here can have a stock, a turned trump, a last-trick bonus, sandbags, the hook, a scoring
+kitty or an exchange between hands.
 
 ## The findings
 

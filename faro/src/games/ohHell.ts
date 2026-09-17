@@ -7,7 +7,9 @@ import { GameDefinition } from '../engine/types';
 // game inside out, because half the skill is in throwing tricks away on purpose.
 //
 // The deal shrinks as the match goes on, so a bid of one means something quite different in a
-// seven-card hand than in a two-card one.
+// seven-card hand than in a two-card one. And the dealer is hooked: bidding last, they are not
+// allowed to name the number that would make the bids add up to the tricks available, so the
+// table can never all be right at once.
 export const ohHell: GameDefinition = {
   schemaVersion: '1.0',
   meta: {
@@ -15,10 +17,11 @@ export const ohHell: GameDefinition = {
     name: 'Oh Hell',
     description:
       'Every player bids exactly how many tricks they will take, and has to hit that number on '
-      + 'the nose — one over is as bad as one under. Follow suit if you can; spades are trump. '
-      + 'The hand size shrinks with the table, so at six players you get eight cards and at '
-      + 'three you get seventeen. Score your bid plus a bonus for making it exactly, nothing at '
-      + 'all if you miss. First to 100.',
+      + 'the nose — one over is as bad as one under. Seven cards the first hand, six the next, '
+      + 'down to one; a fresh card is turned for trump every deal. The dealer bids last and is '
+      + 'hooked: they may not bid the number that would make the bids add up, so somebody has '
+      + 'to miss every hand. Score your bid plus a bonus for making it exactly, nothing at all '
+      + 'if you miss. Seven hands, highest total wins.',
     players: { min: 3, max: 6 },
     family: 'trick-taking',
   },
@@ -34,12 +37,10 @@ export const ohHell: GameDefinition = {
   ],
   setup: [
     { op: 'shuffle', zone: 'draw' },
-    // The deal has to change with the table, or a full pack either will not go round or leaves
-    // a pointless stub. Every one of these divides 52 as evenly as it can.
-    {
-      op: 'deal', from: 'draw', to: 'hand', countPerPlayer: 10,
-      countByPlayers: { 3: 17, 4: 13, 5: 10, 6: 8 },
-    },
+    // Seven down to one. The changing deal is the game: a bid of one in a seven-card hand and a
+    // bid of one in a two-card hand are not the same promise at all. Seven fits any table from
+    // three to six with cards left over for the turned trump.
+    { op: 'deal', from: 'draw', to: 'hand', countPerPlayer: 7, growPerHand: -1 },
   ],
   turnFlow: { order: 'clockwise', startPlayer: 'first', actionsPerTurn: { min: 1, max: 1 } },
   actions: [],
@@ -47,12 +48,19 @@ export const ohHell: GameDefinition = {
   endConditions: [
     { id: 'handsEmpty', when: { zoneCount: { zone: 'hand', of: 'anyPlayer', eq: 0 } }, result: 'roundOver' },
   ],
-  scoring: { mode: 'lowestPoints', winner: 'highestTotal', cardPoints: {}, target: 100 },
+  // No target: the match is seven hands long by construction, because the deal counts itself
+  // down to one. A race to 100 would end it in the middle of the countdown.
+  scoring: { mode: 'lowestPoints', winner: 'highestTotal', cardPoints: {}, target: null, handsCap: 7 },
   trick: {
-    trump: 'S',
+    // Turned off the stock every deal — see turnedTrump. A fixed trump would make this
+    // Contract Whist with the serial numbers filed off.
+    trump: 'none',
+    turnedTrump: true,
+    turnedTrumpFrom: 'stock',
     mustFollowSuit: true,
     aceHigh: true,
     scoreBy: 'mostTricks',
     bidding: true,
+    hookDealer: true,
   },
 };
