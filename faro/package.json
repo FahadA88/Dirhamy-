@@ -37,7 +37,8 @@
     "verify:pwa": "node scripts/browser/pwa.mjs",
     "build:artifact": "vite build --config vite.artifact.config.ts && node scripts/pack-artifact.mjs",
     "taptargets": "node scripts/browser/taptargets.mjs",
-    "prerender": "tsx scripts/prerender.ts"
+    "prerender": "tsx scripts/prerender.ts",
+    "rulesheet": "tsx scripts/rulesheet.ts"
   },
   "dependencies": {
     "react": "^18.3.1",
