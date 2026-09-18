@@ -4928,6 +4928,10 @@ which were the two things the palette sweep actually meant
 .profile-tabs { align-self: flex-start; }
 .profile-tabrow { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .profile-export { white-space: nowrap; }
+/* Only ever present when a save could not happen. A button that quietly does nothing is worse
+   than one that says why, and inside a host that will not hand out files that is the whole
+   story the person gets. */
+.profile-savenote { margin: 6px 0 0; font-size: 13px; color: var(--muted); }
 .profile-note { margin: 0; font-size: 13px; }
 .profile-panel { padding: 16px 18px; }
 .profile-panel h4 {

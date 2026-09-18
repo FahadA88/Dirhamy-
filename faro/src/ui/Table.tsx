@@ -30,6 +30,7 @@ import { Seat, MoveRecord } from '../server/matchService';
 import { recordResult, currentStreak, currentLossStreak } from '../social/records';
 import { encodeSharedHand } from '../social/handShare';
 import { renderHandImage, handImageToBlob } from '../social/handImage';
+import { saveFile, saveMessage } from './saveFile';
 
 // This component holds a match id and a redacted view — never a MatchState. Every move it wants
 // to make goes to the service as an intent; the service decides, and hands back the board as
@@ -651,14 +652,8 @@ export function Table({
       moves: clientRef.current.history(),
     };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `faro-match-${def.meta.id}-${new Date().toISOString().slice(0, 10)}.json`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
+    void saveFile(`faro-match-${def.meta.id}-${new Date().toISOString().slice(0, 10)}.json`, blob)
+      .then((r) => { const m = saveMessage(r, 'export'); if (m) setToast({ text: m, tone: 'info' }); });
   }
 
   /** Item 73: "the deal is a seed... that is a shareable link, and it does not exist." Only
@@ -3102,14 +3097,9 @@ export function Table({
                         try { await navigator.share({ files: [file], title: `${def.meta.name} — Faro` }); return; }
                         catch { /* cancelled or unsupported mid-flight; fall through to a download */ }
                       }
-                      const url = URL.createObjectURL(blob);
-                      const a = document.createElement('a');
-                      a.href = url;
-                      a.download = `faro-${def.meta.id}-${new Date().toISOString().slice(0, 10)}.png`;
-                      document.body.appendChild(a);
-                      a.click();
-                      a.remove();
-                      URL.revokeObjectURL(url);
+                      const r = await saveFile(`faro-${def.meta.id}-${new Date().toISOString().slice(0, 10)}.png`, blob);
+                      const m = saveMessage(r, 'picture');
+                      if (m) setToast({ text: m, tone: 'info' });
                     })();
                   }}
                 >

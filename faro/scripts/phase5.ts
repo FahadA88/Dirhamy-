@@ -10,6 +10,7 @@ import { explainGame } from '../src/authoring/explain';
 import { catalog } from '../src/games/catalog';
 import { MatchService } from '../src/server/matchService';
 import { crazyEights } from '../src/games/crazyEights';
+import { saveFile, saveMessage, canSaveFiles } from '../src/ui/saveFile';
 
 let failed = false;
 const check = (label: string, cond: boolean, extra?: unknown) => {
@@ -138,6 +139,57 @@ section('Reporting, blocking and muting');
 
   toggleMute('Loud Person');
   check('muting is separate from blocking', isMuted('Loud Person') && !isBlocked('Loud Person'));
+}
+
+// ---------- handing somebody a file ----------
+section('Every export works, or says why it did not');
+{
+  // The bug this exists to stop: an anchor with a download attribute does nothing at all inside
+  // the claude.ai artifact viewer, so every export in the app was dead there and said nothing.
+  // Each case below is a host the page can find itself in.
+  const win = globalThis as { window?: unknown; document?: unknown; URL?: unknown };
+  const saved: { filename: string; data: unknown }[] = [];
+  const clicks: string[] = [];
+
+  // Enough of a DOM for the plain-browser path to run.
+  win.document = {
+    body: { appendChild: () => {} },
+    createElement: () => ({ href: '', download: '', click() { clicks.push(this.download); }, remove: () => {} }),
+  };
+  (globalThis as { URL: { createObjectURL: unknown; revokeObjectURL: unknown } }).URL
+    = Object.assign(URL, { createObjectURL: () => 'blob:x', revokeObjectURL: () => {} });
+
+  const withHost = (claude: unknown) => { win.window = claude === undefined ? {} : { claude }; };
+
+  // A plain browser tab: no host at all.
+  withHost(undefined);
+  check('a plain browser saves through the anchor', await saveFile('a.json', 'x') === 'saved');
+  check('and the anchor was actually clicked', clicks[0] === 'a.json', clicks);
+  check('nothing is said about a save that worked', saveMessage('saved') === null);
+
+  // A host that grants downloads.
+  withHost({ use: async (n: string) => (n === 'downloads'
+    ? { save: async (r: { filename: string; data: unknown }) => { saved.push(r); return { status: 'saved' }; } }
+    : null) });
+  check('a host with downloads saves through the host', await saveFile('b.json', 'y') === 'saved');
+  check('with the filename and the data', saved[0]?.filename === 'b.json' && saved[0]?.data === 'y', saved[0]);
+  check('and not through the anchor', clicks.length === 1, clicks);
+
+  // The viewer says no. That is the capability working, not a failure.
+  withHost({ use: async () => ({ save: async () => { throw { code: 'declined', message: 'no' }; } }) });
+  check('a refused save reports declined', await saveFile('c.json', 'z') === 'declined');
+  check('and says nothing about it', saveMessage('declined') === null);
+
+  // A host that will not serve downloads at all — the case the anchor used to fail silently in.
+  withHost({ use: async () => null });
+  const out = await saveFile('d.json', 'w');
+  check('a host without downloads reports unavailable', out === 'unavailable', out);
+  check('and says so out loud', (saveMessage(out, 'export') ?? '').includes('cannot save files'));
+  check('and never falls back to the anchor that does nothing', clicks.length === 1, clicks);
+  check('canSaveFiles agrees', await canSaveFiles() === false);
+
+  withHost(undefined);
+  check('and is true in a plain browser', await canSaveFiles() === true);
 }
 
 console.log(failed ? '\nPHASE 5: FAILED' : '\nPHASE 5: all acceptance checks passed');

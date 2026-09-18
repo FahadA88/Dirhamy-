@@ -28,7 +28,8 @@ function dealOf(d: GameDefinition): string {
   if (step.op === 'dealAll') return 'the whole pack';
   const bits = [`${step.countPerPlayer}`];
   if (step.countByPlayers) bits.push(`by seats ${JSON.stringify(step.countByPlayers)}`);
-  if (step.growPerHand) bits.push(`${step.growPerHand > 0 ? '+' : ''}${step.growPerHand}/hand`);
+  const grow = Number(step.growPerHand ?? 0);
+  if (grow) bits.push(`${grow > 0 ? '+' : ''}${grow}/hand`);
   const others = (d.setup ?? []).filter((s) => s.op === 'move' || (s.op === 'deal' && s !== step));
   for (const o of others as Record<string, unknown>[]) bits.push(`${o.count ?? o.countPerPlayer} → ${o.to}`);
   return bits.join(', ');

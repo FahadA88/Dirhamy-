@@ -8,6 +8,7 @@ import { buildDeck } from '../engine/deck';
 import { simulate, SimReport } from '../engine/simulator';
 import { catalog } from '../games/catalog';
 import { GameDefinition, Rank, Suit } from '../engine/types';
+import { saveFile, saveMessage } from './saveFile';
 import { Table } from './Table';
 import { SolitaireTable } from './SolitaireTable';
 import { RestrictionBuilder, RuleBuilder } from './RuleBuilder';
@@ -1429,12 +1430,9 @@ function ExpertEditor({ def, onApply, isOverride }: { def: GameDefinition; onApp
   // takes, so importing is never a second, separately-trusted code path.
   function downloadDefinition() {
     const blob = new Blob([JSON.stringify(def, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${(def.meta.id || def.meta.name || 'game').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'game'}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
+    const name = (def.meta.id || def.meta.name || 'game')
+      .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'game';
+    void saveFile(`${name}.json`, blob).then((r) => setError(saveMessage(r, 'file')));
   }
   function importFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];

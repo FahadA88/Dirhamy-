@@ -5,6 +5,7 @@ import {
   Badge, allResults, badges, currentStreak, highlights, leaderboard, mySummary, playCalendar,
   playStreak, tierFor,
 } from '../social/records';
+import { saveFile, saveMessage } from './saveFile';
 
 // Your record.
 //
@@ -18,6 +19,10 @@ type Tab = 'overview' | 'games' | 'badges';
 export function ProfileView({ onPlay }: { onPlay: () => void }) {
   const { settings } = useSettings();
   const [tab, setTab] = useState<Tab>('overview');
+  // Only ever set when a save went wrong. Handing somebody a file is not guaranteed — inside
+  // the artifact viewer the host asks them first, and can refuse outright — so a button that
+  // quietly does nothing needs a sentence attached to it.
+  const [saveNote, setSaveNote] = useState<string | null>(null);
 
   const summary = useMemo(() => mySummary(), []);
   const results = useMemo(() => allResults(), []);
@@ -55,14 +60,8 @@ export function ProfileView({ onPlay }: { onPlay: () => void }) {
   function exportRecord() {
     const payload = { exportedAt: new Date().toISOString(), player: settings.playerName, results };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `faro-record-${new Date().toISOString().slice(0, 10)}.json`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
+    void saveFile(`faro-record-${new Date().toISOString().slice(0, 10)}.json`, blob)
+      .then((r) => setSaveNote(saveMessage(r, 'backup')));
   }
 
   if (summary.played === 0) {
@@ -126,6 +125,7 @@ export function ProfileView({ onPlay }: { onPlay: () => void }) {
           Download your record ↓
         </button>
       </div>
+      {saveNote && <p className="profile-savenote" role="status">{saveNote}</p>}
 
       {tab === 'overview' && (
         <>
