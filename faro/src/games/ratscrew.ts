@@ -19,6 +19,10 @@ export const ratscrew: GameDefinition = {
     // Seats up to eight, which is about as many as fit round a real table.
     players: { min: 2, max: 8 },
     family: 'reflex',
+    // Said out loud in the rules panel rather than left for a player to discover.
+    simplifications: [
+      'You may slap a jack or a pair. The sandwich (a card, anything, then its match) and the face-card challenge — where the next player owes cards until they turn one up — are not here.',
+    ],
   },
   deck: {
     base: 'standard54', includeJokers: false,

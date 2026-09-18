@@ -14,6 +14,9 @@ import { ohHell } from '../src/games/ohHell';
 import { skat } from '../src/games/skat';
 import { spadesLite } from '../src/games/spades';
 import { president } from '../src/games/president';
+import { catalog } from '../src/games/catalog';
+import { explainGame } from '../src/authoring/explain';
+import { termsFor } from '../src/ui/glossary';
 
 let failed = false;
 const check = (label: string, cond: boolean, extra?: unknown) => {
@@ -175,6 +178,52 @@ section('S2 · President exchanges cards between hands');
   check('the log says who paid whom',
     next.log.some((l) => /pays .* and takes .* back/.test(l.text)),
     next.log.slice(0, 3).map((l) => l.text));
+}
+
+// ---------- the simplifications the audit accepted ----------
+section('Every game the audit called SIMPLIFIED says so on its own rules panel');
+{
+  // The other half of the audit. Five games were WRONG and are fixed above; these are the ones
+  // that are knowingly narrower than the game they are named after. That is a defensible
+  // choice and a dishonest silence — a Bridge player who finds no doubling should be told it
+  // was never there rather than left to conclude the game is broken.
+  const owes = ['Bridge', 'Canasta', 'Hand and Foot', 'Rummy', 'Golf', 'Egyptian Ratscrew', 'Showdown Poker'];
+  for (const name of owes) {
+    const def = catalog.find((d) => d.meta.name === name);
+    const notes = def?.meta.simplifications ?? [];
+    check(`${name} admits what it leaves out`, notes.length > 0, { found: !!def, notes });
+  }
+
+  // And nothing anywhere is a placeholder, a fragment, or a note to a maintainer.
+  for (const def of catalog) {
+    for (const note of def.meta.simplifications ?? []) {
+      const good = note.length > 30 && /[.!?]$/.test(note) && !/TODO|FIXME|XXX/.test(note);
+      check(`${def.meta.name}: "${note.slice(0, 40)}…" reads as a sentence`, good, note);
+    }
+  }
+}
+
+// ---------- what the game says about itself ----------
+section('No game promises a meld the engine would refuse');
+{
+  // Found by putting an honest note next to the old copy: Canasta's rules panel said "Make sets
+  // of 3+ and runs of 3+", drew a run in cards as an example, and listed runs in the shape of a
+  // turn — for a game whose allowRuns is false and whose engine rejects every one of them.
+  const promisesRuns = (d: typeof catalog[number]) => /runs? of \d/i.test(explainGame(d).join(' '));
+  for (const def of catalog) {
+    if (def.rummy?.allowRuns !== false) continue;
+    const said = explainGame(def).join(' ');
+    check(`${def.meta.name} does not offer runs`, !promisesRuns(def), said);
+    check(`${def.meta.name} says outright that it has none`, /no runs/i.test(said), said);
+    const meld = termsFor(def).find((t) => t.term === 'Meld')?.def ?? '';
+    check(`${def.meta.name}'s glossary does not define a meld with runs`,
+      meld.length > 0 && !/\ba run\b/i.test(meld), meld);
+  }
+  // And a game that DOES allow them still says so, or this check would pass by saying nothing.
+  const withRuns = catalog.filter((d) => d.rummy && d.rummy.allowRuns !== false);
+  check(`${withRuns.length} rummies still describe their runs`,
+    withRuns.length > 0 && withRuns.every(promisesRuns),
+    withRuns.filter((d) => !promisesRuns(d)).map((d) => d.meta.name));
 }
 
 console.log(failed ? '\nACCURACY: FAILED' : '\nACCURACY: every audited rule is implemented');

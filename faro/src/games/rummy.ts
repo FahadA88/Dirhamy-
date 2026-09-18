@@ -12,6 +12,10 @@ export const rummy: GameDefinition = {
       'Draw a card from the stock or the discard, lay down sets (three or more of a rank) and runs (three or more in sequence of one suit), then discard. Cards that fit a meld already on the table can be laid off onto it, whoever put it down. First to get rid of every card wins.',
     players: { min: 2, max: 4 },
     family: 'rummy',
+    // Said out loud in the rules panel rather than left for a player to discover.
+    simplifications: [
+      'The target is 30 rather than the 100 or more a real game plays to. It is a short game on purpose.',
+    ],
   },
   deck: {
     base: 'standard54', includeJokers: false,

@@ -40,6 +40,20 @@ export interface GameDefinition {
       step?: number;
     };
     family: string;
+    /**
+     * Where this game knowingly differs from the game it is named after.
+     *
+     * Several of the classics here are narrower than the real thing — a target that is short
+     * because a browser game against bots should not take an hour, a variant rule, a whole
+     * half of the scoring left out. That is a defensible choice and a dishonest silence: a
+     * Bridge player who finds no doubling should be told it was never there, not left to
+     * conclude the game is broken.
+     *
+     * One plain sentence per divergence, written for a player rather than a maintainer, and
+     * shown in the rules panel under its own heading. Absent means "as far as the definition
+     * says anything, this is the real game" — which is the case for most of the catalogue.
+     */
+    simplifications?: string[];
   };
   deck: {
     /**

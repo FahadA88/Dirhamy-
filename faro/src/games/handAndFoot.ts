@@ -31,6 +31,11 @@ export const handAndFoot: GameDefinition = {
     // for in the first place.
     players: { min: 4, max: 8 },
     family: 'rummy',
+    // Said out loud in the rules panel rather than left for a player to discover.
+    simplifications: [
+      'Melds are sets only, which is the real rule — but red threes and the pile-taking rules that go with them are not here.',
+      'The target is 300 rather than the thousands a real game runs to, so a match is a handful of hands.',
+    ],
   },
   deck: {
     base: 'standard54',

@@ -210,7 +210,11 @@ export function explainGame(def: GameDefinition): string[] {
   } else if (def.fish) {
     out.push(`Ask an opponent for a rank you already hold. Collect ${def.fish.bookSize} of a kind to make a book.`);
   } else if (def.rummy) {
-    out.push(`Make sets of ${def.rummy.setMin}+ and runs of ${def.rummy.runMin}+.`);
+    // Canasta and Hand & Foot forbid runs outright (allowRuns: false) — the engine will not
+    // accept one — and this promised them anyway, right next to a diagram drawing one.
+    out.push(def.rummy.allowRuns === false
+      ? `Make sets of ${def.rummy.setMin}+ of a rank. No runs — this game melds ranks only.`
+      : `Make sets of ${def.rummy.setMin}+ and runs of ${def.rummy.runMin}+.`);
     if (def.rummy.knock) out.push('Melds stay hidden; end the hand by knocking.');
   } else if (def.war) {
     out.push('Both players flip. Higher card takes both. Ties mean war.');

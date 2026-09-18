@@ -929,7 +929,12 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
 .teach-log { max-height: 64vh; }
 .teach-deal { justify-content: center; font-style: italic; }
 
-.help-box { max-width: 520px; text-align: left; }
+/* Two selectors, because one was not winning. `.modal-box` sets text-align: center further
+   down the file at the same specificity, so this rule — which has always SAID left — lost the
+   cascade and the whole rules panel was centred: paragraphs of rules ragged on both sides, and
+   the title's drop cap floated hard left while the rest of the name centred away from it, so
+   "Bridge" read as a stray B and the word "ridge". Naming the scrim as well settles it. */
+.modal .help-box { max-width: 520px; text-align: left; }
 /* Rules beside the table, not instead of it (item 34): a right-docked panel rather than a
    centered box, so the table stays visible — dimmed, not replaced — while it's open. The scrim
    still blocks play underneath; that's an explicit trade-off, not an oversight — letting moves
@@ -4932,6 +4937,11 @@ which were the two things the palette sweep actually meant
    than one that says why, and inside a host that will not hand out files that is the whole
    story the person gets. */
 .profile-savenote { margin: 6px 0 0; font-size: 13px; color: var(--muted); }
+
+/* An admission, not a warning: quieter than the rules above it, and not coloured like an
+   error, because a short target on purpose is a design decision rather than a fault. */
+.help-simplifications { color: var(--muted); }
+.help-simplifications li { margin-bottom: 4px; }
 .profile-note { margin: 0; font-size: 13px; }
 .profile-panel { padding: 16px 18px; }
 .profile-panel h4 {

@@ -80,16 +80,17 @@ function panelsFor(def: GameDefinition): Panel[] {
   }
 
   if (def.rummy) {
-    return [
-      {
-        caption: 'A set is three or more of the same rank.',
-        board: [{ card: c('8', 'C') }, { card: c('8', 'H') }, { card: c('8', 'S') }],
-      },
-      {
-        caption: 'A run is three or more in order, all one suit.',
-        board: [{ card: c('4', 'D') }, { card: c('5', 'D') }, { card: c('6', 'D') }],
-      },
-    ];
+    const set = {
+      caption: `A set is ${def.rummy.setMin} or more of the same rank.`,
+      board: [{ card: c('8', 'C') }, { card: c('8', 'H') }, { card: c('8', 'S') }],
+    };
+    // A game that forbids runs was still being shown one, drawn out in cards, as an example of
+    // a legal meld. Canasta and Hand & Foot meld ranks only; the picture has to agree.
+    if (def.rummy.allowRuns === false) return [set];
+    return [set, {
+      caption: `A run is ${def.rummy.runMin} or more in order, all one suit.`,
+      board: [{ card: c('4', 'D') }, { card: c('5', 'D') }, { card: c('6', 'D') }],
+    }];
   }
 
   if (def.war) {

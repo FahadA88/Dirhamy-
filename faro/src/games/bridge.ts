@@ -26,6 +26,12 @@ export const bridge: GameDefinition = {
       + 'vulnerability and no dummy — declarer plays their own hand.',
     players: { min: 4, max: 4, step: 2 },
     family: 'trick-taking',
+    // Said out loud in the rules panel rather than left for a player to discover.
+    simplifications: [
+      'There is no doubling and no redoubling — a contract is worth what it is worth, and there is no way to tell the table you think they cannot make it.',
+      'Nobody is vulnerable. Real Bridge scores a made or failed contract differently depending on how the rubber stands; here every hand is priced the same way.',
+      'It is a race to a score rather than a rubber, so there are no games, no part-scores carrying over and no rubber bonus.',
+    ],
   },
   deck: {
     base: 'standard54', includeJokers: false,

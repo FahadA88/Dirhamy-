@@ -17,6 +17,11 @@ export const showdownPoker: GameDefinition = {
       'Five cards each, blinds posted, one round of betting — check, bet, call, raise or fold — then a showdown. No side pots: if you cannot cover the current bet, folding is your only option. Eight hands, chips carried across all of them, biggest stack at the end takes the table.',
     players: { min: 2, max: 8 },
     family: 'poker',
+    // Said out loud in the rules panel rather than left for a player to discover.
+    simplifications: [
+      'One round of betting and a showdown. There are no community cards, no draw and no second round, which is why it is called Showdown rather than Hold\'em.',
+      'There are no side pots: going short on chips means folding rather than a partial call.',
+    ],
   },
   deck: {
     base: 'standard54', includeJokers: false,

@@ -1,4 +1,4 @@
-import { explainGame } from '../authoring/explain';
+import { explainGame, suitWord } from '../authoring/explain';
 import { GameDefinition } from '../engine/types';
 import { useDismissable } from './useEscape';
 import { GameDiagram } from './GameDiagram';
@@ -89,7 +89,13 @@ const FAMILY_HOW: Record<string, string[]> = {
 // The rules used to live only on the library card, which you can't see once you're playing.
 export function GameHelp({ def, onClose }: { def: GameDefinition; onClose: () => void }) {
   const ref = useDismissable(true, onClose);
-  const steps = FAMILY_HOW[def.meta.family] ?? [];
+  // The family blurb is written for the family, and one line of the rummy one is not true of
+  // every rummy: Canasta and Hand & Foot meld ranks only. Swap that line rather than dropping
+  // the section, so the turn still reads as three steps.
+  const steps = (FAMILY_HOW[def.meta.family] ?? []).map((line) => (
+    def.rummy?.allowRuns === false && line.startsWith('Sets are three or more of a rank;')
+      ? `Sets are ${def.rummy.setMin} or more of a rank. This game has no runs.`
+      : line));
   // A game built in the builder has no family blurb, and any game may carry author-written
   // rules. explainGame() covers both, so the rules panel is never wrong about a custom game.
   const summary = explainGame(def);
@@ -116,6 +122,20 @@ export function GameHelp({ def, onClose }: { def: GameDefinition; onClose: () =>
           {summary.map((line, i) => <li key={i}>{line}</li>)}
         </ul>
 
+        {/* Where this stops being the game it is named after.
+            Several classics here are deliberately narrower than the real thing — a short
+            target, a variant rule, a whole half of the scoring left out. Leaving that
+            unsaid reads as a bug to anyone who knows the game, so it gets its own heading
+            rather than a hedge buried in the blurb. */}
+        {(def.meta.simplifications?.length ?? 0) > 0 && (
+          <>
+            <div className="help-head">Not quite the whole game</div>
+            <ul className="help-list help-simplifications">
+              {def.meta.simplifications!.map((line) => <li key={line}>{line}</li>)}
+            </ul>
+          </>
+        )}
+
         {steps.length > 0 && (
           <>
             <div className="help-head">The shape of a turn</div>
@@ -128,7 +148,15 @@ export function GameHelp({ def, onClose }: { def: GameDefinition; onClose: () =>
           <div><dt>Family</dt><dd>{kindLabel(def)}</dd></div>
           <div><dt>Players</dt><dd>{def.meta.players.min === def.meta.players.max
             ? def.meta.players.min : `${def.meta.players.min}–${def.meta.players.max}`}</dd></div>
-          {def.trick && <div><dt>Trump</dt><dd>{def.trick.auction ? 'named each hand' : def.trick.trump === 'none' ? 'none' : def.trick.trump}</dd></div>}
+          {/* Four ways a game decides trump, and this knew about two of them: a contract auction
+              (Bridge, Skat, Five Hundred) and a turned card (Whist, Briscola) both read "none"
+              here, because "none" is what the definition writes in the field an auction is
+              going to override. A Bridge player told trump is none has been told a lie. */}
+          {def.trick && <div><dt>Trump</dt><dd>{
+            def.trick.auction || def.trick.numericAuction ? 'bid for each hand'
+              : def.trick.turnedTrump ? 'a card is turned for it each hand'
+                : def.trick.trump === 'none' ? 'none' : suitWord(def.trick.trump)
+          }</dd></div>}
           {def.scoring.target != null && <div><dt>Match</dt><dd>race to {def.scoring.target}</dd></div>}
           {cfg && <div><dt>Board</dt><dd>{cfg.columns} columns · {cfg.foundations} foundations{cfg.freeCells ? ` · ${cfg.freeCells} free cells` : ''}</dd></div>}
         </dl>

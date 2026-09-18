@@ -179,6 +179,17 @@ Eleven solitaires, the five house games (Trade Winds, Undertow, Palace, Dutch, K
 Hokm's joker variant have no external reference to diverge from; they are audited against their
 own descriptions and match them.
 
+Every SIMPLIFIED entry now says so in its own rules panel, under "Not quite the whole game" —
+`meta.simplifications`, one plain sentence per divergence, written for a player. A short target
+on purpose is a design decision; leaving it unsaid is a player concluding the game is broken.
+`scripts/accuracy.ts` fails if any of the seven stops admitting it.
+
+Writing those sentences turned up a real one. Canasta and Hand & Foot set `allowRuns: false` —
+the engine rejects a run — while the rules panel said "Make sets of 3+ and runs of 3+", drew a
+run in cards as an example of a legal meld, listed runs in the shape of a turn, and defined the
+word "meld" using them. Four places promising a move the game does not have. All four now read
+the flag, and there is a check for it.
+
 Four entries are marked SIMPLIFIED on scoring targets alone — Rummy at 30, Canasta and Hand and
 Foot at 300, Bridge at 100. Those are pacing decisions for a game played against bots in a
 browser, and the Canasta file already explains its reasoning. The one thing worth doing there is

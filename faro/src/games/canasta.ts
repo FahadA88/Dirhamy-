@@ -21,6 +21,11 @@ export const canasta: GameDefinition = {
       + 'already on the table. First to shed every card ends the hand; lowest total wins.',
     players: { min: 2, max: 4 },
     family: 'rummy',
+    // Said out loud in the rules panel rather than left for a player to discover.
+    simplifications: [
+      'Melds are sets only. Real Canasta has no runs either, so this matches — but red threes, freezing the pile and taking the discard pile as a whole are all left out.',
+      'The target is 300 rather than the usual 5000, which is a few hands instead of an evening.',
+    ],
   },
   deck: {
     base: 'standard54',

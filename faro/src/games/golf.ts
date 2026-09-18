@@ -18,6 +18,10 @@ export const golf: GameDefinition = {
       + 'win, and the fewer cards you leave behind, the better the round.',
     players: { min: 1, max: 1 },
     family: 'solitaire',
+    // Said out loud in the rules panel rather than left for a player to discover.
+    simplifications: [
+      'Building wraps around: a king accepts an ace and an ace accepts a king. That is a common variant rather than the base game, where the king is a dead end.',
+    ],
   },
   deck: {
     base: 'standard54', includeJokers: false,

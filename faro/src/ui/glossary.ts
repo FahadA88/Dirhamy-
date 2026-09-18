@@ -90,5 +90,20 @@ const GAME_TERMS: Record<string, [string, string][]> = {
 export function termsFor(def: GameDefinition): { term: string; def: string }[] {
   const family = FAMILY_TERMS[kindOf(def)] ?? [];
   const own = GAME_TERMS[def.meta.id] ?? [];
-  return [...family, ...own].map(([term, d]) => ({ term, def: d }));
+  return [...family, ...own].map(([term, d]) => ({ term, def: defineFor(def, term, d) }));
+}
+
+/**
+ * A family term, narrowed to the game actually being played.
+ *
+ * The family definition of a meld includes runs, and Canasta and Hand & Foot do not have them —
+ * the engine rejects every one. A glossary that defines a word using a rule the game forbids is
+ * teaching the wrong game, so the one term that varies gets adjusted rather than the whole
+ * family entry being duplicated per game.
+ */
+function defineFor(def: GameDefinition, term: string, text: string): string {
+  if (term === 'Meld' && def.rummy?.allowRuns === false) {
+    return `${def.rummy.setMin} or more of the same rank, laid down as a group. This game has no runs.`;
+  }
+  return text;
 }
