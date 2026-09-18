@@ -41,7 +41,12 @@ const BUDGETS: Budget[] = [
   // the face-up trump lying half under the back of the pile, with a count, and a second
   // arrangement for phones and landscape where there is no room to the right of the trick.
   // Without it the rule is implemented and invisible, which is the same as not having it.
-  { pattern: /^index-.*\.css$/, maxKB: 272, label: 'stylesheet' },
+  //
+  // 272 -> 278: the palette was rebuilt twice in one pass — once down to muted pigments and once
+  // back up to casino colour — and what survives is a third set of felts, a fourth room light,
+  // two gold edge tokens, and the gilt inlay the tables wear. Sitting 0.4 KB under a ceiling is
+  // not a budget, it is a tripwire.
+  { pattern: /^index-.*\.css$/, maxKB: 278, label: 'stylesheet' },
 ];
 
 const files = readdirSync(DIST);

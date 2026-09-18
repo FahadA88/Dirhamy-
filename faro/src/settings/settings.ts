@@ -342,15 +342,15 @@ export const THEME_PACKS: ThemePack[] = [
 
   /* The house look, and what the app opens on. Dyed cloth, tarnished brass, old ivory —
      every colour on the screen is something a real table is made of. */
-  { id: 'club', name: 'The Card Room', blurb: 'Green baize, brass trim, ivory cards. The house look.', accent: 'emerald', tableFelt: 'mahogany', cardBack: 'lattice', cardFace: 'classic' },
+  { id: 'club', name: 'The Card Room', blurb: 'Green baize under a lamp, gold on the rail. The house look.', accent: 'emerald', tableFelt: 'mahogany', cardBack: 'lattice', cardFace: 'classic' },
 
   /* No hue in the furniture at all: graphite, pewter and one brass accent for what has been
      won. Every colour on the screen belongs to the cards. The strictest reading of quiet. */
-  { id: 'inkmetal', name: 'Ink & Metal', blurb: 'Graphite and pewter. The only colour is on the cards.', accent: 'amber', tableFelt: 'zinc', cardBack: 'halftone', cardFace: 'mono' },
+  { id: 'inkmetal', name: 'High Roller', blurb: 'Oxblood velvet, gold inlay, and nothing cheap in the room.', accent: 'amber', tableFelt: 'velvet', cardBack: 'artdeco', cardFace: 'deco' },
 
   /* Cold everywhere, warm once. Slate blue through the interface and a copper signal on the
      one thing that matters — which is also how the table already marks what you have won. */
-  { id: 'coldmodern', name: 'Cold Modern', blurb: 'Slate and smoked glass, with one copper signal.', accent: 'ocean', tableFelt: 'darkglass', cardBack: 'linen', cardFace: 'minimal' },
+  { id: 'coldmodern', name: 'After Midnight', blurb: 'Indigo cloth under the sign outside. The room at 3am.', accent: 'teal', tableFelt: 'neon', cardBack: 'neongrid', cardFace: 'big-index' },
 
   { id: 'neon', name: 'Neon Table', blurb: 'A card room after midnight, lit by the sign outside.', accent: 'teal', tableFelt: 'neon', cardBack: 'monogram', cardFace: 'classic' },
   { id: 'parlour', name: 'Sunlit Parlour', blurb: 'Afternoon light on a quiet table.', accent: 'amber', tableFelt: 'parlour', cardBack: 'ivory', cardFace: 'typographic' },
@@ -367,38 +367,42 @@ export const THEME_PACKS: ThemePack[] = [
 export interface AccentPreset { name: string; green: string; greenD: string; emerald: string; lime: string; }
 
 /*
-  Eight pigments, not eight hues off a framework's default ramp.
+  Eight casino chips.
 
-  What was here — #16a34a, #2563eb, #7c3aed, #14b8a6, #e11d48, #f59e0b, #64748b — is Tailwind's
-  500 step in seven families, at full chroma, which is the palette every generated interface has
-  worn for three years. It is also the wrong register for this: a card room is dyed cloth,
-  tarnished metal and old paper, and none of those things are fluorescent.
+  Two wrong answers got us here. The first was the framework default — Tailwind's 500 step in
+  seven families, the palette every generated interface wears. The second was the over-correction
+  away from it: pigments so far down in chroma that the place stopped reading as a card room at
+  all and started reading as a design studio. Quiet is not the same as tasteful, and a card room
+  is not a quiet place.
 
-  So every ramp is pulled down in chroma and off the primary axes, and named for what it
-  actually is. The IDS are unchanged on purpose — they are written into saved settings on every
-  device that has ever opened this, and each one still points at its own hue family, so nobody's
-  chosen colour jumps somewhere unrecognisable. The id is history; the name is the colour.
+  So: the colours a casino actually owns, at the strength it actually uses them. These are chip
+  denominations — white, red, green, black, purple, gold — plus the cloth and the metal. Rich,
+  saturated, and lit. The restraint lives in the LAYOUT now, which is where it belongs: one bold
+  thing per screen, on glass, with room around it. Not in the colours.
+
+  The ids are unchanged, as before — they are written into saved settings on every device that
+  has ever opened this.
 
   Four steps, darkest first: greenD, green, emerald, lime. A dark room takes the brighter pair
   and a light room the deeper pair — see applySettings.
 */
 export const ACCENTS: Record<AccentId, AccentPreset> = {
-  /** Table green. The one every card room in the world is already painted. */
-  emerald: { name: 'Baize',     green: '#2C6B4A', greenD: '#1F5138', emerald: '#3F8A62', lime: '#63AD85' },
-  /** Slate blue — the colour of a window at dusk, not of a hyperlink. */
-  ocean:   { name: 'Steel',     green: '#3A6184', greenD: '#2B4A66', emerald: '#5480A6', lime: '#7CA4C6' },
-  /** Dusty plum. Violet with the electricity taken out of it. */
-  violet:  { name: 'Damson',    green: '#5F4372', greenD: '#4A3358', emerald: '#7D5C92', lime: '#A186B2' },
-  /** Aged copper — the green that metal goes, cooler and greyer than a teal. */
-  teal:    { name: 'Verdigris', green: '#2A6F69', greenD: '#1E5450', emerald: '#3D8F87', lime: '#66B0A6' },
-  /** Deep red-brown. The red suits and the velvet, not a notification badge. */
-  rose:    { name: 'Oxblood',   green: '#8C2F39', greenD: '#6E2129', emerald: '#AE4650', lime: '#C9727A' },
-  /** Warm metal. The rail, the trim, and everything that has been won. */
-  amber:   { name: 'Brass',     green: '#9A7230', greenD: '#7E5A22', emerald: '#B99147', lime: '#D4B071' },
-  /** Neutral, faintly warm grey. For a room with no colour in it at all. */
-  slate:   { name: 'Pewter',    green: '#5A6168', greenD: '#454B52', emerald: '#767E87', lime: '#9BA3AC' },
-  /** Burnt orange-brown — the one warm signal in an otherwise cold room. */
-  copper:  { name: 'Copper',    green: '#96522F', greenD: '#7A3E22', emerald: '#B36B42', lime: '#CB8E68' },
+  /** The cloth. Billiard green — the colour the whole room is built around. */
+  emerald: { name: 'Baize',     green: '#0A8A4E', greenD: '#056B3C', emerald: '#12B268', lime: '#46D993' },
+  /** The metal. Rails, trim, chips of the highest denomination, and everything won. */
+  amber:   { name: 'Gold',      green: '#C08D18', greenD: '#9A6E10', emerald: '#E3B03A', lime: '#FFD470' },
+  /** The other half of every deck and every wheel. */
+  rose:    { name: 'Crimson',   green: '#B5122C', greenD: '#8E0E22', emerald: '#DE2145', lime: '#FF5E76' },
+  /** The blue chip, and the only cool colour on a warm table. */
+  ocean:   { name: 'Sapphire',  green: '#1656A8', greenD: '#10407F', emerald: '#2276D6', lime: '#5AA0F0' },
+  /** The five-hundred chip. The one nobody at a low table ever sees. */
+  violet:  { name: 'Amethyst',  green: '#6A24B0', greenD: '#4E1A86', emerald: '#8B3DDB', lime: '#B173F0' },
+  /** The sign in the window, after midnight. */
+  teal:    { name: 'Peacock',   green: '#088C8C', greenD: '#056B6B', emerald: '#0FB5B0', lime: '#3EE0D6' },
+  /** Hot orange — a dealer's button, a warning, a hand you should be watching. */
+  copper:  { name: 'Tangerine', green: '#C4530C', greenD: '#9A3D08', emerald: '#EE7016', lime: '#FF9A4D' },
+  /** Bright silver rather than grey. Chrome, not concrete. */
+  slate:   { name: 'Platinum',  green: '#77828F', greenD: '#5A6472', emerald: '#98A3B0', lime: '#C2CBD6' },
 };
 
 export interface FeltPreset { name: string; blurb: string }
@@ -624,6 +628,24 @@ export function resolveMotion(mode: MotionMode): 'full' | 'reduced' {
   return mode;
 }
 
+/**
+ * Black or white, whichever can actually be read on this colour.
+ *
+ * WCAG relative luminance, with the usual 0.179 crossover — the point at which white text and
+ * black text contrast equally against a background. Off-black and off-white rather than the
+ * extremes, because pure #000 on a saturated fill reads as a hole.
+ */
+function readableInkOn(hex: string): string {
+  const h = hex.replace('#', '');
+  const n = parseInt(h.length === 3 ? h.split('').map((c) => c + c).join('') : h.slice(0, 6), 16);
+  const chan = (c: number) => {
+    const v = c / 255;
+    return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+  };
+  const lum = 0.2126 * chan((n >> 16) & 255) + 0.7152 * chan((n >> 8) & 255) + 0.0722 * chan(n & 255);
+  return lum > 0.179 ? '#141210' : '#FFFFFF';
+}
+
 // Push settings into the DOM: CSS custom properties + data-* attributes the stylesheet keys off.
 export function applySettings(s: Settings): void {
   const root = document.documentElement;
@@ -654,6 +676,15 @@ export function applySettings(s: Settings): void {
   const accentHi = theme === 'dark' ? a.lime : a.emerald;
   root.style.setProperty('--accent', accent);
   root.style.setProperty('--accent-hi', accentHi);
+  /*
+    The ink that goes ON a filled accent.
+    Every "this is the chosen one" control is a pill filled with the accent now, and whether its
+    label should be black or white is a property of the colour, not of the theme: white on Gold
+    or Platinum is unreadable, black on Crimson or Amethyst is worse. CSS cannot branch on
+    luminance, so it is worked out here, off the lighter of the two steps the pill is actually
+    painted with — the gradient's top stop is what most of the label sits on.
+  */
+  root.style.setProperty('--on-accent', readableInkOn(accentHi));
   // 'system' asks the machine. The stylesheet already honours the media query on its own, but
   // the app reads data-motion in JS too, so it has to resolve to a real answer here.
   root.setAttribute('data-motion', resolveMotion(s.motion));

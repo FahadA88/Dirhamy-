@@ -257,10 +257,10 @@ for (const theme of ['dark', 'light'] as const) {
   const panelOverPage = compositeOver(parseColor(tokens.panel), bg0);
   for (const [id, a] of Object.entries(ACCENTS)) {
     const accent = theme === 'dark' ? a.emerald : a.green;
-    // --accent-ink: the bright step on dark, the accent 78% of the way to black on light.
+    // --accent-ink: the bright step on dark, the accent 62% of the way to black on light.
     const inkRgb = theme === 'dark'
       ? hexToRgb(a.lime)
-      : (hexToRgb(accent).map((c) => Math.round(c * 0.78)) as [number, number, number]);
+      : (hexToRgb(accent).map((c) => Math.round(c * 0.62)) as [number, number, number]);
     // --ac14 is the accent at 14%, painted on the panel, which is itself on the page.
     const wash = compositeOver([...hexToRgb(accent), 0.14] as [number, number, number, number],
       [...panelOverPage, 1] as [number, number, number, number]);
