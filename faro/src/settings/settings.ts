@@ -2,7 +2,7 @@
 // and applied live — appearance AND gameplay, not just game rules.
 
 export type ThemeMode = 'light' | 'dark' | 'system';
-export type AccentId = 'emerald' | 'ocean' | 'violet' | 'teal' | 'rose' | 'amber' | 'slate';
+export type AccentId = 'emerald' | 'ocean' | 'violet' | 'teal' | 'rose' | 'amber' | 'slate' | 'copper';
 /** Every back on the menu. Pure decoration — a back carries no information, so any of them
  *  is safe to ship and safe to let somebody make their own version of. */
 export type CardBack =
@@ -220,11 +220,13 @@ export interface Settings {
 }
 
 export const defaultSettings: Settings = {
-  // Neon Table is the house look, and a card room after midnight is dark. Daylight is a choice.
+  // The Card Room is the house look, and a card room is dark. Daylight is a choice.
+  // These four have to agree with the 'club' pack in THEME_PACKS or the app opens showing a
+  // look it is not actually wearing.
   theme: 'dark',
-  accent: 'teal',
+  accent: 'emerald',
   cardBack: 'lattice',
-  tableFelt: 'litedges',
+  tableFelt: 'mahogany',
   cardFace: 'classic',
   customBack: null,
   cardSize: 100,
@@ -327,10 +329,30 @@ export interface ThemePack {
 export type MyLook = Omit<ThemePack, 'blurb'>;
 
 export const THEME_PACKS: ThemePack[] = [
-  // The house look leads the list, and it is the one the app opens on — so it is the one that
-  // shows as chosen until somebody changes something.
-  { id: 'club', name: 'The Card Room', blurb: 'The house look — mahogany, brass and green baize.', accent: 'teal', tableFelt: 'mahogany', cardBack: 'lattice', cardFace: 'classic' },
-  { id: 'neon', name: 'Neon Table', blurb: 'A card room after midnight, lit by the sign outside.', accent: 'emerald', tableFelt: 'neon', cardBack: 'monogram', cardFace: 'classic' },
+  /*
+    Three whole colourways lead the list, because a colourway is the thing people actually
+    choose — not an accent on its own. Each one is a complete answer to "what room is this":
+    what the cloth is made of, what the cards are printed on, and what colour the interface
+    round them is allowed to be.
+
+    They are deliberately different arguments rather than three shades of the same one:
+    a room with pigment in it, a room with no hue at all, and a cold room with a single
+    warm thing in it.
+  */
+
+  /* The house look, and what the app opens on. Dyed cloth, tarnished brass, old ivory —
+     every colour on the screen is something a real table is made of. */
+  { id: 'club', name: 'The Card Room', blurb: 'Green baize, brass trim, ivory cards. The house look.', accent: 'emerald', tableFelt: 'mahogany', cardBack: 'lattice', cardFace: 'classic' },
+
+  /* No hue in the furniture at all: graphite, pewter and one brass accent for what has been
+     won. Every colour on the screen belongs to the cards. The strictest reading of quiet. */
+  { id: 'inkmetal', name: 'Ink & Metal', blurb: 'Graphite and pewter. The only colour is on the cards.', accent: 'amber', tableFelt: 'zinc', cardBack: 'halftone', cardFace: 'mono' },
+
+  /* Cold everywhere, warm once. Slate blue through the interface and a copper signal on the
+     one thing that matters — which is also how the table already marks what you have won. */
+  { id: 'coldmodern', name: 'Cold Modern', blurb: 'Slate and smoked glass, with one copper signal.', accent: 'ocean', tableFelt: 'darkglass', cardBack: 'linen', cardFace: 'minimal' },
+
+  { id: 'neon', name: 'Neon Table', blurb: 'A card room after midnight, lit by the sign outside.', accent: 'teal', tableFelt: 'neon', cardBack: 'monogram', cardFace: 'classic' },
   { id: 'parlour', name: 'Sunlit Parlour', blurb: 'Afternoon light on a quiet table.', accent: 'amber', tableFelt: 'parlour', cardBack: 'ivory', cardFace: 'typographic' },
   { id: 'midnight', name: 'Midnight Blue', blurb: 'Deep and cool, easy on the eyes.', accent: 'ocean', tableFelt: 'midnight', cardBack: 'neongrid', cardFace: 'big-index' },
   { id: 'autumn', name: 'Autumn Study', blurb: 'Mahogany, brass and old paper.', accent: 'amber', tableFelt: 'mahogany', cardBack: 'kraft', cardFace: 'woodcut' },
@@ -338,18 +360,45 @@ export const THEME_PACKS: ThemePack[] = [
   { id: 'spring', name: 'Spring Green', blurb: 'Fresh felt, bright cards.', accent: 'emerald', tableFelt: 'vegas', cardBack: 'lattice', cardFace: 'four-color' },
   { id: 'noir', name: 'Chalk & Noir', blurb: 'Blackboard green, chalk-white pips.', accent: 'slate', tableFelt: 'chalkboard', cardBack: 'halftone', cardFace: 'mono' },
   { id: 'vegas', name: 'Vegas Red', blurb: 'Oxblood velvet and gold trim.', accent: 'rose', tableFelt: 'velvet', cardBack: 'sunburst', cardFace: 'deco' },
+  { id: 'study', name: 'The Study', blurb: 'Damson cloth, walnut rail, and a lamp on one corner.', accent: 'violet', tableFelt: 'walnut', cardBack: 'damask', cardFace: 'typographic' },
+  { id: 'signal', name: 'Copper Signal', blurb: 'A concrete table with one hot metal edge.', accent: 'copper', tableFelt: 'concrete', cardBack: 'kraft', cardFace: 'big-index' },
 ];
 
 export interface AccentPreset { name: string; green: string; greenD: string; emerald: string; lime: string; }
 
+/*
+  Eight pigments, not eight hues off a framework's default ramp.
+
+  What was here — #16a34a, #2563eb, #7c3aed, #14b8a6, #e11d48, #f59e0b, #64748b — is Tailwind's
+  500 step in seven families, at full chroma, which is the palette every generated interface has
+  worn for three years. It is also the wrong register for this: a card room is dyed cloth,
+  tarnished metal and old paper, and none of those things are fluorescent.
+
+  So every ramp is pulled down in chroma and off the primary axes, and named for what it
+  actually is. The IDS are unchanged on purpose — they are written into saved settings on every
+  device that has ever opened this, and each one still points at its own hue family, so nobody's
+  chosen colour jumps somewhere unrecognisable. The id is history; the name is the colour.
+
+  Four steps, darkest first: greenD, green, emerald, lime. A dark room takes the brighter pair
+  and a light room the deeper pair — see applySettings.
+*/
 export const ACCENTS: Record<AccentId, AccentPreset> = {
-  emerald: { name: 'Emerald', green: '#16a34a', greenD: '#0e7a37', emerald: '#10b981', lime: '#4ade80' },
-  ocean:   { name: 'Ocean',   green: '#2563eb', greenD: '#1d4ed8', emerald: '#3b82f6', lime: '#60a5fa' },
-  violet:  { name: 'Violet',  green: '#7c3aed', greenD: '#6d28d9', emerald: '#8b5cf6', lime: '#a78bfa' },
-  teal:    { name: 'Teal',    green: '#0d9488', greenD: '#0f766e', emerald: '#14b8a6', lime: '#2dd4bf' },
-  rose:    { name: 'Rose',    green: '#e11d48', greenD: '#be123c', emerald: '#f43f5e', lime: '#fb7185' },
-  amber:   { name: 'Amber',   green: '#d97706', greenD: '#b45309', emerald: '#f59e0b', lime: '#fbbf24' },
-  slate:   { name: 'Slate',   green: '#475569', greenD: '#334155', emerald: '#64748b', lime: '#94a3b8' },
+  /** Table green. The one every card room in the world is already painted. */
+  emerald: { name: 'Baize',     green: '#2C6B4A', greenD: '#1F5138', emerald: '#3F8A62', lime: '#63AD85' },
+  /** Slate blue — the colour of a window at dusk, not of a hyperlink. */
+  ocean:   { name: 'Steel',     green: '#3A6184', greenD: '#2B4A66', emerald: '#5480A6', lime: '#7CA4C6' },
+  /** Dusty plum. Violet with the electricity taken out of it. */
+  violet:  { name: 'Damson',    green: '#5F4372', greenD: '#4A3358', emerald: '#7D5C92', lime: '#A186B2' },
+  /** Aged copper — the green that metal goes, cooler and greyer than a teal. */
+  teal:    { name: 'Verdigris', green: '#2A6F69', greenD: '#1E5450', emerald: '#3D8F87', lime: '#66B0A6' },
+  /** Deep red-brown. The red suits and the velvet, not a notification badge. */
+  rose:    { name: 'Oxblood',   green: '#8C2F39', greenD: '#6E2129', emerald: '#AE4650', lime: '#C9727A' },
+  /** Warm metal. The rail, the trim, and everything that has been won. */
+  amber:   { name: 'Brass',     green: '#9A7230', greenD: '#7E5A22', emerald: '#B99147', lime: '#D4B071' },
+  /** Neutral, faintly warm grey. For a room with no colour in it at all. */
+  slate:   { name: 'Pewter',    green: '#5A6168', greenD: '#454B52', emerald: '#767E87', lime: '#9BA3AC' },
+  /** Burnt orange-brown — the one warm signal in an otherwise cold room. */
+  copper:  { name: 'Copper',    green: '#96522F', greenD: '#7A3E22', emerald: '#B36B42', lime: '#CB8E68' },
 };
 
 export interface FeltPreset { name: string; blurb: string }

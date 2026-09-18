@@ -298,6 +298,11 @@ body::before {
     radial-gradient(140vw 64vh at 46% 122%, var(--lamp-floor) 0%, transparent 74%);
 }
 :root {
+  /* The accent AS TYPE. --accent-hi is the bright end of the ramp, which is right for a
+     highlight on a dark ground and unreadable as 13px text on a pale one; every "this is the
+     chosen tab / filter / segment" rule needs the readable end instead. Dark room: the bright
+     step. Light room: the accent taken most of the way to black. */
+  --accent-ink: var(--accent-hi);
   --lamp-key: color-mix(in srgb, var(--accent) 12%, transparent);
   /* Pulled a long way round the wheel from the accent and then almost all the way to nothing:
      a second light of a different colour is what stops the page reading as one flat tint. */
@@ -309,6 +314,7 @@ body::before {
   --hairline: rgba(255, 255, 255, 0.09);
 }
 :root[data-theme="light"] {
+  --accent-ink: color-mix(in srgb, var(--accent) 78%, #000);
   --lamp-key: color-mix(in srgb, var(--accent) 9%, transparent);
   --lamp-cool: color-mix(in srgb, color-mix(in srgb, var(--accent) 35%, #3a4fd8) 7%, transparent);
   --lamp-floor: color-mix(in srgb, var(--accent) 4%, transparent);
@@ -660,11 +666,11 @@ h2 { letter-spacing: -0.025em; color: var(--ink); font-size: 22px; font-weight: 
   --felt-bg:
     radial-gradient(120% 90% at 50% -10%, rgba(255,255,255,0.16), transparent 55%),
     radial-gradient(90% 120% at 50% 120%, rgba(0,0,0,0.42), transparent 60%),
-    linear-gradient(#1d6b3d, #14522e);
+    linear-gradient(#276147, #1B4835);
   --felt-shadow: inset 0 0 0 2px rgba(0,0,0,0.45), inset 0 14px 40px rgba(0,0,0,0.40);
-  --t-ink: #eef7f0; --t-muted: rgba(226,242,231,0.62); --t-key: #7dd8a0;
+  --t-ink: #eef7f0; --t-muted: rgba(226,242,231,0.62); --t-key: #93C7AB;
   --t-line: rgba(255,255,255,0.14); --t-panel: rgba(0,0,0,0.26);
-  --t-seat: rgba(255,255,255,0.09); --t-seat-line: rgba(160,230,185,0.5);
+  --t-seat: rgba(255,255,255,0.09); --t-seat-line: rgba(147,199,171,0.5);
 }
 .rail-furniture .well {
   position: absolute; width: 22px; height: 22px; margin-left: -11px; border-radius: 50%;
@@ -684,9 +690,9 @@ h2 { letter-spacing: -0.025em; color: var(--ink); font-size: 22px; font-weight: 
   --rail-bg: linear-gradient(180deg, #d8dde0, #a8b2b8 40%, #78838a);
   --rail-shadow: inset 0 2px 0 rgba(255,255,255,0.8), 0 16px 38px rgba(20, 50, 35, 0.24);
   --felt-bg:
-    radial-gradient(150% 100% at 50% 0%, #1f9a55, #128243 62%, #0c6d38);
+    radial-gradient(150% 100% at 50% 0%, #2E7A55, #246444 62%, #1A5238);
   --felt-shadow: inset 0 0 0 2px rgba(255,255,255,0.16);
-  --t-ink: #ffffff; --t-muted: rgba(255,255,255,0.72); --t-key: #ffe9a8;
+  --t-ink: #ffffff; --t-muted: rgba(255,255,255,0.72); --t-key: #E3CB92;
   --t-line: rgba(255,255,255,0.28); --t-panel: rgba(255,255,255,0.14);
   --t-seat: rgba(255,255,255,0.16); --t-seat-line: rgba(255,255,255,0.6);
 }
@@ -705,7 +711,7 @@ h2 { letter-spacing: -0.025em; color: var(--ink); font-size: 22px; font-weight: 
     repeating-linear-gradient(93deg, rgba(255,240,220,0.07) 0 9px, rgba(96,60,26,0.09) 9px 19px),
     linear-gradient(160deg, #b98552, #9a6a3c 45%, #7d5330);
   --rail-shadow: inset 0 0 0 1px rgba(255,240,220,0.26), inset 0 -2px 6px rgba(70,42,16,0.4), 0 14px 34px rgba(70,48,22,0.24);
-  --felt-bg: linear-gradient(#5f8f70, #4b7659);
+  --felt-bg: linear-gradient(#6D8F7A, #577665);
   --felt-shadow: inset 0 0 0 1px rgba(255,255,255,0.20), inset 0 6px 20px rgba(0,0,0,0.16);
   --t-ink: #f8faf6; --t-muted: rgba(244,252,247,0.74); --t-key: #ffffff;
   --t-line: rgba(255,255,255,0.34); --t-panel: rgba(255,255,255,0.14);
@@ -727,14 +733,14 @@ h2 { letter-spacing: -0.025em; color: var(--ink); font-size: 22px; font-weight: 
   --rail-bg: linear-gradient(180deg, #23282b, #101315);
   --rail-shadow: inset 0 1px 0 rgba(255,255,255,0.10), 0 22px 60px rgba(0,0,0,0.5);
   --felt-bg:
-    radial-gradient(70% 90% at 50% 34%, #12503a 0%, #0b3728 45%, #06211a 100%);
-  --felt-shadow: inset 0 0 90px rgba(0,0,0,0.75), inset 0 0 0 1px rgba(120,220,170,0.16);
-  --t-ink: #dff4e8; --t-muted: rgba(198,230,213,0.58); --t-key: #5fe0a2;
-  --t-line: rgba(120,220,170,0.20); --t-panel: rgba(0,0,0,0.34);
-  --t-seat: rgba(95,224,162,0.10); --t-seat-line: rgba(95,224,162,0.45);
+    radial-gradient(70% 90% at 50% 34%, #154639 0%, #0D3029 45%, #061D18 100%);
+  --felt-shadow: inset 0 0 90px rgba(0,0,0,0.75), inset 0 0 0 1px rgba(147,199,171,0.16);
+  --t-ink: #dff4e8; --t-muted: rgba(198,230,213,0.58); --t-key: #7EC5A6;
+  --t-line: rgba(147,199,171,0.20); --t-panel: rgba(0,0,0,0.34);
+  --t-seat: rgba(126,197,166,0.10); --t-seat-line: rgba(126,197,166,0.45);
 }
-.mn-ring { fill: none; stroke: rgba(120,225,175,0.30); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
-.mn-ring.faint { stroke: rgba(120,225,175,0.12); }
+.mn-ring { fill: none; stroke: rgba(147,199,171,0.32); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+.mn-ring.faint { stroke: rgba(147,199,171,0.14); }
 
 /* ---------------- mobile ----------------
    The table was built desktop-first: seats stacked into a column you had to scroll past to
@@ -1992,7 +1998,7 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
 .hero {
   display: flex; align-items: center; justify-content: space-between; gap: 24px;
   width: 100%; text-align: left; cursor: pointer; overflow: hidden; position: relative;
-  padding: 34px 36px; border-radius: 22px; margin-bottom: 34px; color: #f4f1e8;
+  padding: 34px 36px; border-radius: 22px; margin-bottom: 34px; color: var(--ink);
   /* Glass, like everything else on the page. This was a solid bottle-green slab the width of
      the screen — the single loudest thing on the front page, and the reason the panels either
      side of it read as grey rather than as glass. The game's own art is the colour here; the
@@ -2010,10 +2016,10 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
 .hero-body { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; z-index: 1; }
 .hero-kicker {
   font-family: var(--mono); font-size: 10px; letter-spacing: 2.4px; text-transform: uppercase;
-  color: var(--accent-hi);
+  color: var(--accent-ink);
 }
-.hero-body h2 { margin: 0; font-size: clamp(32px, 5vw, 52px); color: #fff; }
-.hero-body .sc-meta { color: rgba(255,255,255,0.68); }
+.hero-body h2 { margin: 0; font-size: clamp(32px, 5vw, 52px); color: var(--ink); }
+.hero-body .sc-meta { color: var(--muted); }
 .hero-cta {
   margin-top: 6px; padding: 11px 22px; border-radius: 999px;
   background: linear-gradient(178deg, var(--brass-hi), var(--brass));
@@ -2840,7 +2846,7 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
     radial-gradient(rgba(255,255,255,.22) 1px, transparent 1.3px) 4px 5px/13px 13px,
     linear-gradient(#9a9a97, #86867f);
   --felt-shadow: inset 0 0 0 2px rgba(255,255,255,0.5), inset 0 4px 16px rgba(0,0,0,0.18);
-  --t-ink: #16160f; --t-muted: rgba(22,22,15,0.66); --t-key: #ff5a1f;
+  --t-ink: #16160f; --t-muted: rgba(22,22,15,0.66); --t-key: #B36B42;
   --t-line: rgba(0,0,0,0.24); --t-panel: rgba(255,255,255,0.24);
   --t-seat: rgba(255,255,255,0.3); --t-seat-line: rgba(255,255,255,0.8);
 }
@@ -2850,7 +2856,7 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
   --rail-shadow: inset 0 0 0 1px rgba(255,255,255,0.2), 0 16px 40px rgba(0,0,0,0.5);
   --felt-bg: linear-gradient(150deg, #263039 0%, #131920 55%, #1c242c 100%);
   --felt-shadow: inset 0 1px 0 rgba(255,255,255,0.22), inset 0 -18px 40px rgba(0,0,0,0.5);
-  --t-ink: #eef3f8; --t-muted: rgba(238,243,248,0.62); --t-key: #7fd4ff;
+  --t-ink: #eef3f8; --t-muted: rgba(238,243,248,0.62); --t-key: #7CA4C6;
   --t-line: rgba(255,255,255,0.14); --t-panel: rgba(255,255,255,0.07);
   --t-seat: rgba(255,255,255,0.09); --t-seat-line: rgba(160,210,240,0.6);
 }
@@ -2870,7 +2876,7 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
     radial-gradient(120% 90% at 50% 50%, transparent 60%, rgba(33,29,20,.05)),
     #f4f1e7;
   --felt-shadow: inset 0 0 0 1px #ccc5b0;
-  --t-ink: #211d14; --t-muted: rgba(33,29,20,0.6); --t-key: #8a1f16;
+  --t-ink: #211d14; --t-muted: rgba(33,29,20,0.6); --t-key: #8C2F39;
   --t-line: rgba(33,29,20,0.18); --t-panel: rgba(33,29,20,0.05);
   --t-seat: rgba(33,29,20,0.05); --t-seat-line: rgba(33,29,20,0.4);
 }
@@ -2878,9 +2884,9 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
   --rail-w: 18px; --rail-r: 18px; --felt-r: 8px; --felt-pad: 26px;
   --rail-bg: linear-gradient(160deg, #3d0a16, #240610);
   --rail-shadow: inset 0 0 0 2px #c9a227, 0 16px 40px rgba(0,0,0,0.45);
-  --felt-bg: radial-gradient(120% 90% at 50% 0, #8a1730, #4d0a18);
+  --felt-bg: radial-gradient(120% 90% at 50% 0, #7A2532, #48111C);
   --felt-shadow: inset 0 0 0 2px var(--ac45), inset 0 8px 30px rgba(0,0,0,0.42);
-  --t-ink: #f6e6c4; --t-muted: rgba(246,230,196,0.68); --t-key: #e8c46a;
+  --t-ink: #f6e6c4; --t-muted: rgba(246,230,196,0.68); --t-key: #D4B071;
   --t-line: var(--ac35); --t-panel: rgba(0,0,0,0.24);
   --t-seat: var(--ac14); --t-seat-line: rgba(205, 207, 210,0.7);
 }
@@ -2890,7 +2896,7 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
   --rail-shadow: inset 0 0 0 1px rgba(255,255,255,0.3), 0 14px 34px rgba(40,44,52,0.3);
   --felt-bg: radial-gradient(60% 50% at 28% 22%, #fff, transparent 62%), radial-gradient(50% 60% at 74% 74%, #e2e4e9, transparent 60%), linear-gradient(40deg, #eceef2, #ccd0d8);
   --felt-shadow: inset 0 0 0 1px rgba(255,255,255,0.7), inset 0 6px 22px rgba(60,66,78,0.14);
-  --t-ink: #1c2028; --t-muted: rgba(28,32,40,0.62); --t-key: #2f5d8c;
+  --t-ink: #1c2028; --t-muted: rgba(28,32,40,0.62); --t-key: #3A6184;
   --t-line: rgba(28,32,40,0.16); --t-panel: rgba(255,255,255,0.55);
   --t-seat: rgba(255,255,255,0.5); --t-seat-line: rgba(28,32,40,0.35);
 }
@@ -2900,7 +2906,7 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
   --rail-shadow: inset 0 0 0 1px rgba(255,255,255,0.22), 0 12px 30px rgba(0,0,0,0.34);
   --felt-bg: repeating-linear-gradient(100deg, #9aa0a8 0 4px, #878d95 4px 9px);
   --felt-shadow: inset 0 0 0 1px rgba(255,255,255,0.34), inset 0 5px 18px rgba(0,0,0,0.24);
-  --t-ink: #14171b; --t-muted: rgba(20,23,27,0.64); --t-key: #1d4f7a;
+  --t-ink: #14171b; --t-muted: rgba(20,23,27,0.64); --t-key: #2B4A66;
   --t-line: rgba(0,0,0,0.2); --t-panel: rgba(255,255,255,0.26);
   --t-seat: rgba(255,255,255,0.3); --t-seat-line: rgba(20,23,27,0.4);
 }
@@ -2908,9 +2914,9 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
   --rail-w: 6px; --rail-r: 12px; --felt-r: 10px; --felt-pad: 26px;
   --rail-bg: linear-gradient(160deg, #10101c, #07070f);
   --rail-shadow: inset 0 0 0 1px rgba(34,211,238,0.5), 0 0 34px rgba(34,211,238,0.28);
-  --felt-bg: linear-gradient(160deg, #10101e, #08080f);
+  --felt-bg: linear-gradient(160deg, #12151A, #08090C);
   --felt-shadow: inset 0 0 0 2px rgba(34,211,238,0.75), inset 0 0 40px rgba(34,211,238,0.14);
-  --t-ink: #dff6ff; --t-muted: rgba(223,246,255,0.6); --t-key: #22d3ee;
+  --t-ink: #dff6ff; --t-muted: rgba(223,246,255,0.6); --t-key: #66B0A6;
   --t-line: rgba(34,211,238,0.28); --t-panel: rgba(34,211,238,0.09);
   --t-seat: rgba(34,211,238,0.1); --t-seat-line: rgba(34,211,238,0.7);
 }
@@ -2929,7 +2935,7 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
   --rail-bg: #fbfbfa; --rail-shadow: none;
   --felt-bg: #ffffff;
   --felt-shadow: 0 10px 34px rgba(40,40,44,0.14), inset 0 0 0 1px rgba(0,0,0,0.05);
-  --t-ink: #17171a; --t-muted: rgba(23,23,26,0.55); --t-key: #3d3bd6;
+  --t-ink: #17171a; --t-muted: rgba(23,23,26,0.55); --t-key: #3A6184;
   --t-line: rgba(23,23,26,0.12); --t-panel: rgba(23,23,26,0.04);
   --t-seat: rgba(23,23,26,0.04); --t-seat-line: rgba(23,23,26,0.3);
 }
@@ -2960,9 +2966,9 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
   --felt-bg:
     radial-gradient(120% 90% at 50% -10%, rgba(255,255,255,0.08), transparent 55%),
     radial-gradient(90% 120% at 50% 120%, rgba(0,0,0,0.34), transparent 60%),
-    linear-gradient(#6d1c28, #551420);
+    linear-gradient(#61232C, #4A1721);
   --felt-shadow: inset 0 0 0 2px rgba(0,0,0,0.36), inset 0 12px 34px rgba(0,0,0,0.34);
-  --t-ink: #f8ede0; --t-muted: rgba(248,237,224,0.66); --t-key: #e8b979;
+  --t-ink: #f8ede0; --t-muted: rgba(248,237,224,0.66); --t-key: #D4B071;
   --t-line: rgba(255,232,208,0.18); --t-panel: rgba(0,0,0,0.26);
   --t-seat: rgba(255,232,208,0.09); --t-seat-line: rgba(210, 210, 214,0.55);
 }
@@ -3209,8 +3215,11 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
   align-items: center;
 }
 .hero-slide .hero:hover { transform: none; }
+/* Inherit. Three rules used to paint the hero's own text white, which was right while the
+   hero was a bottle-green slab and turns the front page's biggest word invisible now that it
+   is a sheet of glass — white on a pale ground in daylight. */
 .hero-title {
-  padding: 0; border: 0; background: none; color: #fff; cursor: pointer;
+  padding: 0; border: 0; background: none; color: inherit; cursor: pointer;
   font: inherit; text-align: left;
   text-decoration-color: transparent; text-decoration-line: underline;
   text-underline-offset: 6px; text-decoration-thickness: 2px;
@@ -3271,9 +3280,12 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
 .shelfcard .sc-kind { overflow: visible; text-overflow: clip; }
 
 /* The board keeps its own light-on-dark accent — oak is an ink colour and dies on green. */
-.hero .hero-kicker { color: #d9ba6d; }
-.hero .sc-kind { border-color: rgba(255,255,255,.28); color: rgba(255,255,255,.8); }
-.hero .sc-rating { color: #d9ba6d; }
+/* The hero is glass now, and glass takes the page's own ink. These three painted it for a dark
+   green slab: a hardcoded brass kicker and two white-at-an-opacity labels, all of which vanish
+   on a pale ground in daylight. */
+.hero .hero-kicker { color: var(--accent-ink); }
+.hero .sc-kind { border-color: var(--hairline); color: var(--muted); }
+.hero .sc-rating { color: var(--gold); }
 
 /* A rail of cards is a shelf: they line up at the top and the bottom, whether or not one
    game's meta strip wraps onto a second line. */
@@ -4119,7 +4131,7 @@ button.ghost.danger:hover { border-color: var(--red); color: var(--red); }
    it. There were fourteen of these in a row under the hero, and the chosen one was a solid pill
    with a 22px halo — enough colour in one strip to undo the whole page. */
 .chip.on, .kindtab.on {
-  color: var(--accent-hi);
+  color: var(--accent-ink);
   background: var(--ac14);
   border-color: var(--ac28);
   box-shadow: none;
@@ -4199,7 +4211,7 @@ header h1, header .wordmark {
     0 0 46px var(--ac28),
     0 26px 70px rgba(0,0,0,.62);
   --felt-bg:
-    radial-gradient(72% 92% at 50% 30%, #2c1f6b 0%, #1a1147 46%, #0f0a2e 100%);
+    radial-gradient(72% 92% at 50% 30%, #2A2450 0%, #1A1738 46%, #0D0B20 100%);
   --felt-shadow:
     inset 0 0 100px rgba(0,0,0,.62),
     inset 0 0 0 1px rgba(76, 143, 132,.22),
@@ -4262,6 +4274,7 @@ header h1, header .wordmark {
 .hero-body h2 { color: var(--ink); text-shadow: none; font-weight: 800; }
 .hero-blurb { color: var(--muted); }
 .hero .sc-kind { border-color: var(--hairline); color: var(--muted); }
+.hero .sc-meta { color: var(--muted); }
 .hero .sc-rating { color: var(--gold); }
 
 /* The one button per screen that starts a game, in the accent. Gold was reserved in phase 4
@@ -4345,6 +4358,13 @@ header h1, header .wordmark {
   of the page is made of.
 */
 .ga-felt { opacity: 0.34; filter: saturate(0.55); }
+/* In daylight the same cloths are a problem in the other direction: every gradient ends near
+   black, so a third of one over a pale card is a grey slab and the whole shelf loses the hue
+   that made it readable across the room. Lifted and lightened, the tile keeps its colour. */
+:root[data-theme="light"] .ga-felt { opacity: 0.30; filter: saturate(0.75) brightness(1.75); }
+:root[data-theme="light"] .ga-vignette {
+  background: radial-gradient(78% 78% at 50% 42%, transparent 52%, rgba(40, 44, 56, .16) 100%);
+}
 .ga-vignette {
   background: radial-gradient(78% 78% at 50% 42%, transparent 46%, rgba(4, 6, 14, .34) 100%);
 }
@@ -4791,7 +4811,7 @@ header h1, header .wordmark {
   --rail-w: 14px; --rail-r: 20px; --felt-r: 12px; --felt-pad: 24px;
   --rail-bg: var(--cf-rail, #241a12);
   --rail-shadow: inset 0 1px 0 rgba(255,255,255,0.10), 0 12px 30px rgba(0,0,0,0.42);
-  --felt-bg: var(--cf-cloth, #1c6b46);
+  --felt-bg: var(--cf-cloth, #276147);
   --felt-shadow: inset 0 0 90px rgba(0,0,0,0.34);
   --t-ink: #f4f1ea; --t-muted: rgba(244,241,234,0.6); --t-key: var(--gold, #d6af5c);
   --t-line: rgba(255,255,255,0.16); --t-panel: rgba(255,255,255,0.06);
@@ -7234,14 +7254,14 @@ button.primary:active {
    otherwise all glass, and a nav bar is not where a page should spend its one bold move. */
 .tabs button.on {
   background: var(--ac14);
-  color: var(--accent-hi);
+  color: var(--accent-ink);
   box-shadow: inset 0 0 0 1px var(--ac28);
 }
 /* Same voice as a chosen tab or a chosen filter. A settings panel can have a dozen of these
    visible at once — a dozen solid accent pills is a control panel, not a preferences sheet. */
 .seg-btn.on {
   background: var(--ac14);
-  color: var(--accent-hi);
+  color: var(--accent-ink);
   border-color: var(--ac28);
 }
 
@@ -7581,13 +7601,13 @@ which is what a sans is for.
      chosen segments at once; a dozen solid accent blocks is a control panel, and this one is
      meant to read as a sheet of glass with a few things marked on it. */
   --seg-on-bg: var(--ac14);
-  --seg-on-ink: var(--accent-hi);
+  --seg-on-ink: var(--accent-ink);
 }
 :root[data-theme="light"] {
   /* The same idea in daylight: the accent has to darken to hold against a light ground, and
      the tint behind it has to lighten. */
   --seg-on-bg: var(--ac14);
-  --seg-on-ink: color-mix(in srgb, var(--accent) 78%, #000);
+  --seg-on-ink: var(--accent-ink);
 }
 
 /* `border-color` cannot take a gradient, so the rules that set it from

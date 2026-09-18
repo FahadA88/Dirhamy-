@@ -16,6 +16,8 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { ACCENTS } from '../src/settings/settings';
+
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const CSS = readFileSync(join(ROOT, 'src', 'ui', 'styles.css'), 'utf8');
 
@@ -233,6 +235,40 @@ for (const { theme, label, fg, bg, min } of CHECKS) {
   if (!ok) failed = true;
   const bgNote = bgParsed[3] < 1 ? `${bgVal} composited over --bg0 = ${bgHex}` : bgHex;
   console.log(`  ${ok ? 'PASS' : 'FAIL'}   [${theme}] ${label.padEnd(58)} ${ratio.toFixed(2)}:1 (needs ${min}:1) — --${fg} ${fgHex} on --${bg} ${bgNote}`);
+}
+
+/*
+  The accents, which the loop above cannot see.
+
+  Every ramp lives in TypeScript (settings.ts) and is written onto the root element as an inline
+  style at runtime, so a check that reads styles.css is blind to all of them — and they are
+  exactly where a palette change goes wrong. The chosen tab, the chosen filter and the chosen
+  segment are all "the accent, as 13px type, on a 14% wash of itself", in eight colours and two
+  themes: thirty-two pairings that nothing was checking.
+
+  Dark rooms take the bright end of the ramp and light rooms the accent taken most of the way to
+  black — the same two rules --accent-ink is defined by in the stylesheet, restated here because
+  a check that re-derives the value is a check that catches a change to it.
+*/
+console.log('\nThe accent as type, on a wash of itself');
+for (const theme of ['dark', 'light'] as const) {
+  const tokens = theme === 'dark' ? darkTokens : lightTokens;
+  const bg0 = parseColor(tokens.bg0);
+  const panelOverPage = compositeOver(parseColor(tokens.panel), bg0);
+  for (const [id, a] of Object.entries(ACCENTS)) {
+    const accent = theme === 'dark' ? a.emerald : a.green;
+    // --accent-ink: the bright step on dark, the accent 78% of the way to black on light.
+    const inkRgb = theme === 'dark'
+      ? hexToRgb(a.lime)
+      : (hexToRgb(accent).map((c) => Math.round(c * 0.78)) as [number, number, number]);
+    // --ac14 is the accent at 14%, painted on the panel, which is itself on the page.
+    const wash = compositeOver([...hexToRgb(accent), 0.14] as [number, number, number, number],
+      [...panelOverPage, 1] as [number, number, number, number]);
+    const ratio = contrastRatio(toHex(inkRgb), toHex(wash));
+    const ok = ratio >= 4.5;
+    if (!ok) failed = true;
+    console.log(`  ${ok ? 'PASS' : 'FAIL'}   [${theme}] ${`${a.name} (${id}) on its own wash`.padEnd(58)} ${ratio.toFixed(2)}:1 (needs 4.5:1) — ${toHex(inkRgb)} on ${toHex(wash)}`);
+  }
 }
 
 if (failed) {

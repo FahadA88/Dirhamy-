@@ -56,17 +56,26 @@ interface Scene {
 // wrong thing for a boxed game to look like. A shelf still has to be readable across the room,
 // so the ten hues are unchanged and every one still has a lamp on it at the top left; what
 // changed is that the lamp lights a dyed cloth instead of being the cloth.
+/*
+  Ten cloths, in the same pigments the rest of the site is now mixed from.
+
+  The names are unchanged — a scene picks its cloth by name and there are sixty of those — but
+  every hue has come down off the fluorescent set these started as. The point of ten cloths is
+  that you can tell Hearts from Euchre across the room, and that survives a long way down in
+  chroma; what does not survive is fifty-five of them at full strength on one screen, which is
+  what the shelf used to be.
+*/
 const CLOTH = {
-  claret: 'radial-gradient(120% 100% at 22% 8%, #b8324f 0%, #7a1730 42%, #2e0912 100%)',
-  forest: 'radial-gradient(120% 100% at 22% 8%, #2f9b6a 0%, #14603f 44%, #06251a 100%)',
-  midnight: 'radial-gradient(120% 100% at 22% 8%, #4a6ec8 0%, #22357f 42%, #0a1030 100%)',
-  amber: 'radial-gradient(120% 100% at 22% 8%, #d9a43c 0%, #9c5f16 44%, #331a06 100%)',
-  plum: 'radial-gradient(120% 100% at 22% 8%, #8f5bbf 0%, #542a86 42%, #1d0b33 100%)',
-  slate: 'radial-gradient(120% 100% at 22% 8%, #7a8a99 0%, #3a4652 44%, #10151b 100%)',
-  teal: 'radial-gradient(120% 100% at 22% 8%, #2f9bb0 0%, #14606f 44%, #052229 100%)',
-  rust: 'radial-gradient(120% 100% at 22% 8%, #c9743f 0%, #8c3a15 44%, #2b0e05 100%)',
-  moss: 'radial-gradient(120% 100% at 22% 8%, #7fa63c 0%, #416b18 44%, #16240a 100%)',
-  ink: 'radial-gradient(120% 100% at 22% 8%, #a24070 0%, #4a2059 46%, #0f0a1e 100%)',
+  claret: 'radial-gradient(120% 100% at 22% 8%, #8C3A44 0%, #5B1E27 42%, #230C10 100%)',
+  forest: 'radial-gradient(120% 100% at 22% 8%, #3A7D59 0%, #1F5138 44%, #0A2116 100%)',
+  midnight: 'radial-gradient(120% 100% at 22% 8%, #4A5E92 0%, #2A3660 42%, #0D1124 100%)',
+  amber: 'radial-gradient(120% 100% at 22% 8%, #B08944 0%, #7A5A22 44%, #2A1D0A 100%)',
+  plum: 'radial-gradient(120% 100% at 22% 8%, #7A5C90 0%, #4A3358 42%, #190F22 100%)',
+  slate: 'radial-gradient(120% 100% at 22% 8%, #79818B 0%, #454B52 44%, #14171B 100%)',
+  teal: 'radial-gradient(120% 100% at 22% 8%, #3E8E86 0%, #1E5450 44%, #08211F 100%)',
+  rust: 'radial-gradient(120% 100% at 22% 8%, #AC6740 0%, #74391F 44%, #240F07 100%)',
+  moss: 'radial-gradient(120% 100% at 22% 8%, #7E8A45 0%, #4C5525 44%, #171A0B 100%)',
+  ink: 'radial-gradient(120% 100% at 22% 8%, #7E5070 0%, #45283F 46%, #150C14 100%)',
 };
 
 /** Four cards thrown into the middle, the winner on top. What a trick looks like. */
