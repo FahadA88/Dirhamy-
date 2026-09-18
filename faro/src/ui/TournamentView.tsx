@@ -27,7 +27,7 @@ export function TournamentView({ def, you, onPlayTable, onClose }: {
 
       {t.champion && (
         <div className="tourney-banner glass" role="status">
-          <span className="tb-mark" aria-hidden="true">🏆</span>
+          <span className="tb-mark" aria-hidden="true">♛</span>
           <div>
             <b>{t.champion === you ? 'You won the tournament!' : `${t.champion} won the tournament.`}</b>
             <p className="muted">{entrants} entrants, {t.rounds} round{t.rounds === 1 ? '' : 's'}.</p>

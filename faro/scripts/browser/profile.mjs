@@ -41,7 +41,14 @@ await p.evaluate(() => {
 await p.reload({ waitUntil: 'networkidle' });
 await p.locator('nav button', { hasText: 'You' }).first().click();
 await p.waitForTimeout(300);
-ok('the summary appears', (await p.locator('.stat').count()) === 4);
+// By label, not by count. This asserted `=== 4` from the day it was written, and a fifth stat
+// (the day streak, worklist #79) arrived later without anyone noticing — a count is a test that
+// fails when the page gains something correct, and says nothing about whether the right things
+// are there. verify:all is not part of `npm test`, so it sat red without being run.
+const statLabels = await p.locator('.stat .stat-label, .stat dt, .stat > span:last-child')
+  .allInnerTexts().then((xs) => xs.map((x) => x.trim().toLowerCase()));
+ok(`the summary appears (${statLabels.join(', ')})`,
+  ['played', 'won', 'win rate'].every((l) => statLabels.includes(l)));
 const played = await p.locator('.stat').first().locator('.stat-value').innerText();
 ok(`it counted the games (${played})`, played === '12');
 ok('best-of is shown', (await p.locator('.highlight-list li').count()) > 0);

@@ -30,7 +30,7 @@ export function MiniTable({ def, seats }: { def: GameDefinition; seats: number }
   if ('error' in preview) {
     return (
       <div className="mini-table broken">
-        <div className="mini-broken-mark">⚠</div>
+        <div className="mini-broken-mark">▲</div>
         <p>{preview.error}</p>
       </div>
     );

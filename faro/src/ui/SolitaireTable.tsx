@@ -194,16 +194,16 @@ export function SolitaireTable({ def, daily = false, puzzle = false }: {
                 {/* Today's Deal is one deal, the same for everyone playing today — a "new deal"
                     button here would just be a way to quietly stop playing it. */}
                 {daily
-                  ? <span className="sol-stat" title="Today's Deal is the same for everyone">📅 Today's Deal</span>
+                  ? <span className="sol-stat" title="Today's Deal is the same for everyone">Today's Deal</span>
                   : (
                     <>
                       {puzzle && (
                         board.puzzleMoves != null
                           ? <span className="sol-stat" title="A no-lookahead player found a real win from this exact deal">
-                              🧩 Puzzle · solved in {board.puzzleMoves}
+                              Puzzle · solved in {board.puzzleMoves}
                             </span>
                           : <span className="sol-stat" title="No quick solve turned up in time — this is an ordinary deal instead">
-                              🧩 No puzzle found — try again
+                              No puzzle found — try again
                             </span>
                       )}
                       <button className="ghost sm" onClick={replayDeal} title="Deal this exact layout again">Replay</button>

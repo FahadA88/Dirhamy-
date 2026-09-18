@@ -319,7 +319,11 @@ function Featured({ games, onOpen, onPlay, onChanged }: {
   onChanged: () => void;
 }) {
   if (games.length === 0) return null;
-  const [live, ...rest] = games;
+  // Two alternates, not three. The column beside the hero sets the hero's height, and at three
+  // cards it made a 656px glass panel to hold 250px of words — four hundred pixels of nothing,
+  // which is the opposite of what a quiet page is for. Two cards is a shorter column, a hero
+  // that fits what is in it, and one less thing on the page.
+  const [live, ...rest] = games.slice(0, 3);
 
   return (
     <div className="featured">
@@ -549,16 +553,16 @@ function GameDetail({ game, me, onBack, onPlay, onSetup, onPuzzle, onTournament,
             {!game.definition.solitaire && <button className="ghost" onClick={onSetup}>Set up a table</button>}
             {game.definition.solitaire && canFindPuzzle(game.definition) && (
               <button className="ghost" onClick={onPuzzle} title="A deal known ahead of time to have a short solution">
-                🧩 Solve a puzzle
+                Solve a puzzle
               </button>
             )}
             {canRunTournament(game.definition) && (
               <button className="ghost" onClick={onTournament} title={`A single-elimination bracket of ${game.definition.meta.players.min}-handed ${game.definition.meta.name}`}>
-                🏆 Tournament
+                Tournament
               </button>
             )}
             <button className="ghost" onClick={onTeach} title="Watch the game play itself, one move at a time, with why">
-              🎓 Teach mode
+              Teach mode
             </button>
             {!game.definition.solitaire && onOnline && (
               <button className="ghost" onClick={onOnline}>Play with people</button>

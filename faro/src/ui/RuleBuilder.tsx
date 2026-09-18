@@ -308,7 +308,7 @@ function RulePreviewPanel({ def, rule }: { def: GameDefinition; rule: ReturnType
     <div className="rb-preview">
       <div className="rb-preview-head">
         <span className="rb-readback-label">Watch it fire</span>
-        <button className="chip subtle sm" onClick={() => setSeed((s) => s + 1)}>🎲 Deal another hand</button>
+        <button className="chip subtle sm" onClick={() => setSeed((s) => s + 1)}>↻ Deal another hand</button>
       </div>
       {!preview.ok ? (
         <p className="rb-preview-note">Can't preview this yet — {preview.error ?? 'the game has something to fix first.'}</p>

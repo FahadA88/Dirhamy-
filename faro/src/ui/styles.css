@@ -88,7 +88,7 @@
   --ac06: color-mix(in srgb, var(--accent) 6%, transparent);
   --ac10: color-mix(in srgb, var(--accent) 10%, transparent);
   --ac14: color-mix(in srgb, var(--accent) 14%, transparent);
-  --ac20: color-mix(in srgb, var(--accent) 20%, transparent);
+  --ac20: color-mix(in srgb, var(--accent) 12%, transparent);
   --ac28: color-mix(in srgb, var(--accent) 28%, transparent);
   --ac35: color-mix(in srgb, var(--accent) 35%, transparent);
   --ac45: color-mix(in srgb, var(--accent) 45%, transparent);
@@ -264,20 +264,63 @@ body {
   font-weight: 500;
   color: var(--ink);
   min-height: 100vh;
-  /* One quiet wash of the accent, high in the frame, and nothing else — the glass panels are
-     what does the work of the page from here down; the ground behind them just needs to be
-     calm enough that translucency reads as glass rather than as a window onto a light show. */
-  background:
-    radial-gradient(1100px 760px at 50% -12%, var(--accent-dim) 0%, transparent 62%),
-    var(--bg0);
-  background-attachment: fixed;
+  background: var(--bg0);
   overflow-x: hidden;
 }
-:root[data-theme="light"] body {
+
+/*
+  THE ROOM HAS LIGHTS IN IT.
+
+  Frosted glass is not a fill — it is what happens to whatever is BEHIND a panel. This page had
+  one small wash of accent at the very top of the frame and flat near-black everywhere else, so
+  a translucent panel over it was, pixel for pixel, the same colour as an opaque one: twenty-five
+  backdrop-filters in the stylesheet and nothing for any of them to refract. The glass was real
+  and invisible.
+
+  Three lights, all soft, all weak, none of them on the same axis as another: the key high and
+  left in the accent, a cool counter-light low and right, and a wide floor wash that keeps the
+  bottom of a long page from going dead. Fixed, so a panel moves through the light as the page
+  scrolls rather than carrying its own patch of it around.
+
+  Every one of them is mixed from --accent, so a change of accent relights the whole room rather
+  than leaving a green glow behind a red table. The alphas are single digits on purpose — this
+  is a lit room, not a gradient hero.
+*/
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
   background:
-    radial-gradient(1100px 760px at 50% -12%, var(--accent-dim) 0%, transparent 62%),
-    var(--bg0);
-  background-attachment: fixed;
+    radial-gradient(96vw 86vh at 16% 20%, var(--lamp-key) 0%, transparent 68%),
+    radial-gradient(88vw 80vh at 92% 72%, var(--lamp-cool) 0%, transparent 66%),
+    radial-gradient(140vw 64vh at 46% 122%, var(--lamp-floor) 0%, transparent 74%);
+}
+:root {
+  --lamp-key: color-mix(in srgb, var(--accent) 12%, transparent);
+  /* Pulled a long way round the wheel from the accent and then almost all the way to nothing:
+     a second light of a different colour is what stops the page reading as one flat tint. */
+  --lamp-cool: color-mix(in srgb, color-mix(in srgb, var(--accent) 35%, #3a4fd8) 10%, transparent);
+  --lamp-floor: color-mix(in srgb, var(--accent) 5%, transparent);
+  /* One hairline for every edge on the page. A border is the only thing separating one sheet
+     of glass from the next, so it has to be the same hairline everywhere or the page reads as
+     a pile of unrelated boxes. */
+  --hairline: rgba(255, 255, 255, 0.09);
+}
+:root[data-theme="light"] {
+  --lamp-key: color-mix(in srgb, var(--accent) 9%, transparent);
+  --lamp-cool: color-mix(in srgb, color-mix(in srgb, var(--accent) 35%, #3a4fd8) 7%, transparent);
+  --lamp-floor: color-mix(in srgb, var(--accent) 4%, transparent);
+  --hairline: rgba(20, 22, 32, 0.10);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --lamp-key: color-mix(in srgb, var(--accent) 12%, transparent);
+    --lamp-cool: color-mix(in srgb, color-mix(in srgb, var(--accent) 35%, #3a4fd8) 10%, transparent);
+    --lamp-floor: color-mix(in srgb, var(--accent) 5%, transparent);
+    --hairline: rgba(255, 255, 255, 0.09);
+  }
 }
 
 /* A fixed background repaints on every scroll frame on most mobile engines rather than
@@ -894,7 +937,6 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
   padding: 14px 18px; margin-bottom: 18px; font-size: 14px;
 }
 .daily-info { display: flex; align-items: center; gap: 12px; flex: 1 1 auto; min-width: 0; }
-.daily-mark { font-size: 22px; line-height: 1; flex: 0 0 auto; }
 .daily-info b { color: var(--ink); }
 .daily-info p { margin: 2px 0 0; font-size: 13px; }
 .daily .primary.sm { margin-left: auto; flex: 0 0 auto; }
@@ -1502,10 +1544,15 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
 .pt-cell input:focus { outline: none; border-color: var(--green); }
 
 /* trick-taking table */
-.trick-area { flex-wrap: wrap; gap: 20px; position: relative; }
+/* align-content, because this wraps. The badges take their own full-width row, and a wrapped
+   flex container distributes its rows with align-content — which defaults to stretch, so
+   whenever the trick area was taller than its contents (a tall felt, an empty trick between
+   leads) the two rows were pushed to opposite ends of it and trump ended up 139px adrift of
+   the cards it describes. */
+.trick-area { flex-wrap: wrap; align-content: center; gap: 20px; position: relative; }
 .trick-card { text-align: center; }
 .trick-empty { color: var(--muted); font-family: var(--mono); font-size: 13px; padding: 30px 0; }
-.trick-meta { position: absolute; bottom: -22px; left: 50%; transform: translateX(-50%); white-space: nowrap; color: var(--muted); font-family: var(--mono); font-size: 12px; }
+.trick-meta { white-space: nowrap; color: var(--muted); font-family: var(--mono); font-size: 12px; }
 
 /* fishing (Go Fish) */
 .seat.askable { cursor: pointer; box-shadow: 0 0 0 2px var(--green), 0 6px 20px var(--glow); }
@@ -1946,11 +1993,17 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
   display: flex; align-items: center; justify-content: space-between; gap: 24px;
   width: 100%; text-align: left; cursor: pointer; overflow: hidden; position: relative;
   padding: 34px 36px; border-radius: 22px; margin-bottom: 34px; color: #f4f1e8;
+  /* Glass, like everything else on the page. This was a solid bottle-green slab the width of
+     the screen — the single loudest thing on the front page, and the reason the panels either
+     side of it read as grey rather than as glass. The game's own art is the colour here; the
+     panel it sits in is a sheet with the room behind it. */
   background:
-    radial-gradient(600px 300px at 78% 50%, var(--ac14), transparent 70%),
-    linear-gradient(150deg, #0f2a1e 0%, #123c2a 60%, #175136 100%);
-  border: 1px solid var(--ac28);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 18px 50px rgba(0,0,0,0.5);
+    radial-gradient(760px 380px at 76% 44%, var(--ac10), transparent 72%),
+    var(--glass-fill);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--hairline);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 18px 50px rgba(0, 0, 0, 0.38);
   transition: transform 200ms cubic-bezier(.2,.9,.3,1.1), border-color 200ms;
 }
 .hero:hover { transform: translateY(-3px); border-color: var(--ac55); }
@@ -4062,18 +4115,21 @@ button.ghost.danger:hover { border-color: var(--red); color: var(--red); }
   box-shadow: 0 2px 0 rgba(0,0,0,.28);
 }
 .chip:hover, .kindtab:hover { color: var(--ink); border-color: var(--violet); box-shadow: 0 2px 0 rgba(0,0,0,.28), 0 0 18px rgba(155, 92, 255,.32); }
+/* A chosen filter, in the same voice as a chosen tab: the accent in the type and a tint behind
+   it. There were fourteen of these in a row under the hero, and the chosen one was a solid pill
+   with a 22px halo — enough colour in one strip to undo the whole page. */
 .chip.on, .kindtab.on {
-  color: #fff;
-  background: linear-gradient(180deg, var(--hot-hi), var(--hot));
-  border-color: transparent;
-  box-shadow: 0 2px 0 color-mix(in srgb, var(--accent) 55%, #000), 0 0 22px var(--ac45);
+  color: var(--accent-hi);
+  background: var(--ac14);
+  border-color: var(--ac28);
+  box-shadow: none;
 }
-.kindtab.on .kt-count { border-color: rgba(255,255,255,.55); opacity: .9; }
+.kindtab.on .kt-count { border-color: var(--ac45); opacity: .9; }
 
 .tabs {
-  background: linear-gradient(180deg, var(--panel-hi), var(--panel));
-  border: 1px solid var(--panel-brd);
-  box-shadow: 0 2px 0 rgba(0,0,0,.3), 0 1px 0 rgba(255,255,255,.08) inset;
+  background: var(--glass-fill);
+  border: 1px solid var(--hairline);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, .05) inset;
 }
 .tabs button { font-weight: 700; }
 .tabs button.on {
@@ -4096,19 +4152,19 @@ input:focus, textarea:focus, select:focus {
 ::placeholder { color: var(--dim); }
 
 /* --- the brand, lit --- */
+/* The mark is a piece of the same glass as everything else, with the suit in the accent. It
+   was a filled accent tile with a 26px halo — a logo does not need to glow to be a logo. */
 .logo3d span {
-  background: linear-gradient(150deg, var(--accent-hi) 0%, var(--accent) 100%);
-  color: #fff;
-  box-shadow: 0 0 26px var(--ac45),
-              0 4px 0 color-mix(in srgb, var(--accent) 70%, #000),
-              0 1px 0 rgba(255,255,255,.4) inset;
+  background: var(--glass-fill-hi);
+  color: var(--accent-hi);
+  box-shadow: inset 0 0 0 1px var(--hairline), 0 2px 8px rgba(0, 0, 0, .3);
 }
 /* The gradient used to run out on --cyan, which put the dimmest stop of the ramp under the last
    letter — the Y of the old DECKY wordmark visibly dropped out against the dark ground. The cyan is now a stop in
    the middle and both ends land bright, so no letter of the name is ever the faint one. */
 header h1, header .wordmark {
-  /* The ink is the Foil rule further down; this only carries the glow. */
-  filter: drop-shadow(0 0 18px var(--ac35));
+  /* The ink is the Foil rule further down. The 18px halo that used to be here went with the
+     rest of the glow: foil reads because of its own gradient, not because it is lit from behind. */
   font-family: var(--display);
 }
 
@@ -4167,118 +4223,130 @@ header h1, header .wordmark {
 }
 
 /* ============================================================
-   ENERGY
-   The hero, the shelf and the tiles, turned up.
+   QUIET
+
+   This block used to be called ENERGY and it turned the hero, the
+   shelf and the tiles UP: a bottle-green slab the width of the page
+   with a light sweeping across it on a loop, tiles on an opaque
+   gradient with a violet glow on hover, a gold button with a 24px
+   halo, a play button shouting through three !importants.
+
+   All of it landed on top of the glass system defined further up this
+   file — twenty-five backdrop-filters, a metal hairline, a specular
+   corner — and cancelled it. The page had a glass design and an
+   arcade design fighting over the same elements, and the arcade one
+   came later in the file, so it won.
+
+   It is the quiet one now. The glass rules are allowed to apply, the
+   accent appears once per screen on the thing you are meant to press,
+   and nothing glows. Colour on this page comes from the games; the
+   furniture is glass and hairlines.
    ============================================================ */
 
-/* --- the hero is the table under a lamp --- */
-/* It was a lit sign: magenta into violet into electric blue, with a cyan wash over the top. A
-   sign is what you put outside a place to make people come in from the street. Inside, the
-   thing worth looking at is the cloth, so the banner is deep green baize with a single warm
-   lamp on it and a gilt rule round the edge. */
+/* --- the hero is a sheet of glass with the game's own art in it --- */
 .hero {
   background:
-    radial-gradient(760px 380px at 84% 14%, rgba(210, 212, 214, .16), transparent 64%),
-    radial-gradient(620px 460px at 4% 98%, rgba(0, 0, 0, .40), transparent 62%),
-    linear-gradient(140deg, #17553a 0%, #10432e 46%, #0a2c1f 78%, #071c14 100%);
-  border: 1px solid rgba(200, 200, 205, .34);
+    radial-gradient(820px 420px at 78% 30%, var(--ac10), transparent 70%),
+    var(--glass-fill);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--hairline);
   box-shadow:
-    0 1px 0 rgba(255, 240, 210, .14) inset,
-    0 0 0 1px rgba(0, 0, 0, .35),
-    0 26px 70px rgba(0, 0, 0, .58);
+    0 1px 0 rgba(255, 255, 255, .06) inset,
+    0 20px 54px rgba(0, 0, 0, .40);
 }
-/* A slow sweep of light across it, the way a lamp catches the nap of cloth. */
-.hero::after {
-  content: ""; position: absolute; inset: 0; pointer-events: none;
-  background: linear-gradient(102deg, transparent 32%, rgba(255, 246, 224, .10) 48%, transparent 62%);
-  transform: translateX(-60%);
-  animation: sheen 7s ease-in-out infinite;
-}
-@keyframes sheen { 0%, 62% { transform: translateX(-60%); } 88%, 100% { transform: translateX(60%); } }
+/* The sheen — a band of light crossing the banner every seven seconds — is gone. A loop that
+   draws the eye back to the same element forever is an advertisement's trick, and it was the
+   only thing on the front page that moved when nobody had touched anything. */
 
-.hero .hero-kicker {
-  color: #fff; opacity: .92;
-  text-shadow: 0 0 14px rgba(255,255,255,.5);
-}
-.hero-body h2 { color: #fff; text-shadow: 0 2px 24px rgba(0,0,0,.4); font-weight: 900; }
-.hero-blurb { color: rgba(255,255,255,.82); }
-.hero .sc-kind { border-color: rgba(255,255,255,.4); color: #fff; }
-.hero .sc-rating { color: var(--gold-hi); }
+.hero-body h2 { color: var(--ink); text-shadow: none; font-weight: 800; }
+.hero-blurb { color: var(--muted); }
+.hero .sc-kind { border-color: var(--hairline); color: var(--muted); }
+.hero .sc-rating { color: var(--gold); }
 
-/* Winning colour on the one button that starts a game. */
+/* The one button per screen that starts a game, in the accent. Gold was reserved in phase 4
+   for what you have WON or EARNED — a rating, a hand taken, a badge — and a button you have
+   not pressed yet has earned nothing. */
 .hero-slide .hero-cta {
-  background: linear-gradient(180deg, #ffe08a 0%, var(--gold) 54%, #e0a300 100%);
-  color: #241700;
-  font-weight: 900;
-  box-shadow:
-    0 var(--lip) 0 #a97600,
-    0 calc(var(--lip) + 10px) 24px rgba(255, 197, 49,.44),
-    0 1px 0 rgba(255,255,255,.6) inset;
-  transition: transform 90ms cubic-bezier(.2,.9,.3,1.3), box-shadow 90ms, filter 140ms;
+  background: linear-gradient(180deg, var(--accent-hi), var(--accent));
+  color: var(--on-accent, #062018);
+  font-weight: 800;
+  box-shadow: 0 var(--lip) 0 var(--accent-deep, rgba(0, 0, 0, .34)), 0 1px 0 rgba(255, 255, 255, .28) inset;
+  transition: transform 90ms cubic-bezier(.2, .9, .3, 1.3), box-shadow 90ms, filter 140ms;
 }
-.hero-slide .hero-cta:hover { transform: translateY(-1px); filter: brightness(1.06); }
+.hero-slide .hero-cta:hover { transform: translateY(-1px); filter: brightness(1.05); }
 .hero-slide .hero-cta:active {
   transform: translateY(var(--lip));
-  box-shadow: 0 0 0 #a97600, 0 2px 8px rgba(255, 197, 49,.3), 0 1px 0 rgba(255,255,255,.4) inset;
+  box-shadow: 0 0 0 var(--accent-deep, rgba(0, 0, 0, .34)), 0 1px 0 rgba(255, 255, 255, .2) inset;
 }
 .hero-more {
-  background: rgba(255,255,255,.14); border-color: rgba(255,255,255,.34); color: #fff;
-  font-weight: 700;
+  background: var(--glass-fill-hi); border-color: var(--hairline); color: var(--ink);
+  font-weight: 600;
 }
-.hero-more:hover { background: rgba(255,255,255,.24); border-color: #fff; }
-/* car-arrow itself is set once,
-near the carousel — see the comment there. This section only
-   restyles the hover and the dots,
-which were the two things the palette sweep actually meant
-   to touch here; the arrow's own background used to be repeated below with the old neon
-   indigo (rgba(20,
-10,
-48)) still in it; a duplicate rule this far down the file wins on source
-   order regardless of what the real one says { background: var(--hot); border-color: var(--hot); box-shadow: 0 0 24px var(--ac55); }
+.hero-more:hover { background: var(--glass-fill-hi); border-color: var(--ac45); }
 
-.car-dot.on::after { background: var(--hot); border-color: var(--hot); box-shadow: 0 0 14px var(--ac75); }
+/* Two rules that have never once applied: the comment above them was opened and never closed,
+   so it ran on and swallowed `.car-arrow:hover` and `.car-dot.on::after` whole. Restored, in
+   the quiet palette — the carousel's own arrow and dot, in the accent, without the halo. */
+.car-arrow:hover { background: var(--ac28); border-color: var(--ac55); }
+.car-dot.on::after { background: var(--accent); border-color: var(--accent); }
 
-/* --- shelf cards lift and light up --- */
+/* --- shelf cards are glass, and lift --- */
+/* No background here on purpose. `.shelfcard` is in the glass selector list near the top of
+   this file — fill, blur, metal hairline, specular corner — and this rule used to paint an
+   opaque gradient straight over all four of them. */
 .shelfcard {
-  background: linear-gradient(180deg, var(--panel-hi), var(--panel));
-  border: 1px solid var(--panel-brd);
   border-radius: var(--r-lg);
   overflow: hidden;
-  box-shadow: 0 3px 0 rgba(0,0,0,.34), 0 14px 30px rgba(4,0,20,.4);
-  transition: transform 220ms cubic-bezier(.2,.9,.3,1.2), box-shadow 220ms, border-color 220ms;
+  transition: transform 220ms cubic-bezier(.2, .9, .3, 1.2), box-shadow 220ms, border-color 220ms;
 }
 .shelfcard:hover {
-  transform: translateY(-6px);
-  border-color: var(--hot);
-  box-shadow: 0 3px 0 rgba(0,0,0,.34), 0 0 34px var(--ac35), 0 22px 46px rgba(4,0,20,.55);
+  transform: translateY(-4px);
+  box-shadow: 0 2px 3px rgba(0, 0, 0, .3), 0 24px 48px rgba(0, 0, 0, .42);
 }
-.shelfcard .sc-main h3 { font-weight: 800; letter-spacing: -.02em; }
+.shelfcard .sc-main h3 { font-weight: 700; letter-spacing: -.02em; }
+/* The family label is a label, not a badge. It was a violet pill on every tile — fifty-five
+   of them on one screen, in a colour that appears nowhere else in the design. */
 .sc-kind {
-  border-color: rgba(155, 92, 255,.5); color: var(--violet);
-  background: rgba(155, 92, 255,.10); opacity: 1;
+  border-color: var(--hairline); color: var(--muted);
+  background: transparent; opacity: 1;
 }
 .sc-rating { color: var(--gold); }
+/* Gold, because a staff pick is a judgement somebody made — but a judgement does not need a
+   halo to be read. */
 .pick-badge {
   background: linear-gradient(180deg, var(--gold-hi), var(--gold));
-  color: #241700; box-shadow: 0 0 18px rgba(255, 197, 49,.6);
+  color: #241700; box-shadow: none;
 }
-/* The play button on a tile is the loudest thing on it. */
+/* The play button appears on hover and is the accent. It does not need to shout: it is the
+   only coloured thing on a tile, and it arrives the moment you point at one. */
 .sc-play {
-  background: linear-gradient(180deg, var(--hot-hi), var(--hot)) !important;
-  color: #fff !important; border: 0 !important;
-  box-shadow: 0 0 20px var(--ac55);
-  opacity: 0; transform: scale(.8);
-  transition: opacity 180ms, transform 220ms cubic-bezier(.2,.9,.3,1.4);
+  background: var(--accent) !important;
+  color: var(--on-accent, #062018) !important; border: 0 !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .35);
+  opacity: 0; transform: scale(.85);
+  transition: opacity 180ms, transform 220ms cubic-bezier(.2, .9, .3, 1.4);
 }
 .shelfcard:hover .sc-play, .sc-play:focus-visible { opacity: 1; transform: scale(1); }
-.star.on { color: var(--hot); text-shadow: 0 0 14px var(--ac75); }
+.star.on { color: var(--gold); text-shadow: none; }
 
 /* --- the tiles get their colour back up --- */
-.gameart { border-bottom: 1px solid rgba(255,255,255,.10); }
-/* The cloths are already lit; a filter on top of them only smears the gradient. */
-.ga-felt { filter: none; }
+.gameart { border-bottom: 1px solid var(--hairline); }
+/*
+  The cloth is a TINT, not a poster.
+
+  Every game gets its own hue so a shelf reads as a row of boxed games rather than wallpaper —
+  that is worth keeping, and the scenes underneath are worth keeping. What is not worth keeping
+  is the saturation: fifty-five of these at full strength, five across and eleven down, is a
+  wall of colour with no quiet in it anywhere, and it buried every piece of glass on the page.
+
+  Dropped to about a third and desaturated, the hue still tells Hearts from Euchre across the
+  room, and the tile reads as tinted glass over the room's own light — which is what the rest
+  of the page is made of.
+*/
+.ga-felt { opacity: 0.34; filter: saturate(0.55); }
 .ga-vignette {
-  background: radial-gradient(78% 78% at 50% 42%, transparent 40%, rgba(4,0,20,.5) 100%);
+  background: radial-gradient(78% 78% at 50% 42%, transparent 46%, rgba(4, 6, 14, .34) 100%);
 }
 .ga-mark { color: rgba(255,255,255,.18); }
 
@@ -5510,6 +5578,33 @@ button.primary.lg { padding: 13px 28px; font-size: 16px; border-radius: 999px; }
      paying 148px of empty cloth above the board and 156px down either side for seats that
      do not exist. */
   .felt-content:has(> .opponents) { padding: 148px 156px 0; }
+
+  /*
+    The cloth got taller; the game did not move down with it.
+
+    Once the felt takes the screen rather than a 780px band of it, a stack in ordinary block
+    flow leaves everything crowded into the top half with a quarter of a million pixels of
+    empty green under the hand. A real table does the opposite: the others sit along the far
+    edge, the trick is in the MIDDLE of the cloth, and your own cards are at the edge nearest
+    you. So the three bands become a column that fills — the middle takes the slack, and the
+    hand is pushed to the bottom rather than sitting wherever the middle happens to end.
+  */
+  .felt-content:has(> .opponents) { display: flex; flex-direction: column; }
+  /* align-content as well as align-items: the trick area WRAPS (the badges take their own
+     row), and a wrapped flex container distributes its lines with align-content, which
+     defaults to stretch — so the two rows were pushed 230px apart to fill the slack instead
+     of sitting together in the middle of it. */
+  .felt-content:has(> .opponents) > .center {
+    flex: 1 1 auto; align-items: center; align-content: center;
+  }
+  .felt-content:has(> .opponents) > .you { margin-top: auto; }
+
+  /* And the side seats move with the height instead of sitting at a fixed 152px from the top
+     of a cloth that is now half as tall again. Clamped at both ends: they still clear the
+     corner seats above them on a short window, and they do not drift into the hand on a tall
+     one. */
+  .seat.at-l, .seat.at-r { top: clamp(120px, 24%, 300px); }
+  .ring-2 .seat.at-l, .ring-2 .seat.at-r { top: clamp(96px, 30%, 340px); }
   /* Your own hand is not in the middle — it is along the bottom edge, a long way under the
      side seats — so it has no reason to pay for their gutters. Inside them it got 592px of a
      904px felt, which for an eighteen-card hand meant a 34px sliver per card: narrower than a
@@ -5767,10 +5862,21 @@ button.primary.lg { padding: 13px 28px; font-size: 16px; border-radius: 999px; }
 
 /* Trump and the led suit, as badges rather than a grey mono footnote. Trump decides who
    takes every trick, so it should be the easiest thing on the table to find. */
+/*
+  In the flow, under the trick — not hung 30px off the bottom of it.
+
+  Absolute positioning was a way of not paying for a row in a felt with no room to give. The
+  felt has room now, and the hack had two costs: on a phone the badges were printed half under
+  the hand panel, and on a tall desktop table — where the trick area stretches to take the
+  slack — "bottom" meant the bottom of a 400px box, so trump ended up floating alone in the
+  middle of the cloth, a long way from the cards it was about.
+*/
 .trick-meta {
-  position: absolute; bottom: -30px; left: 50%; transform: translateX(-50%);
-  display: flex; align-items: center; gap: 8px; white-space: nowrap;
+  order: 3; width: 100%;
+  display: flex; align-items: center; justify-content: center;
+  gap: 8px; white-space: nowrap; margin-top: 8px;
 }
+.trick-stock { order: 2; }
 .trump-badge, .lead-badge {
   display: inline-flex; align-items: center; gap: 5px;
   padding: 3px 10px; border-radius: 999px;
@@ -5818,17 +5924,8 @@ button.primary.lg { padding: 13px 28px; font-size: 16px; border-radius: 999px; }
   }
   .trick-stock .stock-trump { transform: rotate(90deg) scale(.8); }
   .trick-stock .stock-back { margin-top: 0; }
-  /* The badges hang 30px BELOW the trick on a wide table, where there is 30px to hang into.
-     On a phone the hand panel starts 18px under it, so trump — the thing that decides every
-     trick — was printed half-under the panel. Put both back in the flow instead, stacked under
-     the cards: the trick area is the one .center that has rows to give, and letting them become
-     ordinary flex items in a row would have stood them BESIDE the trick rather than under it. */
-  .center.trick-area { flex-wrap: wrap; }
-  .trick-meta {
-    position: static; transform: none;
-    width: 100%; justify-content: center; order: 3; margin-top: 8px;
-  }
-  .trick-stock { width: 100%; justify-content: center; order: 2; }
+  /* The stock takes its own row here too — there is no room beside the trick on a phone. */
+  .trick-stock { width: 100%; justify-content: center; }
 }
 
 /* The game log is the story of the hand, not a debug console. It was monospace green on a
@@ -6753,7 +6850,10 @@ button.bluff-go:disabled {
      each other; the room's own accent wash is what shows through it. */
   --glass-fill: rgba(255, 255, 255, 0.055);
   --glass-fill-hi: rgba(255, 255, 255, 0.09);
-  --glass-blur: saturate(140%) blur(20px);
+  /* 140% saturation turned every panel sitting under the room's key light into a green slab —
+     a backdrop-filter multiplies whatever chroma is behind it, and there is chroma behind
+     everything now. Just above 1 is enough to keep glass from looking grey. */
+  --glass-blur: saturate(115%) blur(22px);
   --glass-top: rgba(255, 255, 255, 0.10);
 
   /* --- elevation ---------------------------------------------------
@@ -7129,15 +7229,20 @@ button.primary:active {
   background-clip: padding-box, border-box;
   box-shadow: var(--e1);
 }
+/* Which tab you are on, said with a tint and the accent in the type rather than a solid slab
+   of colour. A filled pill in the brand colour is the loudest thing in a header that is
+   otherwise all glass, and a nav bar is not where a page should spend its one bold move. */
 .tabs button.on {
-  background: linear-gradient(178deg, var(--brass-hi), var(--brass));
-  color: var(--bg0);
-  box-shadow: var(--e1);
+  background: var(--ac14);
+  color: var(--accent-hi);
+  box-shadow: inset 0 0 0 1px var(--ac28);
 }
+/* Same voice as a chosen tab or a chosen filter. A settings panel can have a dozen of these
+   visible at once — a dozen solid accent pills is a control panel, not a preferences sheet. */
 .seg-btn.on {
-  background: linear-gradient(178deg, var(--brass-hi), var(--brass));
-  color: var(--bg0);
-  border-color: color-mix(in srgb, var(--accent-hi) 55%, transparent);
+  background: var(--ac14);
+  color: var(--accent-hi);
+  border-color: var(--ac28);
 }
 
 /* ------------------------------------------------------------------
@@ -7472,25 +7577,29 @@ which is what a sans is for.
    it.
    ------------------------------------------------------------------ */
 :root {
-  --seg-on-bg: linear-gradient(178deg, var(--brass-hi), var(--brass));
-  --seg-on-ink: #17171a;
+  /* A tint and the accent in the type, not a filled pill. One settings page can show a dozen
+     chosen segments at once; a dozen solid accent blocks is a control panel, and this one is
+     meant to read as a sheet of glass with a few things marked on it. */
+  --seg-on-bg: var(--ac14);
+  --seg-on-ink: var(--accent-hi);
 }
 :root[data-theme="light"] {
-  /* Steel has to darken in daylight to hold its own, and then the ink
-     on top of it has to go the other way. */
-  --seg-on-bg: linear-gradient(178deg, var(--brass), #2a1060);
-  --seg-on-ink: #fafafb;
+  /* The same idea in daylight: the accent has to darken to hold against a light ground, and
+     the tint behind it has to lighten. */
+  --seg-on-bg: var(--ac14);
+  --seg-on-ink: color-mix(in srgb, var(--accent) 78%, #000);
 }
 
-/* `border-color` cannot take a gradient, so the six rules that set it
-   from the same token would drop their border entirely. Give them the
-   solid metal instead. */
+/* `border-color` cannot take a gradient, so the rules that set it from
+   the same token would drop their border entirely. The solid accent at
+   a low mix, matching the tint inside them — a chosen control is marked
+   by the accent, not filled with it. */
 .seg-btn.on,
 .seg button.on,
 .rb-join button.on,
 .tabs button.on,
 .nav-dock button.on {
-  border-color: var(--brass);
+  border-color: var(--ac28);
 }
 
 /* ------------------------------------------------------------------
@@ -9179,20 +9288,52 @@ input[type="checkbox"]:focus-visible { outline: 2px solid var(--brass-hi); outli
    left at two thirds of the screen with the hand below the fold.
 
    While a table is open (Table.tsx sets data-playing), the shell gets
-   out of the way on anything phone-sized. The table has its own
-   "← All games" crumb, so there is still a way back; it is simply not
-   a persistent bar any more.
+   out of the way. The table has its own "← All games" crumb, so there
+   is still a way back; it is simply not a persistent bar any more.
+
+   This used to be scoped to `max-width: 899px`, and a desktop table
+   was the worse case of the two: measured at 1600x1000, the felt was
+   1112x778 — 54% of the screen — because the site header, the footer
+   and `.app`'s 1180px reading measure were all still in the way, and
+   "Full screen" in the table menu made the WINDOW bigger without
+   making the table any bigger inside it. A reading measure is right
+   for a page of prose and wrong for a card table; the table is not
+   text, and the only thing it competes with for space is nothing.
    ============================================================ */
+:root[data-playing="yes"] .nav-bar,
+:root[data-playing="yes"] .nav-rail,
+:root[data-playing="yes"] .nav-centre,
+:root[data-playing="yes"] .nav-dock,
+:root[data-playing="yes"] .nav-dock-head,
+:root[data-playing="yes"] .nav-plate,
+:root[data-playing="yes"] .site-footer { display: none; }
+:root[data-playing="yes"] main { padding-block: 0; }
+:root[data-playing="yes"] main > div { padding-block: 0; }
+
+/* The measure goes with it. `.app` is 1180px wide because that is a comfortable column of
+   text; the felt should be as wide as the glass it is under. */
+:root[data-playing="yes"] .app,
+:root[data-playing="yes"].nav-is-rail main {
+  max-width: none;
+  padding-top: max(10px, env(safe-area-inset-top));
+  padding-inline: max(8px, env(safe-area-inset-left)) max(8px, env(safe-area-inset-right));
+  padding-bottom: calc(10px + env(safe-area-inset-bottom));
+}
+/* What is left above the felt is the game's own bar — a back link, the name, Rules, the seat
+   count — and nothing else. Measured against that, not guessed. */
+/* The game bar loses its 18px of air above and below — it is a strip of controls over a table,
+   not a heading with a paragraph under it, and 36px of nothing is 4% of the screen. */
+:root[data-playing="yes"] .crumbs { margin: 0 0 6px; }
+/* Measured, not guessed: 10px of page padding, a 41px game bar, its 6px gap, and the rail's own
+   6px puts the top of the cloth at 63. At 1600x1000 that leaves the felt 1572x921 — 90% of the
+   screen, against the 54% it had before any of this. */
+:root[data-playing="yes"] { --table-top: 63px; --table-bottom: 4px; }
+:root[data-playing="yes"] .table-wrap { margin-top: 0; }
+
 @media (max-width: 899px) {
-  :root[data-playing="yes"] .nav-bar,
-  :root[data-playing="yes"] .nav-rail,
-  :root[data-playing="yes"] .nav-centre,
-  :root[data-playing="yes"] .nav-dock,
-  :root[data-playing="yes"] .nav-dock-head,
-  :root[data-playing="yes"] .nav-plate,
-  :root[data-playing="yes"] .site-footer { display: none; }
-  :root[data-playing="yes"] main { padding-block: 0; }
-  :root[data-playing="yes"] { --table-top: 96px; --table-bottom: 8px; }
+  /* Measured the same way: the game bar wraps to two short rows on a 390px screen, so it is
+     taller here than on a desktop, and the tab bar is hidden while a table is open. */
+  :root[data-playing="yes"] { --table-top: 82px; --table-bottom: 6px; }
 }
 
 /* ============================================================

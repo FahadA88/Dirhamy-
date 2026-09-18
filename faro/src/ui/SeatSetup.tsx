@@ -135,7 +135,7 @@ export function SeatSetup({ def, defaultSeats, defaultName, initialHouseRules, o
                   setCopied(true);
                   window.setTimeout(() => setCopied(false), 2000);
                 }).catch(() => {});
-              }}>{copied ? '✓ Copied' : '🔗 Copy a link with these rules'}</button>
+              }}>{copied ? '✓ Copied' : '↗ Copy a link with these rules'}</button>
             )}
           </div>
         )}

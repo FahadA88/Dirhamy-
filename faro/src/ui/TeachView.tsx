@@ -93,11 +93,11 @@ export function TeachView({ def, onClose }: { def: GameDefinition; onClose: () =
           </p>
         </div>
         {!done && (
-          <button className="ghost sm" onClick={() => setPlaying((p) => !p)}>{playing ? '⏸ Pause' : '▶ Play'}</button>
+          <button className="ghost sm" onClick={() => setPlaying((p) => !p)}>{playing ? '❙❙ Pause' : '▶ Play'}</button>
         )}
-        {!done && !playing && <button className="ghost sm" onClick={step}>⏭ Next move</button>}
+        {!done && !playing && <button className="ghost sm" onClick={step}>▸ Next move</button>}
         <button className="primary sm" onClick={() => setSeed((s) => { const n = s + 1_618_033; reset(n); return n; })}>
-          🔁 Watch again
+          ↻ Watch again
         </button>
       </div>
 

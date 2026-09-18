@@ -149,7 +149,7 @@ export function OnlineTable({ def, onStart, onCancel }: {
     return (
       <Shell def={def} onCancel={onCancel}>
         <div className="online-none">
-          <p className="on-mark" aria-hidden="true">⚡</p>
+          <p className="on-mark" aria-hidden="true">◈</p>
           <h3>No host is running</h3>
           <p className="muted">
             Playing with other people needs a server to referee. Everything else — every game,

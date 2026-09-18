@@ -346,7 +346,6 @@ export function PlayView({ startDailyTrigger }: { startDailyTrigger?: number } =
           social/daily.ts for what "ranked" honestly means without a server behind it). */}
       <div className="daily glass" role="status">
         <div className="daily-info">
-          <span className="daily-mark" aria-hidden="true">📅</span>
           <div>
             <b>Today's Deal</b>
             <p className="muted">

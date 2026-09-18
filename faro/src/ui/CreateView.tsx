@@ -358,7 +358,7 @@ export function CreateView({ onPlay }: { onPlay?: (def: GameDefinition) => void 
                 <Metric label="Winnable" value={report.winnable ? 'yes' : 'no'} />
                 <Metric label="Avg length" value={`${report.avgMoves.toFixed(1)} moves`} />
                 <Metric label="Seat win-rates" value={report.winRateBySeat.map((w) => (w * 100).toFixed(0) + '%').join(' / ')} />
-                {report.maxMovesHit > 0 && <div className="warn">⚠️ {report.maxMovesHit} games hit the move cap.</div>}
+                {report.maxMovesHit > 0 && <div className="warn">▲ {report.maxMovesHit} games hit the move cap.</div>}
               </div>
             )}
             <div className="step-actions">
@@ -1369,7 +1369,7 @@ export function CreateView({ onPlay }: { onPlay?: (def: GameDefinition) => void 
             <b>{validation.status === 'green' ? '✓ Ready to publish' : validation.status === 'amber' ? '! Playable, with warnings' : '✕ Not publishable yet'}</b>
             <ul>
               {validation.issues.length === 0 && <li>No issues — well-formed.</li>}
-              {validation.issues.map((iss, i) => (<li key={i} className={iss.level}>{iss.level === 'error' ? '⛔ ' : '⚠️ '}{iss.message}</li>))}
+              {validation.issues.map((iss, i) => (<li key={i} className={iss.level}>{iss.level === 'error' ? '✕ ' : '▲ '}{iss.message}</li>))}
             </ul>
           </div>
           <div className="test-row">
@@ -1382,7 +1382,7 @@ export function CreateView({ onPlay }: { onPlay?: (def: GameDefinition) => void 
               <Metric label="Winnable" value={report.winnable ? 'yes' : 'no'} />
               <Metric label="Avg length" value={`${report.avgMoves.toFixed(1)} moves`} />
               <Metric label="Seat win-rates" value={report.winRateBySeat.map((w) => (w * 100).toFixed(0) + '%').join(' / ')} />
-              {report.maxMovesHit > 0 && <div className="warn">⚠️ {report.maxMovesHit} games hit the move cap.</div>}
+              {report.maxMovesHit > 0 && <div className="warn">▲ {report.maxMovesHit} games hit the move cap.</div>}
             </div>
           )}
 

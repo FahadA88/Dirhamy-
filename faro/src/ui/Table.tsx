@@ -2067,7 +2067,7 @@ export function Table({
           )}
           {myLegal.some((m) => m.actionId === 'bluffChallenge') && (
             <button className="primary bluff-challenge" onClick={() => submit({ actionId: 'bluffChallenge' })}>
-              🤨 Call bluff!
+              Call bluff!
             </button>
           )}
         </div>
@@ -2345,11 +2345,11 @@ export function Table({
                 <span className="kent-note mine">You signalled — hope somebody is watching…</span>
               ) : myLegal.some((m) => m.actionId === 'kentCall') ? (
                 <button className="primary kent-go" onClick={() => submit({ actionId: 'kentCall' })}>
-                  ✋ Kent!
+                  Kent!
                 </button>
               ) : myLegal.some((m) => m.actionId === 'kentStop') ? (
                 <button className="primary kent-go stop" onClick={() => submit({ actionId: 'kentStop' })}>
-                  ✋ Call it off!
+                  Call it off!
                 </button>
               ) : null
             ) : (
@@ -2440,7 +2440,7 @@ export function Table({
                 : `Pass ${view.passDirection}`}
             </span>
           )}
-          {isInterrupt && <span className="bomb-badge">💣 Bomb?</span>}
+          {isInterrupt && <span className="bomb-badge">Bomb?</span>}
           {discardMoves.length > 0 && <span className="turn-badge">Discard one</span>}
           {/* "Your turn" is meaningless where there are no turns — everybody is always in. */}
           {!view.passDirection && view.isYourTurn && !suitPickerOpen && !isInterrupt && !isSet && !isPit && !isKent
@@ -2478,7 +2478,7 @@ export function Table({
           ))}
           {bombMoves.map((m, i) => (
             <button key={`bomb${i}`} className="bomb-btn" onClick={() => submit({ actionId: 'climbBomb', cards: m.cards })}>
-              💣 Bomb · {m.cards!.length}×{rankOfId(m.cards![0])}
+              Bomb · {m.cards!.length}×{rankOfId(m.cards![0])}
             </button>
           ))}
           {canDeclineBomb && <button className="draw-btn" onClick={() => submit({ actionId: 'climbNoBomb' })}>Hold</button>}
@@ -2718,7 +2718,7 @@ export function Table({
             </div>
             <div className="reflex-actions">
               {myLegal.some((m) => m.actionId === 'reflexSlap') && (
-                <button className="primary reflex-slap" onClick={() => submit({ actionId: 'reflexSlap' })}>✋ SLAP!</button>
+                <button className="primary reflex-slap" onClick={() => submit({ actionId: 'reflexSlap' })}>SLAP!</button>
               )}
               {myLegal.some((m) => m.actionId === 'reflexFlip') && (
                 <button className="ghost" onClick={() => submit({ actionId: 'reflexFlip' })}>Flip</button>
@@ -2994,7 +2994,7 @@ export function Table({
                   generic match-over modal" — Pit's only way to end IS its one big moment
                   (cornering the market), so it gets a kicker that says so instead of the
                   generic "Game over" every other single-hand family also falls back to. */}
-              <span className="cb-kicker">{isPit ? '📐 Cornered the market' : view.matchTarget != null ? 'Match over' : 'Game over'}</span>
+              <span className="cb-kicker">{isPit ? 'Cornered the market' : view.matchTarget != null ? 'Match over' : 'Game over'}</span>
               {(() => {
                 const title = iWon ? (isKent ? 'Your pair wins' : 'You win')
                   : isKent ? `${teamOf(view.matchWinner ?? '') ?? 'The other pair'} wins`
@@ -3152,7 +3152,7 @@ export function Table({
       {handoff && (
         <div className="modal handoff">
           <div className="modal-box" ref={handoffRef} role="dialog" aria-modal="true">
-            <div className="handoff-mark">🃏</div>
+            <div className="handoff-mark">♠</div>
             <h3>Pass the device to {nameOfSeat(handoff)}</h3>
             <p className="scores">Everyone else, look away.</p>
             <button className="primary" onClick={() => takeSeat(handoff)}>

@@ -1,7 +1,7 @@
 import { TableFelt } from '../settings/settings';
 
 const SEASON_N = 16;
-const SEASON_GLYPH: Record<'snow' | 'leaves', string> = { snow: '❄', leaves: '🍂' };
+const SEASON_GLYPH: Record<'snow' | 'leaves', string> = { snow: '❄', leaves: '❧' };
 
 /** A slow scatter of snow or leaves over the felt — see FeltDust just below for the same
  *  deterministic-spread trick, so a re-render never reshuffles where anything is falling. */
