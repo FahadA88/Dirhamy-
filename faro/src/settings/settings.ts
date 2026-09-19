@@ -2,7 +2,7 @@
 // and applied live — appearance AND gameplay, not just game rules.
 
 export type ThemeMode = 'light' | 'dark' | 'system';
-export type AccentId = 'emerald' | 'ocean' | 'violet' | 'teal' | 'rose' | 'amber' | 'slate' | 'copper';
+export type AccentId = 'emerald' | 'ocean' | 'rose' | 'amber';
 /** Every back on the menu. Pure decoration — a back carries no information, so any of them
  *  is safe to ship and safe to let somebody make their own version of. */
 export type CardBack =
@@ -224,7 +224,7 @@ export const defaultSettings: Settings = {
   // These four have to agree with the 'club' pack in THEME_PACKS or the app opens showing a
   // look it is not actually wearing.
   theme: 'dark',
-  accent: 'emerald',
+  accent: 'amber',
   cardBack: 'lattice',
   tableFelt: 'mahogany',
   cardFace: 'classic',
@@ -342,67 +342,65 @@ export const THEME_PACKS: ThemePack[] = [
 
   /* The house look, and what the app opens on. Dyed cloth, tarnished brass, old ivory —
      every colour on the screen is something a real table is made of. */
-  { id: 'club', name: 'The Card Room', blurb: 'Green baize under a lamp, gold on the rail. The house look.', accent: 'emerald', tableFelt: 'mahogany', cardBack: 'lattice', cardFace: 'classic' },
+  { id: 'club', name: 'The Card Room', blurb: 'Green baize under a lamp, gold on the rail. The house look.', accent: 'amber', tableFelt: 'mahogany', cardBack: 'lattice', cardFace: 'classic' },
 
   /* No hue in the furniture at all: graphite, pewter and one brass accent for what has been
      won. Every colour on the screen belongs to the cards. The strictest reading of quiet. */
   { id: 'inkmetal', name: 'High Roller', blurb: 'Oxblood velvet, gold inlay, and nothing cheap in the room.', accent: 'amber', tableFelt: 'velvet', cardBack: 'artdeco', cardFace: 'deco' },
 
-  /* Cold everywhere, warm once. Slate blue through the interface and a copper signal on the
+  /* Cold everywhere, warm once. Sapphire through the interface and a magenta sign on the
      one thing that matters — which is also how the table already marks what you have won. */
-  { id: 'coldmodern', name: 'After Midnight', blurb: 'Indigo cloth under the sign outside. The room at 3am.', accent: 'teal', tableFelt: 'neon', cardBack: 'neongrid', cardFace: 'big-index' },
+  { id: 'coldmodern', name: 'After Midnight', blurb: 'Indigo cloth under the sign outside. The room at 3am.', accent: 'ocean', tableFelt: 'neon', cardBack: 'neongrid', cardFace: 'big-index' },
 
-  { id: 'neon', name: 'Neon Table', blurb: 'A card room after midnight, lit by the sign outside.', accent: 'teal', tableFelt: 'neon', cardBack: 'monogram', cardFace: 'classic' },
+  { id: 'neon', name: 'Neon Table', blurb: 'A card room after midnight, lit by the sign outside.', accent: 'ocean', tableFelt: 'neon', cardBack: 'monogram', cardFace: 'classic' },
   { id: 'parlour', name: 'Sunlit Parlour', blurb: 'Afternoon light on a quiet table.', accent: 'amber', tableFelt: 'parlour', cardBack: 'ivory', cardFace: 'typographic' },
   { id: 'midnight', name: 'Midnight Blue', blurb: 'Deep and cool, easy on the eyes.', accent: 'ocean', tableFelt: 'midnight', cardBack: 'neongrid', cardFace: 'big-index' },
   { id: 'autumn', name: 'Autumn Study', blurb: 'Mahogany, brass and old paper.', accent: 'amber', tableFelt: 'mahogany', cardBack: 'kraft', cardFace: 'woodcut' },
-  { id: 'frost', name: 'Winter Frost', blurb: 'Cold marble and pale ink.', accent: 'teal', tableFelt: 'marble', cardBack: 'linen', cardFace: 'minimal' },
+  { id: 'frost', name: 'Winter Frost', blurb: 'Cold marble and pale ink.', accent: 'ocean', tableFelt: 'marble', cardBack: 'linen', cardFace: 'minimal' },
   { id: 'spring', name: 'Spring Green', blurb: 'Fresh felt, bright cards.', accent: 'emerald', tableFelt: 'vegas', cardBack: 'lattice', cardFace: 'four-color' },
-  { id: 'noir', name: 'Chalk & Noir', blurb: 'Blackboard green, chalk-white pips.', accent: 'slate', tableFelt: 'chalkboard', cardBack: 'halftone', cardFace: 'mono' },
+  { id: 'noir', name: 'Chalk & Noir', blurb: 'Blackboard green, chalk-white pips.', accent: 'ocean', tableFelt: 'chalkboard', cardBack: 'halftone', cardFace: 'mono' },
   { id: 'vegas', name: 'Vegas Red', blurb: 'Oxblood velvet and gold trim.', accent: 'rose', tableFelt: 'velvet', cardBack: 'sunburst', cardFace: 'deco' },
-  { id: 'study', name: 'The Study', blurb: 'Damson cloth, walnut rail, and a lamp on one corner.', accent: 'violet', tableFelt: 'walnut', cardBack: 'damask', cardFace: 'typographic' },
-  { id: 'signal', name: 'Copper Signal', blurb: 'A concrete table with one hot metal edge.', accent: 'copper', tableFelt: 'concrete', cardBack: 'kraft', cardFace: 'big-index' },
+  { id: 'study', name: 'The Study', blurb: 'Damson cloth, walnut rail, and a lamp on one corner.', accent: 'rose', tableFelt: 'walnut', cardBack: 'damask', cardFace: 'typographic' },
+  { id: 'signal', name: 'Copper Signal', blurb: 'A concrete table with one hot metal edge.', accent: 'amber', tableFelt: 'concrete', cardBack: 'kraft', cardFace: 'big-index' },
 ];
 
 export interface AccentPreset { name: string; green: string; greenD: string; emerald: string; lime: string; }
 
 /*
-  Eight casino chips.
+  Four casino chips, not eight.
 
-  Two wrong answers got us here. The first was the framework default — Tailwind's 500 step in
-  seven families, the palette every generated interface wears. The second was the over-correction
-  away from it: pigments so far down in chroma that the place stopped reading as a card room at
-  all and started reading as a design studio. Quiet is not the same as tasteful, and a card room
-  is not a quiet place.
+  There were three wrong answers before this one. The framework default — Tailwind's 500 step
+  in seven families, the palette every generated interface wears. The over-correction away from
+  it: pigments so far down in chroma the place read as a design studio rather than a card room.
+  And then eight rich, saturated chip colours, which fixed the flatness but turned the accent
+  picker itself into a wall of choice nobody asked for — and because --bg0 and the ambient
+  lighting were both keyed off "the cloth" (emerald) by default, the whole room read as green
+  regardless of which accent a player actually preferred.
 
-  So: the colours a casino actually owns, at the strength it actually uses them. These are chip
-  denominations — white, red, green, black, purple, gold — plus the cloth and the metal. Rich,
-  saturated, and lit. The restraint lives in the LAYOUT now, which is where it belongs: one bold
-  thing per screen, on glass, with room around it. Not in the colours.
+  Four now: Gold, Crimson, Emerald, Sapphire. Enough to feel like a casino's real palette —
+  metal, the two suit colours, one cool note — without asking anyone to choose between eight
+  near-neighbours. Gold leads and is the default, because it is the one colour that reads as
+  "casino" without also being a specific felt's colour — the room's ambient light and every
+  "you are here" control take their cue from it before a player touches Settings at all.
 
-  The ids are unchanged, as before — they are written into saved settings on every device that
-  has ever opened this.
+  The ids that survive are unchanged, as before — they are written into saved settings on every
+  device that has ever opened this. An id that no longer exists here (`violet`, `teal`, `slate`,
+  `copper`) falls back to the default the same way any other invalid saved value does — see the
+  `ALLOWED` re-validation in `loadSettings`.
 
   Four steps, darkest first: greenD, green, emerald, lime. A dark room takes the brighter pair
   and a light room the deeper pair — see applySettings.
 */
 export const ACCENTS: Record<AccentId, AccentPreset> = {
-  /** The cloth. Billiard green — the colour the whole room is built around. */
-  emerald: { name: 'Baize',     green: '#0A8A4E', greenD: '#056B3C', emerald: '#12B268', lime: '#46D993' },
-  /** The metal. Rails, trim, chips of the highest denomination, and everything won. */
+  /** The metal. Rails, trim, the wordmark, and everything that has been won — the default,
+   *  because gold reads as "casino" without also painting the whole room one felt's colour. */
   amber:   { name: 'Gold',      green: '#C08D18', greenD: '#9A6E10', emerald: '#E3B03A', lime: '#FFD470' },
   /** The other half of every deck and every wheel. */
   rose:    { name: 'Crimson',   green: '#B5122C', greenD: '#8E0E22', emerald: '#DE2145', lime: '#FF8C9C' },
-  /** The blue chip, and the only cool colour on a warm table. */
+  /** The cloth. Billiard green, for whoever wants the table itself as the accent. */
+  emerald: { name: 'Emerald',   green: '#0A8A4E', greenD: '#056B3C', emerald: '#12B268', lime: '#46D993' },
+  /** The blue chip, and the only cool colour in the set. */
   ocean:   { name: 'Sapphire',  green: '#1656A8', greenD: '#10407F', emerald: '#2276D6', lime: '#8FC0FB' },
-  /** The five-hundred chip. The one nobody at a low table ever sees. */
-  violet:  { name: 'Amethyst',  green: '#6A24B0', greenD: '#4E1A86', emerald: '#8B3DDB', lime: '#C9A0F8' },
-  /** The sign in the window, after midnight. */
-  teal:    { name: 'Peacock',   green: '#088C8C', greenD: '#056B6B', emerald: '#0FB5B0', lime: '#3EE0D6' },
-  /** Hot orange — a dealer's button, a warning, a hand you should be watching. */
-  copper:  { name: 'Tangerine', green: '#C4530C', greenD: '#9A3D08', emerald: '#EE7016', lime: '#FF9A4D' },
-  /** Bright silver rather than grey. Chrome, not concrete. */
-  slate:   { name: 'Platinum',  green: '#77828F', greenD: '#5A6472', emerald: '#98A3B0', lime: '#C2CBD6' },
 };
 
 export interface FeltPreset { name: string; blurb: string }

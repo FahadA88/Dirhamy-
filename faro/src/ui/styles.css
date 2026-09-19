@@ -63,31 +63,34 @@
   --daywarm: 0.3;          /* set for real at mount, from the local clock — see App.tsx */
 
   /*
-    THE GROUND IS NOT BLACK.
+    THE GROUND IS NOT BLACK, AND IT IS NOT ONE FELT'S COLOUR EITHER.
 
-    --bg0 was #0a0c11 — near-black with a faint blue in it — and every panel on the site is
-    five per cent white laid over it. So the whole place was a black page with a few small
-    coloured things scattered on it, and no amount of work on the accents was ever going to
-    fix that: the accents were never the problem, the FLOOR was.
+    First version: --bg0 was #0a0c11, near-black, and every panel on the site is a few
+    percent of white laid over it — a black page with small coloured things scattered on it.
+    Second version fixed that by making the ground deep green baize. Which solved "black and
+    depressing" and immediately became its own complaint: green is one table's colour, not
+    the room's, and hard-coding it into --bg0 meant the whole site was that one green
+    regardless of which accent a player actually chose — the ROOM stopped listening to the
+    accent the moment the floor was welded to a specific felt.
 
-    Nothing in a casino is black. The carpet is a jewel colour, the walls are papered, the
-    lamps are warm, and every surface has some of that bouncing off it. So the ground is a
-    deep green now — the darkest end of the same baize the tables are cut from — with enough
-    saturation left in it that a translucent panel picks the colour up instead of going grey.
-    Everything else on this page inherits that.
+    So the ground is neutral now — a warm, near-black wood-and-leather tone, the colour of a
+    dim room rather than of any one table in it — and every place that wants colour gets it
+    from the LIGHTS (below) and the accent instead, both of which already track the player's
+    choice. Switch the accent to Sapphire and the room actually goes blue; that was never
+    true while the floor itself was hard-coded green.
   */
-  --bg0: #0C3528;          /* the floor: baize, two stops down */
-  --bg1: #114535;
+  --bg0: #14100B;          /* the floor: warm near-black, no hue committed to it */
+  --bg1: #1C1610;
   /* Glass with warmth in it. Neutral white at 5% over a coloured ground reads as fog; a fill
      that carries a little of the room's own light reads as glass in that room. */
   --panel: rgba(255, 246, 228, 0.075);
-  --panel-solid: #103B2C;                /* an opaque fallback — high-contrast mode, printed output */
+  --panel-solid: #211A13;                /* an opaque fallback — high-contrast mode, printed output */
   --panel-hi: rgba(255, 246, 228, 0.12);
   --panel-brd: rgba(255, 240, 210, 0.13);
   --panel-brd-hi: rgba(255, 240, 210, 0.30);
-  --ink: #F6F3EA;
-  --muted: #A9BCB0;
-  --dim: #6C8478;
+  --ink: #F6F2E8;
+  --muted: #AFA79A;
+  --dim: #726A5C;
 
   /* One accent. Everything that used to reach for a second or third hue reaches for this
      instead — a select state and a focus ring should read as the same kind of "on", not as
@@ -403,15 +406,18 @@ body::after {
   --lamp-floor: color-mix(in srgb, var(--accent) 10%, transparent);
   --hairline: rgba(20, 22, 32, 0.10);
 }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --lamp-lamp: rgba(255, 206, 122, 0.10);
-    --lamp-key: color-mix(in srgb, var(--accent) 17%, transparent);
-    --lamp-cool: color-mix(in srgb, color-mix(in srgb, var(--accent) 35%, #3a4fd8) 10%, transparent);
-    --lamp-floor: color-mix(in srgb, var(--accent) 5%, transparent);
-    --hairline: rgba(255, 255, 255, 0.09);
-  }
-}
+/*
+  There used to be a `@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) }`
+  block here, left from before `applySettings` always wrote an explicit `data-theme` attribute
+  on mount. `:root:not([data-theme="light"])` outranks the plain `:root` block above on
+  specificity (0,2,0) against (0,1,0)) — inside the media query, not by source order — so on
+  ANY device with a dark OS preference it was silently overriding the current five-light
+  --lamp-* values with an older, dimmer set that also re-tinted --lamp-cool from the accent
+  (which, back when the default accent was green, quietly recreated the "too much green" bug
+  through a code path nobody was looking at). There is no unstyled-flash window for it to guard
+  — nothing paints before JS calls applySettings — so it was pure duplication, and dangerous
+  duplication at that. Removed rather than reconciled.
+*/
 
 /* A fixed background repaints on every scroll frame on most mobile engines rather than
    compositing for free the way it does on desktop — one more line item in the same 4x-throttled
@@ -4361,15 +4367,25 @@ header h1, header .wordmark {
    is built out of exactly those two materials.
    ============================================================ */
 
-/* --- the hero is the table, under a lamp --- */
+/* --- the hero is the table, under a lamp — dark, whichever colour it is --- */
+/* This used to be a linear-gradient of specific greens: the cloth, painted in whether or not
+   green was anything to do with the room a player had actually chosen. The biggest single
+   block of colour on the front page was hard-coded, and it was always the same colour.
+
+   It stays dark on purpose in both themes — a table under a lamp reads as a table under a
+   lamp whether or not the rest of the page has its shutters open, the same way the felt itself
+   never turned pale in daylight mode — but the base is a neutral warm near-black now, not a
+   fixed green, and the accent supplies its own glow on top. Switch the accent to Sapphire and
+   this panel visibly goes blue; a hard-coded gradient could never do that. */
 .hero {
   background:
-    /* the lamp */
-    radial-gradient(700px 420px at 74% -6%, rgba(255, 238, 198, .24), transparent 62%),
+    /* the lamp: warm and fixed, a light source rather than a hue */
+    radial-gradient(700px 420px at 74% -6%, rgba(255, 238, 198, .22), transparent 62%),
+    /* the accent's own glow */
+    radial-gradient(820px 480px at 22% 62%, var(--ac35), transparent 70%),
     /* the shadow it throws into the far corner */
-    radial-gradient(620px 460px at 4% 100%, rgba(0, 0, 0, .42), transparent 62%),
-    /* the cloth */
-    linear-gradient(148deg, #12924F 0%, #0B6B3C 40%, #064A2B 72%, #032D1B 100%);
+    radial-gradient(620px 460px at 4% 100%, rgba(0, 0, 0, .40), transparent 62%),
+    linear-gradient(148deg, #241B12 0%, #17110B 46%, #0E0A06 100%);
   border: 1px solid var(--gold-edge);
   box-shadow:
     0 1px 0 rgba(255, 244, 214, .18) inset,
