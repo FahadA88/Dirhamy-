@@ -392,11 +392,11 @@ export const ACCENTS: Record<AccentId, AccentPreset> = {
   /** The metal. Rails, trim, chips of the highest denomination, and everything won. */
   amber:   { name: 'Gold',      green: '#C08D18', greenD: '#9A6E10', emerald: '#E3B03A', lime: '#FFD470' },
   /** The other half of every deck and every wheel. */
-  rose:    { name: 'Crimson',   green: '#B5122C', greenD: '#8E0E22', emerald: '#DE2145', lime: '#FF5E76' },
+  rose:    { name: 'Crimson',   green: '#B5122C', greenD: '#8E0E22', emerald: '#DE2145', lime: '#FF8C9C' },
   /** The blue chip, and the only cool colour on a warm table. */
-  ocean:   { name: 'Sapphire',  green: '#1656A8', greenD: '#10407F', emerald: '#2276D6', lime: '#5AA0F0' },
+  ocean:   { name: 'Sapphire',  green: '#1656A8', greenD: '#10407F', emerald: '#2276D6', lime: '#8FC0FB' },
   /** The five-hundred chip. The one nobody at a low table ever sees. */
-  violet:  { name: 'Amethyst',  green: '#6A24B0', greenD: '#4E1A86', emerald: '#8B3DDB', lime: '#B173F0' },
+  violet:  { name: 'Amethyst',  green: '#6A24B0', greenD: '#4E1A86', emerald: '#8B3DDB', lime: '#C9A0F8' },
   /** The sign in the window, after midnight. */
   teal:    { name: 'Peacock',   green: '#088C8C', greenD: '#056B6B', emerald: '#0FB5B0', lime: '#3EE0D6' },
   /** Hot orange — a dealer's button, a warning, a hand you should be watching. */

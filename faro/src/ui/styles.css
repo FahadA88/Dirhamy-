@@ -61,16 +61,33 @@
    ------------------------------------------------------------------ */
 :root {
   --daywarm: 0.3;          /* set for real at mount, from the local clock — see App.tsx */
-  --bg0: #0a0c11;          /* the room, past midnight */
-  --bg1: #12151c;
-  --panel: rgba(255, 255, 255, 0.055);   /* glass: translucent, tinted by whatever sits behind it */
-  --panel-solid: #14171f;                /* an opaque fallback — high-contrast mode, printed output */
-  --panel-hi: rgba(255, 255, 255, 0.09);
-  --panel-brd: rgba(255, 255, 255, 0.10);
-  --panel-brd-hi: rgba(255, 255, 255, 0.24);
-  --ink: #eef0f4;
-  --muted: #99a1b0;
-  --dim: #5c6472;
+
+  /*
+    THE GROUND IS NOT BLACK.
+
+    --bg0 was #0a0c11 — near-black with a faint blue in it — and every panel on the site is
+    five per cent white laid over it. So the whole place was a black page with a few small
+    coloured things scattered on it, and no amount of work on the accents was ever going to
+    fix that: the accents were never the problem, the FLOOR was.
+
+    Nothing in a casino is black. The carpet is a jewel colour, the walls are papered, the
+    lamps are warm, and every surface has some of that bouncing off it. So the ground is a
+    deep green now — the darkest end of the same baize the tables are cut from — with enough
+    saturation left in it that a translucent panel picks the colour up instead of going grey.
+    Everything else on this page inherits that.
+  */
+  --bg0: #0C3528;          /* the floor: baize, two stops down */
+  --bg1: #114535;
+  /* Glass with warmth in it. Neutral white at 5% over a coloured ground reads as fog; a fill
+     that carries a little of the room's own light reads as glass in that room. */
+  --panel: rgba(255, 246, 228, 0.075);
+  --panel-solid: #103B2C;                /* an opaque fallback — high-contrast mode, printed output */
+  --panel-hi: rgba(255, 246, 228, 0.12);
+  --panel-brd: rgba(255, 240, 210, 0.13);
+  --panel-brd-hi: rgba(255, 240, 210, 0.30);
+  --ink: #F6F3EA;
+  --muted: #A9BCB0;
+  --dim: #6C8478;
 
   /* One accent. Everything that used to reach for a second or third hue reaches for this
      instead — a select state and a focus ring should read as the same kind of "on", not as
@@ -119,7 +136,7 @@
   /* --red as small text on a panel measures ~3.7:1 here — fine for a background or a border,
      not enough for reading. A separate, brighter token for red TEXT specifically, so a warning
      nobody notices doesn't share a color with a button nobody has to read. */
-  --red-text: #e56059;
+  --red-text: #FF8F86;
   --amber: #c99a4b;
 
   /* Older names, still asked for all over the sheet. Pointed at the new lights rather than
@@ -170,16 +187,18 @@
    panelled room with a lamp in it.
 */
 :root[data-theme="light"] {
-  --bg0: #f3f4f8;          /* the room, shutters open */
-  --bg1: #f9fafc;
-  --panel: rgba(20, 22, 32, 0.045);        /* glass again, just tinted dark-on-light this time */
-  --panel-solid: #ffffff;
-  --panel-hi: rgba(20, 22, 32, 0.075);
-  --panel-brd: rgba(20, 22, 32, 0.10);
-  --panel-brd-hi: rgba(20, 22, 32, 0.22);
-  --ink: #14161f;
-  --muted: #5a6070;
-  --dim: #9aa0ac;
+  /* Daylight is the same room with the shutters open, so it is not a neutral grey page
+     either — it is warm, the colour of the cream the cards are printed on. */
+  --bg0: #F6F1E4;          /* the room, shutters open */
+  --bg1: #FFFBF1;
+  --panel: rgba(38, 30, 12, 0.05);         /* glass again, just tinted dark-on-light this time */
+  --panel-solid: #FFFDF6;
+  --panel-hi: rgba(38, 30, 12, 0.085);
+  --panel-brd: rgba(38, 30, 12, 0.13);
+  --panel-brd-hi: rgba(38, 30, 12, 0.26);
+  --ink: #1B2118;
+  --muted: #5A6354;
+  --dim: #8F9887;
 
   --accent: #3f5fd6;
   --accent-hi: #5b7cea;
@@ -197,7 +216,7 @@
   --gold-edge: rgba(168, 124, 22, 0.44);
   --gold-inlay: rgba(168, 124, 22, 0.28);
   --red: #a8352f;
-  --red-text: #a8352f;   /* already ~6.5:1 against a light panel — no separate value needed */
+  --red-text: #9E2B24;   /* already ~6.5:1 against a light panel — no separate value needed */
   --amber: #92671f;
 
   --green: var(--accent);
@@ -301,11 +320,46 @@ body::before {
   z-index: 0;
   pointer-events: none;
   background:
-    radial-gradient(74vw 62vh at 22% -6%, var(--lamp-lamp) 0%, transparent 62%),
-    radial-gradient(96vw 86vh at 14% 26%, var(--lamp-key) 0%, transparent 68%),
-    radial-gradient(84vw 78vh at 94% 74%, var(--lamp-cool) 0%, transparent 66%),
-    radial-gradient(140vw 64vh at 46% 122%, var(--lamp-floor) 0%, transparent 74%);
+    /* the lamp over the table */
+    radial-gradient(62vw 52vh at 30% -12%, var(--lamp-lamp) 0%, transparent 58%),
+    /* the cloth's own bounce, up the left */
+    radial-gradient(84vw 78vh at 4% 40%, var(--lamp-key) 0%, transparent 66%),
+    /* and one through the middle, where the content actually sits — a room lit only round its
+       edges is a room with a hole in the middle of it */
+    radial-gradient(72vw 58vh at 50% 34%, var(--lamp-mid) 0%, transparent 64%),
+    /* the sign in the window, top right */
+    radial-gradient(58vw 58vh at 100% -4%, var(--lamp-sign) 0%, transparent 58%),
+    /* the carpet, catching light from the far side of the room */
+    radial-gradient(64vw 64vh at 100% 96%, var(--lamp-cool) 0%, transparent 60%),
+    radial-gradient(56vw 56vh at 0% 104%, var(--lamp-ruby) 0%, transparent 58%),
+    /* and the floor under everything */
+    radial-gradient(150vw 70vh at 44% 124%, var(--lamp-floor) 0%, transparent 76%);
 }
+
+/*
+  The carpet.
+
+  A casino floor is patterned, and the pattern is most of why the place does not read as an
+  empty room. Four overlapping diagonals make a diamond lattice — cheap to paint, fixed so it
+  does not scroll, and weak enough that it is texture rather than wallpaper. It sits over the
+  lights and under everything else.
+*/
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: var(--carpet-opacity, 1);
+  background:
+    repeating-linear-gradient(60deg, var(--carpet-ink) 0 1px, transparent 1px 34px),
+    repeating-linear-gradient(-60deg, var(--carpet-ink) 0 1px, transparent 1px 34px),
+    repeating-linear-gradient(60deg, var(--carpet-glow) 0 1px, transparent 1px 102px),
+    repeating-linear-gradient(-60deg, var(--carpet-glow) 0 1px, transparent 1px 102px);
+}
+/* A pattern is motion to some people and noise to others; the same switch that stills the
+   table stills the floor. */
+:root[data-motion="reduced"] body::after { opacity: .5; }
 :root {
   /* The accent AS TYPE. --accent-hi is the bright end of the ramp, which is right for a
      highlight on a dark ground and unreadable as 13px text on a pale one; every "this is the
@@ -315,12 +369,22 @@ body::before {
   /* Four lights, not three. The new one is the LAMP over the table — warm, gold, high in the
      frame — because a room lit only in its own accent reads as a gel over a lens rather than
      as a room. Gold above, accent through the middle, a cool counter-light on the far side. */
-  --lamp-lamp: rgba(255, 206, 122, 0.10);
-  --lamp-key: color-mix(in srgb, var(--accent) 17%, transparent);
+  /* Five lights, and none of them shy. On a coloured floor a nine-per-cent wash does nothing
+     at all; these are what turn a dark green rectangle into a room with lamps in it. */
+  --lamp-lamp: rgba(255, 206, 122, 0.22);
+  --lamp-key: color-mix(in srgb, var(--accent) 34%, transparent);
+  /* The sign in the window. Deliberately NOT the accent — one colour everywhere is a tint, two
+     that disagree is a room. */
+  --lamp-sign: rgba(224, 58, 140, 0.34);
+  /* And one in the far corner, the colour of the carpet itself. */
+  --lamp-ruby: rgba(190, 26, 62, 0.26);
+  --lamp-mid: rgba(255, 236, 190, 0.10);
+  --carpet-ink: rgba(0, 0, 0, 0.22);
+  --carpet-glow: rgba(255, 214, 138, 0.085);
   /* Pulled a long way round the wheel from the accent and then almost all the way to nothing:
      a second light of a different colour is what stops the page reading as one flat tint. */
-  --lamp-cool: color-mix(in srgb, color-mix(in srgb, var(--accent) 35%, #3a4fd8) 10%, transparent);
-  --lamp-floor: color-mix(in srgb, var(--accent) 5%, transparent);
+  --lamp-cool: rgba(110, 48, 200, 0.34);
+  --lamp-floor: color-mix(in srgb, var(--accent) 18%, transparent);
   /* One hairline for every edge on the page. A border is the only thing separating one sheet
      of glass from the next, so it has to be the same hairline everywhere or the page reads as
      a pile of unrelated boxes. */
@@ -328,10 +392,15 @@ body::before {
 }
 :root[data-theme="light"] {
   --accent-ink: color-mix(in srgb, var(--accent) 62%, #000);
-  --lamp-lamp: rgba(255, 198, 104, 0.09);
-  --lamp-key: color-mix(in srgb, var(--accent) 12%, transparent);
-  --lamp-cool: color-mix(in srgb, color-mix(in srgb, var(--accent) 35%, #3a4fd8) 7%, transparent);
-  --lamp-floor: color-mix(in srgb, var(--accent) 4%, transparent);
+  --lamp-lamp: rgba(255, 190, 92, 0.16);
+  --lamp-key: color-mix(in srgb, var(--accent) 16%, transparent);
+  --lamp-sign: rgba(214, 74, 140, 0.15);
+  --lamp-ruby: rgba(198, 40, 74, 0.11);
+  --lamp-mid: rgba(255, 228, 160, 0.10);
+  --carpet-ink: rgba(70, 52, 16, 0.07);
+  --carpet-glow: rgba(150, 110, 30, 0.05);
+  --lamp-cool: rgba(120, 60, 210, 0.13);
+  --lamp-floor: color-mix(in srgb, var(--accent) 10%, transparent);
   --hairline: rgba(20, 22, 32, 0.10);
 }
 @media (prefers-color-scheme: dark) {
@@ -860,7 +929,7 @@ h2 { letter-spacing: -0.025em; color: var(--ink); font-size: 22px; font-weight: 
     gap: 0; padding: 4px 4px calc(4px + env(safe-area-inset-bottom));
     border-radius: 0; border: 0; border-top: 1px solid var(--panel-brd);
     background: color-mix(in srgb, var(--panel-solid) 94%, transparent);
-    backdrop-filter: blur(12px);
+    backdrop-filter: saturate(135%) blur(14px);
   }
   .nav-bar .tabs.nv-items button {
     flex-direction: column; gap: 3px; min-height: 52px;
@@ -3910,8 +3979,11 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
      applies at that point, so the notch reservation has to be repeated here (see item 32). */
   padding-top: max(10px, env(safe-area-inset-top));
   padding-bottom: 10px;
-  background: color-mix(in srgb, var(--panel-solid) 88%, transparent);
-  backdrop-filter: blur(12px);
+  /* Glass, like everything else. This was 88% of an opaque near-black panel, which on a black
+     page read as "the header" and on a green one reads as a dark slab laid across the room. */
+  background: color-mix(in srgb, var(--bg0) 62%, transparent);
+  -webkit-backdrop-filter: saturate(150%) blur(16px);
+  backdrop-filter: saturate(150%) blur(16px);
   border-radius: 0 0 16px 16px;
 }
 
