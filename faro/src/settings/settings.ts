@@ -376,9 +376,10 @@ export interface AccentPreset { name: string; green: string; greenD: string; eme
   is the same clash the room itself had before it was repainted, just moved one level down into
   the one part of it that hadn't been touched yet.
 
-  Four now, all cool, all mixable with the signage overhead: Cyan (the wordmark's own first
-  colour, and the default), Violet, Magenta and Laser Green — a hue wheel that stays inside the
-  same family the room is lit in instead of fighting it.
+  Four now, sampled straight from the wordmark's own five-stop gradient rather than picked to
+  merely "go with" it: Cyan (the first stop, and the default), Violet (the middle), Magenta and
+  Pink (the last two) — a hue wheel that stays inside the same soft, sky-to-rose family the room
+  is lit in instead of fighting it.
 
   The ids that survive are unchanged, as before — they are written into saved settings on every
   device that has ever opened this, so `amber`/`rose`/`emerald`/`ocean` keep meaning "the first
@@ -391,17 +392,15 @@ export interface AccentPreset { name: string; green: string; greenD: string; eme
   and a light room the deeper pair — see applySettings.
 */
 export const ACCENTS: Record<AccentId, AccentPreset> = {
-  /** The wordmark's own first colour. Default, because a player who never opens Settings should
-   *  still get the same cyan the mark and the "on" states are already lit in. */
-  amber:   { name: 'Violet',    green: '#6B21A8', greenD: '#4C1D80', emerald: '#A855F7', lime: '#D8B4FE' },
-  /** The wordmark's second colour. */
-  rose:    { name: 'Magenta',   green: '#A3157A', greenD: '#750F58', emerald: '#F0399A', lime: '#FF8FD8' },
-  /** The one hue outside the wordmark's own gradient — every neon room needs a second signal,
-   *  not just a second shade of the first one. */
-  emerald: { name: 'Laser Green', green: '#0E7A4A', greenD: '#0A5535', emerald: '#2FE88A', lime: '#9CFFC2' },
+  /** The wordmark's middle colour. */
+  amber:   { name: 'Violet',  green: '#4B2F94', greenD: '#33206A', emerald: '#8E68ED', lime: '#C6B3F7' },
+  /** The wordmark's fourth stop. */
+  rose:    { name: 'Magenta', green: '#7A2F8C', greenD: '#551F61', emerald: '#BE68D3', lime: '#E3B3EE' },
+  /** The wordmark's last colour, where the gradient lands. */
+  emerald: { name: 'Pink',    green: '#93386E', greenD: '#66264C', emerald: '#E078B7', lime: '#F5BFDC' },
   /** The wordmark's own first colour, spelled out as its own swatch too — this is the site's
    *  default light, not a "cool option" among warm ones any more. */
-  ocean:   { name: 'Cyan',      green: '#0E7A90', greenD: '#0A5568', emerald: '#22D3EE', lime: '#8FF3FF' },
+  ocean:   { name: 'Cyan',    green: '#1B5A73', greenD: '#123E50', emerald: '#64CEEB', lime: '#BFF0FB' },
 };
 
 export interface FeltPreset { name: string; blurb: string }
