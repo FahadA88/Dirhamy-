@@ -314,18 +314,18 @@ body::before {
 :root {
   /* Two lights, not one: cyan top-left, violet bottom-right, the same pair the mark and the
      wordmark are lit in — a room lit in its own two colours instead of a wash of one. */
-  --lamp-key: rgba(34, 211, 238, 0.16);
-  --lamp-cool: rgba(168, 85, 247, 0.16);
-  --lamp-floor: rgba(244, 114, 182, 0.05);
+  --lamp-key: rgba(34, 211, 238, 0.30);
+  --lamp-cool: rgba(168, 85, 247, 0.28);
+  --lamp-floor: rgba(244, 114, 182, 0.12);
   /* One hairline for every edge on the page. A border is the only thing separating one sheet
      of glass from the next, so it has to be the same hairline everywhere or the page reads as
      a pile of unrelated boxes. */
   --hairline: rgba(255, 255, 255, 0.09);
 }
 :root[data-theme="light"] {
-  --lamp-key: rgba(34, 211, 238, 0.10);
-  --lamp-cool: rgba(168, 85, 247, 0.10);
-  --lamp-floor: rgba(244, 114, 182, 0.04);
+  --lamp-key: rgba(34, 211, 238, 0.18);
+  --lamp-cool: rgba(168, 85, 247, 0.16);
+  --lamp-floor: rgba(244, 114, 182, 0.07);
   --hairline: rgba(20, 22, 32, 0.10);
 }
 /* There used to be a `@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) }`
@@ -2011,15 +2011,22 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
      side of it read as grey rather than as glass. The game's own art is the colour here; the
      panel it sits in is a sheet with the room behind it. */
   background:
-    radial-gradient(760px 380px at 76% 44%, var(--ac10), transparent 72%),
+    radial-gradient(760px 380px at 76% 44%, rgba(168, 85, 247, .16), transparent 72%),
+    radial-gradient(600px 320px at 6% 10%, rgba(34, 211, 238, .14), transparent 70%),
     var(--glass-fill);
   -webkit-backdrop-filter: var(--glass-blur);
   backdrop-filter: var(--glass-blur);
-  border: 1px solid var(--hairline);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 18px 50px rgba(0, 0, 0, 0.38);
-  transition: transform 200ms cubic-bezier(.2,.9,.3,1.1), border-color 200ms;
+  border: 1px solid rgba(34, 211, 238, .22);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 18px 50px rgba(0, 0, 0, 0.38),
+    0 0 46px rgba(168, 85, 247, .16);
+  transition: transform 200ms cubic-bezier(.2,.9,.3,1.1), border-color 200ms, box-shadow 200ms;
 }
-.hero:hover { transform: translateY(-3px); border-color: var(--ac55); }
+.hero:hover {
+  transform: translateY(-3px);
+  border-color: var(--neon-cyan);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 18px 50px rgba(0, 0, 0, 0.38),
+    0 0 60px rgba(34, 211, 238, .3);
+}
 .hero-body { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; z-index: 1; }
 .hero-kicker {
   font-family: var(--mono); font-size: 10px; letter-spacing: 2.4px; text-transform: uppercase;
@@ -4172,7 +4179,8 @@ input:focus, textarea:focus, select:focus {
   background: linear-gradient(135deg, #101838, #1d275a);
   color: var(--neon-cyan);
   border: 1px solid var(--neon-cyan);
-  box-shadow: 0 0 20px rgba(34, 211, 238, .45), inset 0 0 12px rgba(34, 211, 238, .12);
+  box-shadow: 0 0 30px rgba(34, 211, 238, .6), 0 0 50px rgba(168, 85, 247, .28),
+    inset 0 0 14px rgba(34, 211, 238, .2);
 }
 /* The gradient used to run out on --cyan, which put the dimmest stop of the ramp under the last
    letter — the Y of the old DECKY wordmark visibly dropped out against the dark ground. The cyan is now a stop in
@@ -4317,7 +4325,9 @@ header h1, header .wordmark {
 }
 .shelfcard:hover {
   transform: translateY(-4px);
-  box-shadow: 0 2px 3px rgba(0, 0, 0, .3), 0 24px 48px rgba(0, 0, 0, .42);
+  box-shadow: 0 2px 3px rgba(0, 0, 0, .3), 0 24px 48px rgba(0, 0, 0, .42),
+    0 0 28px rgba(34, 211, 238, .22);
+  border-color: rgba(34, 211, 238, .35);
 }
 .shelfcard .sc-main h3 { font-weight: 700; letter-spacing: -.02em; }
 /* The family label is a label, not a badge. It was a violet pill on every tile — fifty-five
@@ -4336,9 +4346,9 @@ header h1, header .wordmark {
 /* The play button appears on hover and is the accent. It does not need to shout: it is the
    only coloured thing on a tile, and it arrives the moment you point at one. */
 .sc-play {
-  background: var(--accent) !important;
-  color: var(--on-accent, #062018) !important; border: 0 !important;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, .35);
+  background: linear-gradient(135deg, var(--neon-cyan), var(--neon-violet)) !important;
+  color: var(--neon-ink) !important; border: 0 !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .35), 0 0 18px rgba(34, 211, 238, .5);
   opacity: 0; transform: scale(.85);
   transition: opacity 180ms, transform 220ms cubic-bezier(.2, .9, .3, 1.4);
 }
@@ -7048,6 +7058,11 @@ header .wordmark {
   color: transparent;
   -webkit-text-fill-color: transparent;
 }
+/* The one halo the QUIET pass took out, put back on purpose: this is the brand mark, lit from
+   behind, the way it always was before there was a quieter option. */
+header h1, header .wordmark {
+  filter: drop-shadow(0 0 14px rgba(34, 211, 238, .45)) drop-shadow(0 0 26px rgba(168, 85, 247, .3));
+}
 :root[data-theme="light"] .foil,
 :root[data-theme="light"] header h1,
 :root[data-theme="light"] header .wordmark {
@@ -7251,18 +7266,18 @@ button.primary:active {
    holds up over both the cloth and the glass.
    ------------------------------------------------------------------ */
 :focus-visible {
-  outline: 2px solid var(--brass-hi);
+  outline: 2px solid var(--neon-cyan);
   outline-offset: 2px;
   border-radius: 6px;
 }
 button:focus-visible, a:focus-visible, [role="button"]:focus-visible {
-  outline: 2px solid var(--brass-hi);
+  outline: 2px solid var(--neon-cyan);
   outline-offset: 3px;
-  box-shadow: 0 0 0 5px rgba(0, 0, 0, 0.45), 0 0 18px var(--lit);
+  box-shadow: 0 0 0 5px rgba(0, 0, 0, 0.45), 0 0 18px rgba(34, 211, 238, .55);
 }
 :root[data-theme="light"] button:focus-visible,
 :root[data-theme="light"] a:focus-visible {
-  box-shadow: 0 0 0 5px rgba(255, 255, 255, 0.8), 0 0 18px var(--lit);
+  box-shadow: 0 0 0 5px rgba(255, 255, 255, 0.8), 0 0 18px rgba(34, 211, 238, .45);
 }
 
 /* ------------------------------------------------------------------
@@ -7578,12 +7593,12 @@ which is what a sans is for.
      in cyan-to-violet everywhere, the same pair the wordmark and the mark are lit in. */
   --seg-on-bg: linear-gradient(135deg, var(--neon-cyan), var(--neon-violet));
   --seg-on-ink: var(--neon-ink);
-  --seg-on-glow: 0 0 16px rgba(34, 211, 238, .38);
+  --seg-on-glow: 0 0 24px rgba(34, 211, 238, .58);
 }
 :root[data-theme="light"] {
   --seg-on-bg: linear-gradient(135deg, var(--neon-cyan), var(--neon-violet));
   --seg-on-ink: var(--neon-ink);
-  --seg-on-glow: 0 0 14px rgba(34, 211, 238, .28);
+  --seg-on-glow: 0 0 20px rgba(34, 211, 238, .42);
 }
 
 /* `border-color` cannot take a gradient, so the rules that set it from
@@ -7626,10 +7641,11 @@ header::after {
   position: absolute; left: 0; right: 0; bottom: 0;
   height: 1px;
   background: linear-gradient(90deg,
-    transparent 0%, var(--brass) 22%, var(--brass-hi) 50%, var(--brass) 78%, transparent 100%);
+    transparent 0%, var(--neon-cyan) 22%, var(--neon-violet) 50%, var(--neon-cyan) 78%, transparent 100%);
   background-size: 220% 100%;
   animation: seam-sheen 9s linear infinite;
-  opacity: 0.6;
+  box-shadow: 0 0 10px rgba(34, 211, 238, .4);
+  opacity: 0.8;
 }
 @keyframes seam-sheen {
   0%   { background-position: 130% 0; }
