@@ -224,7 +224,7 @@ export const defaultSettings: Settings = {
   // These four have to agree with the 'club' pack in THEME_PACKS or the app opens showing a
   // look it is not actually wearing.
   theme: 'dark',
-  accent: 'amber',
+  accent: 'ocean',
   cardBack: 'lattice',
   tableFelt: 'mahogany',
   cardFace: 'classic',
@@ -340,9 +340,9 @@ export const THEME_PACKS: ThemePack[] = [
     warm thing in it.
   */
 
-  /* The house look, and what the app opens on. Dyed cloth, tarnished brass, old ivory —
-     every colour on the screen is something a real table is made of. */
-  { id: 'club', name: 'The Card Room', blurb: 'Green baize under a lamp, gold on the rail. The house look.', accent: 'amber', tableFelt: 'mahogany', cardBack: 'lattice', cardFace: 'classic' },
+  /* The house look, and what the app opens on: cyan on near-black, the wordmark's own colour,
+     not a felt table's. */
+  { id: 'club', name: 'The Card Room', blurb: 'Cyan under the sign outside. The house look.', accent: 'ocean', tableFelt: 'mahogany', cardBack: 'lattice', cardFace: 'classic' },
 
   /* No hue in the furniture at all: graphite, pewter and one brass accent for what has been
      won. Every colour on the screen belongs to the cards. The strictest reading of quiet. */
@@ -367,40 +367,41 @@ export const THEME_PACKS: ThemePack[] = [
 export interface AccentPreset { name: string; green: string; greenD: string; emerald: string; lime: string; }
 
 /*
-  Four casino chips, not eight.
+  Four neon tubes, not four casino chips.
 
-  There were three wrong answers before this one. The framework default — Tailwind's 500 step
-  in seven families, the palette every generated interface wears. The over-correction away from
-  it: pigments so far down in chroma the place read as a design studio rather than a card room.
-  And then eight rich, saturated chip colours, which fixed the flatness but turned the accent
-  picker itself into a wall of choice nobody asked for — and because --bg0 and the ambient
-  lighting were both keyed off "the cloth" (emerald) by default, the whole room read as green
-  regardless of which accent a player actually preferred.
+  Gold and Crimson read as a casino's palette — brass and oxblood, warm against a felt table.
+  The room they are picked from is not that room any more: cyan into violet into pink, on a
+  near-black ground lit by its own two colours. A warm gold or a red-orange crimson sitting in
+  that same picker looked like it had wandered in from a different site, because it had — this
+  is the same clash the room itself had before it was repainted, just moved one level down into
+  the one part of it that hadn't been touched yet.
 
-  Four now: Gold, Crimson, Emerald, Sapphire. Enough to feel like a casino's real palette —
-  metal, the two suit colours, one cool note — without asking anyone to choose between eight
-  near-neighbours. Gold leads and is the default, because it is the one colour that reads as
-  "casino" without also being a specific felt's colour — the room's ambient light and every
-  "you are here" control take their cue from it before a player touches Settings at all.
+  Four now, all cool, all mixable with the signage overhead: Cyan (the wordmark's own first
+  colour, and the default), Violet, Magenta and Laser Green — a hue wheel that stays inside the
+  same family the room is lit in instead of fighting it.
 
   The ids that survive are unchanged, as before — they are written into saved settings on every
-  device that has ever opened this. An id that no longer exists here (`violet`, `teal`, `slate`,
-  `copper`) falls back to the default the same way any other invalid saved value does — see the
-  `ALLOWED` re-validation in `loadSettings`.
+  device that has ever opened this, so `amber`/`rose`/`emerald`/`ocean` keep meaning "the first
+  swatch, the second, the third, the fourth" even though none of their names still say what the
+  id says. An id that no longer exists here (`violet`, `teal`, `slate`, `copper`) falls back to
+  the default the same way any other invalid saved value does — see the `ALLOWED` re-validation
+  in `loadSettings`.
 
   Four steps, darkest first: greenD, green, emerald, lime. A dark room takes the brighter pair
   and a light room the deeper pair — see applySettings.
 */
 export const ACCENTS: Record<AccentId, AccentPreset> = {
-  /** The metal. Rails, trim, the wordmark, and everything that has been won — the default,
-   *  because gold reads as "casino" without also painting the whole room one felt's colour. */
-  amber:   { name: 'Gold',      green: '#C08D18', greenD: '#9A6E10', emerald: '#E3B03A', lime: '#FFD470' },
-  /** The other half of every deck and every wheel. */
-  rose:    { name: 'Crimson',   green: '#B5122C', greenD: '#8E0E22', emerald: '#DE2145', lime: '#FF8C9C' },
-  /** The cloth. Billiard green, for whoever wants the table itself as the accent. */
-  emerald: { name: 'Emerald',   green: '#0A8A4E', greenD: '#056B3C', emerald: '#12B268', lime: '#46D993' },
-  /** The blue chip, and the only cool colour in the set. */
-  ocean:   { name: 'Sapphire',  green: '#1656A8', greenD: '#10407F', emerald: '#2276D6', lime: '#8FC0FB' },
+  /** The wordmark's own first colour. Default, because a player who never opens Settings should
+   *  still get the same cyan the mark and the "on" states are already lit in. */
+  amber:   { name: 'Violet',    green: '#6B21A8', greenD: '#4C1D80', emerald: '#A855F7', lime: '#D8B4FE' },
+  /** The wordmark's second colour. */
+  rose:    { name: 'Magenta',   green: '#A3157A', greenD: '#750F58', emerald: '#F0399A', lime: '#FF8FD8' },
+  /** The one hue outside the wordmark's own gradient — every neon room needs a second signal,
+   *  not just a second shade of the first one. */
+  emerald: { name: 'Laser Green', green: '#0E7A4A', greenD: '#0A5535', emerald: '#2FE88A', lime: '#9CFFC2' },
+  /** The wordmark's own first colour, spelled out as its own swatch too — this is the site's
+   *  default light, not a "cool option" among warm ones any more. */
+  ocean:   { name: 'Cyan',      green: '#0E7A90', greenD: '#0A5568', emerald: '#22D3EE', lime: '#8FF3FF' },
 };
 
 export interface FeltPreset { name: string; blurb: string }
