@@ -61,8 +61,18 @@
    ------------------------------------------------------------------ */
 :root {
   --daywarm: 0.3;          /* set for real at mount, from the local clock — see App.tsx */
-  --bg0: #0a0c11;          /* the room, past midnight */
-  --bg1: #12151c;
+  --bg0: #05060f;          /* the room, past midnight */
+  --bg1: #0a0e22;
+
+  /* The site's own two colours, fixed rather than player-chosen — this is what the name was lit
+     in before there was an accent picker at all. The player's --accent still tints incidental
+     things (a hover border, a filter chip); the wordmark, the mark, the CTA and every "this is
+     chosen" state below are deliberately NOT --accent, because that is the one thing this look
+     is supposed to always be. */
+  --neon-cyan: #22d3ee;
+  --neon-violet: #a855f7;
+  --neon-pink: #f472b6;
+  --neon-ink: #05121f;
   --panel: rgba(255, 255, 255, 0.055);   /* glass: translucent, tinted by whatever sits behind it */
   --panel-solid: #14171f;                /* an opaque fallback — high-contrast mode, printed output */
   --panel-hi: rgba(255, 255, 255, 0.09);
@@ -166,6 +176,10 @@
 :root[data-theme="light"] {
   --bg0: #f3f4f8;          /* the room, shutters open */
   --bg1: #f9fafc;
+  --neon-cyan: #22d3ee;
+  --neon-violet: #a855f7;
+  --neon-pink: #f472b6;
+  --neon-ink: #05121f;
   --panel: rgba(20, 22, 32, 0.045);        /* glass again, just tinted dark-on-light this time */
   --panel-solid: #ffffff;
   --panel-hi: rgba(20, 22, 32, 0.075);
@@ -298,20 +312,20 @@ body::before {
     radial-gradient(140vw 64vh at 46% 122%, var(--lamp-floor) 0%, transparent 74%);
 }
 :root {
-  --lamp-key: color-mix(in srgb, var(--accent) 12%, transparent);
-  /* Pulled a long way round the wheel from the accent and then almost all the way to nothing:
-     a second light of a different colour is what stops the page reading as one flat tint. */
-  --lamp-cool: color-mix(in srgb, color-mix(in srgb, var(--accent) 35%, #3a4fd8) 10%, transparent);
-  --lamp-floor: color-mix(in srgb, var(--accent) 5%, transparent);
+  /* Two lights, not one: cyan top-left, violet bottom-right, the same pair the mark and the
+     wordmark are lit in — a room lit in its own two colours instead of a wash of one. */
+  --lamp-key: rgba(34, 211, 238, 0.16);
+  --lamp-cool: rgba(168, 85, 247, 0.16);
+  --lamp-floor: rgba(244, 114, 182, 0.05);
   /* One hairline for every edge on the page. A border is the only thing separating one sheet
      of glass from the next, so it has to be the same hairline everywhere or the page reads as
      a pile of unrelated boxes. */
   --hairline: rgba(255, 255, 255, 0.09);
 }
 :root[data-theme="light"] {
-  --lamp-key: color-mix(in srgb, var(--accent) 9%, transparent);
-  --lamp-cool: color-mix(in srgb, color-mix(in srgb, var(--accent) 35%, #3a4fd8) 7%, transparent);
-  --lamp-floor: color-mix(in srgb, var(--accent) 4%, transparent);
+  --lamp-key: rgba(34, 211, 238, 0.10);
+  --lamp-cool: rgba(168, 85, 247, 0.10);
+  --lamp-floor: rgba(244, 114, 182, 0.04);
   --hairline: rgba(20, 22, 32, 0.10);
 }
 /* There used to be a `@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) }`
@@ -2015,8 +2029,9 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
 .hero-body .sc-meta { color: rgba(255,255,255,0.68); }
 .hero-cta {
   margin-top: 6px; padding: 11px 22px; border-radius: 999px;
-  background: linear-gradient(178deg, var(--brass-hi), var(--brass));
-  color: #0d1220; font-weight: 800; font-size: 14px;
+  background: linear-gradient(135deg, var(--neon-cyan), var(--neon-violet));
+  box-shadow: 0 6px 22px rgba(34, 211, 238, 0.32);
+  color: var(--neon-ink); font-weight: 800; font-size: 14px;
   letter-spacing: -0.01em;
 }
 .hero-art { flex: 0 0 auto; display: none; }
@@ -4118,12 +4133,12 @@ button.ghost.danger:hover { border-color: var(--red); color: var(--red); }
    it. There were fourteen of these in a row under the hero, and the chosen one was a solid pill
    with a 22px halo — enough colour in one strip to undo the whole page. */
 .chip.on, .kindtab.on {
-  color: var(--accent-hi);
-  background: var(--ac14);
-  border-color: var(--ac28);
-  box-shadow: none;
+  color: var(--seg-on-ink);
+  background: var(--seg-on-bg);
+  border-color: transparent;
+  box-shadow: var(--seg-on-glow);
 }
-.kindtab.on .kt-count { border-color: var(--ac45); opacity: .9; }
+.kindtab.on .kt-count { border-color: rgba(5, 18, 31, .35); opacity: .9; }
 
 .tabs {
   background: var(--glass-fill);
@@ -4154,9 +4169,10 @@ input:focus, textarea:focus, select:focus {
 /* The mark is a piece of the same glass as everything else, with the suit in the accent. It
    was a filled accent tile with a 26px halo — a logo does not need to glow to be a logo. */
 .logo3d span {
-  background: var(--glass-fill-hi);
-  color: var(--accent-hi);
-  box-shadow: inset 0 0 0 1px var(--hairline), 0 2px 8px rgba(0, 0, 0, .3);
+  background: linear-gradient(135deg, #101838, #1d275a);
+  color: var(--neon-cyan);
+  border: 1px solid var(--neon-cyan);
+  box-shadow: 0 0 20px rgba(34, 211, 238, .45), inset 0 0 12px rgba(34, 211, 238, .12);
 }
 /* The gradient used to run out on --cyan, which put the dimmest stop of the ramp under the last
    letter — the Y of the old DECKY wordmark visibly dropped out against the dark ground. The cyan is now a stop in
@@ -4287,8 +4303,8 @@ header h1, header .wordmark {
 /* Two rules that have never once applied: the comment above them was opened and never closed,
    so it ran on and swallowed `.car-arrow:hover` and `.car-dot.on::after` whole. Restored, in
    the quiet palette — the carousel's own arrow and dot, in the accent, without the halo. */
-.car-arrow:hover { background: var(--ac28); border-color: var(--ac55); }
-.car-dot.on::after { background: var(--accent); border-color: var(--accent); }
+.car-arrow:hover { background: rgba(34, 211, 238, .16); border-color: var(--neon-cyan); box-shadow: 0 0 14px rgba(34, 211, 238, .3); }
+.car-dot.on::after { background: var(--neon-cyan); border-color: var(--neon-cyan); box-shadow: 0 0 8px rgba(34, 211, 238, .5); }
 
 /* --- shelf cards are glass, and lift --- */
 /* No background here on purpose. `.shelfcard` is in the glass selector list near the top of
@@ -7024,17 +7040,9 @@ which is the
 .foil,
 header h1,
 header .wordmark {
-  /* The dark stop sits at 78%, not 62%. Polished metal is mostly
-     bright with one dark band low down where it turns away from the
-     light — put the dark band in the middle and the letterforms lose
-     their middle, which at this weight is most of the letter. */
-  background: linear-gradient(
-    168deg,
-    #fdf1d6 0%,
-    var(--brass-hi) 26%,
-    var(--brass) 58%,
-    color-mix(in srgb, var(--accent) 66%, #000) 78%,
-    var(--brass-hi) 100%);
+  /* Neon, not metal: the mark was never brass here — it was cyan running into violet running
+     into pink, clipped to the letterforms, the same gradient the mark's own glow is mixed from. */
+  background: linear-gradient(90deg, var(--neon-cyan), var(--neon-violet) 60%, var(--neon-pink));
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -7043,17 +7051,11 @@ header .wordmark {
 :root[data-theme="light"] .foil,
 :root[data-theme="light"] header h1,
 :root[data-theme="light"] header .wordmark {
-  /* Same metal, lit from the other side. On ivory the bright stops are
-     the ones that disappear, so the gradient runs dark-to-bright-to-dark
-     instead — polished brass seen against a white wall rather than a
-     black one. */
-  background: linear-gradient(
-    168deg,
-    color-mix(in srgb, var(--gold) 58%, #000) 0%,
-    color-mix(in srgb, var(--gold) 82%, #000) 30%,
-    color-mix(in srgb, var(--gold) 96%, #fff) 52%,
-    color-mix(in srgb, var(--gold) 76%, #000) 74%,
-    color-mix(in srgb, var(--gold) 54%, #000) 100%);
+  /* Same two colours, darkened enough to hold against ivory instead of near-black. */
+  background: linear-gradient(90deg,
+    color-mix(in srgb, var(--neon-cyan) 70%, #000),
+    color-mix(in srgb, var(--neon-violet) 70%, #000) 60%,
+    color-mix(in srgb, var(--neon-pink) 70%, #000));
   -webkit-background-clip: text;
   background-clip: text;
 }
@@ -7228,20 +7230,16 @@ button.primary:active {
   background-clip: padding-box, border-box;
   box-shadow: var(--e1);
 }
-/* Which tab you are on, said with a tint and the accent in the type rather than a solid slab
-   of colour. A filled pill in the brand colour is the loudest thing in a header that is
-   otherwise all glass, and a nav bar is not where a page should spend its one bold move. */
+/* Which tab you are on, said in the site's own two colours — the one filled, glowing thing a
+   glass header is allowed, because it is the one thing on the page that always means "here". */
 .tabs button.on {
-  background: var(--ac14);
-  color: var(--accent-hi);
-  box-shadow: inset 0 0 0 1px var(--ac28);
+  background: var(--seg-on-bg);
+  color: var(--seg-on-ink);
 }
-/* Same voice as a chosen tab or a chosen filter. A settings panel can have a dozen of these
-   visible at once — a dozen solid accent pills is a control panel, not a preferences sheet. */
+/* Same voice as a chosen tab or a chosen filter. */
 .seg-btn.on {
-  background: var(--ac14);
-  color: var(--accent-hi);
-  border-color: var(--ac28);
+  background: var(--seg-on-bg);
+  color: var(--seg-on-ink);
 }
 
 /* ------------------------------------------------------------------
@@ -7576,29 +7574,28 @@ which is what a sans is for.
    it.
    ------------------------------------------------------------------ */
 :root {
-  /* A tint and the accent in the type, not a filled pill. One settings page can show a dozen
-     chosen segments at once; a dozen solid accent blocks is a control panel, and this one is
-     meant to read as a sheet of glass with a few things marked on it. */
-  --seg-on-bg: var(--ac14);
-  --seg-on-ink: var(--accent-hi);
+  /* The site's own gradient, not the player's accent — a chosen tab, chip or segment is marked
+     in cyan-to-violet everywhere, the same pair the wordmark and the mark are lit in. */
+  --seg-on-bg: linear-gradient(135deg, var(--neon-cyan), var(--neon-violet));
+  --seg-on-ink: var(--neon-ink);
+  --seg-on-glow: 0 0 16px rgba(34, 211, 238, .38);
 }
 :root[data-theme="light"] {
-  /* The same idea in daylight: the accent has to darken to hold against a light ground, and
-     the tint behind it has to lighten. */
-  --seg-on-bg: var(--ac14);
-  --seg-on-ink: color-mix(in srgb, var(--accent) 78%, #000);
+  --seg-on-bg: linear-gradient(135deg, var(--neon-cyan), var(--neon-violet));
+  --seg-on-ink: var(--neon-ink);
+  --seg-on-glow: 0 0 14px rgba(34, 211, 238, .28);
 }
 
 /* `border-color` cannot take a gradient, so the rules that set it from
-   the same token would drop their border entirely. The solid accent at
-   a low mix, matching the tint inside them — a chosen control is marked
-   by the accent, not filled with it. */
+   the same token would drop their border entirely, and box-shadow does not cascade from a
+   background token either — both set once, here, for every "this one is chosen" control. */
 .seg-btn.on,
 .seg button.on,
 .rb-join button.on,
 .tabs button.on,
 .nav-dock button.on {
-  border-color: var(--ac28);
+  border-color: transparent;
+  box-shadow: var(--seg-on-glow);
 }
 
 /* ------------------------------------------------------------------
