@@ -96,7 +96,7 @@ export function App() {
         onDaily={() => { setView('play'); setDailyTrigger((n) => n + 1); }}
       />
       <main>
-        {view === 'play' ? <PlayView startDailyTrigger={dailyTrigger} />
+        {view === 'play' ? <PlayView startDailyTrigger={dailyTrigger} onOpenSettings={() => setSettingsOpen(true)} />
           : view === 'create'
             ? <Suspense fallback={<div className="view-loading muted">Loading the builder…</div>}><CreateView /></Suspense>
           : <ProfileView onPlay={() => setView('play')} />}

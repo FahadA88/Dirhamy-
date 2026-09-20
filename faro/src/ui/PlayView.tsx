@@ -50,7 +50,9 @@ function ordinal(n: number): string {
 }
 
 // Discover + play the classics library (and, once wired, published community games).
-export function PlayView({ startDailyTrigger }: { startDailyTrigger?: number } = {}) {
+export function PlayView(
+  { startDailyTrigger, onOpenSettings }: { startDailyTrigger?: number; onOpenSettings?: () => void } = {},
+) {
   const { settings, set } = useSettings();
   const [game, setGame] = useState<GameDefinition | null>(null);
   const [seats, setSeats] = useState(settings.defaultSeats);
@@ -323,6 +325,7 @@ export function PlayView({ startDailyTrigger }: { startDailyTrigger?: number } =
                 client={session?.client}
                 mySeat={session?.seat}
                 resumeMatchId={resumeId ?? undefined}
+                onOpenSettings={onOpenSettings}
                 onMatchOver={tournamentTable ? (winnerId) => {
                   const winnerName = (plan ?? []).find((s) => s.id === winnerId)?.name;
                   if (!winnerName) return;

@@ -9368,6 +9368,40 @@ input[type="checkbox"]:focus-visible { outline: 2px solid var(--brass-hi); outli
   :root[data-playing="yes"] { --table-top: 82px; --table-bottom: 6px; }
 }
 
+/* The corner toolbar: Settings and the expand/compact toggle, fixed to the viewport so both
+   survive whichever of the two layouts above is active — expanded is exactly the state that
+   takes the nav's own Settings gear off the screen, so this is what replaces it. */
+.table-corner-controls {
+  position: fixed;
+  top: max(10px, env(safe-area-inset-top));
+  right: max(10px, env(safe-area-inset-right));
+  z-index: 40;
+  display: flex;
+  gap: 6px;
+}
+.table-corner-btn {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  height: 44px; min-width: 44px; padding: 0 14px;
+  border-radius: var(--r-pill);
+  background: var(--glass-fill);
+  border: 1px solid var(--hairline);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  color: var(--ink);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: var(--e1);
+  transition: border-color 150ms, color 150ms;
+}
+.table-corner-btn:hover, .table-corner-btn:focus-visible { border-color: var(--neon-cyan); color: var(--neon-cyan); }
+.table-corner-btn[aria-pressed="true"] { border-color: var(--neon-cyan); color: var(--neon-cyan); box-shadow: var(--e1), 0 0 14px rgba(100, 206, 235, .35); }
+.table-corner-label { font-size: 12px; font-weight: 600; }
+@media (max-width: 640px) {
+  .table-corner-label { display: none; }
+  .table-corner-btn { padding: 0; width: 44px; justify-content: center; }
+}
+
 /* ============================================================
    LANDSCAPE ON A PHONE
 

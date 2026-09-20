@@ -212,6 +212,7 @@ const STANDARD_PILES = new Set([
 
 export function Table({
   def, seats = 3, plan, practice = false, client: injected, mySeat, resumeMatchId, onMatchOver, forcedHandSeed,
+  onOpenSettings,
 }: {
   def: GameDefinition;
   seats?: number;
@@ -244,6 +245,10 @@ export function Table({
    * `matchOver` turns true; `null` only if the match somehow ended with nobody the winner.
    */
   onMatchOver?: (winnerId: string | null) => void;
+  /** Opens the site's Preferences panel. The in-match view hides the whole nav bar (see
+   *  `expanded` below) so this is the only way in while a hand is up — see the corner toolbar
+   *  in the JSX below. */
+  onOpenSettings?: () => void;
 }) {
   const { settings, set: setSetting } = useSettings();
   const players = useMemo(
@@ -1374,10 +1379,16 @@ export function Table({
     () => typeof window === 'undefined' || window.matchMedia('(min-width: 900px)').matches,
   );
 
+  // Starts compact — the felt at its ordinary ~55% share of the screen, nav and Settings still
+  // reachable — rather than dropping straight into the "the table takes the screen" layout the
+  // moment a hand starts. That layout is still one tap away (see the corner toolbar below); it
+  // just used to be the only option, with no way back to the nav short of leaving the match.
+  const [expanded, setExpanded] = useState(false);
   useEffect(() => {
-    document.documentElement.setAttribute('data-playing', 'yes');
+    if (expanded) document.documentElement.setAttribute('data-playing', 'yes');
+    else document.documentElement.removeAttribute('data-playing');
     return () => document.documentElement.removeAttribute('data-playing');
-  }, []);
+  }, [expanded]);
 
   function react(seat: string, text: string) {
     if (reactionTimer.current) window.clearTimeout(reactionTimer.current);
@@ -1547,6 +1558,24 @@ export function Table({
 
   return (
     <div className="table-wrap">
+    {/* The one corner control that survives both layouts: compact (the default, nav still up)
+        and expanded (the nav is gone — see the data-playing effect above — so this is also the
+        only way back to Settings without leaving the match). Two buttons, not folded into the
+        existing "⋯" table menu, because "how big is the table" and "can I reach Settings" are
+        both things a player needs to find in one glance, not after opening a menu. */}
+    <div className="table-corner-controls">
+      {onOpenSettings && (
+        <button className="table-corner-btn" onClick={onOpenSettings} title="Preferences" aria-label="Preferences">
+          ⚙
+        </button>
+      )}
+      <button className="table-corner-btn" onClick={() => setExpanded((v) => !v)}
+        title={expanded ? 'Shrink the table back down' : 'Expand the table to fill the screen'}
+        aria-pressed={expanded}>
+        {expanded ? '⤡' : '⤢'}
+        <span className="table-corner-label">{expanded ? 'Compact' : 'Expand'}</span>
+      </button>
+    </div>
     {/* Purely decorative: a genuinely 3D, angled rendering of the table's own rim, sized to
         .table-surface rather than the whole of .table-wrap so it lines up with the felt alone
         and not the score pad/log sitting below it. It has to live as a sibling of .table
