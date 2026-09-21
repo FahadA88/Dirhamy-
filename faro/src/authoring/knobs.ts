@@ -182,11 +182,13 @@ export interface Knobs {
   pokerHands: number;      // hands in a sitting; chips carry between them
   // pit
   pitCornerSize: number;
+  pitRoundCap: number;     // safety bound: after this many moves, most cards held wins outright
   // kent — a partnership signalling game with no turn order
   kentHandSize: number;
   kentPoolSize: number;
   kentTellPlies: number;   // how long a tell stays up, in moves (the engine has no clock)
   kentLetters: string;     // spell this and the pair is out
+  kentRoundCap: number;    // same safety bound as pit's, for the same reason — no turn order
   // maid — draw blind from a neighbour's fan; every rank pairs off except one
   maidOddRank: Rank;
   // layout — a shared board everybody plays into (Kings Corner)
@@ -458,10 +460,12 @@ export const defaultKnobs: Knobs = {
   pokerMinRaise: 10,
   pokerHands: 6,
   pitCornerSize: 7,
+  pitRoundCap: 3000,
   kentHandSize: 4,
   kentPoolSize: 4,
   kentTellPlies: 3,
   kentLetters: 'KENT',
+  kentRoundCap: 3000,
   maidOddRank: 'Q',
   layoutPiles: 4,
   layoutCornerPiles: 4,
@@ -771,7 +775,10 @@ function buildLayoutDefinition(knobs: Knobs, id: string): GameDefinition {
     setup: [{ op: 'shuffle', zone: 'draw' }],
     turnFlow: { order: 'clockwise', startPlayer: 'dealerLeft', actionsPerTurn: { min: 1, max: 1 } },
     actions: [], triggers: [], endConditions: [],
-    scoring: { mode: 'lowestPoints', winner: 'firstOut', cardPoints: {}, target: null },
+    scoring: {
+      mode: 'lowestPoints', winner: 'firstOut', cardPoints: {}, target: matchTarget(knobs),
+      ...(clampInt(knobs.handsCap, 0, 60) > 0 ? { handsCap: clampInt(knobs.handsCap, 0, 60) } : {}),
+    },
     layout: {
       piles: clampInt(knobs.layoutPiles, 1, 8),
       cornerPiles: clampInt(knobs.layoutCornerPiles, 0, 8),
@@ -813,7 +820,10 @@ function buildMaidDefinition(knobs: Knobs, id: string): GameDefinition {
     setup: [{ op: 'shuffle', zone: 'draw' }, { op: 'dealAll', from: 'draw', to: 'hand' }],
     turnFlow: { order: 'clockwise', startPlayer: 'dealerLeft', actionsPerTurn: { min: 1, max: 1 } },
     actions: [], triggers: [], endConditions: [],
-    scoring: { mode: 'lowestPoints', winner: 'lowestTotal', cardPoints: {}, target: null },
+    scoring: {
+      mode: 'lowestPoints', winner: 'lowestTotal', cardPoints: {}, target: matchTarget(knobs),
+      ...(clampInt(knobs.handsCap, 0, 60) > 0 ? { handsCap: clampInt(knobs.handsCap, 0, 60) } : {}),
+    },
     maid: { oddRank },
   };
 }
@@ -1030,7 +1040,10 @@ function buildBluffDefinition(knobs: Knobs, id: string): GameDefinition {
     setup: [{ op: 'shuffle', zone: 'center' }, { op: 'dealAll', from: 'center', to: 'hand' }],
     turnFlow: { order: 'clockwise', startPlayer: knobs.startPlayer, actionsPerTurn: { min: 1, max: 1 } },
     actions: [], triggers: [], endConditions: [],
-    scoring: { mode: 'lowestPoints', winner: 'highestTotal', cardPoints: {}, target: null },
+    scoring: {
+      mode: 'lowestPoints', winner: 'highestTotal', cardPoints: {}, target: matchTarget(knobs),
+      ...(clampInt(knobs.handsCap, 0, 60) > 0 ? { handsCap: clampInt(knobs.handsCap, 0, 60) } : {}),
+    },
     bluff: knobs.bluffClaimRanks.length ? { claimableRanks: [...knobs.bluffClaimRanks] } : {},
   };
 }
@@ -1108,8 +1121,14 @@ function buildPitDefinition(knobs: Knobs, id: string): GameDefinition {
     setup: [{ op: 'shuffle', zone: 'draw' }, { op: 'dealAll', from: 'draw', to: 'hand' }],
     turnFlow: { order: 'clockwise', startPlayer: knobs.startPlayer, actionsPerTurn: { min: 1, max: 1 } },
     actions: [], triggers: [], endConditions: [],
-    scoring: { mode: 'lowestPoints', winner: 'highestTotal', cardPoints: {}, target: null },
-    pit: { cornerSize: clampInt(knobs.pitCornerSize, 4, 13) },
+    scoring: {
+      mode: 'lowestPoints', winner: 'highestTotal', cardPoints: {}, target: matchTarget(knobs),
+      ...(clampInt(knobs.handsCap, 0, 60) > 0 ? { handsCap: clampInt(knobs.handsCap, 0, 60) } : {}),
+    },
+    pit: {
+      cornerSize: clampInt(knobs.pitCornerSize, 4, 13),
+      ...(knobs.pitRoundCap !== 3000 ? { roundCap: clampInt(knobs.pitRoundCap, 200, 20000) } : {}),
+    },
   };
 }
 
@@ -1135,12 +1154,16 @@ function buildKentDefinition(knobs: Knobs, id: string): GameDefinition {
     setup: [{ op: 'shuffle', zone: 'draw' }, { op: 'deal', from: 'draw', to: 'hand', countPerPlayer: hand }],
     turnFlow: { order: 'clockwise', startPlayer: knobs.startPlayer, actionsPerTurn: { min: 1, max: 1 } },
     actions: [], triggers: [], endConditions: [],
-    scoring: { mode: 'lowestPoints', winner: 'highestTotal', cardPoints: {}, target: null },
+    scoring: {
+      mode: 'lowestPoints', winner: 'highestTotal', cardPoints: {}, target: matchTarget(knobs),
+      ...(clampInt(knobs.handsCap, 0, 60) > 0 ? { handsCap: clampInt(knobs.handsCap, 0, 60) } : {}),
+    },
     kent: {
       handSize: hand,
       poolSize: clampInt(knobs.kentPoolSize, 3, 6),
       tellPlies: clampInt(knobs.kentTellPlies, 1, 8),
       letters: (knobs.kentLetters || 'KENT').toUpperCase().slice(0, 8),
+      ...(knobs.kentRoundCap !== 3000 ? { roundCap: clampInt(knobs.kentRoundCap, 200, 20000) } : {}),
     },
   };
 }
@@ -1163,7 +1186,10 @@ function buildSetDefinition(knobs: Knobs, id: string): GameDefinition {
     zones: [], setup: [],
     turnFlow: { order: 'clockwise', startPlayer: knobs.startPlayer, actionsPerTurn: { min: 1, max: 1 } },
     actions: [], triggers: [], endConditions: [],
-    scoring: { mode: 'lowestPoints', winner: 'highestTotal', cardPoints: {}, target: null },
+    scoring: {
+      mode: 'lowestPoints', winner: 'highestTotal', cardPoints: {}, target: matchTarget(knobs),
+      ...(clampInt(knobs.handsCap, 0, 60) > 0 ? { handsCap: clampInt(knobs.handsCap, 0, 60) } : {}),
+    },
     set: {
       size: clampInt(knobs.setSize, 2, 4),
       boardSize: clampInt(knobs.setBoardSize, 6, 21),
@@ -1657,10 +1683,12 @@ export function knobsFromDefinition(def: GameDefinition): Knobs {
     pokerHands: def.poker?.hands ?? 1,
     bluffClaimRanks: def.bluff?.claimableRanks ?? [],
     pitCornerSize: def.pit?.cornerSize ?? 7,
+    pitRoundCap: def.pit?.roundCap ?? 3000,
     kentHandSize: def.kent?.handSize ?? 4,
     kentPoolSize: def.kent?.poolSize ?? 4,
     kentTellPlies: def.kent?.tellPlies ?? 3,
     kentLetters: def.kent?.letters ?? 'KENT',
+    kentRoundCap: def.kent?.roundCap ?? 3000,
     maidOddRank: def.maid?.oddRank ?? 'Q',
     layoutPiles: def.layout?.piles ?? 4,
     layoutCornerPiles: def.layout?.cornerPiles ?? 4,

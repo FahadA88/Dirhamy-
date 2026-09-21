@@ -1077,6 +1077,8 @@ export function CreateView({ onPlay, initialRemix, onInitialRemixConsumed }: {
                 <input value={knobs.kentLetters} maxLength={8}
                   onChange={(e) => set('kentLetters', e.target.value.replace(/[^a-zA-Z]/g, '').toUpperCase())} /></label>
               <span className="mini-label">{knobs.kentLetters.length || 4} letters: {(knobs.kentLetters || 'KENT').split('').join('-')}.</span>
+              <NumField label="Safety cap — moves before the round is forced to a decision" value={knobs.kentRoundCap} onChange={(v) => set('kentRoundCap', v)} />
+              <span className="mini-label">With no turn order, nothing else stops a table that never signals. Turn on Match play below to race a partnership series instead of one round.</span>
             </Section>
           )}
 
@@ -1095,6 +1097,7 @@ export function CreateView({ onPlay, initialRemix, onInitialRemixConsumed }: {
               {knobs.setPenalty === 0 && (
                 <span className="mini-label warn-text">With no penalty, calling every combination at random is a winning strategy.</span>
               )}
+              <span className="mini-label">A round ends once nothing is left to find. Turn on Match play below to keep dealing fresh boards to a target score instead of stopping at one.</span>
             </Section>
           )}
 
@@ -1106,6 +1109,7 @@ export function CreateView({ onPlay, initialRemix, onInitialRemixConsumed }: {
                   {RANKS_13.map((r) => <option key={r} value={r}>{r}</option>)}
                 </select></div>
               <span className="mini-label">Three of the four {rankLabel(knobs.maidOddRank)}s come out of the deck before the deal, so the fourth has no match.</span>
+              <span className="mini-label">Turn on Match play below to count who is stuck with it fewest times across several deals, instead of settling on one.</span>
             </Section>
           )}
 
@@ -1131,6 +1135,7 @@ export function CreateView({ onPlay, initialRemix, onInitialRemixConsumed }: {
                   value={knobs.layoutBuild} onChange={(v) => set('layoutBuild', v)} /></div>
               <div className="field row"><Switch on={knobs.layoutMovePiles} onChange={(v) => set('layoutMovePiles', v)} aria-label="A whole pile may be picked up and moved onto another it continues" />
                 <span aria-hidden="true">A whole pile may be picked up and moved onto another it continues</span></div>
+              <span className="mini-label">Turn on Match play below for a running score of cards left across several deals, instead of just one.</span>
             </Section>
           )}
 
@@ -1164,6 +1169,7 @@ export function CreateView({ onPlay, initialRemix, onInitialRemixConsumed }: {
               <div className="mini-label">Ranks a claim may name (none selected = any rank)</div>
               <RankGrid ranks={RANKS_13} selected={knobs.bluffClaimRanks} onToggle={(r) => toggleRank('bluffClaimRanks', r)} />
               <span className="mini-label">Narrowing this is what turns Cheat into a tighter game — claims can only walk up and down a short ladder.</span>
+              <span className="mini-label">Turn on Match play below for a running score across several hands instead of just one.</span>
             </Section>
           )}
 
@@ -1214,6 +1220,8 @@ export function CreateView({ onPlay, initialRemix, onInitialRemixConsumed }: {
               <label className="field"><span>Cards that corner a suit: <b>{knobs.pitCornerSize}</b></span>
                 <input type="range" min={4} max={13} value={knobs.pitCornerSize} onChange={(e) => set('pitCornerSize', +e.target.value)} /></label>
               <span className="mini-label">At a table too crowded to hold that many, a whole hand of one suit wins instead.</span>
+              <NumField label="Safety cap — trades before the round is forced to a decision" value={knobs.pitRoundCap} onChange={(v) => set('pitRoundCap', v)} />
+              <span className="mini-label">With no turn order, nothing else stops a stalled table. Turn on Match play below to race to a target across several rounds instead of just one.</span>
             </Section>
           )}
 
