@@ -133,10 +133,6 @@ export const SHOP_ITEMS: ShopItem[] = [
   { id: 'shop-avatar-comet', kind: 'avatar', value: '☄️', name: 'Comet', blurb: '', price: { gems: 15 } },
 ];
 
-export function ownedShopItems(unlocked: string[]): Set<string> {
-  return new Set(unlocked);
-}
-
 export function canAfford(w: Wallet, item: ShopItem): boolean {
   return (item.price.chips ?? 0) <= w.chips && (item.price.gems ?? 0) <= w.gems;
 }

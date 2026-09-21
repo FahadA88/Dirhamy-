@@ -473,27 +473,27 @@ export const BACKS: Record<Exclude<CardBack, 'custom'>, BackPreset> = {
   'shop-back-starfield': { name: 'Starfield' },
 };
 
-export interface HomeLayoutPreset { name: string; blurb: string; mark: string }
+export interface HomeLayoutPreset { name: string; blurb: string }
 
 /** Order here is the order the picker offers them in. The house grid leads. */
 export const HOME_LAYOUTS: Record<HomeLayout, HomeLayoutPreset> = {
-  grid:       { name: 'Grid',           blurb: 'The house front page — a carousel, kind tabs, and shelves under that.', mark: '▦' },
-  kanban:     { name: 'Kanban Board',   blurb: 'One column per kind of game, each game a card in its column.', mark: '▥' },
-  feed:       { name: 'Vertical Feed',  blurb: 'A scrolling feed of picks, recent plays and new arrivals.', mark: '☰' },
-  radial:     { name: 'Radial Menu',    blurb: 'Kinds arranged around a hub — spin to the one you want.', mark: '◎' },
-  pager:      { name: 'Full-Screen Pager', blurb: 'One game at a time, edge to edge. Step through with the arrows.', mark: '▭' },
-  command:    { name: 'Command Palette', blurb: 'Type to filter the whole library, Enter opens the top match.', mark: '⌘' },
-  magazine:   { name: 'Magazine',       blurb: 'One game given the cover story, the rest set as a reading list.', mark: '𝔸' },
-  bento:      { name: 'Bento Grid',     blurb: 'A mix of tile sizes — one big pick, small stats, the rest of the shelf.', mark: '▣' },
-  dual:       { name: 'Split Pane',     blurb: 'A scannable list on the left, a live preview on the right.', mark: '◫' },
-  iconrail:   { name: 'Icon Rail',      blurb: 'A narrow rail of kind icons instead of a row of tabs.', mark: '▤' },
-  drawer:     { name: 'Slide-Out Drawer', blurb: 'Filters tuck into a drawer; the shelf gets the full width.', mark: '⇥' },
-  megaheader: { name: 'Mega-Header',    blurb: 'A tall header that opens into a full menu of kinds.', mark: '▔' },
-  canvas:     { name: 'Infinite Canvas', blurb: 'Games as nodes on a pannable board, clustered by kind.', mark: '⬡' },
-  terminal:   { name: 'Terminal',       blurb: 'A command line — type a name, or `list --family`, to browse.', mark: '❯' },
-  doctree:    { name: 'Doc Tree',       blurb: 'Kinds expand into games like folders into files, in a sidebar.', mark: '⌸' },
-  widgets:    { name: 'Widget Dashboard', blurb: 'Small real widgets — jump back in, staff picks, your stats.', mark: '⊞' },
-  ledger:     { name: 'Newsprint Ledger', blurb: 'Dense columns and hairline rules, built for scanning names fast.', mark: '≡' },
+  grid:       { name: 'Grid',           blurb: 'The house front page — a carousel, kind tabs, and shelves under that.' },
+  kanban:     { name: 'Kanban Board',   blurb: 'One column per kind of game, each game a card in its column.' },
+  feed:       { name: 'Vertical Feed',  blurb: 'A scrolling feed of picks, recent plays and new arrivals.' },
+  radial:     { name: 'Radial Menu',    blurb: 'Kinds arranged around a hub — spin to the one you want.' },
+  pager:      { name: 'Full-Screen Pager', blurb: 'One game at a time, edge to edge. Step through with the arrows.' },
+  command:    { name: 'Command Palette', blurb: 'Type to filter the whole library, Enter opens the top match.' },
+  magazine:   { name: 'Magazine',       blurb: 'One game given the cover story, the rest set as a reading list.' },
+  bento:      { name: 'Bento Grid',     blurb: 'A mix of tile sizes — one big pick, small stats, the rest of the shelf.' },
+  dual:       { name: 'Split Pane',     blurb: 'A scannable list on the left, a live preview on the right.' },
+  iconrail:   { name: 'Icon Rail',      blurb: 'A narrow rail of kind icons instead of a row of tabs.' },
+  drawer:     { name: 'Slide-Out Drawer', blurb: 'Filters tuck into a drawer; the shelf gets the full width.' },
+  megaheader: { name: 'Mega-Header',    blurb: 'A tall header that opens into a full menu of kinds.' },
+  canvas:     { name: 'Infinite Canvas', blurb: 'Games as nodes on a pannable board, clustered by kind.' },
+  terminal:   { name: 'Terminal',       blurb: 'A command line — type a name, or `list --family`, to browse.' },
+  doctree:    { name: 'Doc Tree',       blurb: 'Kinds expand into games like folders into files, in a sidebar.' },
+  widgets:    { name: 'Widget Dashboard', blurb: 'Small real widgets — jump back in, staff picks, your stats.' },
+  ledger:     { name: 'Newsprint Ledger', blurb: 'Dense columns and hairline rules, built for scanning names fast.' },
 };
 
 export interface FacePreset { name: string; note: string }
