@@ -496,9 +496,8 @@ h2 { letter-spacing: -0.025em; color: var(--ink); font-size: 22px; font-weight: 
    to fill that same box) — no measuring, no ResizeObserver, so it tracks every seat count
    and viewport width for free, the same as the felt beside it. Scoped to .table-surface
    rather than .table-wrap specifically so it lines up with the felt alone, not the score
-   pad and log sitting below it in the same wrap. Tied to the site's own --cyan rather than
-   any one felt's colours, so it re-themes with everything else instead of clashing with
-   whichever accent is live. */
+   pad and log sitting below it in the same wrap. Plain dark stone, not lit in the accent —
+   see .t3d-plane/.t3d-edge below for why a coloured light here stopped working. */
 .table-surface {
   position: relative;
 }
@@ -523,15 +522,12 @@ h2 { letter-spacing: -0.025em; color: var(--ink); font-size: 22px; font-weight: 
   transform-origin: 50% 100%;
   transform-style: preserve-3d;
   background: linear-gradient(180deg, #17142080 0%, #0a0812 55%, #050308 100%);
-  /* This used to run the ring and both glows at full accent strength — fine when the accent
-     was a muted gold, a giant glowing outline once it became a saturated neon cyan by default.
-     Mixed down to a rim-light instead: still there, still re-themes with the accent, no longer
-     the loudest thing on the screen. */
-  box-shadow:
-    inset 0 0 0 1px color-mix(in srgb, var(--cyan, #1fe3ff) 45%, transparent),
-    inset 0 0 40px color-mix(in srgb, var(--cyan, #1fe3ff) 8%, transparent),
-    0 0 30px color-mix(in srgb, var(--cyan, #1fe3ff) 12%, transparent),
-    0 60px 100px rgba(0, 0, 0, .55);
+  /* Used to carry a lit edge here — a ring and two glows tied to --cyan/--glow, meant to
+     re-theme with the accent. Dimmed once already when the accent went from a muted gold to a
+     saturated neon cyan by default, and it still didn't belong: a coloured light on the one
+     surface that is supposed to read as plain angled stone under the felt, not another lit
+     thing. Plain depth now — a cast shadow, nothing lit. */
+  box-shadow: 0 60px 100px rgba(0, 0, 0, .55);
 }
 .t3d-edge {
   position: absolute;
@@ -540,7 +536,7 @@ h2 { letter-spacing: -0.025em; color: var(--ink); font-size: 22px; font-weight: 
   transform-origin: 50% 0%;
   border-radius: 0 0 26px 26px;
   background: linear-gradient(180deg, #0a0712 0%, #020103 100%);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--cyan, #1fe3ff) 30%, transparent), 0 20px 40px rgba(0, 0, 0, .6);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, .6);
 }
 /* Nothing here animates, so reduced-motion has nothing to opt out of — a still 3D plate is
    decoration, not motion. Touch devices are a different problem: a perspective-transformed
