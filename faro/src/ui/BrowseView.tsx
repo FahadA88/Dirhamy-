@@ -312,12 +312,35 @@ export function BrowseView({ onPlay, onSetup, onPuzzle, onTournament, onTeach, o
  * at once instead: the top pick gets the full hero treatment, the rest sit beside it as ordinary
  * shelf cards — smaller, but every one of them one click away rather than a timed reveal.
  */
+// The kicker's own words, not the featured game's data — this rotates on its own, but a live
+// stat that lied the moment nobody was actually online would be worse than the static line it
+// replaced. Four true things about the site itself, said in turn, kept short enough that the
+// crossfade below never has to reflow anything else in the hero.
+const HERO_KICKERS = ["Tonight's table", 'Dealt fresh, every time', '55 games, one engine', 'Your move'];
+
+/** Cycles through a short, honest list of strings, paused entirely under reduced motion rather
+ *  than just skipping the animation — the safest reading of "respects reduced motion" for
+ *  something that changes on its own without being asked to. */
+function useCyclingText(words: string[], intervalMs: number): string {
+  const [i, setI] = useState(0);
+  useEffect(() => {
+    if (words.length < 2) return;
+    const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+      || document.documentElement.getAttribute('data-motion') === 'reduced';
+    if (reduced) return;
+    const id = window.setInterval(() => setI((n) => (n + 1) % words.length), intervalMs);
+    return () => window.clearInterval(id);
+  }, [words, intervalMs]);
+  return words[i % words.length];
+}
+
 function Featured({ games, onOpen, onPlay, onChanged }: {
   games: PublishedGame[];
   onOpen: (id: string) => void;
   onPlay: (g: PublishedGame) => void;
   onChanged: () => void;
 }) {
+  const kicker = useCyclingText(HERO_KICKERS, 4200);
   if (games.length === 0) return null;
   // Two alternates, not three. The column beside the hero sets the hero's height, and at three
   // cards it made a 656px glass panel to hold 250px of words — four hundred pixels of nothing,
@@ -329,7 +352,9 @@ function Featured({ games, onOpen, onPlay, onChanged }: {
     <div className="featured">
       <div className="hero">
         <div className="hero-body">
-          <span className="hero-kicker">Tonight's table</span>
+          {/* `key` forces a fresh element per word, which is what lets the CSS fade/slide
+              actually replay on every change instead of only running once on mount. */}
+          <span className="hero-kicker" key={kicker}>{kicker}</span>
           <h2><button className="hero-title" onClick={() => onOpen(live.id)}>{live.definition.meta.name}</button></h2>
           <p className="hero-blurb">{blurb(live.definition.meta.description)}</p>
           <Meta game={live} />

@@ -17,7 +17,7 @@ export function startMagneticButtons(): () => void {
   if (typeof window === 'undefined') return () => {};
   if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return () => {};
 
-  const SEL = 'button.primary, button.ghost';
+  const SEL = 'button.primary, button.ghost, .nv-items button, .nav-dock button';
   const REACH = 46;   // px beyond the button's own edge that still pulls it
   const PULL = 0.24;
   const MAX = 7;       // never drifts far enough to misalign a click
@@ -172,6 +172,60 @@ export function startFeltSpotlight(): () => void {
 }
 
 /**
+ * A spotlight that follows the pointer across whichever shelf card it's currently over — the
+ * same one-listener-on-document shape as cardSheen.ts, so a shelf of fifty-five games costs the
+ * same as a shelf of five. Mouse-only, the same call cardSheen.ts and startFeltSpotlight make:
+ * a touch device has no hover state for this to track anyway, and .shelfcard's tap target is
+ * already sized for a press, not a drag across it.
+ */
+export function startShelfSpotlight(): () => void {
+  if (typeof window === 'undefined') return () => {};
+  if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return () => {};
+
+  const SEL = '.shelfcard';
+  let pending: PointerEvent | null = null;
+  let frame = 0;
+  let last: HTMLElement | null = null;
+
+  const paint = () => {
+    frame = 0;
+    const e = pending;
+    pending = null;
+    if (!e) return;
+
+    const el = (e.target as Element | null)?.closest?.(SEL) as HTMLElement | null;
+    if (el !== last) {
+      last?.style.removeProperty('--spx');
+      last?.style.removeProperty('--spy');
+      last?.classList.remove('sc-spotlit');
+      last = el;
+    }
+    if (!el) return;
+
+    const r = el.getBoundingClientRect();
+    if (!r.width || !r.height) return;
+    el.style.setProperty('--spx', `${(((e.clientX - r.left) / r.width) * 100).toFixed(1)}%`);
+    el.style.setProperty('--spy', `${(((e.clientY - r.top) / r.height) * 100).toFixed(1)}%`);
+    el.classList.add('sc-spotlit');
+  };
+
+  const onMove = (e: PointerEvent) => {
+    if (e.pointerType !== 'mouse') return;
+    pending = e;
+    if (!frame) frame = requestAnimationFrame(paint);
+  };
+
+  window.addEventListener('pointermove', onMove, { passive: true });
+  return () => {
+    window.removeEventListener('pointermove', onMove);
+    if (frame) cancelAnimationFrame(frame);
+    last?.classList.remove('sc-spotlit');
+    last?.style.removeProperty('--spx');
+    last?.style.removeProperty('--spy');
+  };
+}
+
+/**
  * A ripple born where a primary or ghost button was actually pressed. One short-lived `<span>`
  * per press, sized to the button it landed on and removed once its animation ends — nothing
  * kept around between presses.
@@ -184,7 +238,9 @@ export function startTapRipple(): () => void {
 
   const onDown = (e: PointerEvent) => {
     if (reduced()) return;
-    const target = (e.target as HTMLElement)?.closest<HTMLButtonElement>('button.primary, button.ghost');
+    const target = (e.target as HTMLElement)?.closest<HTMLButtonElement>(
+      'button.primary, button.ghost, .nv-items button, .nav-dock button',
+    );
     if (!target || target.disabled) return;
     const r = target.getBoundingClientRect();
     const size = Math.max(r.width, r.height) * 1.6;

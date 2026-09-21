@@ -39,7 +39,13 @@ export function SiteNav({ style, view, onView, onSettings, onDaily }: {
   // The marks are only rendered where they are used. Hiding them with CSS leaves the glyph in
   // the element's text, so a button reading "Play" is really "\u2660Play" to anything matching on
   // text — screen readers included.
-  const marks = style === 'rail' || style === 'dock';
+  // Every variant gets a mark now. The bar (the one everybody actually sees — the other four
+  // are only ever reached with `?nav=`) was the one place a button read as bare text with
+  // nothing else on it, which is a large part of why the whole header read as a website's nav
+  // rather than an app's. The narrow-phone bottom-tab-bar CSS for .nav-bar already sized and
+  // positioned an .nv-mark at two breakpoints (see styles.css) — it simply never had an element
+  // to act on, because this flag kept it out of the DOM entirely above 780px.
+  const marks = true;
   // The rail has room for it, and the default bar becomes a labelled bottom tab bar on phones
   // where a bare gear would be the one unexplained cell in the row. CSS hides it again above
   // 780px, where the gear sits in a pill beside four labelled tabs and reads fine alone.

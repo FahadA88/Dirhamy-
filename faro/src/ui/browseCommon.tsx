@@ -90,6 +90,13 @@ export function ShelfCard({ game, onOpen, onPlay, onChanged }: {
   const fav = isFavourite(game.id);
   return (
     <div className="shelfcard">
+      {/* Its own element rather than another use of ::before/::after — both are already spoken
+          for on .shelfcard (the specular highlight and the noise-grain overlay, shared across
+          every .glass surface), and a shorthand `background` here would have silently blown
+          away that grain texture on every shelf card on the site. Reads --spx/--spy by
+          inheritance from tableFx.ts's startShelfSpotlight(), which writes them on .shelfcard
+          itself. */}
+      <span className="sc-spot" aria-hidden="true" />
       <button className="sc-main" onClick={onOpen}>
         <GameArt def={def} id={game.id} />
         <div className="sc-body">

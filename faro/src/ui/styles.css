@@ -451,13 +451,31 @@ button.primary.sm, button.ghost.sm { padding: 7px 14px; font-size: 13px; }
 .tabs { display: flex; gap: 4px; padding: 4px; background: var(--panel); border: 1px solid var(--panel-brd); border-radius: var(--r-pill); }
 .tabs button {
   background: transparent; color: var(--muted); border: none;
-  padding: 8px 20px; border-radius: var(--r-pill); cursor: pointer; font: inherit; font-weight: 600; transition: 0.14s;
+  padding: 8px 20px; border-radius: var(--r-pill); cursor: pointer; font: inherit; font-weight: 600;
+  transition: color 140ms, transform 140ms var(--ease), box-shadow 140ms;
 }
-.tabs button:hover { color: var(--ink); }
+.tabs button:hover { color: var(--ink); transform: translateY(-1px); box-shadow: 0 0 0 1px var(--ac28); }
 .tabs button.on { color: var(--bg1); background: var(--ink); }
 /* Item 84: the diamond keeps its suit colour so the Daily entry reads as a card, not a tab,
    even sitting in the same row as Play/Create/You. */
 .nv-daily .nv-mark { color: var(--red-text); }
+
+/* The mark itself: every nav variant now renders one on every button (see SiteNav.tsx), and a
+   glyph that sits flat next to its label is still just text with a symbol taped on. It lifts
+   and lights up in the accent on hover or once its button is the chosen one — the same "this
+   one is lit" language the rest of the chrome already speaks. */
+.nv-items button .nv-mark, .nav-dock button .nv-mark {
+  display: inline-block;
+  transition: transform 160ms var(--ease), filter 160ms var(--ease);
+}
+.nv-items button:hover .nv-mark, .nav-dock button:hover .nv-mark {
+  transform: scale(1.16) translateY(-1px);
+  filter: drop-shadow(0 0 6px var(--ac55));
+}
+.nv-items button.on .nv-mark, .nav-dock button.on .nv-mark {
+  filter: drop-shadow(0 0 8px var(--ac75));
+}
+.nv-daily:hover .nv-mark { filter: drop-shadow(0 0 6px rgba(255, 46, 94, .55)); }
 
 .crumbs { display: flex; align-items: center; gap: 14px; margin: 18px 0; flex-wrap: wrap; }
 .crumb-title { font-weight: 700; letter-spacing: -0.01em; color: var(--ink); }
@@ -2038,6 +2056,16 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
 .hero-kicker {
   font-family: var(--mono); font-size: 10px; letter-spacing: 2.4px; text-transform: uppercase;
   color: var(--accent-hi);
+  display: inline-block;
+  /* A fresh element per word (see BrowseView.tsx's `key={kicker}`) mounts already at these
+     start values and animates to rest — no JS-driven class toggling needed for a one-shot
+     entrance. Motion-safe by construction: the word only ever changes at all when
+     useCyclingText's own reduced-motion check lets the interval run in the first place. */
+  animation: hero-kicker-in 420ms var(--ease) both;
+}
+@keyframes hero-kicker-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 .hero-body h2 { margin: 0; font-size: clamp(32px, 5vw, 52px); color: #fff; }
 .hero-body .sc-meta { color: rgba(255,255,255,0.68); }
@@ -2088,6 +2116,10 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
 .sc-main {
   display: block; width: 100%; text-align: left; background: none; border: 0; cursor: pointer;
   color: inherit; padding: 0;
+  /* Above .sc-spot (position: absolute; z-index: 0) on purpose — an unpositioned static child
+     paints below any positioned z-index:0 sibling regardless of DOM order, which put the new
+     spotlight glow over the card's own art and title instead of under them. */
+  position: relative; z-index: 1;
 }
 .sc-body { padding: 12px 14px 16px; }
 .sc-main h3 { margin: 0 0 6px; font-size: 17px; }
@@ -3923,10 +3955,10 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
   width: 100%; padding: 11px 4px; border-radius: 12px; cursor: pointer;
   font: inherit; font-size: 11px; color: var(--muted);
   background: transparent; border: 1px solid transparent;
-  transition: background 140ms, color 140ms;
+  transition: background 140ms, color 140ms, transform 140ms var(--ease);
 }
 .nav-rail .nv-items button .nv-mark { font-size: 19px; line-height: 1; }
-.nav-rail .nv-items button:hover { background: var(--oak-dim); color: var(--ink); }
+.nav-rail .nv-items button:hover { background: var(--oak-dim); color: var(--ink); transform: translateX(2px); }
 .nav-rail .nv-items button.on {
   background: var(--seg-on-bg); color: var(--seg-on-ink); font-weight: 650;
 }
@@ -3951,9 +3983,9 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
   letter-spacing: .04em; text-transform: uppercase;
   background: none; border: 0; color: var(--muted);
   border-bottom: 2px solid transparent;
-  transition: color 140ms, border-color 140ms;
+  transition: color 140ms, border-color 140ms, transform 140ms var(--ease);
 }
-.nav-centre .nv-items button:hover { color: var(--ink); }
+.nav-centre .nv-items button:hover { color: var(--ink); transform: translateY(-1px); }
 .nav-centre .nv-items button.on { color: var(--ink); border-bottom-color: var(--accent); font-weight: 700; }
 .nav-centre .nv-settings { font-size: 17px !important; }
 
@@ -4025,9 +4057,9 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
   background: rgba(0,0,0,.16);
   border: 1px solid rgba(0,0,0,.24);
   box-shadow: 0 1px 0 rgba(255,255,255,.12) inset;
-  transition: background 150ms, color 150ms;
+  transition: background 150ms, color 150ms, transform 150ms var(--ease);
 }
-.nav-plate .nv-items button:hover { color: #fff; background: rgba(0,0,0,.26); }
+.nav-plate .nv-items button:hover { color: #fff; background: rgba(0,0,0,.26); transform: translateY(-1px); }
 .nav-plate .nv-items button.on {
   color: #3a2712; background: linear-gradient(180deg, #f0e2c2, #d9c69c);
   border-color: rgba(0,0,0,.3);
@@ -7986,7 +8018,7 @@ button.primary:hover::after { left: 130%; }
 /* Ghost and primary buttons alike drift a few px toward the pointer as it nears (tableFx.ts
    writes `--mgx`/`--mgy`); `translate` again, so it never fights the hover lift or the press
    squash above, both of which live on `transform`. */
-button.primary, button.ghost {
+button.primary, button.ghost, .nv-items button, .nav-dock button {
   translate: var(--mgx, 0px) var(--mgy, 0px);
   transition: translate 200ms var(--ease);
 }
@@ -8484,7 +8516,7 @@ felt) and a stitch line on every one of them would be a shop
   from { transform: scale(0); opacity: 0.35; }
   to { transform: scale(1); opacity: 0; }
 }
-button.primary, button.ghost { position: relative; overflow: hidden; }
+button.primary, button.ghost, .nv-items button, .nav-dock button { position: relative; overflow: hidden; }
 .tap-ripple {
   position: absolute; left: var(--rx, 50%); top: var(--ry, 50%);
   width: var(--rr, 140px); height: var(--rr, 140px); margin: calc(var(--rr, 140px) / -2);
@@ -8505,6 +8537,28 @@ button.primary, button.ghost { position: relative; overflow: hidden; }
     transition: opacity 0.4s;
   }
   .felt.spotlit::before { opacity: 1; }
+}
+
+/* The same idea on a shelf card, in the site's own accent rather than a neutral white — this is
+   the "does this card follow my mouse" gap tableFx.ts's startShelfSpotlight() fills. A real
+   element (.sc-spot, see ShelfCard in browseCommon.tsx), not ::before/::after — both of those
+   are already spoken for on .shelfcard by the shared .glass specular highlight and noise-grain
+   rules, and a shorthand `background` here would have silently overwritten the grain texture on
+   every shelf card on the site, not just added to it. Desktop only, same reasoning as the felt
+   above: --spx/--spy sit at their default centre-point until a real pointermove writes them,
+   and a touch device would show a spotlight frozen wherever it was last tapped rather than
+   none at all. */
+@media (hover: hover) and (pointer: fine) {
+  .shelfcard { position: relative; }
+  .sc-spot {
+    position: absolute; inset: 0; z-index: 0; pointer-events: none;
+    border-radius: inherit;
+    background: radial-gradient(260px 260px at var(--spx, 50%) var(--spy, 50%),
+      color-mix(in srgb, var(--accent) 22%, transparent), transparent 70%);
+    opacity: 0;
+    transition: opacity 0.35s;
+  }
+  .shelfcard.sc-spotlit .sc-spot { opacity: 1; }
 }
 :root[data-motion="reduced"] .felt::before { display: none; }
 @media (prefers-reduced-motion: reduce) { .felt::before { display: none; } }

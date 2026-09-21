@@ -3,7 +3,7 @@ import { PlayView } from './PlayView';
 import { ProfileView } from './ProfileView';
 import { Backdrop } from './Backdrop';
 import { startCardSheen } from './cardSheen';
-import { startMagneticButtons, startTableParallax, startFeltSpotlight, startTapRipple } from './tableFx';
+import { startMagneticButtons, startTableParallax, startFeltSpotlight, startShelfSpotlight, startTapRipple } from './tableFx';
 import { SettingsPanel } from './SettingsPanel';
 import { SiteNav, navStyle } from './SiteNav';
 import { FirstRun } from './FirstRun';
@@ -77,6 +77,7 @@ export function App() {
   useEffect(() => startMagneticButtons(), []);
   useEffect(() => startTableParallax(), []);
   useEffect(() => startFeltSpotlight(), []);
+  useEffect(() => startShelfSpotlight(), []);
   useEffect(() => startTapRipple(), []);
   // An almost-imperceptible day/night warmth: the felt's own haze (see SEVENTY-THREE MORE,
   // "ambient atmosphere") leans a little warmer at midday, a little cooler overnight. Read once
