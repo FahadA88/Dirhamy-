@@ -697,10 +697,18 @@ export function applySettings(s: Settings): void {
   if (cb) {
     root.style.setProperty('--cb-ink', cb.ink);
     root.style.setProperty('--cb-ground', cb.ground);
-    root.setAttribute('data-cbpattern', cb.pattern);
+    // Only while the custom back is actually the ACTIVE back — not just designed once and
+    // left sitting in storage. [data-cbpattern="X"] and [data-back="X"] match X in {lattice,
+    // stripe, checker, wave} at identical specificity, cbpattern later in the cascade, so
+    // leaving this attribute set after switching back to one of those four built-ins silently
+    // repainted them in the custom colours. Four players hitting the designer once (its default
+    // pattern IS 'lattice', the app's own default back) is not an edge case.
+    if (s.cardBack === 'custom') root.setAttribute('data-cbpattern', cb.pattern);
+    else root.removeAttribute('data-cbpattern');
     // An uploaded picture covers the whole back and wins over the pattern.
     root.style.setProperty('--cb-image', cb.image ? `url("${cb.image}")` : 'none');
   } else {
+    root.removeAttribute('data-cbpattern');
     root.style.setProperty('--cb-image', 'none');
   }
   const cf = s.customFelt;
