@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import {
-  CONDITIONS, CondNode, EFFECTS, HOOKS, ParamSpec, ParamValue, RestrictionDraft, RuleDraft,
-  compileRestriction, compileRule, condNodesOf, defaultsFor, findCondition, findEffect,
+  CONDITIONS, CondNode, EFFECTS, HOOKS, HOUSE_RULES, ParamSpec, ParamValue, RestrictionDraft,
+  RuleDraft, compileRestriction, compileRule, condNodesOf, defaultsFor, findCondition, findEffect,
   newRestrictionDraft, newRuleDraft, PATTERNS,
 } from '../authoring/ruleKit';
 import { explainPredicate, explainRule } from '../authoring/explain';
@@ -79,6 +79,23 @@ export function RuleBuilder({ def, rules, onChange }: {
           <button className="primary sm" onClick={add}>Write your first rule</button>
         </div>
       )}
+
+      {/* One click, one finished rule — the house rules everyone already knows from some deck,
+          for anyone who wants a twist without learning the builder below first. */}
+      <div className="rb-house">
+        <span className="mini-label">House rules — add one as it stands, then change it like any other</span>
+        <div className="rb-house-list">
+          {HOUSE_RULES.map((hr) => (
+            <button key={hr.id} className="rb-house-btn" title={hr.blurb} onClick={() => {
+              const made = hr.build(rules.length + 1);
+              onChange([...rules, ...made]);
+              setOpenId(made[0].id);
+            }}>
+              {hr.name}
+            </button>
+          ))}
+        </div>
+      </div>
 
       {/* Rules that reference each other are the hard part to discover: a counter one rule
           writes and another reads is invisible until you have seen it done once. */}

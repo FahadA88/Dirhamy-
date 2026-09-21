@@ -1518,6 +1518,14 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
 .rb-pattern:hover { border-color: var(--green); }
 .rb-pattern b { font-size: 13px; }
 .rb-pattern em { font-size: 12px; font-style: normal; color: var(--muted); }
+.rb-house { margin: 10px 0; }
+.rb-house-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.rb-house-btn {
+  padding: 7px 13px; border-radius: 999px; font: inherit; font-size: 12.5px;
+  border: 1px solid var(--panel-brd); background: rgba(0,0,0,0.03); color: var(--ink);
+  cursor: pointer; transition: 0.12s;
+}
+.rb-house-btn:hover { border-color: var(--green); background: var(--oak-dim); }
 
 .seg { display: flex; gap: 5px; }
 .seg button { flex: 1; padding: 9px; cursor: pointer; font: inherit; font-size: 13px; background: transparent; color: var(--muted); border: 1px solid var(--panel-brd); border-radius: var(--r-pill); transition: 0.15s; }

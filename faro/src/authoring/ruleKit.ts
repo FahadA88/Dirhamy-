@@ -717,6 +717,83 @@ export const PATTERNS: RulePattern[] = [
   },
 ];
 
+/**
+ * Single, ready-to-play twists — the house rules everyone already knows from some deck or
+ * another, one click and done. Different job from PATTERNS above: those teach the machinery
+ * (a counter, a shared sub-rule, a stop) by dropping in two or three rules that reference each
+ * other; these drop in exactly one, already finished, for someone who just wants "add a jack
+ * skip" without learning the builder first.
+ */
+export interface HouseRule {
+  id: string;
+  name: string;
+  blurb: string;
+  build: (seq: number) => RuleDraft[];
+}
+
+export const HOUSE_RULES: HouseRule[] = [
+  {
+    id: 'jack-skips',
+    name: 'Jack skips the next player',
+    blurb: 'Play a jack and whoever is next misses their turn.',
+    build: (n) => [draft({
+      id: `h${n}jack`, name: 'Jack skips',
+      conds: [{ condId: 'rankIs', params: { rank: 'J' } }],
+      effects: [{ specId: 'skipNext', params: {} }],
+    })],
+  },
+  {
+    id: 'ace-draws',
+    name: 'Ace makes the next player draw two',
+    blurb: 'A sting on the way out — the next seat pays for it.',
+    build: (n) => [draft({
+      id: `h${n}ace`, name: 'Ace draws two',
+      conds: [{ condId: 'rankIs', params: { rank: 'A' } }],
+      effects: [{ specId: 'draw', params: { who: '$next', count: 2, from: 'draw' } }],
+    })],
+  },
+  {
+    id: 'queen-reverses',
+    name: 'Queen reverses the order of play',
+    blurb: 'Turns the table around, right when somebody least expects it.',
+    build: (n) => [draft({
+      id: `h${n}queen`, name: 'Queen reverses',
+      conds: [{ condId: 'rankIs', params: { rank: 'Q' } }],
+      effects: [{ specId: 'reverse', params: {} }],
+    })],
+  },
+  {
+    id: 'king-again',
+    name: 'King earns an extra turn',
+    blurb: 'Play a king and go again immediately.',
+    build: (n) => [draft({
+      id: `h${n}king`, name: 'King plays again',
+      conds: [{ condId: 'rankIs', params: { rank: 'K' } }],
+      effects: [{ specId: 'extraTurn', params: {} }],
+    })],
+  },
+  {
+    id: 'last-card',
+    name: 'Last card gets called out',
+    blurb: 'The log announces it the moment somebody is down to one.',
+    build: (n) => [draft({
+      id: `h${n}last`, name: 'One card left', when: 'turnEnd',
+      conds: [{ condId: 'handSize', params: { op: '<=', value: 1 } }],
+      effects: [{ specId: 'announce', params: { text: 'One card left!' } }],
+    })],
+  },
+  {
+    id: 'spades-bonus',
+    name: 'Spades score a bonus point',
+    blurb: 'A small reward for playing into the black suit.',
+    build: (n) => [draft({
+      id: `h${n}spade`, name: 'Spade bonus',
+      conds: [{ condId: 'suitIs', params: { suit: 'S' } }],
+      effects: [{ specId: 'addScore', params: { who: '$me', amount: 1, times: 'flat' } }],
+    })],
+  },
+];
+
 // ---------- plays a game forbids ----------
 
 /**
