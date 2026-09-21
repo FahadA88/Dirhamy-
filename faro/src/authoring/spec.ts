@@ -50,6 +50,7 @@ const BY_FAMILY: Record<Knobs['family'], (keyof Knobs)[]> = {
     'rummyWilds', 'rummyMaxWilds', 'rummyGinBonus', 'rummyUndercutBonus', 'wildRanks',
     'perRankPoints'],
   war: ['warRoundCap'],
+  capture: ['captureTableStart', 'captureHandSize', 'captureSweepBonus', 'captureLastClaimerTakesRest'],
   bluff: ['bluffClaimRanks'],
   reflex: ['reflexSlapRanks', 'reflexSlapMatch', 'reflexFlipCap'],
   poker: ['pokerHandSize', 'pokerStartingChips', 'pokerAnte', 'pokerSmallBlind', 'pokerBigBlind',

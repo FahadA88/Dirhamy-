@@ -9,6 +9,7 @@ import { SiteNav, navStyle } from './SiteNav';
 import { FirstRun } from './FirstRun';
 import { SiteFooter } from './SiteFooter';
 import { normalizeEntry, onRouteChange, pushRoute, readRoute, RouteView } from './route';
+import type { PublishedGame } from '../library/library';
 
 // Worklist #98: opening the shelf used to download the whole builder — the rule kit, the
 // knob catalogue, the AI copilot prompts and templates — to draw a grid of cards that has
@@ -71,6 +72,15 @@ export function App() {
   // actual daily-deal boot logic already, for the shelf's own "Today's Deal" card) and jumps
   // straight into today's deal on every change, from whichever of the three tabs was open.
   const [dailyTrigger, setDailyTrigger] = useState(0);
+  // Set by BrowseView's "Remix it" (bubbled up through PlayView's onRemix), consumed once by
+  // CreateView on mount and cleared straight back to null — see CreateView's own initialRemix
+  // prop doc for why a stale value here would otherwise re-seed a later, unrelated visit to
+  // Create. Kept as the raw PublishedGame rather than resolved to Knobs here: App.tsx is the
+  // eager main bundle and CreateView is deliberately its own lazy chunk (see the comment above
+  // the lazy() call) — importing knobsFromDefinition here to resolve a built-in classic's
+  // missing stored knobs would have pulled the whole authoring module out of that chunk and
+  // into every session's first load, whether or not anyone ever opens Create.
+  const [remixGame, setRemixGame] = useState<PublishedGame | null>(null);
   // One document-level listener, started once: see cardSheen.ts.
   useEffect(() => startCardSheen(), []);
   // Two more of the same shape: see tableFx.ts.
@@ -97,10 +107,16 @@ export function App() {
         onDaily={() => { setView('play'); setDailyTrigger((n) => n + 1); }}
       />
       <main>
-        {view === 'play' ? <PlayView startDailyTrigger={dailyTrigger} onOpenSettings={() => setSettingsOpen(true)} />
-          : view === 'create'
-            ? <Suspense fallback={<div className="view-loading muted">Loading the builder…</div>}><CreateView /></Suspense>
-          : <ProfileView onPlay={() => setView('play')} />}
+        {view === 'play' ? (
+          <PlayView
+            startDailyTrigger={dailyTrigger} onOpenSettings={() => setSettingsOpen(true)}
+            onRemix={(g) => { setRemixGame(g); setView('create'); }}
+          />
+        ) : view === 'create' ? (
+          <Suspense fallback={<div className="view-loading muted">Loading the builder…</div>}>
+            <CreateView initialRemix={remixGame ?? undefined} onInitialRemixConsumed={() => setRemixGame(null)} />
+          </Suspense>
+        ) : <ProfileView onPlay={() => setView('play')} />}
       </main>
       <SiteFooter onView={setView} />
       <SettingsPanel open={settingsOpen} onClose={() => setSettingsOpen(false)} />

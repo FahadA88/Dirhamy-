@@ -1219,6 +1219,13 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
   box-shadow: 0 6px 16px rgba(16, 64, 40, 0.18); color: var(--card-black); overflow: hidden;
 }
 .card.face.red { color: var(--card-red); }
+/* A face the player mixed themselves (Settings → Cards → Design your own face). Single ink,
+   like Mono/Contrast already are — a genuine two-tone red/black recolour is what Four Colours
+   is for, and duplicating that whole system here for one more colour picker would be a lot of
+   surface for what this is: a simple "make it feel like mine" option, not a fifth accessible
+   palette. */
+.card.f-custom { background: var(--cface-ground, var(--card-bg)); }
+.card.f-custom, .card.f-custom.red { color: var(--cface-ink, var(--card-black)); }
 /* Static sheen (no per-frame repaint — keeps long hands smooth on mobile). */
 .card.face .holo {
   position: absolute; inset: 0; pointer-events: none; opacity: 0.07;
@@ -1291,6 +1298,12 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
   width: calc(var(--ch) * 0.146); height: calc(var(--ch) * 0.146);
 }
 .card.face .pips .spot svg { display: block; width: 100%; height: 100%; }
+/* A flat vector fill reads as a sticker; real ink sits slightly proud of the stock. One soft,
+   close shadow under each mark — not a bevel or a gradient fill, which would fight every f-*
+   face variant's own colour rules — is enough to read as printed rather than screen-drawn. */
+.card.face .pips .spot svg, .card.face .pip.ace svg, .card.face .corner .ix-suit svg {
+  filter: drop-shadow(0 0.6px 0.5px rgba(0, 0, 0, 0.22));
+}
 
 /* --- the courts --- */
 .card.face .court-art { position: absolute; inset: 0; z-index: 1; display: grid; place-items: center; }
@@ -1403,6 +1416,9 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
 .status-pill.red { background: color-mix(in srgb, var(--red) 12%, transparent); color: var(--red); border: 1px solid color-mix(in srgb, var(--red) 40%, transparent); }
 
 .starters { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 12px; }
+.starters-search { margin-top: 4px; }
+.starters-search input { width: 100%; max-width: 360px; }
+.starters-search-results { margin-top: 10px; }
 .mini-label { color: var(--muted); font-size: 12px; font-family: var(--mono); letter-spacing: 0.3px; margin: 8px 0 4px; display: block; }
 .chip { background: var(--panel); color: var(--ink); border: 1px solid var(--panel-brd); border-radius: 999px; padding: 6px 13px; cursor: pointer; font: inherit; font-size: 13px; transition: 0.15s; }
 .chip:hover { border-color: var(--accent); color: var(--accent-hi); box-shadow: 0 4px 12px var(--ac20); }
@@ -2867,6 +2883,39 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
   background-size: 200% 200%;
 }
 
+/* --- shop backs (src/social/economy.ts SHOP_ITEMS) --- */
+/* Aurora: two soft colour fields drifting past each other, green through violet. */
+[data-back="shop-back-aurora"] .card.back::before,
+.sw-back[data-back="shop-back-aurora"]::before {
+  background:
+    radial-gradient(70% 60% at 30% 20%, rgba(74, 222, 128, .55), transparent 65%),
+    radial-gradient(70% 60% at 75% 80%, rgba(168, 85, 247, .55), transparent 65%),
+    #0b1220;
+}
+/* Embercut: faceted triangles, warm at the centre and cooling toward the edge — cut glass lit
+   from underneath rather than a flat pattern. */
+[data-back="shop-back-embercut"] .card.back::before,
+.sw-back[data-back="shop-back-embercut"]::before {
+  background:
+    repeating-linear-gradient(60deg, rgba(255, 176, 59, .35) 0 4px, transparent 4px 10px),
+    repeating-linear-gradient(-60deg, rgba(255, 90, 59, .28) 0 4px, transparent 4px 10px),
+    radial-gradient(circle at 50% 45%, #4a1608, #1a0602 75%);
+}
+/* Starfield: a scatter of pinlight stars at two sizes, on deep navy. */
+[data-back="shop-back-starfield"] .card.back::before,
+.sw-back[data-back="shop-back-starfield"]::before {
+  background:
+    radial-gradient(1.4px 1.4px at 18% 22%, #fff, transparent),
+    radial-gradient(1.1px 1.1px at 68% 15%, #fff, transparent),
+    radial-gradient(1.6px 1.6px at 40% 55%, #fff, transparent),
+    radial-gradient(1.1px 1.1px at 82% 62%, #fff, transparent),
+    radial-gradient(1.4px 1.4px at 25% 82%, #fff, transparent),
+    radial-gradient(1.1px 1.1px at 58% 78%, #fff, transparent),
+    radial-gradient(1.6px 1.6px at 90% 88%, #fff, transparent),
+    #0a0e22;
+  background-size: 100% 100%;
+}
+
 /* A back somebody made: pattern, two colours and one glyph. */
 [data-back="custom"] .card.back::before { background: var(--cb-ground, #1c2a44); }
 [data-cbpattern="lattice"] .card.back::before { background: repeating-linear-gradient(45deg, var(--cb-ink) 0 3px, transparent 3px 7px), repeating-linear-gradient(-45deg, var(--cb-ink) 0 3px, transparent 3px 7px), var(--cb-ground); }
@@ -3776,6 +3825,7 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
   box-shadow: 0 1px 0 var(--card-edge), 0 2px 6px rgba(9, 5, 24,.26);
 }
 .designer .sw-back.big.mine { width: 84px; height: 118px; }
+.designer .sw-card.big { width: 84px; height: 118px; --cw: 84px; --ch: 118px; }
 .swatch .sw-card, .prefs-preview .sw-card { --cw: 42px; --ch: 59px; }
 /* Whatever a face style adds — pips, blocks, glows — stays inside the swatch. */
 .swatch .sw-card { overflow: hidden; }
@@ -4915,6 +4965,15 @@ header h1, header .wordmark {
 .swatch.glyph:hover { border-color: var(--panel-brd-hi); }
 .swatch.glyph.on { border-color: var(--accent); box-shadow: 0 0 0 2px var(--ac28); }
 
+/* ---- not unlocked yet — from the Shop ---- */
+.swatch.locked { opacity: 0.5; cursor: not-allowed; }
+.swatch.locked:hover { border-color: transparent; }
+.sw-lock {
+  position: absolute; inset-block-start: 2px; inset-inline-end: 2px;
+  font-size: 10px; line-height: 1; z-index: 2;
+}
+.swatch.locked { position: relative; }
+
 /* ---- a whole look, in one click ---- */
 .swatches.packs { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
 .pack-swatch {
@@ -5070,6 +5129,15 @@ header h1, header .wordmark {
 .profile-avatar.tier-gold     { border: 3px solid var(--gold); }
 .profile-avatar.tier-platinum { border: 3px solid var(--cyan); }
 
+/* ---- what a finished game is worth ---- */
+.wallet-row { display: flex; gap: 10px; margin-inline-start: auto; align-self: flex-start; }
+.wallet-amt {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 6px 11px; border-radius: 999px;
+  border: 1px solid var(--panel-brd); background: var(--panel-hi);
+  font-family: var(--display); font-size: 14px; font-variant-numeric: tabular-nums;
+}
+
 .profile-tabs { align-self: flex-start; }
 .profile-tabrow { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .profile-export { white-space: nowrap; }
@@ -5113,6 +5181,20 @@ header h1, header .wordmark {
 .hl-label { flex: 1; font-size: 13px; }
 .hl-value { font-family: var(--display); font-size: 19px; font-variant-numeric: tabular-nums; color: var(--gold, #d6af5c); }
 .highlight-list em, .recent-list .muted { font-style: normal; font-size: 12px; }
+
+/* ---- the shop ---- */
+.shop-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+.shop-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px; border-radius: var(--r-md);
+  border: 1px solid var(--panel-brd); background: var(--panel);
+}
+.shop-item.owned { opacity: 0.72; }
+.shop-item-preview.swatch.glyph { cursor: default; }
+.shop-item-body { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.shop-item-body b { font-size: 13px; }
+.shop-item-body p { margin: 0; font-size: 12px; }
+.shop-item-owned { font-size: 12px; color: var(--muted); white-space: nowrap; }
 
 .recent-list .rl-mark { inline-size: 14px; color: var(--muted); }
 .recent-list li.won .rl-mark { color: var(--gold, #d6af5c); }

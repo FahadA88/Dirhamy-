@@ -20,7 +20,7 @@ import { buildDefinition, knobsFromDefinition } from '../src/authoring/knobs';
 
 const FAMILY_KEYS = [
   'trick', 'climb', 'fish', 'rummy', 'war', 'solitaire', 'bluff', 'reflex',
-  'poker', 'pit', 'kent', 'set', 'maid', 'layout', 'swap',
+  'poker', 'pit', 'kent', 'set', 'maid', 'layout', 'swap', 'capture',
 ] as const;
 
 /**

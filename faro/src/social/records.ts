@@ -4,6 +4,8 @@
 // written when a match ends rather than counted from clicks. Everything here is per-device for
 // now; the shapes are what a server would store, so wiring one up is a swap of read/write.
 
+import { earnForMatch, earnForStreak } from './economy';
+
 export interface Result {
   gameId: string;
   gameName: string;
@@ -44,7 +46,12 @@ function write(rs: Result[]): void {
 export function recordResult(r: Result): void {
   // Practice is for trying things out. Recording it would make the record a lie.
   if (r.practice) return;
+  // Read before writing, so the streak award below can tell "just reached the threshold" from
+  // "already past it" — see earnForStreak in economy.ts.
+  const streakBefore = currentStreak();
   write([...read(), r]);
+  earnForMatch(r.youWon);
+  earnForStreak(streakBefore, currentStreak());
 }
 
 export function allResults(gameId?: string): Result[] {

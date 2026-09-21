@@ -5,6 +5,7 @@ import {
   Badge, allResults, badges, currentStreak, highlights, leaderboard, mySummary, playCalendar,
   playStreak, tierFor,
 } from '../social/records';
+import { EarnEvent, SHOP_ITEMS, ShopItem, Wallet, canAfford, ledger, purchase, wallet } from '../social/economy';
 import { saveFile, saveMessage } from './saveFile';
 
 // Your record.
@@ -14,11 +15,12 @@ import { saveFile, saveMessage } from './saveFile';
 // there is only one story about what somebody did. The summary functions had been sitting in
 // records.ts with no reader for a while; this is that reader.
 
-type Tab = 'overview' | 'games' | 'badges';
+type Tab = 'overview' | 'games' | 'badges' | 'shop';
 
 export function ProfileView({ onPlay }: { onPlay: () => void }) {
-  const { settings } = useSettings();
+  const { settings, set } = useSettings();
   const [tab, setTab] = useState<Tab>('overview');
+  const [w, setW] = useState<Wallet>(() => wallet());
   // Only ever set when a save went wrong. Handing somebody a file is not guaranteed — inside
   // the artifact viewer the host asks them first, and can refuse outright — so a button that
   // quietly does nothing needs a sentence attached to it.
@@ -64,6 +66,14 @@ export function ProfileView({ onPlay }: { onPlay: () => void }) {
       .then((r) => setSaveNote(saveMessage(r, 'backup')));
   }
 
+  function buyItem(item: ShopItem) {
+    if (settings.unlockedCosmetics.includes(item.id)) return;
+    const next = purchase(item);
+    if (!next) return;
+    setW(next);
+    set('unlockedCosmetics', [...settings.unlockedCosmetics, item.id]);
+  }
+
   if (summary.played === 0) {
     /*
       An empty record used to be one line on an otherwise blank screen, which answers the
@@ -83,7 +93,7 @@ export function ProfileView({ onPlay }: { onPlay: () => void }) {
     */
     return (
       <section className="profile">
-        <ProfileHead name={settings.playerName} avatar={settings.avatar} summary={summary} />
+        <ProfileHead name={settings.playerName} avatar={settings.avatar} summary={summary} wallet={w} />
         <div className="empty-hero">
           <div className="eh-cards" aria-hidden="true">
             <span className="eh-card c1">A♠</span>
@@ -111,11 +121,11 @@ export function ProfileView({ onPlay }: { onPlay: () => void }) {
 
   return (
     <section className="profile">
-      <ProfileHead name={settings.playerName} avatar={settings.avatar} summary={summary} />
+      <ProfileHead name={settings.playerName} avatar={settings.avatar} summary={summary} wallet={w} />
 
       <div className="profile-tabrow">
         <div className="seg profile-tabs" role="tablist" aria-label="Your record">
-          {([['overview', 'Overview'], ['games', 'By game'], ['badges', 'Badges']] as [Tab, string][]).map(([id, label]) => (
+          {([['overview', 'Overview'], ['games', 'By game'], ['badges', 'Badges'], ['shop', 'Shop']] as [Tab, string][]).map(([id, label]) => (
             <button key={id} role="tab" aria-selected={tab === id} className={tab === id ? 'on' : ''}
               onClick={() => setTab(id)}>{label}</button>
           ))}
@@ -206,12 +216,78 @@ export function ProfileView({ onPlay }: { onPlay: () => void }) {
           {earned.map((b) => <BadgeCard key={b.id} badge={b} />)}
         </div>
       )}
+
+      {tab === 'shop' && <ShopTab wallet={w} owned={settings.unlockedCosmetics} onBuy={buyItem} />}
     </section>
   );
 }
 
-function ProfileHead({ name, avatar, summary }: {
-  name: string; avatar: string; summary: { played: number; won: number; streak?: number };
+/** Cosmetics you can buy with what you've already earned — nothing here is purchasable with
+ *  real money (see economy.ts). Grouped by kind so "backs" and "faces" read as two shelves,
+ *  not one long list. */
+function ShopTab({ wallet: w, owned, onBuy }: { wallet: Wallet; owned: string[]; onBuy: (item: ShopItem) => void }) {
+  // ledger() reads localStorage, not `w` — the dependency re-runs this read after a purchase
+  // changes the wallet (and thus the ledger) on disk, which is the only time it needs to.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const recent = useMemo(() => ledger().slice(0, 6), [w]);
+  const groups: [string, ShopItem['kind']][] = [['Card backs', 'cardBack'], ['Avatars', 'avatar']];
+  return (
+    <>
+      {groups.map(([label, kind]) => (
+        <section key={kind} className="panel glass profile-panel">
+          <h4>{label}</h4>
+          <div className="shop-grid">
+            {SHOP_ITEMS.filter((it) => it.kind === kind).map((it) => {
+              const isOwned = owned.includes(it.id);
+              const afford = canAfford(w, it);
+              return (
+                <article key={it.id} className={`shop-item ${isOwned ? 'owned' : ''}`}>
+                  <span className={`shop-item-preview ${kind === 'cardBack' ? 'sw-back' : 'swatch glyph'}`}
+                    data-back={kind === 'cardBack' ? it.value : undefined} aria-hidden="true">
+                    {kind === 'avatar' ? it.value : ''}
+                  </span>
+                  <div className="shop-item-body">
+                    <b>{it.name}</b>
+                    {it.blurb && <p className="muted">{it.blurb}</p>}
+                  </div>
+                  {isOwned
+                    ? <span className="shop-item-owned">Owned</span>
+                    : (
+                      <button className="ghost sm" disabled={!afford} onClick={() => onBuy(it)}
+                        title={afford ? `Buy ${it.name}` : "You don't have enough yet"}>
+                        {it.price.chips ? `${it.price.chips} chips` : `${it.price.gems} gems`}
+                      </button>
+                    )}
+                </article>
+              );
+            })}
+          </div>
+        </section>
+      ))}
+      {recent.length > 0 && (
+        <section className="panel glass profile-panel">
+          <h4>Recent activity</h4>
+          <ul className="highlight-list">
+            {recent.map((e: EarnEvent, i: number) => (
+              <li key={`${e.at}-${i}`}>
+                <span className="hl-label">{e.reason}</span>
+                <b className="hl-value">
+                  {e.chips ? `${e.chips > 0 ? '+' : ''}${e.chips} chips` : ''}
+                  {e.chips && e.gems ? ' · ' : ''}
+                  {e.gems ? `${e.gems > 0 ? '+' : ''}${e.gems} gems` : ''}
+                </b>
+                <em className="muted">{ago(e.at)}</em>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+    </>
+  );
+}
+
+function ProfileHead({ name, avatar, summary, wallet: w }: {
+  name: string; avatar: string; summary: { played: number; won: number; streak?: number }; wallet: Wallet;
 }) {
   // A run of three or more wins earns the avatar a faint warmth of its own — nothing louder
   // than that, since this is a badge you carry everywhere, not a trophy you stop to admire.
@@ -234,6 +310,10 @@ function ProfileHead({ name, avatar, summary }: {
             ? 'No games finished yet'
             : `${summary.won} of ${summary.played} games won`}
         </p>
+      </div>
+      <div className="wallet-row" title="Chips — earned by playing. Gems — earned at streaks, daily deals and tournament wins.">
+        <span className="wallet-amt"><span aria-hidden="true">🪙</span> {w.chips}</span>
+        <span className="wallet-amt"><span aria-hidden="true">💎</span> {w.gems}</span>
       </div>
     </header>
   );

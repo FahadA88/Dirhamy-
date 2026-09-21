@@ -8,6 +8,7 @@
 import { GameDefinition } from '../engine/types';
 import { playOneMatch } from '../engine/simulator';
 import { Seat } from '../server/matchService';
+import { earnForChampionship } from './economy';
 
 export interface TournamentTable {
   round: number;
@@ -190,11 +191,17 @@ export function seatsForTable(table: TournamentTable, you: string): Seat[] {
   }));
 }
 
-/** Records your table's result and advances the bracket as far as that unlocks. */
-export function recordYourTable(def: GameDefinition, t: Tournament, table: TournamentTable, winnerName: string): Tournament {
+/** Records your table's result and advances the bracket as far as that unlocks. `you`, when
+ *  given, is compared against the champion this call crowns (if any) — a single round win
+ *  already pays out through the match's own recordResult(), so this only ever fires the bigger,
+ *  scarcer championship award, and only for the actual bracket winner, not every seat that
+ *  reaches this function across every round. */
+export function recordYourTable(def: GameDefinition, t: Tournament, table: TournamentTable, winnerName: string, you?: string): Tournament {
   const live = t.tables.find((tb) => tb.round === table.round && tb.index === table.index);
   if (live) live.winner = winnerName;
+  const wasAlreadyDecided = !!t.champion;
   advance(def, t);
   save(t);
+  if (!wasAlreadyDecided && t.champion && you && t.champion === you) earnForChampionship();
   return { ...t, tables: t.tables.slice() };
 }

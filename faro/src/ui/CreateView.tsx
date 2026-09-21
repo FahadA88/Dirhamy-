@@ -16,7 +16,7 @@ import { MiniTable } from './MiniTable';
 import { TEMPLATES } from '../authoring/templates';
 import { RestrictionDraft, RuleDraft } from '../authoring/ruleKit';
 import { explainGame } from '../authoring/explain';
-import { publish, complexityOf, playtimeOf, kindLabel } from '../library/library';
+import { publish, complexityOf, playtimeOf, kindLabel, PublishedGame } from '../library/library';
 import { checkName, checkText } from '../social/safety';
 import { useSettings } from '../settings/SettingsContext';
 import { DescribeGame } from './DescribeGame';
@@ -151,17 +151,52 @@ function ContractList({ value, onChange }: { value: { sets: number; runs: number
   );
 }
 
-export function CreateView({ onPlay }: { onPlay?: (def: GameDefinition) => void } = {}) {
+// Seven, not fifty-five: one immediately-recognisable classic per major family (trick-taking,
+// rummy, shedding, solitaire, comparison, poker, climbing), so the Start screen offers a real
+// choice instead of a wall of fifty-five names in alphabetical soup. Every other classic is
+// still one search away — see the search box below this list — and Browse (the Play tab) is
+// still the actual full library; this is only the "start editing from" shortlist.
+const STARTER_CLASSIC_IDS = [
+  'classic-hearts', 'classic-spades', 'classic-gin-rummy', 'classic-crazy-eights',
+  'classic-klondike', 'classic-war', 'classic-showdown-poker',
+];
+
+export function CreateView({ onPlay, initialRemix, onInitialRemixConsumed }: {
+  onPlay?: (def: GameDefinition) => void;
+  /**
+   * Seeds the editor straight into Design, bypassing Start and any autosaved draft — this is
+   * how "Remix it" (BrowseView.tsx) lands here. A built-in classic's PublishedGame never carries
+   * stored knobs (builtIns() in library.ts doesn't compute them — nothing needed them before
+   * this), so it falls back to the same knobsFromDefinition() reverse-compile Start's "Or start
+   * from a classic" already uses. Only read once, at mount: this component remounts fresh
+   * whenever the app switches back to the Create tab (see App.tsx's view switch), so a lazy
+   * useState initializer is enough.
+   */
+  initialRemix?: PublishedGame;
+  /** Called once, right after initialRemix is consumed, so the caller can clear it — otherwise
+   *  the NEXT time the author navigates back to Create (with no new remix) they would be seeded
+   *  with the same stale game all over again, silently overwriting their own new draft. */
+  onInitialRemixConsumed?: () => void;
+} = {}) {
   const { settings } = useSettings();
   const savedDraft = useMemo(loadDraft, []);
-  const [step, setStep] = useState<Step>(savedDraft?.step ?? 'start');
+  const initialKnobs = useMemo(
+    () => (initialRemix ? initialRemix.knobs ?? knobsFromDefinition(initialRemix.definition) : undefined),
+    // Deliberately computed once, from whatever initialRemix was AT MOUNT — see the prop doc.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+  const [step, setStep] = useState<Step>(initialKnobs ? 'design' : (savedDraft?.step ?? 'start'));
+  const [classicSearch, setClassicSearch] = useState('');
   const [seats, setSeats] = useState(savedDraft?.seats ?? 3);
   const [tags, setTags] = useState(savedDraft?.tags ?? '');
   const [published, setPublished] = useState<{ id: string; name: string } | null>(null);
   // Where this game came from. Set when the writer produced it, so publishing can say so.
   const [writtenFrom, setWrittenFrom] = useState<string | null>(null);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { if (initialRemix) onInitialRemixConsumed?.(); }, []);
   const [publishError, setPublishError] = useState<string | null>(null);
-  const [knobs, setKnobs] = useState<Knobs>(savedDraft?.knobs ?? { ...defaultKnobs });
+  const [knobs, setKnobs] = useState<Knobs>(initialKnobs ?? savedDraft?.knobs ?? { ...defaultKnobs });
   const [override, setOverride] = useState<GameDefinition | null>(null);
   const [desc, setDesc] = useState('');
   const [proposal, setProposal] = useState<TranslateResult | null>(null);
@@ -300,14 +335,32 @@ export function CreateView({ onPlay }: { onPlay?: (def: GameDefinition) => void 
             <p className="muted">Opens the finished game in the editor, ready to be pulled apart.</p>
           </div>
           <div className="starters">
-            {/* Derived from the catalogue, not listed by hand: the hand-written list had
-                drifted to fourteen of the twenty-one games, so the newest ones could not be
-                opened in the editor at all. Every one of these round-trips through the knobs
-                and still validates. */}
-            {catalog.map((g) => (
-              <button key={g.meta.id} className="chip"
-                onClick={() => startFromTemplate(knobsFromDefinition(g))}>{g.meta.name}</button>
+            {/* Seven, not fifty-five — one recognisable name per family, so this reads as a
+                shortlist rather than the whole shelf reprinted as buttons. Every one of these
+                still round-trips through the knobs and validates, same as the full catalogue
+                did before. */}
+            {STARTER_CLASSIC_IDS.map((id) => catalog.find((g) => g.meta.id === id)).filter(Boolean).map((g) => (
+              <button key={g!.meta.id} className="chip"
+                onClick={() => startFromTemplate(knobsFromDefinition(g!))}>{g!.meta.name}</button>
             ))}
+          </div>
+          <div className="starters-search">
+            <input type="search" className="pref-text" placeholder="Search all 55 classics…"
+              value={classicSearch} onChange={(e) => setClassicSearch(e.target.value)} />
+            {classicSearch.trim() && (
+              <div className="starters starters-search-results">
+                {catalog
+                  .filter((g) => g.meta.name.toLowerCase().includes(classicSearch.trim().toLowerCase()))
+                  .map((g) => (
+                    <button key={g.meta.id} className="chip"
+                      onClick={() => startFromTemplate(knobsFromDefinition(g))}>{g.meta.name}</button>
+                  ))}
+                {catalog.filter((g) => g.meta.name.toLowerCase().includes(classicSearch.trim().toLowerCase())).length === 0 && (
+                  <p className="muted">No classic matches "{classicSearch.trim()}". Try Browse (the Play tab) to see the
+                    whole shelf, or describe it above and the co-pilot will build it from scratch.</p>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -483,6 +536,10 @@ export function CreateView({ onPlay }: { onPlay?: (def: GameDefinition) => void 
               <button className={knobs.family === 'maid' ? 'on' : ''} onClick={() => set('family', 'maid')}>Matching</button>
               <button className={knobs.family === 'layout' ? 'on' : ''} onClick={() => set('family', 'layout')}>Layout</button>
               <button className={knobs.family === 'swap' ? 'on' : ''} onClick={() => set('family', 'swap')}>Swap</button>
+              {/* Scopa's own family — the engine has fully supported it since CaptureConfig
+                  shipped, but nothing in this picker ever offered it, so loading Scopa itself
+                  from "Start from a classic" silently mis-detected as Shedding. */}
+              <button className={knobs.family === 'capture' ? 'on' : ''} onClick={() => set('family', 'capture')}>Capture</button>
             </div>
           </div>
 
@@ -531,6 +588,8 @@ export function CreateView({ onPlay }: { onPlay?: (def: GameDefinition) => void 
               <span className="mini-label">One deck only, and no jokers — a joker has no colour to alternate against, so it could never be placed at all.</span>
             ) : knobs.family === 'swap' ? (
               <span className="mini-label">One deck only, and no jokers — every slot holds one specific card, so a second copy would have nowhere unambiguous to go.</span>
+            ) : knobs.family === 'capture' ? (
+              <span className="mini-label">Ace through ten only, one deck, no jokers — a claim is decided by where a card's rank sits, and a face card or a repeat of one already on the table would have no clean value to claim with.</span>
             ) : (
               <>
                 <div className="field"><span>Number of decks</span>
@@ -565,7 +624,7 @@ export function CreateView({ onPlay }: { onPlay?: (def: GameDefinition) => void 
                 )}
               </>
             )}
-            {knobs.family !== 'set' && <>
+            {knobs.family !== 'set' && knobs.family !== 'capture' && <>
               <div className="mini-label">Remove whole ranks (short deck)</div>
               <RankGrid ranks={RANKS_13} selected={knobs.excludeRanks} onToggle={(r) => toggleRank('excludeRanks', r)} />
               <CardPicker
@@ -1166,6 +1225,24 @@ export function CreateView({ onPlay }: { onPlay?: (def: GameDefinition) => void 
             </Section>
           )}
 
+          {knobs.family === 'capture' && (
+            <Section title="Capture rules" defaultOpen>
+              <span className="mini-label">A shared table starts face up. Play a card from your hand and take every table card worth the same, or — short of that — the whole table at once if it adds up to your card. Ace through ten only; a card's value is just where its rank sits.</span>
+              <label className="field"><span>Cards on the table to start: <b>{knobs.captureTableStart}</b></span>
+                <input type="range" min={2} max={8} value={knobs.captureTableStart} onChange={(e) => set('captureTableStart', +e.target.value)} /></label>
+              <label className="field"><span>Cards in hand: <b>{knobs.captureHandSize}</b></span>
+                <input type="range" min={2} max={6} value={knobs.captureHandSize} onChange={(e) => set('captureHandSize', +e.target.value)} /></label>
+              <label className="field"><span>Bonus for clearing the table in one claim: <b>{knobs.captureSweepBonus}</b></span>
+                <input type="range" min={0} max={50} value={knobs.captureSweepBonus} onChange={(e) => set('captureSweepBonus', +e.target.value)} /></label>
+              <div className="field row">
+                <Switch on={knobs.captureLastClaimerTakesRest}
+                  onChange={(v) => set('captureLastClaimerTakesRest', v)}
+                  aria-label="Whoever claimed last takes whatever is left on the table when the deck runs out" />
+                <span aria-hidden="true">Last claimer takes what's left on the table at the end</span>
+              </div>
+            </Section>
+          )}
+
           {knobs.family === 'climb' && (
             <Section title="Climbing rules" defaultOpen>
               <span className="mini-label">All cards are dealt out. Beat the pile with a higher card or pass.</span>
@@ -1635,7 +1712,7 @@ function seatsAllowed(k: Knobs): number[] {
 
 /** How many copies of the pack a family can honestly shuffle together. */
 function maxDecksFor(family: Knobs['family']): number {
-  if (family === 'war' || family === 'poker' || family === 'maid' || family === 'layout' || family === 'swap') return 1;
+  if (family === 'war' || family === 'poker' || family === 'maid' || family === 'layout' || family === 'swap' || family === 'capture') return 1;
   if (family === 'shedding') return 3;
   return 2;
 }

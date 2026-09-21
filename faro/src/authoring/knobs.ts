@@ -10,7 +10,7 @@ export const RANKS_13: Rank[] = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '1
 
 export interface Knobs {
   family: 'shedding' | 'trick' | 'climb' | 'fish' | 'rummy' | 'war' | 'solitaire'
-    | 'bluff' | 'reflex' | 'poker' | 'pit' | 'kent' | 'set' | 'maid' | 'layout' | 'swap';
+    | 'bluff' | 'reflex' | 'poker' | 'pit' | 'kent' | 'set' | 'maid' | 'layout' | 'swap' | 'capture';
   // Author-written conditional rules. Kept as drafts (ingredient ids + parameters) so the
   // builder can re-open them; compiled into definition.rules on every build.
   customRules: RuleDraft[];
@@ -160,6 +160,11 @@ export interface Knobs {
   rummyUndercutBonus: number; // extra to the defender who matches or beats the knocker
   // war
   warRoundCap: number;
+  // capture (Scopa's family: a shared table you take FROM, by matching or summing)
+  captureTableStart: number;
+  captureHandSize: number;
+  captureSweepBonus: number;
+  captureLastClaimerTakesRest: boolean;
   // bluff
   /** Ranks a claim may name. Empty = any rank in the deck. */
   bluffClaimRanks: Rank[];
@@ -437,6 +442,10 @@ export const defaultKnobs: Knobs = {
   rummyGinBonus: 25,
   rummyUndercutBonus: 25,
   warRoundCap: 800,
+  captureTableStart: 4,
+  captureHandSize: 3,
+  captureSweepBonus: 5,
+  captureLastClaimerTakesRest: true,
   bluffClaimRanks: [],
   reflexSlapRanks: ['J'],
   reflexSlapMatch: false,
@@ -667,6 +676,7 @@ function buildFamilyDefinition(knobs: Knobs, id: string): GameDefinition {
   if (knobs.family === 'fish') return buildFishDefinition(knobs, id);
   if (knobs.family === 'rummy') return buildRummyDefinition(knobs, id);
   if (knobs.family === 'war') return buildWarDefinition(knobs, id);
+  if (knobs.family === 'capture') return buildCaptureDefinition(knobs, id);
   if (knobs.family === 'solitaire') return buildSolitaireDefinition(knobs, id);
   if (knobs.family === 'bluff') return buildBluffDefinition(knobs, id);
   if (knobs.family === 'reflex') return buildReflexDefinition(knobs, id);
@@ -951,6 +961,55 @@ function buildWarDefinition(knobs: Knobs, id: string): GameDefinition {
     endConditions: [{ id: 'handEmpty', when: { zoneCount: { zone: 'hand', of: 'anyPlayer', eq: 0 } }, result: 'roundOver' }],
     scoring: { mode: 'lowestPoints', winner: 'highestTotal', cardPoints: {}, target: matchTarget(knobs), ...(clampInt(knobs.handsCap, 0, 60) > 0 ? { handsCap: clampInt(knobs.handsCap, 0, 60) } : {}) },
     war: { aceHigh: knobs.aceHigh, roundCap: clampInt(knobs.warRoundCap, 100, 5000) },
+  };
+}
+
+/**
+ * Capture-by-sum: a shared face-up table, claimed by matching a played card's value or (short
+ * of that) by the table summing to it all at once. See CaptureConfig in engine/types.ts for
+ * exactly what this cuts from a real table (no choosing WHICH combination sums to it — a
+ * sum-claim is always the whole table). Ace-low numeral ranks only, same as the one classic
+ * built on this family (Scopa, src/games/scopa.ts) — a card's value is where its rank sits in
+ * the deck's own rankOrder, so a face card would need one and this family doesn't ask the
+ * author to invent one.
+ */
+function buildCaptureDefinition(knobs: Knobs, id: string): GameDefinition {
+  const tableStart = clampInt(knobs.captureTableStart, 2, 8);
+  const handSize = clampInt(knobs.captureHandSize, 2, 6);
+  return {
+    schemaVersion: CURRENT_SCHEMA,
+    meta: {
+      id, name: knobs.name,
+      description: knobs.description || 'A shared table starts face up. Play a card from your hand and take every table card worth the same — or, short of that, the whole table at once if it adds up to your card. No claim and your card just joins the table for later.',
+      players: { min: clampInt(knobs.minPlayers, 2, 6), max: clampInt(knobs.maxPlayers, knobs.minPlayers, 6) },
+      family: 'capture',
+    },
+    deck: {
+      base: 'standard54',
+      includeJokers: false,
+      excludeRanks: ['J', 'Q', 'K'],
+      rankOrder: ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10'],
+      tags: {},
+    },
+    zones: [
+      { id: 'draw', type: 'pile', ordered: true, faceDown: true, visibility: 'none', shared: true },
+      { id: 'table', type: 'pile', ordered: false, faceDown: false, visibility: 'all', shared: true },
+      { id: 'hand', type: 'hand', ordered: false, faceDown: true, visibility: 'owner', perPlayer: true },
+      { id: 'captured', type: 'pile', ordered: false, faceDown: false, visibility: 'all', perPlayer: true },
+    ],
+    setup: [
+      { op: 'shuffle', zone: 'draw' },
+      { op: 'move', from: 'draw', to: 'table', count: tableStart },
+      { op: 'deal', from: 'draw', to: 'hand', countPerPlayer: handSize },
+    ],
+    turnFlow: { order: 'clockwise', startPlayer: 'dealerLeft', actionsPerTurn: { min: 1, max: 1 } },
+    actions: [], triggers: [], endConditions: [],
+    scoring: { mode: 'lowestPoints', winner: 'highestTotal', cardPoints: {}, target: matchTarget(knobs) ?? 40 },
+    capture: {
+      tableStart, handSize,
+      sweepBonus: clampInt(knobs.captureSweepBonus, 0, 50),
+      lastClaimerTakesRest: knobs.captureLastClaimerTakesRest,
+    },
   };
 }
 
@@ -1417,7 +1476,7 @@ export function knobsFromDefinition(def: GameDefinition): Knobs {
   const wildRanks = tagRanks('wild').filter((r) => !wildDrawRanks.includes(r));
 
   return {
-    family: def.solitaire ? 'solitaire' : def.war ? 'war' : def.rummy ? 'rummy' : def.fish ? 'fish' : def.climb ? 'climb' : def.trick ? 'trick'
+    family: def.solitaire ? 'solitaire' : def.war ? 'war' : def.capture ? 'capture' : def.rummy ? 'rummy' : def.fish ? 'fish' : def.climb ? 'climb' : def.trick ? 'trick'
       : def.bluff ? 'bluff' : def.reflex ? 'reflex' : def.poker ? 'poker' : def.pit ? 'pit'
       : def.kent ? 'kent' : def.set ? 'set' : def.maid ? 'maid' : def.layout ? 'layout' : def.swap ? 'swap' : 'shedding',
     /*
@@ -1526,6 +1585,10 @@ export function knobsFromDefinition(def: GameDefinition): Knobs {
     rummySetMin: def.rummy?.setMin ?? 3,
     rummyRunMin: def.rummy?.runMin ?? 3,
     warRoundCap: def.war?.roundCap ?? 800,
+    captureTableStart: def.capture?.tableStart ?? 4,
+    captureHandSize: def.capture?.handSize ?? 3,
+    captureSweepBonus: def.capture?.sweepBonus ?? 5,
+    captureLastClaimerTakesRest: def.capture?.lastClaimerTakesRest ?? true,
     climbTwosHigh: def.climb ? def.climb.order[def.climb.order.length - 1] === '2' : true,
     climbCombos: !!def.climb?.combos,
     climbBombSize: def.climb?.bombSize ?? 0,

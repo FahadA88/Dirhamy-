@@ -5,6 +5,7 @@ import { SolitaireTable } from './SolitaireTable';
 import { ErrorBoundary } from './ErrorBoundary';
 import { GameHelp } from './GameHelp';
 import { OpenGame, openGames, resumableSession } from '../server/local';
+import type { PublishedGame } from '../library/library';
 import { Seat } from '../server/matchService';
 import { SeatSetup } from './SeatSetup';
 import { GameDefinition } from '../engine/types';
@@ -51,7 +52,14 @@ function ordinal(n: number): string {
 
 // Discover + play the classics library (and, once wired, published community games).
 export function PlayView(
-  { startDailyTrigger, onOpenSettings }: { startDailyTrigger?: number; onOpenSettings?: () => void } = {},
+  { startDailyTrigger, onOpenSettings, onRemix }: {
+    startDailyTrigger?: number;
+    onOpenSettings?: () => void;
+    /** Bubbled straight up from BrowseView's "Remix it" button to App.tsx, which owns switching
+     *  to the Create tab — PlayView has no reason to know what happens to a remix once it's
+     *  handed off. */
+    onRemix?: (game: PublishedGame) => void;
+  } = {},
 ) {
   const { settings, set } = useSettings();
   const [game, setGame] = useState<GameDefinition | null>(null);
@@ -329,7 +337,8 @@ export function PlayView(
                 onMatchOver={tournamentTable ? (winnerId) => {
                   const winnerName = (plan ?? []).find((s) => s.id === winnerId)?.name;
                   if (!winnerName) return;
-                  const updated = recordYourTable(game, tournamentTable.t, tournamentTable.table, winnerName);
+                  const you = (plan ?? []).find((s) => s.kind === 'local')?.name;
+                  const updated = recordYourTable(game, tournamentTable.t, tournamentTable.table, winnerName, you);
                   setTournamentTable({ t: updated, table: tournamentTable.table });
                 } : undefined}
               />}
@@ -449,6 +458,7 @@ export function PlayView(
         onTeach={(def) => { setTeachFor(def); }}
         onOnline={hostUp ? (def) => { recordPlay(def.meta.id); setOnlineFor(def); } : undefined}
         onlineHostDown={hostChecked && !hostUp}
+        onRemix={onRemix}
       />
     </div>
   );

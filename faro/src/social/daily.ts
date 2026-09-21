@@ -12,6 +12,7 @@
 
 import { catalog } from '../games/catalog';
 import { GameDefinition } from '../engine/types';
+import { earnForDaily } from './economy';
 
 const KEY = 'faro.daily.v1';
 
@@ -61,6 +62,7 @@ export function recordDaily(result: DailyResult): void {
   if (all[result.date]) return;
   all[result.date] = result;
   write(all);
+  earnForDaily(result.won);
 }
 
 export function resultFor(date: string): DailyResult | null {

@@ -8,6 +8,8 @@ import { hostInfo } from '../net/host';
 import { ENGINE_CHANGELOG } from '../engine/changelog';
 import { canSpeak } from './speech';
 import { CardFace as CardFaceArt } from './Card';
+import { LayoutIcon } from './LayoutIcon';
+import { SHOP_ITEMS } from '../social/economy';
 import type { Card } from '../engine/types';
 
 // The one card every face swatch and the live preview are drawn with. An ace, because that is
@@ -17,8 +19,8 @@ import type { Card } from '../engine/types';
 const SWATCH_CARD: Card = { id: 'AD', rank: 'A', suit: 'D' };
 import {
   ACCENTS, AVATARS, AccentId, BACKS, CARD_SIZE_MAX, CARD_SIZE_MIN, CardBack, CardFace, CustomBack,
-  CustomFelt, FACES, FELTS, HOME_LAYOUTS, HomeLayout, MAX_BACK_IMAGE, MyLook, Settings, TableFelt,
-  THEME_PACKS,
+  CustomFace, CustomFelt, FACES, FELTS, HOME_LAYOUTS, HomeLayout, MAX_BACK_IMAGE, MyLook, Settings,
+  TableFelt, THEME_PACKS,
 } from '../settings/settings';
 
 // Preferences.
@@ -38,6 +40,10 @@ const DEFAULT_CUSTOM_BACK: CustomBack = { pattern: 'lattice', ink: '#d6af5c', gr
 
 /** A green cloth in a dark rail — a plain table to start from before you change it. */
 const DEFAULT_FELT: CustomFelt = { cloth: '#1c6b46', rail: '#241a12' };
+
+/** Dark ink on cream stock — the same two-tone starting point Classic itself reads closest to,
+ *  so switching to "Your Own" and leaving it untouched barely looks like a change. */
+const DEFAULT_CUSTOM_FACE: CustomFace = { ink: '#1a1a1a', ground: '#fdfaf3' };
 
 /** Saved settings only ever held 'smart' or 'random'; the picker now offers three tiers. */
 function tierOfDiff(d: Settings['botDiff']): 'easy' | 'normal' | 'hard' {
@@ -287,7 +293,7 @@ function LookSection({ s, set }: { s: Settings; set: Setter }) {
             <button key={id} className={`swatch wide ${s.homeLayout === id ? 'on' : ''}`}
               title={HOME_LAYOUTS[id].blurb} aria-pressed={s.homeLayout === id}
               onClick={() => set('homeLayout', id)}>
-              <span className="layout-mark" aria-hidden="true">{HOME_LAYOUTS[id].mark}</span>
+              <LayoutIcon id={id} className="layout-mark" />
               <em>{HOME_LAYOUTS[id].name}</em>
             </button>
           ))}
@@ -375,20 +381,32 @@ function CardsSection({ s, set }: { s: Settings; set: Setter }) {
         </div>
       </Row>
 
+      {s.cardFace === 'custom' && (
+        <Row label="Your face" hint="Two colours: the ink every pip, index and court is drawn in, and the paper stock underneath it." keywords="custom design own draw face colour">
+          <FaceDesigner value={s.customFace ?? DEFAULT_CUSTOM_FACE} onChange={(v) => set('customFace', v)} />
+        </Row>
+      )}
+
       <Row label="Illustrated suits" hint="Spades, hearts, diamonds and clubs drawn in the same inked linework as the joker's face, instead of the plain flat mark." keywords="suits illustrated hand drawn joker linework spade heart diamond club">
         <Toggle on={s.illustratedSuits} onChange={(v) => set('illustratedSuits', v)} label="Illustrated suits" />
       </Row>
 
-      <Row label="Back" hint="What the other side of every card looks like." keywords="back pattern deck design" wide>
+      <Row label="Back" hint="What the other side of every card looks like. Three are from the Shop — earn chips or gems by playing, then unlock them there." keywords="back pattern deck design shop locked" wide>
         <div className="swatches backs">
-          {(Object.keys(BACKS) as Exclude<CardBack, 'custom'>[]).map((bk) => (
-            <button key={bk} className={`swatch ${s.cardBack === bk ? 'on' : ''}`}
-              title={BACKS[bk].name} aria-pressed={s.cardBack === bk}
-              onClick={() => set('cardBack', bk)}>
-              <span className="sw-back" data-back={bk}>{bk === 'monogram' ? '♠' : ''}</span>
-              <em>{BACKS[bk].name}</em>
-            </button>
-          ))}
+          {(Object.keys(BACKS) as Exclude<CardBack, 'custom'>[]).map((bk) => {
+            const shopItem = SHOP_ITEMS.find((it) => it.kind === 'cardBack' && it.value === bk);
+            const locked = shopItem && !s.unlockedCosmetics.includes(shopItem.id);
+            return (
+              <button key={bk} className={`swatch ${s.cardBack === bk ? 'on' : ''} ${locked ? 'locked' : ''}`}
+                title={locked ? `${BACKS[bk].name} — from the Shop, not yet unlocked` : BACKS[bk].name}
+                aria-pressed={s.cardBack === bk} disabled={locked}
+                onClick={() => set('cardBack', bk)}>
+                <span className="sw-back" data-back={bk}>{bk === 'monogram' ? '♠' : ''}</span>
+                {locked && <span className="sw-lock" aria-hidden="true">🔒</span>}
+                <em>{BACKS[bk].name}</em>
+              </button>
+            );
+          })}
           <button className={`swatch ${s.cardBack === 'custom' ? 'on' : ''}`}
             aria-pressed={s.cardBack === 'custom'}
             onClick={() => { if (!s.customBack) set('customBack', DEFAULT_CUSTOM_BACK); set('cardBack', 'custom'); }}>
@@ -423,13 +441,26 @@ function YouSection({ s, set }: { s: Settings; set: Setter }) {
         <input className="pref-text" value={s.playerName} maxLength={16}
           onChange={(e) => set('playerName', e.target.value || 'You')} />
       </Row>
-      <Row label="Your face" hint="Shown beside your name at the table." keywords="avatar icon emoji face picture you" wide>
+      <Row label="Your face" hint="Shown beside your name at the table. Three more are from the Shop." keywords="avatar icon emoji face picture you shop locked" wide>
         <div className="swatches avatars">
           {AVATARS.map((g) => (
             <button key={g} className={`swatch glyph ${s.avatar === g ? 'on' : ''}`}
               aria-label={`Avatar ${g}`} aria-pressed={s.avatar === g}
               onClick={() => set('avatar', g)}>{g}</button>
           ))}
+          {SHOP_ITEMS.filter((it) => it.kind === 'avatar').map((it) => {
+            const locked = !s.unlockedCosmetics.includes(it.id);
+            return (
+              <button key={it.id} className={`swatch glyph ${s.avatar === it.value ? 'on' : ''} ${locked ? 'locked' : ''}`}
+                aria-label={locked ? `${it.name} — from the Shop, not yet unlocked` : `Avatar ${it.value}`}
+                title={locked ? `${it.name} — from the Shop, not yet unlocked` : it.name}
+                aria-pressed={s.avatar === it.value} disabled={locked}
+                onClick={() => set('avatar', it.value)}>
+                {it.value}
+                {locked && <span className="sw-lock" aria-hidden="true">🔒</span>}
+              </button>
+            );
+          })}
         </div>
       </Row>
       <Row label="Your colour" hint="Tints what belongs to you at the table." keywords="colour color seat you player">
@@ -817,6 +848,31 @@ function BackDesigner({ value, onChange }: { value: CustomBack; onChange: (v: Cu
             )}
             {imgError ? <em className="warn-text" role="alert">{imgError}</em> : <em className="muted">A picture covers the pattern.</em>}
           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** The same idea as BackDesigner, scaled to what a face actually needs: two colours, not a
+ *  pattern/emblem/image system — a face has to keep reading as a rank and a suit, not become a
+ *  second decorative surface. The preview is the real CardFace component, not a hand-approximated
+ *  swatch, so what's shown here is exactly what the table will deal. */
+function FaceDesigner({ value, onChange }: { value: CustomFace; onChange: (v: CustomFace) => void }) {
+  const patch = (p: Partial<CustomFace>) => onChange({ ...value, ...p });
+  return (
+    <div className="designer">
+      <div className="dz-preview" style={{ ['--cface-ink' as string]: value.ink, ['--cface-ground' as string]: value.ground }}>
+        <span className="sw-card big">
+          <CardFaceArt card={SWATCH_CARD} faceOverride="custom" />
+        </span>
+      </div>
+      <div className="dz-controls">
+        <div className="two">
+          <label className="field"><span>Ink</span>
+            <input type="color" value={value.ink} onChange={(e) => patch({ ink: e.target.value })} /></label>
+          <label className="field"><span>Paper</span>
+            <input type="color" value={value.ground} onChange={(e) => patch({ ground: e.target.value })} /></label>
         </div>
       </div>
     </div>

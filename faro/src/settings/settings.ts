@@ -10,7 +10,11 @@ export type CardBack =
   | 'sunburst' | 'linen' | 'neongrid' | 'kraft' | 'tartan' | 'marble'
   | 'circuit' | 'damask' | 'wave' | 'mesh' | 'confetti' | 'deepsolid'
   | 'artdeco' | 'holofoil'
-  | 'custom';
+  | 'custom'
+  // The shop's own backs (src/social/economy.ts SHOP_ITEMS) — earned, never sold as a set of
+  // 21+3; these three exist only because the shop has to sell something new, not because the
+  // stock 21 were short of anything.
+  | 'shop-back-aurora' | 'shop-back-embercut' | 'shop-back-starfield';
 // Four table builds, each with its own rail, felt, markings and lighting.
 /** The fourteen tables that survived the cut. */
 export type TableFelt =
@@ -25,7 +29,16 @@ export type TableFelt =
 export type CardFace =
   | 'classic' | 'big-index' | 'four-color' | 'letters' | 'shapes'
   | 'minimal' | 'block' | 'typographic' | 'woodcut' | 'duplex'
-  | 'chunky' | 'mono' | 'contrast' | 'deco' | 'handdrawn' | 'neon' | 'linen';
+  | 'chunky' | 'mono' | 'contrast' | 'deco' | 'handdrawn' | 'neon' | 'linen' | 'custom';
+
+/** What somebody can change about a face they make — the mark colour and the paper it's
+ *  printed on. Deliberately as small as CustomFelt, not as wide as CustomBack: a face still has
+ *  to read as a rank and a suit from across a table, so this is a recolour of the real card,
+ *  not a pattern designer. */
+export interface CustomFace {
+  ink: string;      // pips, the corner index, court/joker linework
+  ground: string;   // the card's own paper colour
+}
 export type TextSize = 's' | 'm' | 'l' | 'xl';
 export type SeatRing = 'arc' | 'wide' | 'row';
 export type ChipStyle = 'stack' | 'flat' | 'text';
@@ -138,6 +151,11 @@ export interface Settings {
   density: 'comfortable' | 'compact';
   /** A felt the player mixed, applied when tableFelt is 'custom'. */
   customFelt: CustomFelt | null;
+  /** A face the player mixed, applied when cardFace is 'custom'. */
+  customFace: CustomFace | null;
+  /** Shop item ids (src/social/economy.ts SHOP_ITEMS) this player has bought. Everything else
+   *  cosmetic in this file is free by default and needs no entry here at all. */
+  unlockedCosmetics: string[];
   // gameplay / UX
   playerName: string;
   /** One glyph shown beside your name at the table and on your profile. */
@@ -246,6 +264,8 @@ export const defaultSettings: Settings = {
   animSpeed: 'normal',
   density: 'comfortable',
   customFelt: null,
+  customFace: null,
+  unlockedCosmetics: [],
   playerName: 'You',
   avatar: '🂡',
   playerColor: 'emerald',
@@ -448,6 +468,9 @@ export const BACKS: Record<Exclude<CardBack, 'custom'>, BackPreset> = {
   deepsolid: { name: 'Deep Solid' },
   artdeco:   { name: 'Art Deco' },
   holofoil:  { name: 'Holo Foil' },
+  'shop-back-aurora':    { name: 'Aurora' },
+  'shop-back-embercut':  { name: 'Embercut' },
+  'shop-back-starfield': { name: 'Starfield' },
 };
 
 export interface HomeLayoutPreset { name: string; blurb: string; mark: string }
@@ -493,6 +516,7 @@ export const FACES: Record<CardFace, FacePreset> = {
   handdrawn:   { name: 'Hand Drawn',   note: 'Wobbly ink lines, off-register. Looks homemade.' },
   neon:        { name: 'Neon Outline', note: 'Dark cards, glowing suit outlines.' },
   linen:       { name: 'Linen Stock',  note: 'Visible paper grain, warm white, softened ink.' },
+  custom:      { name: 'Your Own',     note: 'Pick the ink and the paper yourself.' },
 };
 
 // The old "medium" preset, still the anchor a card-size percentage scales from — 100 means
@@ -715,6 +739,11 @@ export function applySettings(s: Settings): void {
   if (cf) {
     root.style.setProperty('--cf-cloth', cf.cloth);
     root.style.setProperty('--cf-rail', cf.rail);
+  }
+  const cface = s.customFace;
+  if (cface) {
+    root.style.setProperty('--cface-ink', cface.ink);
+    root.style.setProperty('--cface-ground', cface.ground);
   }
   // Your seat colour, so a table can tint what belongs to you.
   root.style.setProperty('--you', ACCENTS[s.playerColor]?.emerald ?? ACCENTS.emerald.emerald);
