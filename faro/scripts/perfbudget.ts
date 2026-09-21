@@ -46,7 +46,12 @@ const BUDGETS: Budget[] = [
   // back up to casino colour — and what survives is a third set of felts, a fourth room light,
   // two gold edge tokens, and the gilt inlay the tables wear. Sitting 0.4 KB under a ceiling is
   // not a budget, it is a tripwire.
-  { pattern: /^index-.*\.css$/, maxKB: 278, label: 'stylesheet' },
+  //
+  // 278 -> 292: drawn SVG icons for the Preferences rail (replacing nine Unicode marks), an
+  // entrance animation on every modal (there was none), a purchase flourish in the Shop and a
+  // balance pulse on the wallet, plus headroom for the card-face and card-back passes that
+  // follow it in the same body of work — new surface, not bloat in what shipped already.
+  { pattern: /^index-.*\.css$/, maxKB: 292, label: 'stylesheet' },
 ];
 
 const files = readdirSync(DIST);

@@ -21,6 +21,9 @@ export function ProfileView({ onPlay }: { onPlay: () => void }) {
   const { settings, set } = useSettings();
   const [tab, setTab] = useState<Tab>('overview');
   const [w, setW] = useState<Wallet>(() => wallet());
+  // The one item a purchase should visibly land on — cleared by nothing in particular, since a
+  // fresh key (see ShopTab's .just-bought) only ever plays its one-shot animation once anyway.
+  const [justBought, setJustBought] = useState<string | null>(null);
   // Only ever set when a save went wrong. Handing somebody a file is not guaranteed — inside
   // the artifact viewer the host asks them first, and can refuse outright — so a button that
   // quietly does nothing needs a sentence attached to it.
@@ -71,6 +74,7 @@ export function ProfileView({ onPlay }: { onPlay: () => void }) {
     const next = purchase(item);
     if (!next) return;
     setW(next);
+    setJustBought(item.id);
     set('unlockedCosmetics', [...settings.unlockedCosmetics, item.id]);
   }
 
@@ -217,7 +221,7 @@ export function ProfileView({ onPlay }: { onPlay: () => void }) {
         </div>
       )}
 
-      {tab === 'shop' && <ShopTab wallet={w} owned={settings.unlockedCosmetics} onBuy={buyItem} />}
+      {tab === 'shop' && <ShopTab wallet={w} owned={settings.unlockedCosmetics} onBuy={buyItem} justBought={justBought} />}
     </section>
   );
 }
@@ -225,7 +229,9 @@ export function ProfileView({ onPlay }: { onPlay: () => void }) {
 /** Cosmetics you can buy with what you've already earned — nothing here is purchasable with
  *  real money (see economy.ts). Grouped by kind so "backs" and "faces" read as two shelves,
  *  not one long list. */
-function ShopTab({ wallet: w, owned, onBuy }: { wallet: Wallet; owned: string[]; onBuy: (item: ShopItem) => void }) {
+function ShopTab({ wallet: w, owned, onBuy, justBought }: {
+  wallet: Wallet; owned: string[]; onBuy: (item: ShopItem) => void; justBought: string | null;
+}) {
   // ledger() reads localStorage, not `w` — the dependency re-runs this read after a purchase
   // changes the wallet (and thus the ledger) on disk, which is the only time it needs to.
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -241,7 +247,7 @@ function ShopTab({ wallet: w, owned, onBuy }: { wallet: Wallet; owned: string[];
               const isOwned = owned.includes(it.id);
               const afford = canAfford(w, it);
               return (
-                <article key={it.id} className={`shop-item ${isOwned ? 'owned' : ''}`}>
+                <article key={it.id} className={`shop-item ${isOwned ? 'owned' : ''} ${it.id === justBought ? 'just-bought' : ''}`}>
                   <span className={`shop-item-preview ${kind === 'cardBack' ? 'sw-back' : 'swatch glyph'}`}
                     data-back={kind === 'cardBack' ? it.value : undefined} aria-hidden="true">
                     {kind === 'avatar' ? it.value : ''}
@@ -312,8 +318,8 @@ function ProfileHead({ name, avatar, summary, wallet: w }: {
         </p>
       </div>
       <div className="wallet-row" title="Chips — earned by playing. Gems — earned at streaks, daily deals and tournament wins.">
-        <span className="wallet-amt"><span aria-hidden="true">🪙</span> {w.chips}</span>
-        <span className="wallet-amt"><span aria-hidden="true">💎</span> {w.gems}</span>
+        <span key={w.chips} className="wallet-amt"><span aria-hidden="true">🪙</span> {w.chips}</span>
+        <span key={`g${w.gems}`} className="wallet-amt"><span aria-hidden="true">💎</span> {w.gems}</span>
       </div>
     </header>
   );

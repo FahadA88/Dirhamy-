@@ -9,6 +9,7 @@ import { ENGINE_CHANGELOG } from '../engine/changelog';
 import { canSpeak } from './speech';
 import { CardFace as CardFaceArt } from './Card';
 import { LayoutIcon } from './LayoutIcon';
+import { PrefsIcon } from './PrefsIcon';
 import { SHOP_ITEMS } from '../social/economy';
 import type { Card } from '../engine/types';
 
@@ -58,18 +59,18 @@ const PATTERNS: [CustomBack['pattern'], string][] = [
 ];
 const EMBLEMS = ['', '♠', '♥', '♦', '♣', '★', '✦', '❖', '⚜'];
 
-type SectionId = 'look' | 'table' | 'cards' | 'you' | 'play' | 'opponents' | 'motion' | 'access' | 'about';
+export type SectionId = 'look' | 'table' | 'cards' | 'you' | 'play' | 'opponents' | 'motion' | 'access' | 'about';
 
-const SECTIONS: { id: SectionId; label: string; mark: string; blurb: string }[] = [
-  { id: 'look', label: 'Appearance', mark: '◐', blurb: 'Light or dark, and the accent through the site.' },
-  { id: 'table', label: 'The table', mark: '▤', blurb: 'What you play on.' },
-  { id: 'cards', label: 'Cards', mark: '🂠', blurb: 'Faces, backs, and one you draw yourself.' },
-  { id: 'you', label: 'You', mark: '☺', blurb: 'Your name, face and colour at the table.' },
-  { id: 'play', label: 'Playing', mark: '▶', blurb: 'How the table behaves while you play.' },
-  { id: 'opponents', label: 'Opponents', mark: '☻', blurb: 'Who you play against and how fast.' },
-  { id: 'motion', label: 'Motion & sound', mark: '♪', blurb: 'Animation, background, audio.' },
-  { id: 'access', label: 'Accessibility', mark: '◎', blurb: 'Text, contrast, and reducing movement.' },
-  { id: 'about', label: 'About', mark: 'ⓘ', blurb: 'What this is, and what it is not.' },
+const SECTIONS: { id: SectionId; label: string; blurb: string }[] = [
+  { id: 'look', label: 'Appearance', blurb: 'Light or dark, and the accent through the site.' },
+  { id: 'table', label: 'The table', blurb: 'What you play on.' },
+  { id: 'cards', label: 'Cards', blurb: 'Faces, backs, and one you draw yourself.' },
+  { id: 'you', label: 'You', blurb: 'Your name, face and colour at the table.' },
+  { id: 'play', label: 'Playing', blurb: 'How the table behaves while you play.' },
+  { id: 'opponents', label: 'Opponents', blurb: 'Who you play against and how fast.' },
+  { id: 'motion', label: 'Motion & sound', blurb: 'Animation, background, audio.' },
+  { id: 'access', label: 'Accessibility', blurb: 'Text, contrast, and reducing movement.' },
+  { id: 'about', label: 'About', blurb: 'What this is, and what it is not.' },
 ];
 
 /** The live search term, so a row can decide for itself whether it is a match. */
@@ -133,7 +134,7 @@ export function SettingsPanel({ open, onClose }: { open: boolean; onClose: () =>
                 aria-current={!searching && section === s.id}
                 onClick={() => { setQuery(''); setSection(s.id); }}
               >
-                <span className="pt-mark" aria-hidden="true">{s.mark}</span>
+                <PrefsIcon id={s.id} className="pt-mark" />
                 <span className="pt-label">{s.label}</span>
               </button>
             ))}
@@ -158,13 +159,13 @@ export function SettingsPanel({ open, onClose }: { open: boolean; onClose: () =>
                   <p className="prefs-nomatch">Nothing else matches that.</p>
                 </>
               ) : (
-                <>
+                <div key={section} className="prefs-section-in">
                   <div className="prefs-pane-head">
                     <h3>{SECTIONS.find((s) => s.id === section)!.label}</h3>
                     <p>{SECTIONS.find((s) => s.id === section)!.blurb}</p>
                   </div>
                   {body(section, settings, set)}
-                </>
+                </div>
               )}
             </Query.Provider>
           </div>
@@ -401,7 +402,7 @@ function CardsSection({ s, set }: { s: Settings; set: Setter }) {
                 title={locked ? `${BACKS[bk].name} — from the Shop, not yet unlocked` : BACKS[bk].name}
                 aria-pressed={s.cardBack === bk} disabled={locked}
                 onClick={() => set('cardBack', bk)}>
-                <span className="sw-back" data-back={bk}>{bk === 'monogram' ? '♠' : ''}</span>
+                <span className="sw-back" data-back={bk} />
                 {locked && <span className="sw-lock" aria-hidden="true">🔒</span>}
                 <em>{BACKS[bk].name}</em>
               </button>
@@ -411,9 +412,10 @@ function CardsSection({ s, set }: { s: Settings; set: Setter }) {
             aria-pressed={s.cardBack === 'custom'}
             onClick={() => { if (!s.customBack) set('customBack', DEFAULT_CUSTOM_BACK); set('cardBack', 'custom'); }}>
             <span className="sw-back mine" data-cbpattern={s.customBack?.pattern}
-              style={s.customBack ? { ['--cb-ink' as string]: s.customBack.ink, ['--cb-ground' as string]: s.customBack.ground } : undefined}>
-              {s.customBack?.emblem || '+'}
-            </span>
+              style={{
+                ...(s.customBack ? { ['--cb-ink' as string]: s.customBack.ink, ['--cb-ground' as string]: s.customBack.ground } : {}),
+                ['--cb-emblem' as string]: JSON.stringify(s.customBack?.emblem || '+'),
+              }} />
             <em>Yours</em>
           </button>
         </div>
@@ -782,11 +784,13 @@ function Preview() {
           data-back={settings.cardBack === 'custom' ? undefined : settings.cardBack}
           data-cbpattern={settings.cardBack === 'custom' ? settings.customBack?.pattern : undefined}
           style={settings.cardBack === 'custom' && settings.customBack
-            ? { ['--cb-ink' as string]: settings.customBack.ink, ['--cb-ground' as string]: settings.customBack.ground }
+            ? {
+              ['--cb-ink' as string]: settings.customBack.ink,
+              ['--cb-ground' as string]: settings.customBack.ground,
+              ['--cb-emblem' as string]: JSON.stringify(settings.customBack.emblem || ''),
+            }
             : undefined}
-        >
-          {settings.cardBack === 'custom' ? settings.customBack?.emblem : settings.cardBack === 'monogram' ? '♠' : ''}
-        </span>
+        />
       </div>
       <span className="pp-caption">
         {FACES[settings.cardFace].name} · {settings.cardBack === 'custom' ? 'Yours' : BACKS[settings.cardBack as Exclude<CardBack, 'custom'>].name} · {FELTS[settings.tableFelt].name}

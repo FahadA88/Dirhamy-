@@ -721,6 +721,10 @@ export function applySettings(s: Settings): void {
   if (cb) {
     root.style.setProperty('--cb-ink', cb.ink);
     root.style.setProperty('--cb-ground', cb.ground);
+    // A real CSS <string> (JSON.stringify quotes and escapes it for us) so the pattern rule
+    // below can paint it as content — the emblem picker had no reader anywhere else in the
+    // app, so choosing one never actually reached a real card. See card.back::before.
+    root.style.setProperty('--cb-emblem', JSON.stringify(cb.emblem || ''));
     // Only while the custom back is actually the ACTIVE back — not just designed once and
     // left sitting in storage. [data-cbpattern="X"] and [data-back="X"] match X in {lattice,
     // stripe, checker, wave} at identical specificity, cbpattern later in the cascade, so
