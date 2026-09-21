@@ -523,10 +523,14 @@ h2 { letter-spacing: -0.025em; color: var(--ink); font-size: 22px; font-weight: 
   transform-origin: 50% 100%;
   transform-style: preserve-3d;
   background: linear-gradient(180deg, #17142080 0%, #0a0812 55%, #050308 100%);
+  /* This used to run the ring and both glows at full accent strength — fine when the accent
+     was a muted gold, a giant glowing outline once it became a saturated neon cyan by default.
+     Mixed down to a rim-light instead: still there, still re-themes with the accent, no longer
+     the loudest thing on the screen. */
   box-shadow:
-    inset 0 0 0 2px var(--cyan, #1fe3ff),
-    inset 0 0 60px rgba(31, 227, 255, 0.16),
-    0 0 80px var(--glow, rgba(31, 227, 255, .32)),
+    inset 0 0 0 1px color-mix(in srgb, var(--cyan, #1fe3ff) 45%, transparent),
+    inset 0 0 40px color-mix(in srgb, var(--cyan, #1fe3ff) 8%, transparent),
+    0 0 30px color-mix(in srgb, var(--cyan, #1fe3ff) 12%, transparent),
     0 60px 100px rgba(0, 0, 0, .55);
 }
 .t3d-edge {
@@ -536,7 +540,7 @@ h2 { letter-spacing: -0.025em; color: var(--ink); font-size: 22px; font-weight: 
   transform-origin: 50% 0%;
   border-radius: 0 0 26px 26px;
   background: linear-gradient(180deg, #0a0712 0%, #020103 100%);
-  box-shadow: inset 0 0 0 1px rgba(31, 227, 255, 0.35), 0 20px 40px rgba(0, 0, 0, .6);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--cyan, #1fe3ff) 30%, transparent), 0 20px 40px rgba(0, 0, 0, .6);
 }
 /* Nothing here animates, so reduced-motion has nothing to opt out of — a still 3D plate is
    decoration, not motion. Touch devices are a different problem: a perspective-transformed
@@ -7774,7 +7778,11 @@ which would double the letter up rather than press it in. Foil already reads as
 .seat-stats .seat-stat, .you-head .seat-stat {
   display: inline-flex; align-items: center; gap: 3px;
   padding: 2px 9px 2px 8px; border-radius: 999px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, .16), rgba(255, 255, 255, .02));
+  /* A flat white-on-dark chip read as a leftover, unlit part of a room that lights everything
+     else — a hairline of the accent in the bevel is enough to mark it as part of the same
+     room without turning a trick count into another glowing thing. */
+  background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 16%, rgba(255, 255, 255, .16)), rgba(255, 255, 255, .02));
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
   box-shadow:
     0 1px 0 rgba(255, 255, 255, .20) inset,
     0 -1px 0 rgba(0, 0, 0, .38) inset,
