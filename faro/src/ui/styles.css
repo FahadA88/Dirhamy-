@@ -3702,6 +3702,11 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
   background: linear-gradient(180deg, var(--bg1), var(--panel));
   overflow-y: auto;
 }
+/* On the desktop rail, invisible to layout — the tabs stack in .prefs-rail's own column flow
+   exactly as if this wrapper were not there. It exists so the mobile media query below has
+   something to turn into its own horizontally-scrolling strip, independent of the preview
+   that now sits under it instead of disappearing. */
+.prefs-tabs { display: contents; }
 .prefs-tab {
   position: relative;
   display: flex; align-items: center; gap: 10px;
@@ -3853,13 +3858,25 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
   .prefs-scrim { padding: 0; }
   .prefs { width: 100vw; height: 100vh; border-radius: 0; }
   .prefs-body { flex-direction: column; }
+  /* The rail itself stacks its two children — the tab strip, then the preview — instead of
+     being the single horizontal scroller it was: cramming a 104px-tall preview into that same
+     scroller as just another item is what made hiding it look like the only option before. */
   .prefs-rail {
-    flex: 0 0 auto; flex-direction: row; overflow-x: auto; gap: 6px;
+    flex: 0 0 auto; flex-direction: column; gap: 0;
     border-right: none; border-bottom: 1px solid var(--panel-brd);
   }
+  .prefs-tabs { display: flex; flex-direction: row; overflow-x: auto; gap: 6px; padding-bottom: 2px; }
   .prefs-tab { flex: 0 0 auto; }
   .pt-label { white-space: nowrap; }
-  .prefs-preview { display: none; }
+  /* Compact and sideways: a small stage beside its own caption, not the vertical desktop card,
+     so a phone gets the same at-a-glance feedback instead of none at all. */
+  .prefs-preview {
+    flex-direction: row; align-items: center; margin-top: 8px; padding: 8px 2px 0;
+    border-top: 1px solid var(--panel-brd);
+  }
+  .pp-title { display: none; }
+  .pp-stage { width: 96px; height: 56px; flex: 0 0 auto; }
+  .pp-caption { text-align: left; }
   .prefs-head { flex-wrap: wrap; }
   .prefs-pane { padding: 16px 16px 28px; }
   .pref-row { flex-direction: column; align-items: stretch; gap: 10px; }

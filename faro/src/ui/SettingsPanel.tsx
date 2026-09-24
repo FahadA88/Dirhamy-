@@ -127,17 +127,19 @@ export function SettingsPanel({ open, onClose }: { open: boolean; onClose: () =>
 
         <div className="prefs-body">
           <nav className="prefs-rail" aria-label="Settings categories">
-            {SECTIONS.map((s) => (
-              <button
-                key={s.id}
-                className={`prefs-tab ${!searching && section === s.id ? 'on' : ''}`}
-                aria-current={!searching && section === s.id}
-                onClick={() => { setQuery(''); setSection(s.id); }}
-              >
-                <PrefsIcon id={s.id} className="pt-mark" />
-                <span className="pt-label">{s.label}</span>
-              </button>
-            ))}
+            <div className="prefs-tabs">
+              {SECTIONS.map((s) => (
+                <button
+                  key={s.id}
+                  className={`prefs-tab ${!searching && section === s.id ? 'on' : ''}`}
+                  aria-current={!searching && section === s.id}
+                  onClick={() => { setQuery(''); setSection(s.id); }}
+                >
+                  <PrefsIcon id={s.id} className="pt-mark" />
+                  <span className="pt-label">{s.label}</span>
+                </button>
+              ))}
+            </div>
             <Preview />
           </nav>
 

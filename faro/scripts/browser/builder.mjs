@@ -26,7 +26,11 @@ await p.evaluate(() => {
   localStorage.setItem('faro.settings.v1', JSON.stringify({ botSpeed: 'instant' }));
 });
 await p.goto(base, { waitUntil: 'networkidle' });
-await p.locator('button', { hasText: /^Create$/ }).first().click();
+// getByRole computes the accessible name, which the nav's aria-hidden icon mark (see
+// SiteNav.tsx) is correctly excluded from — a plain text-content locator is not: the icon's
+// glyph is still in textContent even though it is hidden from assistive tech, so an exact
+// /^Create$/ match broke the moment every nav style grew an icon.
+await p.getByRole('button', { name: 'Create', exact: true }).first().click();
 
 console.log('\nStep 1 — the builder opens on a choice, not a blank form');
 await p.waitForSelector('.template-grid');

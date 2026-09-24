@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { useSettings } from '../settings/SettingsContext';
 import { catalog } from '../games/catalog';
 import {
-  Badge, allResults, badges, currentStreak, highlights, leaderboard, mySummary, playCalendar,
+  Badge, allResults, badges, currentStreak, highlights, mySummary, playCalendar,
   playStreak, tierFor,
 } from '../social/records';
 import { EarnEvent, SHOP_ITEMS, ShopItem, Wallet, canAfford, ledger, purchase, wallet } from '../social/economy';
@@ -396,6 +396,3 @@ function ago(at: number): string {
   const days = Math.round(hrs / 24);
   return days === 1 ? 'yesterday' : `${days}d ago`;
 }
-
-// Kept so the module owns its own leaderboard access rather than the view importing it twice.
-export { leaderboard };
