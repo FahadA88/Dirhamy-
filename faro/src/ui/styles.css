@@ -983,7 +983,11 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
 .tourney-banner {
   display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
   padding: 14px 18px; margin-bottom: 18px; font-size: 14px;
+  animation: tourney-banner-in 260ms var(--ease) both;
 }
+@keyframes tourney-banner-in { from { opacity: 0; transform: translateY(-4px); } }
+@media (prefers-reduced-motion: reduce) { .tourney-banner { animation: none; } }
+:root[data-motion="reduced"] .tourney-banner { animation: none; }
 .tb-mark { font-size: 22px; line-height: 1; flex: 0 0 auto; }
 .tourney-banner b { color: var(--ink); }
 .tourney-banner p { margin: 2px 0 0; font-size: 13px; }
@@ -1776,7 +1780,15 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
 .rb-empty p { color: var(--muted); font-size: 13px; margin: 0 0 14px; }
 
 .rb-list { list-style: none; padding: 0; margin: 0 0 14px; display: flex; flex-direction: column; gap: 10px; }
-.rb-item { border: 1px solid var(--panel-brd); border-radius: 12px; background: var(--panel); overflow: hidden; }
+.rb-item {
+  border: 1px solid var(--panel-brd); border-radius: 12px; background: var(--panel); overflow: hidden;
+  animation: rb-item-in 240ms var(--ease) both;
+}
+/* Every rule remounts fresh (key={rule.id}), including one just added by a house-rule click or
+   "Write your first rule" — the same one-shot, no-JS-toggling entrance used elsewhere. */
+@keyframes rb-item-in { from { opacity: 0; transform: translateY(6px); } }
+@media (prefers-reduced-motion: reduce) { .rb-item { animation: none; } }
+:root[data-motion="reduced"] .rb-item { animation: none; }
 .rb-item.open { border-color: var(--green-d); }
 .rb-item.off { opacity: 0.5; }
 .rb-row { display: flex; align-items: center; gap: 10px; padding: 10px 12px; }
@@ -2049,8 +2061,9 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
 .searchbox {
   flex: 1 1 260px; min-width: 200px; padding: 9px 14px; border-radius: 999px;
   border: 1px solid var(--panel-brd); background: var(--panel); color: inherit; font-size: 14px;
+  transition: border-color .15s, box-shadow .15s;
 }
-.searchbox:focus { border-color: var(--green-d); outline: none; }
+.searchbox:focus { border-color: var(--green-d); outline: none; box-shadow: 0 0 0 3px var(--ac28, rgba(46,125,80,.18)); }
 .filter-chips { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 /* The native chevron and the native text inset do not match the pill buttons these sit beside,
    so the row read as half-finished. The arrow below is drawn rather than inherited; the element
@@ -3687,6 +3700,7 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
   flex: 1 1 auto; min-width: 0; max-width: 380px;
   padding: 9px 14px; border-radius: 999px; font: inherit; font-size: 13px;
   border: 1px solid var(--panel-brd); background: var(--input-bg); color: var(--ink);
+  transition: border-color .15s, box-shadow .15s;
 }
 .prefs-search:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-dim); }
 .prefs-head-actions { margin-left: auto; display: flex; gap: 8px; flex: 0 0 auto; }
