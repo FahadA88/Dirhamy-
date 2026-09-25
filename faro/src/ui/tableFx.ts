@@ -17,7 +17,7 @@ export function startMagneticButtons(): () => void {
   if (typeof window === 'undefined') return () => {};
   if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return () => {};
 
-  const SEL = 'button.primary, button.ghost, .nv-items button, .nav-dock button';
+  const SEL = 'button.primary, button.ghost, .nv-items button';
   const REACH = 46;   // px beyond the button's own edge that still pulls it
   const PULL = 0.24;
   const MAX = 7;       // never drifts far enough to misalign a click
@@ -239,7 +239,7 @@ export function startTapRipple(): () => void {
   const onDown = (e: PointerEvent) => {
     if (reduced()) return;
     const target = (e.target as HTMLElement)?.closest<HTMLButtonElement>(
-      'button.primary, button.ghost, .nv-items button, .nav-dock button',
+      'button.primary, button.ghost, .nv-items button',
     );
     if (!target || target.disabled) return;
     const r = target.getBoundingClientRect();

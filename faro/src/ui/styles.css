@@ -464,15 +464,15 @@ button.primary.sm, button.ghost.sm { padding: 7px 14px; font-size: 13px; }
    glyph that sits flat next to its label is still just text with a symbol taped on. It lifts
    and lights up in the accent on hover or once its button is the chosen one — the same "this
    one is lit" language the rest of the chrome already speaks. */
-.nv-items button .nv-mark, .nav-dock button .nv-mark {
+.nv-items button .nv-mark {
   display: inline-block;
   transition: transform 160ms var(--ease), filter 160ms var(--ease);
 }
-.nv-items button:hover .nv-mark, .nav-dock button:hover .nv-mark {
+.nv-items button:hover .nv-mark {
   transform: scale(1.16) translateY(-1px);
   filter: drop-shadow(0 0 6px var(--ac55));
 }
-.nv-items button.on .nv-mark, .nav-dock button.on .nv-mark {
+.nv-items button.on .nv-mark {
   filter: drop-shadow(0 0 8px var(--ac75));
 }
 .nv-daily:hover .nv-mark { filter: drop-shadow(0 0 6px rgba(255, 46, 94, .55)); }
@@ -841,37 +841,6 @@ h2 { letter-spacing: -0.025em; color: var(--ink); font-size: 22px; font-weight: 
   .felt-content.sol { --cw: 58px; --ch: 82px; --bw: 58px; --bh: 82px; }
 }
 @media (max-width: 780px) {
-  /* Five destinations never fitted beside the brand in one top pill at phone widths. The old
-     answer was to shrink them, which took the buttons to roughly 30px — under the 44px floor,
-     on the five most-used controls in the product. They move to the bottom instead, where a
-     thumb reaches, and get the height back. Only the default bar: the rail, centre, dock and
-     plate styles each carry their own narrow-width treatment. */
-  /* backdrop-filter makes an element a containing block for its fixed descendants, which pinned
-     the tab bar to the header instead of the viewport. Down here the top bar carries only the
-     brand over an opaque page, so it has nothing to blur and can drop the filter. */
-  /* header.nav-bar, not .nav-bar: the base rule that sets the blur is ~2,900 lines further down,
-     and a media query adds no specificity, so the plain class alone loses on source order. */
-  header.nav-bar { position: relative; backdrop-filter: none; }
-  .nav-bar .tabs.nv-items {
-    position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
-    display: grid; grid-auto-flow: column; grid-auto-columns: 1fr;
-    gap: 0; padding: 4px 4px calc(4px + env(safe-area-inset-bottom));
-    border-radius: 0; border: 0; border-top: 1px solid var(--panel-brd);
-    background: color-mix(in srgb, var(--panel-solid) 94%, transparent);
-    backdrop-filter: blur(12px);
-  }
-  .nav-bar .tabs.nv-items button {
-    flex-direction: column; gap: 3px; min-height: 52px;
-    padding: 7px 4px; border-radius: 10px; font-size: 11px; font-weight: 600;
-  }
-  .nav-bar .tabs.nv-items button .nv-mark { font-size: 18px; line-height: 1; }
-  /* The gear is icon-only on desktop; down here it needs the label its neighbours have, or the
-     fifth cell reads as an unexplained symbol. Its mark goes instead of sitting beside the word,
-     so all five cells are the same shape rather than four words and one word-with-a-glyph. */
-  header.nav-bar .nv-settings .nv-label { display: inline; }
-  header.nav-bar .nv-settings .nv-mark { display: none; }
-  .app { padding-bottom: calc(78px + env(safe-area-inset-bottom)); }
-
   .felt-content.sol { --cw: 52px; --ch: 74px; --bw: 52px; --bh: 74px; gap: 12px; }
   .sol-top { gap: 8px; }
   .sol-group { gap: 5px; }
@@ -880,12 +849,11 @@ h2 { letter-spacing: -0.025em; color: var(--ink); font-size: 22px; font-weight: 
 }
 @media (max-width: 480px) {
   /* Longhand for the same reason as the 780px block above — see item 32. */
-  /* Bottom clearance stays the 780px value — the tab bar is fixed over the page down here. */
-  .app { padding-top: max(10px, env(safe-area-inset-top)); padding-inline: max(6px, env(safe-area-inset-left)) max(6px, env(safe-area-inset-right)); padding-bottom: calc(78px + env(safe-area-inset-bottom)); }
-  .nav-bar .brand { gap: 8px; }
-  .nav-bar .logo3d { width: 30px; height: 30px; }
-  .nav-bar .logo3d span { font-size: 15px; border-radius: 8px; }
-  .nav-bar .wordmark { font-size: 16px; }
+  .app { padding-top: max(10px, env(safe-area-inset-top)); padding-inline: max(6px, env(safe-area-inset-left)) max(6px, env(safe-area-inset-right)); }
+  .nav-plate .brand { gap: 6px; }
+  .nav-plate .logo3d { width: 30px; height: 30px; }
+  .nav-plate .logo3d span { font-size: 15px; border-radius: 8px; }
+  .nav-plate .wordmark { font-size: 15px; letter-spacing: 1.2px; }
   .table[data-felt] { --rail-w: 6px; --felt-pad: 7px; }
   .table-wrap { --room-pad: 4px !important; }
   /* Small enough that seven columns of Klondike still fit without scrolling, big enough that
@@ -1360,9 +1328,10 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
 .empty-hand { color: var(--muted); font-family: var(--mono); }
 
 /* ---------------- modal ---------------- */
-/* z-index 50, not 30: the bottom tab bar is fixed at 40 (see .nav-bar .tabs.nv-items), so every
-   dialog in the app was rendering UNDERNEATH it on a phone — the match-over box had "Play again"
-   sitting behind the nav. Padding so a tall box never touches the edges of a small screen, which
+/* z-index 50, comfortably above every other layered surface in the app (the felt spotlight, the
+   sticky match bar, the shelf's own overlays), so a dialog never renders underneath one of them
+   on a phone — the match-over box once had "Play again" sitting behind the nav. Padding so a
+   tall box never touches the edges of a small screen, which
    is what clipped the crown off the top of the celebration at 375px. */
 .modal {
   position: fixed; inset: 0; background: rgba(16, 40, 28, 0.35); backdrop-filter: blur(4px);
@@ -4040,135 +4009,21 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
 .felt .modal-box .scores { color: var(--muted); }
 
 /* ============================================================
-   NAVIGATION — five candidates, all live
-   Switch with ?nav=rail | centre | dock | plate. The default is
-   the top bar the site already had.
+   NAVIGATION — the oak plate
+   A board across the top with the name engraved into it and the
+   tabs cut in beside it — the brass plate on the door of a card
+   room. Four other candidates lived here during design (a plain
+   top bar, a side rail, a centred masthead, a floating dock,
+   switched with ?nav=) so the choice could be made by looking at
+   the real site rather than a mock. This is the one that read as
+   a game instead of a website; the other four came out.
    ============================================================ */
 
-/* Marks and the settings label are rendered per style rather than hidden with CSS — see the
-   note in SiteNav. Nothing here needs to switch them off. */
-
-/* --- 1. top bar (today) --- */
-/* Worklist #10: Bluff's rank picker and Kent's four cards can run taller than a laptop
-   viewport, so the page scrolls — and until now the bar carrying "All games" and Rules
-   scrolled away with it, right when a claim needed making. Sticky, with the same glass
-   the floating dock already uses, so it survives a scroll instead of chasing it. */
-/* The bar renders a Settings label for its phone-width tab bar; from 781px up the gear sits in a
-   pill beside four labelled tabs and does not need one. */
-.nav-bar .nv-settings .nv-label { display: none; }
-.nav-bar {
-  display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 8px;
-  position: sticky; top: 0; z-index: 25;
-  /* Sticks to the true top of the viewport once scrolled — .app's own top padding no longer
-     applies at that point, so the notch reservation has to be repeated here (see item 32). */
-  padding-top: max(10px, env(safe-area-inset-top));
-  padding-bottom: 10px;
-  background: color-mix(in srgb, var(--panel-solid) 88%, transparent);
-  backdrop-filter: blur(12px);
-  border-radius: 0 0 16px 16px;
-}
-
-/* --- 2. side rail --- */
-/* A fixed column down the left. The page moves over to make room, which is what makes it read
-   as an application rather than a website with a menu. */
-/* The rail is fixed to the true left edge, which on a landscape notched phone can sit under
-   the notch (item 32) — pushed out by env(safe-area-inset-left), 0px on every other device. */
-.nav-is-rail.app { max-width: none; padding-left: calc(116px + env(safe-area-inset-left)); }
-.nav-is-rail main { max-width: 1080px; margin: 0 auto; }
-.nav-rail {
-  position: fixed; top: 0; left: 0; bottom: 0; width: 96px; z-index: 20;
-  /* `justify-content` has to be stated: the base `header` rule sets space-between, which in a
-     column pins the brand to the top and shoves the items to the floor. */
-  display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 6px;
-  padding: 18px 8px;
-  padding-left: calc(8px + env(safe-area-inset-left));
-  background: linear-gradient(180deg, var(--panel-hi), var(--panel));
-  border-right: 1px solid var(--panel-brd);
-  box-shadow: 2px 0 18px rgba(58,44,20,.06);
-}
-.nav-rail .brand { flex-direction: column; gap: 6px; margin-bottom: 14px; }
-.nav-rail .wordmark { font-size: 12px; letter-spacing: 1.4px; }
-.nav-rail .nv-items { display: flex; flex-direction: column; gap: 4px; width: 100%; flex: 1 1 auto; }
-.nav-rail .nv-items button {
-  display: flex; flex-direction: column; align-items: center; gap: 4px;
-  width: 100%; padding: 11px 4px; border-radius: 12px; cursor: pointer;
-  font: inherit; font-size: 11px; color: var(--muted);
-  background: transparent; border: 1px solid transparent;
-  transition: background 140ms, color 140ms, transform 140ms var(--ease);
-}
-.nav-rail .nv-items button .nv-mark { font-size: 19px; line-height: 1; }
-.nav-rail .nv-items button:hover { background: var(--oak-dim); color: var(--ink); transform: translateX(2px); }
-.nav-rail .nv-items button.on {
-  background: var(--seg-on-bg); color: var(--seg-on-ink); font-weight: 650;
-}
-.nav-rail .nv-settings { margin-top: auto; }
-
-/* --- 3. centred masthead --- */
-/* The brand on its own line with the navigation set under it between two rules. It reads as the
-   head of a printed page, which is the world this site is in. */
-.nav-centre {
-  display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 12px;
-  padding: 8px 0 0; margin-bottom: 20px;
-}
-.nav-centre .brand { flex-direction: column; gap: 8px; }
-.nav-centre .wordmark { font-size: 30px; letter-spacing: 2px; }
-.nav-centre .nv-items {
-  display: flex; align-items: center; gap: 28px;
-  width: 100%; justify-content: center;
-  padding: 11px 0; border-top: 1px solid var(--panel-brd); border-bottom: 1px solid var(--panel-brd);
-}
-.nav-centre .nv-items button {
-  padding: 2px 0; cursor: pointer; font: inherit; font-size: 14px;
-  letter-spacing: .04em; text-transform: uppercase;
-  background: none; border: 0; color: var(--muted);
-  border-bottom: 2px solid transparent;
-  transition: color 140ms, border-color 140ms, transform 140ms var(--ease);
-}
-.nav-centre .nv-items button:hover { color: var(--ink); transform: translateY(-1px); }
-.nav-centre .nv-items button.on { color: var(--ink); border-bottom-color: var(--accent); font-weight: 700; }
-.nav-centre .nv-settings { font-size: 17px !important; }
-
-/* --- 4. floating dock --- */
-/* The brand stays small at the top and the navigation floats over the page at the bottom,
-   where a thumb is. This is the one that reads as a game rather than a site. */
-/* The dock itself floats right where a home-indicator gesture bar lives on a notched phone
-   (see .nav-dock's own bottom offset above), so the page clearance for it needs the same
-   reservation (item 32). */
-.nav-is-dock.app { padding-bottom: calc(110px + env(safe-area-inset-bottom)); }
-.nav-dock-head { display: flex; align-items: center; justify-content: flex-start; margin-bottom: 10px; }
-.nav-dock-head .logo3d { width: 34px; height: 34px; }
-.nav-dock-head .logo3d span { font-size: 17px; border-radius: 10px; }
-.nav-dock-head .wordmark { font-size: 18px; }
-.nav-dock {
-  /* Fixed to the viewport, not to .app — floats right where a home-indicator gesture bar sits
-     on a notched phone, so its own bottom offset needs the reservation (item 32). */
-  position: fixed; left: 50%; bottom: calc(22px + env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 30;
-  display: flex; gap: 4px; padding: 6px;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--panel-solid) 88%, transparent);
-  border: 1px solid var(--panel-brd);
-  box-shadow: 0 14px 34px rgba(58,44,20,.24), 0 1px 0 rgba(255,255,255,.7) inset;
-  backdrop-filter: blur(12px);
-}
-.nav-dock button {
-  display: flex; align-items: center; gap: 8px;
-  padding: 11px 20px; border-radius: 999px; cursor: pointer;
-  font: inherit; font-size: 14px; font-weight: 600;
-  background: transparent; border: 0; color: var(--muted);
-  transition: background 160ms, color 160ms, transform 160ms;
-}
-.nav-dock button .nv-mark { font-size: 15px; line-height: 1; }
-.nav-dock button:hover { color: var(--ink); transform: translateY(-1px); }
-.nav-dock button.on { background: var(--seg-on-bg); color: var(--seg-on-ink); }
-.nav-dock .nv-settings { padding: 11px 15px; }
-
-/* --- 5. oak plate --- */
-/* A board across the top with the name engraved into it and the tabs cut in beside it — the
-   brass plate on the door of a card room. */
-/* `display: block` for the same reason: as a flex header the board shrinks to its contents
-   instead of spanning the page. */
+/* `display: block` for the same reason the header itself is: as a flex header the board
+   shrinks to its contents instead of spanning the page. */
 .nav-plate { display: block; margin: -6px -16px 20px; }
 .np-board {
+  position: relative;
   display: flex; align-items: center; justify-content: space-between; gap: 16px;
   /* .nav-plate's negative margin pulls this board flush to the true page edges (that's the
      point — the plate reads as bolted across the top), so on a notched phone this padding is
@@ -4183,6 +4038,16 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
     0 -2px 0 rgba(0,0,0,.28) inset,
     0 10px 26px rgba(58,44,20,.28);
 }
+/* A plate bolted to a door has bolts. Two brass studs low in the corners, below the safe-area
+   padding so a notch never eats one — the detail that tips this from "a brown header bar" to
+   an actual fixture, the kind of thing a screenshot in a list of website headers doesn't have. */
+.np-board::before, .np-board::after {
+  content: ""; position: absolute; bottom: 7px; width: 5px; height: 5px; border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #f8eecb 0%, #cbab6c 45%, #7c5a2e 100%);
+  box-shadow: 0 1px 1px rgba(0,0,0,.55), 0 0 0 1px rgba(0,0,0,.2);
+}
+.np-board::before { left: 9px; }
+.np-board::after { right: 9px; }
 .nav-plate .logo3d span { background: #f3ead6; color: #4a3218; }
 .nav-plate .wordmark {
   color: #f6ecd6; letter-spacing: 3px; font-size: 22px;
@@ -4195,8 +4060,10 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
   color: rgba(246,236,214,.72);
   background: rgba(0,0,0,.16);
   border: 1px solid rgba(0,0,0,.24);
-  box-shadow: 0 1px 0 rgba(255,255,255,.12) inset;
-  transition: background 150ms, color 150ms, transform 150ms var(--ease);
+  /* A resting tab reads as routed into the wood, not stuck on top of it — the "cut in beside
+     it" the header comment promises but the flat single-highlight box-shadow never delivered. */
+  box-shadow: 0 1px 0 rgba(255,255,255,.12) inset, 0 2px 5px rgba(0,0,0,.3) inset;
+  transition: background 150ms, color 150ms, transform 150ms var(--ease), box-shadow 150ms;
 }
 .nav-plate .nv-items button:hover { color: #fff; background: rgba(0,0,0,.26); transform: translateY(-1px); }
 .nav-plate .nv-items button.on {
@@ -4205,22 +4072,20 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
 }
 
 @media (max-width: 760px) {
-  /* The rail becomes a bottom bar at this width (see .nav-rail just below), so it now sits
-     exactly where a home-indicator gesture bar would (item 32). */
-  .nav-is-rail.app { padding-left: 16px; padding-bottom: calc(92px + env(safe-area-inset-bottom)); }
-  .nav-rail {
-    top: auto; right: 0; bottom: 0; width: auto; height: auto;
-    flex-direction: row; justify-content: space-around;
-    border-right: none; border-top: 1px solid var(--panel-brd);
-  }
-  .nav-rail .brand { display: none; }
-  .nav-rail .nv-items { flex-direction: row; }
-  .nav-rail .nv-settings { margin-top: 0; }
-  .nav-centre .wordmark { font-size: 22px; }
-  .nav-centre .nv-items { gap: 18px; }
+  /* Five destinations plus the brand never fitted in one row under about 700px — they used to
+     just run off the right edge of the board, unreachable without a horizontal scroll nobody
+     goes looking for. The board wraps instead: the brand keeps its own row, the tabs get a
+     full-width row under it and share it evenly, tight enough that all five still fit without
+     turning into unlabelled icons. */
   .nav-plate { margin: -6px -10px 16px; }
-  .np-board { padding: 12px 14px; }
+  .np-board { padding: 10px 14px; flex-wrap: wrap; row-gap: 8px; }
   .nav-plate .wordmark { font-size: 17px; letter-spacing: 1.6px; }
+  .nav-plate .nv-items { flex: 1 1 100%; gap: 4px; }
+  .nav-plate .nv-items button {
+    flex: 1 1 0; padding: 8px 4px; font-size: 12px; gap: 2px;
+    display: flex; flex-direction: column; align-items: center;
+  }
+  .nav-plate .nv-items .nv-mark { font-size: 15px; }
 }
 
 /* ============================================================
@@ -4239,7 +4104,7 @@ button.ghost,
 .chip,
 .kindtab,
 .tabs button.on,
-.nav-dock button.on {
+.nav-plate .nv-items button.on {
   font-family: var(--display);
 }
 
@@ -6452,6 +6317,34 @@ button.bluff-go:disabled {
    double-moves every card in the hand. */
 .felt.dealing .hand .card-btn { animation: none; }
 
+/* A hand sitting still used to look like a photograph of cards rather than cards somebody is
+   holding — every motion on this table was a reaction to something (a hover, a play, a deal)
+   and nothing moved on its own once the deal-in settled. This is the one exception: each
+   playable card breathes, a few pixels up and down, out of phase with its neighbours so the
+   fan ripples rather than bobbing as a block. It rides `translate` rather than `transform` —
+   `.card-btn` already owns `transform` for the fan angle and the hover lift (`!important`,
+   above), and a second animation fighting it over the same property would either be silently
+   dropped or tear the lift. `translate` is untouched by either, so this composes underneath
+   without disturbing the fan or the lift. Lives on the inner `.card.face`, not the button
+   itself, for the same reason: the button is `card-to-hand`'s territory during the deal. */
+@keyframes hand-breathe {
+  0%, 100% { translate: 0 0; }
+  50%      { translate: 0 -4px; }
+}
+.hand .card-btn.playable:not(.dim) .card.face {
+  animation: hand-breathe calc(3200ms * var(--anim-scale, 1)) ease-in-out infinite;
+  animation-delay: calc(var(--i, 0) * -260ms);
+}
+.hand .card-btn.playable:hover .card.face,
+.hand .card-btn.playable:focus-visible .card.face,
+.hand .card-btn.selected .card.face,
+.hand .card-btn.staged .card.face,
+.felt.dealing .hand .card-btn .card.face {
+  animation: none;
+}
+@media (prefers-reduced-motion: reduce) { .hand .card-btn .card.face { animation: none !important; } }
+:root[data-motion="reduced"] .hand .card-btn .card.face { animation: none !important; }
+
 /* --- whose go it is --- */
 /* The seat that is thinking breathes. Nothing else on the felt moves on its own,
    so it is unmistakable without being loud. */
@@ -7848,8 +7741,7 @@ which is what a sans is for.
 .seg-btn.on,
 .seg button.on,
 .rb-join button.on,
-.tabs button.on,
-.nav-dock button.on {
+.tabs button.on {
   border-color: transparent;
   box-shadow: var(--seg-on-glow);
 }
@@ -8207,7 +8099,7 @@ button.primary:hover::after { left: 130%; }
 /* Ghost and primary buttons alike drift a few px toward the pointer as it nears (tableFx.ts
    writes `--mgx`/`--mgy`); `translate` again, so it never fights the hover lift or the press
    squash above, both of which live on `transform`. */
-button.primary, button.ghost, .nv-items button, .nav-dock button {
+button.primary, button.ghost, .nv-items button {
   translate: var(--mgx, 0px) var(--mgy, 0px);
   transition: translate 200ms var(--ease);
 }
@@ -8705,7 +8597,7 @@ felt) and a stitch line on every one of them would be a shop
   from { transform: scale(0); opacity: 0.35; }
   to { transform: scale(1); opacity: 0; }
 }
-button.primary, button.ghost, .nv-items button, .nav-dock button { position: relative; overflow: hidden; }
+button.primary, button.ghost, .nv-items button { position: relative; overflow: hidden; }
 .tap-ripple {
   position: absolute; left: var(--rx, 50%); top: var(--ry, 50%);
   width: var(--rr, 140px); height: var(--rr, 140px); margin: calc(var(--rr, 140px) / -2);
@@ -9374,16 +9266,11 @@ input[type="checkbox"]:focus-visible { outline: 2px solid var(--brass-hi); outli
 
 /* A phone turned on its side is not a small desktop — it is short. Every mobile rule above this
    one keys off width, so a landscape phone (812x375, 932x430...) is often wider than the 780px
-   floor and gets the FULL-height desktop chrome: an uncompressed header, a fixed 78px reserved
-   at the bottom for a tab bar sized for a tall screen, room padding that assumes a monitor. The
-   result is the table squeezed into whatever's left over — "nothing changed when I rotated,"
-   even though the layout did technically reflow. Keyed on height and orientation together, not
-   width, so it fires for a landscape phone regardless of how wide it is and leaves a real
-   landscape tablet (900px+ tall) alone. Last in the file on purpose: several of the rules it
-   overrides (the bottom tab bar's fixed position and the .app padding that reserves room for
-   it) are themselves keyed on max-width and would otherwise win a same-specificity tie on a
-   phone narrow enough to trigger both — the same class of bug the header.nav-bar/.nav-bar and
-   .modal-card/.modal-box fixes elsewhere in this file were caught for. */
+   floor and gets the FULL-height desktop chrome: an uncompressed header, room padding that
+   assumes a monitor. The result is the table squeezed into whatever's left over — "nothing
+   changed when I rotated," even though the layout did technically reflow. Keyed on height and
+   orientation together, not width, so it fires for a landscape phone regardless of how wide it
+   is and leaves a real landscape tablet (900px+ tall) alone. */
 @media (orientation: landscape) and (max-height: 500px) {
   .app { padding-top: max(6px, env(safe-area-inset-top)); padding-bottom: max(6px, env(safe-area-inset-bottom)); }
   header { margin-bottom: 4px; gap: 8px; }
@@ -9391,17 +9278,9 @@ input[type="checkbox"]:focus-visible { outline: 2px solid var(--brass-hi); outli
   header .sub { display: none; }
   .logo3d { width: 28px; height: 28px; }
   .logo3d span { font-size: 14px; border-radius: 8px; }
-  /* Back to an ordinary top bar: a fixed 52px-tall bottom tab strip is a fifth of a 375px-tall
-     screen, and there is nowhere on a landscape phone a thumb cannot already reach the top. */
-  header.nav-bar { position: relative; }
-  .nav-bar .tabs.nv-items {
-    position: static; height: auto; padding: 0; border: 0; border-radius: var(--r-pill);
-    box-shadow: none;
-  }
-  .nav-bar .tabs.nv-items button { flex-direction: row; gap: 6px; min-height: 34px; padding: 6px 12px; }
-  .nav-bar .tabs.nv-items button .nv-mark { font-size: 15px; }
-  header.nav-bar .nv-settings .nv-label { display: none; }
-  header.nav-bar .nv-settings .nv-mark { display: inline; }
+  .nav-plate { margin: -6px -10px 12px; }
+  .np-board { padding: 8px 14px; }
+  .nav-plate .wordmark { font-size: 15px; letter-spacing: 1.2px; }
   .center { margin: 8px 0; gap: 10px; }
   .you-head { margin-bottom: 4px; }
   .log { max-height: 70px; }
@@ -9579,11 +9458,6 @@ input[type="checkbox"]:focus-visible { outline: 2px solid var(--brass-hi); outli
    for a page of prose and wrong for a card table; the table is not
    text, and the only thing it competes with for space is nothing.
    ============================================================ */
-:root[data-playing="yes"] .nav-bar,
-:root[data-playing="yes"] .nav-rail,
-:root[data-playing="yes"] .nav-centre,
-:root[data-playing="yes"] .nav-dock,
-:root[data-playing="yes"] .nav-dock-head,
 :root[data-playing="yes"] .nav-plate,
 :root[data-playing="yes"] .site-footer { display: none; }
 :root[data-playing="yes"] main { padding-block: 0; }
@@ -9591,8 +9465,7 @@ input[type="checkbox"]:focus-visible { outline: 2px solid var(--brass-hi); outli
 
 /* The measure goes with it. `.app` is 1180px wide because that is a comfortable column of
    text; the felt should be as wide as the glass it is under. */
-:root[data-playing="yes"] .app,
-:root[data-playing="yes"].nav-is-rail main {
+:root[data-playing="yes"] .app {
   max-width: none;
   padding-top: max(10px, env(safe-area-inset-top));
   padding-inline: max(8px, env(safe-area-inset-left)) max(8px, env(safe-area-inset-right));

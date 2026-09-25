@@ -5,7 +5,7 @@ import { Backdrop } from './Backdrop';
 import { startCardSheen } from './cardSheen';
 import { startMagneticButtons, startTableParallax, startFeltSpotlight, startShelfSpotlight, startTapRipple } from './tableFx';
 import { SettingsPanel } from './SettingsPanel';
-import { SiteNav, navStyle } from './SiteNav';
+import { SiteNav } from './SiteNav';
 import { FirstRun } from './FirstRun';
 import { SiteFooter } from './SiteFooter';
 import { normalizeEntry, onRouteChange, pushRoute, readRoute, RouteView } from './route';
@@ -66,8 +66,6 @@ export function App() {
   useEffect(() => onRouteChange((r) => setViewState(r.view)), []);
   useEffect(() => normalizeEntry(), []);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  // Fixed at start-up: the navigation is being chosen between, not switched at runtime.
-  const [nav] = useState(navStyle);
   // Bumped every time the nav's Daily button is pressed. PlayView watches it (it owns the
   // actual daily-deal boot logic already, for the shelf's own "Today's Deal" card) and jumps
   // straight into today's deal on every change, from whichever of the three tabs was open.
@@ -99,11 +97,11 @@ export function App() {
     document.documentElement.style.setProperty('--daywarm', warmth.toFixed(2));
   }, []);
   return (
-    <div className={`app nav-is-${nav}`}>
+    <div className="app">
       <ColorVisionFilters />
       <Backdrop />
       <SiteNav
-        style={nav} view={view} onView={setView} onSettings={() => setSettingsOpen(true)}
+        view={view} onView={setView} onSettings={() => setSettingsOpen(true)}
         onDaily={() => { setView('play'); setDailyTrigger((n) => n + 1); }}
       />
       <main>
