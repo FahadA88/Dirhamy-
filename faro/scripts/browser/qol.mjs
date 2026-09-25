@@ -58,9 +58,28 @@ ok(`the hand has more than one legal move (${playableCount})`, playableCount >= 
 // replaced a moment later, which then reads as focus, the arrow key and Enter all silently
 // doing nothing.
 await p.locator('.dealmotion').waitFor({ state: 'detached', timeout: 4000 }).catch(() => {});
+// .dealmotion unmounting doesn't mean the hand itself is done settling — card-to-hand's own
+// flight tail (see styles.css) runs a beat longer, and a card can still be reordered or
+// swapped for a fresh element while that finishes. Wait for the playable count to hold steady
+// across two checks, not just for the dealer's wrapper to be gone, before trusting "the first
+// one" is the element that will still be there once .focus() resolves.
+let steadyCount = -1;
+for (let i = 0; i < 15; i++) {
+  const n = await p.locator('.hand .card-btn.playable').count();
+  if (n === steadyCount && n > 0) break;
+  steadyCount = n;
+  await p.waitForTimeout(150);
+}
 const firstCard = p.locator('.hand .card-btn.playable').first();
 await firstCard.focus();
-ok('a card takes focus', await firstCard.evaluate(el => el === document.activeElement));
+let tookFocus = await firstCard.evaluate(el => el === document.activeElement);
+if (!tookFocus) {
+  // One retry: the settle check above narrows the race a lot but does not close it outright.
+  await p.waitForTimeout(300);
+  await firstCard.focus();
+  tookFocus = await firstCard.evaluate(el => el === document.activeElement);
+}
+ok('a card takes focus', tookFocus);
 const before = await p.locator('.hand .card-btn').evaluateAll(els => els.findIndex(e => e === document.activeElement));
 await p.keyboard.press('ArrowRight'); await p.waitForTimeout(160);
 const after = await p.locator('.hand .card-btn').evaluateAll(els => els.findIndex(e => e === document.activeElement));
