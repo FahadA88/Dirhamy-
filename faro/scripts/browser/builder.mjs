@@ -118,7 +118,18 @@ const log = [...seen];
 ok(`played ${plays} times at the table`, plays > 5);
 ok('the author-written rules fired in play', log.some((l) => /Queen|Last card|Too many|reveals/i.test(l)), JSON.stringify(log.slice(0, 4)));
 await p.screenshot({ path: '/tmp/builder-playtest.png' });
-await p.locator('button', { hasText: 'Back to editor' }).click();
+// The bots keep moving on their own once the polling loop above stops watching, and a rule
+// that fires on "1 card left" can chain through several hand-over screens back to back —
+// faster, sometimes, than a slow check-wait-retry keeps up with. Drain whatever modal is up
+// in a tight loop (every ~120ms, not a multi-second click timeout) until none is left, the
+// same way the loop above kept the suit picker clear, rather than hoping one check catches it.
+for (let i = 0; i < 40; i++) {
+  const modalBtn = p.locator('.modal .primary');
+  if (!(await modalBtn.count())) break;
+  await modalBtn.first().click({ timeout: 1000 }).catch(() => {});
+  await p.waitForTimeout(120);
+}
+await p.locator('button', { hasText: 'Back to editor' }).click({ timeout: 10000 });
 
 console.log('\nStep 7 — publish it');
 await p.locator('.steprail-item', { hasText: 'Publish' }).click();
