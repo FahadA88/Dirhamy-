@@ -4009,14 +4009,16 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
 .felt .modal-box .scores { color: var(--muted); }
 
 /* ============================================================
-   NAVIGATION — the oak plate
-   A board across the top with the name engraved into it and the
-   tabs cut in beside it — the brass plate on the door of a card
-   room. Four other candidates lived here during design (a plain
-   top bar, a side rail, a centred masthead, a floating dock,
-   switched with ?nav=) so the choice could be made by looking at
-   the real site rather than a mock. This is the one that read as
-   a game instead of a website; the other four came out.
+   NAVIGATION — a pane of the same glass as everything else
+   A board across the top, frosted like every other panel on the
+   page (see the --glass-fill/--glass-blur tokens), not a solid
+   slab in its own material — the earlier wood-plate version read
+   as a brown bar bolted over the glass room rather than a piece
+   of it. Four other candidates lived here during design too (a
+   plain top bar, a side rail, a centred masthead, a floating
+   dock, switched with ?nav=) so the choice could be made by
+   looking at the real site rather than a mock; those came out
+   along with the wood.
    ============================================================ */
 
 /* `display: block` for the same reason the header itself is: as a flex header the board
@@ -4025,50 +4027,36 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
 .np-board {
   position: relative;
   display: flex; align-items: center; justify-content: space-between; gap: 16px;
-  /* .nav-plate's negative margin pulls this board flush to the true page edges (that's the
-     point — the plate reads as bolted across the top), so on a notched phone this padding is
-     the only thing standing between the engraved title and the notch (item 32). */
+  /* .nav-plate's negative margin pulls this board flush to the true page edges, so on a
+     notched phone this padding is the only thing standing between the wordmark and the notch
+     (item 32). */
   padding: max(14px, env(safe-area-inset-top)) max(26px, env(safe-area-inset-right)) 14px max(26px, env(safe-area-inset-left));
-  border-radius: 0 0 16px 16px;
-  background:
-    repeating-linear-gradient(92deg, rgba(0,0,0,.05) 0 2px, transparent 2px 7px),
-    linear-gradient(180deg, #8a6033 0%, #6d4a26 52%, #7d5730 100%);
-  box-shadow:
-    0 1px 0 rgba(255,255,255,.16) inset,
-    0 -2px 0 rgba(0,0,0,.28) inset,
-    0 10px 26px rgba(58,44,20,.28);
+  border-radius: 0 0 var(--r-lg) var(--r-lg);
+  background: linear-gradient(180deg, var(--glass-fill-hi), var(--glass-fill) 70%);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border-bottom: 1px solid var(--panel-brd);
+  box-shadow: var(--shadow-panel), 0 1px 0 var(--glass-top) inset;
 }
-/* A plate bolted to a door has bolts. Two brass studs low in the corners, below the safe-area
-   padding so a notch never eats one — the detail that tips this from "a brown header bar" to
-   an actual fixture, the kind of thing a screenshot in a list of website headers doesn't have. */
-.np-board::before, .np-board::after {
-  content: ""; position: absolute; bottom: 7px; width: 5px; height: 5px; border-radius: 50%;
-  background: radial-gradient(circle at 35% 30%, #f8eecb 0%, #cbab6c 45%, #7c5a2e 100%);
-  box-shadow: 0 1px 1px rgba(0,0,0,.55), 0 0 0 1px rgba(0,0,0,.2);
-}
-.np-board::before { left: 9px; }
-.np-board::after { right: 9px; }
-.nav-plate .logo3d span { background: #f3ead6; color: #4a3218; }
 .nav-plate .wordmark {
-  color: #f6ecd6; letter-spacing: 3px; font-size: 22px;
-  text-shadow: 0 1px 0 rgba(0,0,0,.45), 0 -1px 0 rgba(255,255,255,.18);
+  color: var(--ink); letter-spacing: 3px; font-size: 22px;
 }
 .nav-plate .nv-items { display: flex; gap: 8px; }
 .nav-plate .nv-items button {
-  padding: 9px 20px; border-radius: 8px; cursor: pointer;
+  padding: 9px 20px; border-radius: var(--r-md); cursor: pointer;
   font: inherit; font-size: 14px; font-weight: 600;
-  color: rgba(246,236,214,.72);
-  background: rgba(0,0,0,.16);
-  border: 1px solid rgba(0,0,0,.24);
-  /* A resting tab reads as routed into the wood, not stuck on top of it — the "cut in beside
-     it" the header comment promises but the flat single-highlight box-shadow never delivered. */
-  box-shadow: 0 1px 0 rgba(255,255,255,.12) inset, 0 2px 5px rgba(0,0,0,.3) inset;
+  color: var(--muted);
+  background: var(--panel);
+  border: 1px solid var(--panel-brd);
+  box-shadow: 0 1px 0 var(--glass-top) inset;
   transition: background 150ms, color 150ms, transform 150ms var(--ease), box-shadow 150ms;
 }
-.nav-plate .nv-items button:hover { color: #fff; background: rgba(0,0,0,.26); transform: translateY(-1px); }
+.nav-plate .nv-items button:hover { color: var(--ink); background: var(--panel-hi); transform: translateY(-1px); }
 .nav-plate .nv-items button.on {
-  color: #3a2712; background: linear-gradient(180deg, #f0e2c2, #d9c69c);
-  border-color: rgba(0,0,0,.3);
+  color: #fff;
+  background: linear-gradient(180deg, var(--accent-hi), var(--accent));
+  border-color: transparent;
+  box-shadow: 0 2px 14px var(--ac35), 0 1px 0 rgba(255,255,255,.35) inset;
 }
 
 @media (max-width: 760px) {
