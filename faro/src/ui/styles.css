@@ -234,6 +234,21 @@
 
 * { box-sizing: border-box; }
 
+/* The browser-default scrollbar was the one flat, un-lit rectangle left on the page — every
+   other edge here has a highlight and a shadow, and a bare grey bar broke that on every single
+   screen the moment content overflowed. A rounded, beveled thumb instead, the same top-highlight/
+   bottom-shadow bevel as a chip or a swatch, in a track the same colour as the glass around it. */
+:root { scrollbar-width: thin; scrollbar-color: var(--panel-brd-hi) transparent; }
+::-webkit-scrollbar { width: 11px; height: 11px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, var(--panel-brd-hi), var(--panel-brd));
+  border-radius: 999px; border: 2px solid transparent; background-clip: padding-box;
+  box-shadow: inset 0 1px 0 var(--glass-top);
+}
+::-webkit-scrollbar-thumb:hover { background: var(--accent); background-clip: padding-box; }
+::-webkit-scrollbar-corner { background: transparent; }
+
 /* Touch ergonomics. None of this changes how anything looks — it changes how it FEELS to press,
    which on a phone is most of the difference between an app and a page rendered on one.
      - The grey flash every tap left behind is Mobile Safari's/Chrome's own default; without
@@ -875,29 +890,40 @@ h2 { letter-spacing: -0.025em; color: var(--ink); font-size: 22px; font-weight: 
 
 /* ---------------- range inputs ----------------
    These were browser-default: a near-black unfilled track that read as a broken progress bar
-   against white panels. */
+   against white panels. The track is routed into the panel now (an inset groove) rather than
+   just tinted, and the thumb is a domed bead — a knob you could actually turn, not a flat disc —
+   that compresses under a press the same way every other pressable thing on this page does. */
 input[type="range"] {
   -webkit-appearance: none; appearance: none;
   width: 100%; height: 22px; background: transparent; cursor: pointer;
 }
 input[type="range"]::-webkit-slider-runnable-track {
-  height: 5px; border-radius: 999px;
+  height: 8px; border-radius: 999px;
   background: var(--panel-brd);
+  box-shadow: inset 0 2px 3px rgba(0,0,0,.35), inset 0 -1px 0 var(--glass-top);
 }
 input[type="range"]::-moz-range-track {
-  height: 5px; border-radius: 999px; background: var(--panel-brd);
+  height: 8px; border-radius: 999px; background: var(--panel-brd);
+  box-shadow: inset 0 2px 3px rgba(0,0,0,.35);
 }
 input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none; appearance: none;
-  width: 17px; height: 17px; margin-top: -6px; border-radius: 50%;
-  background: var(--ink); border: 2px solid var(--panel);
-  box-shadow: 0 1px 4px rgba(16,32,24,0.3);
+  width: 20px; height: 20px; margin-top: -7px; border-radius: 50%;
+  background: linear-gradient(155deg, var(--accent-hi) 0%, var(--accent) 55%, color-mix(in srgb, var(--accent) 65%, #000) 100%);
+  border: 2px solid var(--bg1);
+  box-shadow: 0 1px 0 rgba(255,255,255,.4) inset, 0 2px 4px rgba(0,0,0,.35), 0 3px 8px var(--ac35);
+  transition: transform 120ms var(--ease);
 }
+input[type="range"]::-webkit-slider-thumb:active { transform: scale(0.9); }
 input[type="range"]::-moz-range-thumb {
-  width: 17px; height: 17px; border-radius: 50%;
-  background: var(--ink); border: 2px solid var(--panel);
+  width: 20px; height: 20px; border-radius: 50%;
+  background: linear-gradient(155deg, var(--accent-hi) 0%, var(--accent) 55%, color-mix(in srgb, var(--accent) 65%, #000) 100%);
+  border: 2px solid var(--bg1);
+  box-shadow: 0 1px 0 rgba(255,255,255,.4) inset, 0 2px 4px rgba(0,0,0,.35), 0 3px 8px var(--ac35);
 }
 input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px var(--glow); }
+@media (prefers-reduced-motion: reduce) { input[type="range"]::-webkit-slider-thumb { transition: none; } }
+:root[data-motion="reduced"] input[type="range"]::-webkit-slider-thumb { transition: none; }
 
 /* ---------------- accessibility ---------------- */
 /* Every interactive thing gets a visible keyboard ring. There were two focus rules in the whole
@@ -1503,11 +1529,42 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
 .seg { display: flex; gap: 5px; }
 .seg button { flex: 1; padding: 9px; cursor: pointer; font: inherit; font-size: 13px; background: transparent; color: var(--muted); border: 1px solid var(--panel-brd); border-radius: var(--r-pill); transition: 0.15s; }
 .seg button.on { background: var(--seg-on-bg); color: var(--seg-on-ink); border-color: var(--seg-on-bg); font-weight: 600; }
+/* A pressed segment gets a bevel, not just a fill — a bright hairline where the light catches
+   the top edge, a dark one under it, so "chosen" reads as a tile pushed in rather than a flat
+   colour swap. */
+.seg-btn.on, .seg button.on {
+  box-shadow: 0 1px 0 rgba(255,255,255,.32) inset, 0 -1px 0 rgba(0,0,0,.28) inset, 0 2px 6px rgba(0,0,0,.24);
+}
 
-.toggle { width: 46px; height: 26px; border-radius: 999px; border: 1px solid var(--panel-brd); background: rgba(16, 64, 40, 0.10); cursor: pointer; position: relative; padding: 0; transition: 0.18s; }
-.toggle .knob { position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.2); transition: 0.18s; }
-.toggle.on { background: linear-gradient(135deg, var(--emerald), var(--green)); border-color: transparent; }
-.toggle.on .knob { left: 22px; }
+/* A switch with real depth: the track is routed in (an inset shadow, not a flat fill), and the
+   knob is a domed bead of metal that tilts toward the light on hover — a piece of the uiverse.io
+   "3d switch" family (perspective + rotateX/rotateY on the whole control), recoloured onto the
+   site's own accent/panel tokens instead of the arbitrary black-and-white original. */
+.toggle {
+  width: 46px; height: 26px; border-radius: 999px; border: 0; padding: 0; cursor: pointer;
+  position: relative;
+  background: var(--panel-hi);
+  box-shadow: inset 0 2px 4px rgba(0,0,0,.35), inset 0 -1px 0 var(--glass-top), 0 0 0 1px var(--panel-brd);
+  transition: transform 220ms var(--ease), background 180ms, box-shadow 180ms;
+}
+.toggle:hover { transform: perspective(60px) rotateX(6deg) rotateY(-6deg); }
+.toggle.on:hover { transform: perspective(60px) rotateX(-6deg) rotateY(6deg); }
+.toggle.on {
+  background: linear-gradient(135deg, var(--accent-hi), var(--accent));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.25), inset 0 -2px 4px rgba(0,0,0,.3), 0 2px 8px var(--ac35);
+}
+.toggle .knob {
+  position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; border-radius: 50%;
+  background: linear-gradient(150deg, #fff 10%, var(--panel-brd-hi) 75%);
+  box-shadow: 0 1px 1px rgba(0,0,0,.25), 0 3px 6px rgba(0,0,0,.3);
+  transition: left 0.18s;
+}
+.toggle.on .knob {
+  left: 22px;
+  background: linear-gradient(150deg, var(--ink) 0%, color-mix(in srgb, var(--ink) 60%, transparent) 75%);
+}
+@media (prefers-reduced-motion: reduce) { .toggle, .toggle:hover, .toggle.on:hover { transform: none; transition: none; } }
+:root[data-motion="reduced"] .toggle, :root[data-motion="reduced"] .toggle:hover { transform: none; transition: none; }
 
 .hint { color: var(--muted); font-size: 13px; line-height: 1.5; }
 .desc { width: 100%; resize: vertical; }
@@ -1564,9 +1621,16 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
 .seg.wrap button { flex: 1 1 auto; min-width: 62px; }
 
 .swatches { display: flex; flex-wrap: wrap; gap: 8px; }
-.swatch { width: 34px; height: 34px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; transition: 0.14s; }
-.swatch:hover { transform: scale(1.1); }
-.swatch.on { border-color: var(--ink); box-shadow: 0 0 0 2px var(--panel-solid), 0 0 0 4px var(--green); }
+/* A bead, not a flat disc — a highlight near the top-left (the room's key light, same corner
+   every card and chip in this app catches it from) and a rim shadow, so a swatch reads as a
+   solid marble of its own colour before you ever read what colour it is. */
+.swatch {
+  width: 34px; height: 34px; border-radius: 50%; cursor: pointer; border: 2px solid transparent;
+  box-shadow: inset 0 2px 3px rgba(255,255,255,.35), inset 0 -3px 5px rgba(0,0,0,.3), 0 2px 4px rgba(0,0,0,.25);
+  transition: 0.14s;
+}
+.swatch:hover { transform: scale(1.1) translateY(-1px); }
+.swatch.on { border-color: var(--ink); box-shadow: inset 0 2px 3px rgba(255,255,255,.35), inset 0 -3px 5px rgba(0,0,0,.3), 0 0 0 2px var(--panel-solid), 0 0 0 4px var(--green); }
 
 /* ---------------- table surface variants ---------------- */
 /* The table builds own their own surface, so `surface` applies to the page panels around it. */
@@ -2125,12 +2189,15 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
   max-inline-size: 360px;
   scroll-snap-align: start;
 }
-.shelf-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; }
+.shelf-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; perspective: 1000px; }
+.shelf-rail { perspective: 1000px; }
+.featured-alts { perspective: 1000px; }
 
 /* A game is a dealt hand with a name under it. No paragraph, no chrome. */
 .shelfcard {
   position: relative; border-radius: 16px; overflow: hidden;
   background: var(--panel); border: 1px solid var(--panel-brd);
+  transform-style: preserve-3d;
   transition: transform 180ms cubic-bezier(.2,.9,.3,1.1), border-color 180ms, box-shadow 180ms;
 }
 .shelfcard:hover, .shelfcard:focus-within {
@@ -3110,7 +3177,12 @@ body { font-size: calc(15px * var(--text-scale, 1)); }
 }
 .swatch:hover { border-color: var(--panel-brd); color: var(--ink); }
 .swatch:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.swatch.on { border-color: var(--oak); background: var(--oak-dim); color: var(--ink); font-weight: 700; }
+/* Chosen reads as pressed in, the same language as the round dot swatches above and the
+   segmented control's own .on bevel — an inset shadow rather than just a border and a tint. */
+.swatch.on {
+  border-color: var(--oak); background: var(--oak-dim); color: var(--ink); font-weight: 700;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,.18), inset 0 -1px 0 var(--glass-top);
+}
 .swatch em { font-style: normal; text-align: center; line-height: 1.2; }
 /*
   A swatch that is a tile with a label under it needs its own size back.
@@ -4164,9 +4236,12 @@ button.ghost.danger:hover { border-color: var(--red); color: var(--red); }
   border: 1px solid var(--panel-brd);
   color: var(--muted);
   font-weight: 600;
-  box-shadow: 0 2px 0 rgba(0,0,0,.28);
+  /* A bright hairline along the top edge on top of the existing drop shadow — the same two-part
+     bevel every pressable object in this room gets, which a single flat shadow underneath never
+     quite delivered on its own. */
+  box-shadow: 0 1px 0 var(--glass-top) inset, 0 2px 0 rgba(0,0,0,.28);
 }
-.chip:hover, .kindtab:hover { color: var(--ink); border-color: var(--violet); box-shadow: 0 2px 0 rgba(0,0,0,.28), 0 0 18px rgba(155, 92, 255,.32); }
+.chip:hover, .kindtab:hover { color: var(--ink); border-color: var(--violet); box-shadow: 0 1px 0 var(--glass-top) inset, 0 2px 0 rgba(0,0,0,.28), 0 0 18px rgba(155, 92, 255,.32); }
 /* A chosen filter, in the same voice as a chosen tab: the accent in the type and a tint behind
    it. There were fourteen of these in a row under the hero, and the chosen one was a solid pill
    with a 22px halo — enough colour in one strip to undo the whole page. */
@@ -4362,12 +4437,21 @@ header h1, header .wordmark {
   overflow: hidden;
   transition: transform 220ms cubic-bezier(.2, .9, .3, 1.2), box-shadow 220ms, border-color 220ms;
 }
+/* Lifts AND tilts, rather than just rising straight up — a card picked off a table tips toward
+   whoever picked it up (.shelf-grid/.shelf-rail/.featured-alts each set their own `perspective`
+   for this to tilt into). This is the rule that actually wins for every .shelfcard on the page —
+   it comes after the plainer translateY-only version near the top of the file, same specificity,
+   so that one was dead code in practice; left it as the plain fallback rather than deleting it,
+   since removing it would be the kind of "should be a no-op" cleanup that's easy to get wrong
+   about what else, unseen, depends on source order here. */
 .shelfcard:hover {
-  transform: translateY(-4px);
+  transform: translateY(-6px) rotateX(4deg) rotateY(-4deg) scale(1.015);
   box-shadow: 0 2px 3px rgba(0, 0, 0, .3), 0 24px 48px rgba(0, 0, 0, .42),
     0 0 28px rgba(100, 206, 235, .22);
   border-color: rgba(100, 206, 235, .35);
 }
+@media (prefers-reduced-motion: reduce) { .shelfcard:hover { transform: translateY(-4px); } }
+:root[data-motion="reduced"] .shelfcard:hover { transform: translateY(-4px); }
 .shelfcard .sc-main h3 { font-weight: 700; letter-spacing: -.02em; }
 /* The family label is a label, not a badge. It was a violet pill on every tile — fifty-five
    of them on one screen, in a colour that appears nowhere else in the design. */
@@ -4392,7 +4476,10 @@ header h1, header .wordmark {
   transition: opacity 180ms, transform 220ms cubic-bezier(.2, .9, .3, 1.4);
 }
 .shelfcard:hover .sc-play, .sc-play:focus-visible { opacity: 1; transform: scale(1); }
-.star.on { color: var(--gold); text-shadow: none; }
+/* A won star is a coin, not a flat glyph: a dark rim underneath and a bright one above, the same
+   embossed-metal treatment the trick counter's own digits get (see CHIPS AND DIGITS) applied to
+   the star shape itself rather than to a background it doesn't have. */
+.star.on { color: var(--gold); text-shadow: 0 -1px 0 rgba(255,255,255,.4), 0 1px 0 rgba(0,0,0,.4), 0 2px 3px rgba(0,0,0,.3); }
 
 /* --- the tiles get their colour back up --- */
 .gameart { border-bottom: 1px solid var(--hairline); }
@@ -8644,13 +8731,20 @@ input[type="checkbox"] {
   appearance: none; -webkit-appearance: none;
   width: 18px; height: 18px; border-radius: 5px; flex: none;
   border: 1.5px solid var(--panel-brd); background: var(--panel-hi);
+  /* Routed in rather than just outlined — the same inset groove as the range track above, so an
+     unchecked box reads as a socket waiting for the tick, not a flat swatch. */
+  box-shadow: inset 0 2px 3px rgba(0,0,0,.3), inset 0 -1px 0 var(--glass-top);
   display: inline-grid; place-items: center; cursor: pointer; position: relative; margin: 0;
-  transition: background 0.15s, border-color 0.15s;
+  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
 }
-input[type="checkbox"]:checked { background: var(--hot); border-color: transparent; }
+input[type="checkbox"]:checked {
+  background: linear-gradient(155deg, var(--accent-hi), var(--accent));
+  border-color: transparent;
+  box-shadow: 0 1px 0 rgba(255,255,255,.35) inset, 0 2px 6px var(--ac35);
+}
 input[type="checkbox"]::after {
   content: ""; width: 9px; height: 5px;
-  border-left: 2px solid #1a1613; border-bottom: 2px solid #1a1613;
+  border-left: 2px solid #fff; border-bottom: 2px solid #fff;
   transform: rotate(-45deg) scale(0); transform-origin: center;
   transition: transform 0.2s cubic-bezier(.34, 1.56, .64, 1);
 }
@@ -8763,6 +8857,7 @@ input[type="checkbox"]:focus-visible { outline: 2px solid var(--brass-hi); outli
 .view-loading {
   position: relative; overflow: hidden; border-radius: var(--r-lg, 18px);
   background: var(--panel-hi);
+  perspective: 240px;
 }
 .view-loading::after {
   content: ""; position: absolute; inset: 0;
@@ -8770,8 +8865,28 @@ input[type="checkbox"]:focus-visible { outline: 2px solid var(--brass-hi); outli
   animation: skeleton-sweep 1.6s ease-in-out infinite;
 }
 @keyframes skeleton-sweep { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
-@media (prefers-reduced-motion: reduce) { .view-loading::after { animation: none; } }
-:root[data-motion="reduced"] .view-loading::after { animation: none; }
+/* A card flipping edge-on, not a ring or a bar — this app has exactly one motif for "wait a
+   moment" and it's the thing every screen is about. `perspective` above and `rotateY` here are
+   real 3D, the same technique as uiverse.io's flip-switch and flip-card loaders, not a 2D scale
+   trick; the colour swap lands at the 90°/270° marks, exactly when the card would be edge-on and
+   showing neither face — a back-colour flash rather than a smooth crossfade, because that's what
+   an actual card does. */
+.view-loading::before {
+  content: ""; position: absolute; left: 50%; top: 14px; width: 22px; height: 30px;
+  margin-left: -11px; border-radius: 4px; z-index: 1;
+  background: linear-gradient(155deg, var(--accent-hi), var(--accent));
+  box-shadow: 0 4px 10px rgba(0,0,0,.35);
+  animation: loader-card-flip 1.2s cubic-bezier(.45,.05,.55,.95) infinite;
+}
+@keyframes loader-card-flip {
+  0%   { transform: rotateY(0deg); background: linear-gradient(155deg, var(--accent-hi), var(--accent)); }
+  49%  { background: linear-gradient(155deg, var(--accent-hi), var(--accent)); }
+  50%  { transform: rotateY(180deg); background: linear-gradient(155deg, var(--gold-hi), var(--gold)); }
+  99%  { background: linear-gradient(155deg, var(--gold-hi), var(--gold)); }
+  100% { transform: rotateY(360deg); background: linear-gradient(155deg, var(--accent-hi), var(--accent)); }
+}
+@media (prefers-reduced-motion: reduce) { .view-loading::after, .view-loading::before { animation: none; } }
+:root[data-motion="reduced"] .view-loading::after, :root[data-motion="reduced"] .view-loading::before { animation: none; }
 
 /* The online connection dot: a slow, calm pulse while live, a faster amber one while the socket
    is retrying — a living indicator rather than a static label. */
